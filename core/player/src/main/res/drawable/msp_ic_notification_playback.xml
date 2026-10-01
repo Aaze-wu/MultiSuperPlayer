@@ -1,0 +1,18 @@
+<!--
+  通知栏小图标。
+
+  必须是**单色**（只用一个不透明的 alpha 通道）：Android 会把小图标当作蒙版
+  整体染成系统色（深色主题下偏白）。放彩色图标的结果不是"颜色不对"，而是
+  整个图标变成一坨实心色块——因为所有不透明像素都会被同一种颜色填满。
+
+  这里用的是 Material Symbols 的 music_note 轮廓。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z" />
+</vector>

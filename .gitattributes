@@ -1,0 +1,18 @@
+# 换行符策略
+#
+# 默认对所有文件关闭换行符转换（* -text），保证提交进去的就是磁盘上的字节。
+# 本机 core.autocrlf 未设置（等于 false），所以眼下也不会转换；
+# 这一行是防止以后有人把 autocrlf 打开、或在别的机器上克隆时把换行符改掉。
+* -text
+
+# 下面几类文件的换行符有实际后果，显式钉死。
+# 后写的规则覆盖前面的，所以这些会盖过上面的 * -text。
+
+# Gradle wrapper 的 shell 脚本：必须是 LF，出现 CR 会导致
+# "bad interpreter: No such file or directory"（Linux/macOS 上必挂）
+gradlew text eol=lf
+*.sh    text eol=lf
+
+# Windows 批处理：必须是 CRLF，纯 LF 的 .bat 会被 cmd 误解析
+gradlew.bat text eol=crlf
+*.bat       text eol=crlf

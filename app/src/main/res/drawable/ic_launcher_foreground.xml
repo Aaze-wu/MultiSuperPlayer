@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 均衡器条 + 播放三角，自适应图标安全区（中间 72x72dp）内 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.75"
+        android:pathData="M25,47h6v14h-6z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.9"
+        android:pathData="M34,39h6v22h-6z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.75"
+        android:pathData="M43,50h6v11h-6z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M57,38 L83,54 L57,70 Z" />
+</vector>

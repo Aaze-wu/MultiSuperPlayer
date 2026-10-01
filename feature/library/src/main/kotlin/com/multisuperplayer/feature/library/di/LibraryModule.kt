@@ -1,0 +1,16 @@
+package com.multisuperplayer.feature.library.di
+
+import com.multisuperplayer.feature.library.LibraryViewModel
+import org.koin.core.module.dsl.viewModelOf
+import org.koin.dsl.module
+
+/**
+ * 媒体库功能域的依赖绑定。
+ *
+ * ViewModel 由**功能模块自己**注册，而不是集中写在 app 里。集中注册的代价是：
+ * 删掉 `:feature:library` 之后，app 里会留下一堆指向不存在类的引用，
+ * 编译失败的位置离真正的原因很远。
+ */
+val libraryModule = module {
+    viewModelOf(::LibraryViewModel)
+}

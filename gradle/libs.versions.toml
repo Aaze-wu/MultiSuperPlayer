@@ -1,0 +1,104 @@
+[versions]
+agp = "8.13.2"
+kotlin = "2.4.20"
+
+# AndroidX / Compose
+#
+# ⚠️ 升级下面几个版本前，必须先确认目标版本的 AAR 元数据里
+# `minCompileSdk` ≤ 36 且 `minAndroidGradlePluginVersion` ≤ 8.13.2。
+#
+# 这些约束写在 AAR 内的
+# `META-INF/com/android/build/gradle/aar-metadata.properties` 里，
+# **Gradle 版本目录和 Maven 页面都看不出来**，只有在 `CheckAarMetadata`
+# 阶段才会以「requires ... compile against version 37 or later」的形式炸出来。
+#
+# 踩过的坑：core-ktx 1.19.1 / Compose 1.12.x / lifecycle 2.11.0 /
+# navigation 2.10.x / activity 1.13.0 全都要求 compileSdk 37 + AGP 9.1.0。
+#
+# 本项目固定在 compileSdk 36（AGP 8.13.2 支持的上限，且本机已装 android-36），
+# 所以下面每个版本都是该「代」里最后一个可用版本，实测值：
+#   core-ktx 1.18.0            → minCompileSdk=36
+#   activity-compose 1.12.4    → 36
+#   lifecycle 2.10.0           → 34
+#   navigation-compose 2.9.8   → 35
+#   Compose BOM 2026.06.01     → ui/foundation/animation 1.11.4，minCompileSdk=35
+#   datastore-preferences 1.1.7 → 34
+#   media3 1.11.1              → 36
+coreKtx = "1.18.0"
+activityCompose = "1.12.4"
+lifecycle = "2.10.0"
+navigationCompose = "2.9.8"
+composeBom = "2026.06.01"
+datastore = "1.1.7"
+documentFile = "1.1.0"
+palette = "1.0.0"
+
+# Media
+media3 = "1.11.1"
+
+# KotlinX
+coroutines = "1.11.0"
+serialization = "1.11.0"
+
+# DI
+koin = "4.2.2"
+
+# Test
+junit = "4.13.2"
+
+[libraries]
+# --- AndroidX 基础 ---
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentFile" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = "palette" }
+
+# --- Lifecycle / Navigation ---
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+
+# --- Compose (版本由 BOM 统一管理) ---
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-foundation = { module = "androidx.compose.foundation:foundation" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+
+# --- Media3 ---
+media3-common = { module = "androidx.media3:media3-common", version.ref = "media3" }
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+media3-exoplayer-hls = { module = "androidx.media3:media3-exoplayer-hls", version.ref = "media3" }
+media3-exoplayer-dash = { module = "androidx.media3:media3-exoplayer-dash", version.ref = "media3" }
+media3-exoplayer-rtsp = { module = "androidx.media3:media3-exoplayer-rtsp", version.ref = "media3" }
+media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
+media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
+media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
+
+# --- KotlinX ---
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+
+# --- DI ---
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
+koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
+
+# --- Test ---
+junit = { module = "junit:junit", version.ref = "junit" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

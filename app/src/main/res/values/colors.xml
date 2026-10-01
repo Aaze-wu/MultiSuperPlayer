@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FF1B1B2F</color>
+
+    <!-- Compose 接管前的窗口底色，避免启动瞬间白闪 -->
+    <color name="msp_window_background">#FFFBF8FF</color>
+    <color name="msp_status_bar_scrim">#00000000</color>
+</resources>

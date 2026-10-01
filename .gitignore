@@ -1,0 +1,26 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+keystore.properties
+*.jks
+*.keystore
+
+# Kotlin 2.x 的会话/错误缓存目录，每次构建都会变动
+.kotlin/
+# 构建与运行日志、堆转储
+*.log
+*.hprof

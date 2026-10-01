@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Compose 应用只需要一个「没有 ActionBar、背景色可控」的宿主主题。
+      真正的配色由 Compose 的 MspTheme 负责；这里只处理窗口层面
+      （启动背景、状态栏/导航栏透明、深浅色跟随系统）。
+    -->
+    <style name="Theme.MultiSuperPlayer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/msp_window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="27">shortEdges</item>
+    </style>
+</resources>

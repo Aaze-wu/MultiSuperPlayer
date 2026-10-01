@@ -1,0 +1,5 @@
+<resources>
+    <!-- 通知渠道名。渠道一旦创建，名称就固定在该用户的系统里；
+         改这里的文案只影响新安装的用户，不会修正已存在的渠道。 -->
+    <string name="msp_playback_channel_name">播放控制</string>
+</resources>

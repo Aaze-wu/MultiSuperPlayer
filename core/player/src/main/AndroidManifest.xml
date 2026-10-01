@@ -1,0 +1,31 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      播放服务声明在**本模块**而不是 app 模块。
+
+      理由：这个组件是 core:player 的实现细节，谁改谁维护。放在 app 的
+      AndroidManifest 里意味着「删掉 core:player 之后 app 清单里会留下一个指向
+      不存在类的 service」，而且清单合并的顺序问题（app 覆盖库）会让排查变难。
+
+      exported="true" 是必须的：MediaController（包括车机、蓝牙、系统媒体面板、
+      以及我们以后可能加的第二进程 UI）通过
+      action = androidx.media3.session.MediaSessionService 来发现自己能连的服务。
+      只对本应用可见的做法是 exported="true" + 不加权限，
+      真正能连上的控制器仍受 MediaSession 的 ControllerInfo 校验。
+
+      foregroundServiceType 必须与 app 清单里的
+      FOREGROUND_SERVICE_MEDIA_PLAYBACK 权限配套，否则 Android 12+ 上一进前台就抛
+      SecurityException。
+    -->
+    <application>
+        <service
+            android:name="com.multisuperplayer.core.player.MspPlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>
