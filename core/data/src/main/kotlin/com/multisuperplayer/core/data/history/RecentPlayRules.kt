@@ -37,8 +37,11 @@ internal object RecentPlayRules {
         val byId = entries.associateBy(MediaEntry::id)
         return records
             .asSequence()
-            // 位置为 0 的记录没有意义（写入方不应该写，但存储里可能留着了）。
-            .filter { it.positionMs > 0L }
+            // 位置为 0 **是**一条有效记录：「刚播过，但下次从头播」。短片播完、
+            // 或位置太短不值得当续播点时，写入方就是按 0 记的——如果这里把它们
+            // 滤掉，那个文件就不会出现在最近播放里，而它几分钟前刚被播过。
+            // 只有负数才是不合法的（写入方按 `coerceAtLeast(0)` 写，负数是脏数据）。
+            .filter { it.positionMs >= 0L }
             // 查不到元数据的记录**跳过但不删**：现在查不到可能只是权限没给，
             // 用户把权限补上之后它应该自己回来。删掉就再也回不来了。
             .mapNotNull { record -> byId[record.mediaId]?.let { RecentPlay(it, record.positionMs, record.savedAtMs) } }

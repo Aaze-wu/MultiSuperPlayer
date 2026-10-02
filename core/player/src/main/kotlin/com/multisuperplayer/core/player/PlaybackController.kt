@@ -173,6 +173,19 @@ interface PlaybackController {
      */
     fun setRememberPosition(enabled: Boolean)
 
+    /**
+     * 是否记录「最近播放」（默认 true）。
+     *
+     * 和 [setRememberPosition] 是两个开关，不是同一个：那个管「下次从哪开始播」，
+     * 这个管「列表里记不记这一条」。四种组合都成立——例如「每次都从头播，但我
+     * 想在首页看到最近播过什么」，或者反过来「接着播，但别留播放历史」。
+     *
+     * 关掉时已有的记录同样**保留**（理由见 [setRememberPosition]）。注意它**不**
+     * 阻止续播位置的写入：一条续播位置本身就是一条播放记录，那是 [setRememberPosition]
+     * 决定的事；这个开关只管「位置太短、不值得当续播点」那一种记录的写入。
+     */
+    fun setRecordRecentPlays(enabled: Boolean)
+
     /** 停止并清空队列（用于「关闭播放器」）。 */
     fun stopAndClear()
 

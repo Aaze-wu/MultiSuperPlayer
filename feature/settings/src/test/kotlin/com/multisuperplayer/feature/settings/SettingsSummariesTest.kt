@@ -158,6 +158,31 @@ class SettingsSummariesTest {
     }
 
     @Test
+    fun `播放 - 关掉记录最近播放时说出来`() {
+        val settings = PlaybackSettings(recordRecentPlays = false)
+
+        // 这一条不写出来的话，摘要会显示成完全正常的三项，而用户过几天
+        // 会发现「最近播放一直是空的」——一个他亲手打开、却没有任何痕迹的开关。
+        assertText(
+            "1× · 长按 2× · 适应 · 不记播放历史",
+            SettingsSummaries.playback(settings, softwareDecodingAvailable = true),
+        )
+    }
+
+    @Test
+    fun `播放 - 两个开关都关掉时两条都说`() {
+        val settings = PlaybackSettings(rememberPosition = false, recordRecentPlays = false)
+
+        // 顺序固定：先「不记位置」再「不记播放历史」。用户读到的是
+        // 「我不记位置」和「我连看过什么都不记」这两件不同的事，
+        // 合并成一条会让其中一件事永远无法从摘要里看出来。
+        assertText(
+            "1× · 长按 2× · 适应 · 不记位置 · 不记播放历史",
+            SettingsSummaries.playback(settings, softwareDecodingAvailable = true),
+        )
+    }
+
+    @Test
     fun `播放 - 强制软解开启且可用时说出来`() {
         val settings = PlaybackSettings(forceSoftwareDecoding = true, aspectRatioMode = AspectRatioMode.CROP)
 

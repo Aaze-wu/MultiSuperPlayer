@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,6 +58,7 @@ fun PlaybackSettingsRoute(
         onSetSpeed = viewModel::setSpeed,
         onSetBoostSpeed = viewModel::setBoostSpeed,
         onSetRememberPosition = viewModel::setRememberPosition,
+        onSetRecordRecentPlays = viewModel::setRecordRecentPlays,
         modifier = modifier,
     )
 }
@@ -73,6 +75,7 @@ fun PlaybackSettingsScreen(
     onSetSpeed: (Float) -> Unit = {},
     onSetBoostSpeed: (Float) -> Unit = {},
     onSetRememberPosition: (Boolean) -> Unit = {},
+    onSetRecordRecentPlays: (Boolean) -> Unit = {},
 ) {
     // 当前打开的选择对话框（null = 没开）。
     //
@@ -169,7 +172,10 @@ fun PlaybackSettingsScreen(
             item {
                 val remember = playback.rememberPosition ?: true
                 SettingsSwitchRow(
-                    icon = { Icon(Icons.Outlined.History, contentDescription = null) },
+                    // 用 Restore（回卷）而不是 History：History 留给下面那一行，
+                    // 因为它和「最近」标签用的是同一个图标，用户要能一眼认出
+                    // 那个开关管的是哪一页。
+                    icon = { Icon(Icons.Outlined.Restore, contentDescription = null) },
                     title = stringResource(R.string.msp_settings_remember_position),
                     subtitle = if (remember) {
                         stringResource(R.string.msp_settings_remember_position_on)
@@ -179,6 +185,24 @@ fun PlaybackSettingsScreen(
                     checked = remember,
                     enabled = true,
                     onCheckedChange = onSetRememberPosition,
+                )
+            }
+
+            item {
+                // 和上面那一行相邻，副标题必须把两者的区别说清：两个开关长得很像，
+                // 而「关错了」的结果只是一段时间后发现列表空了——用户根本不会联想到它。
+                val recordRecent = playback.recordRecentPlays ?: true
+                SettingsSwitchRow(
+                    icon = { Icon(Icons.Outlined.History, contentDescription = null) },
+                    title = stringResource(R.string.msp_settings_record_recent),
+                    subtitle = if (recordRecent) {
+                        stringResource(R.string.msp_settings_record_recent_on)
+                    } else {
+                        stringResource(R.string.msp_settings_record_recent_off)
+                    },
+                    checked = recordRecent,
+                    enabled = true,
+                    onCheckedChange = onSetRecordRecentPlays,
                 )
             }
         }

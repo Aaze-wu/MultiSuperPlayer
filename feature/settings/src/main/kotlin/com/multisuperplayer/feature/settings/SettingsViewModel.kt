@@ -249,6 +249,10 @@ class SettingsViewModel(
         playbackSettingsRepository.setRememberPosition(enabled)
     }
 
+    fun setRecordRecentPlays(enabled: Boolean) = persist("记录最近播放=$enabled") {
+        playbackSettingsRepository.setRecordRecentPlays(enabled)
+    }
+
     // ------------------------------------------------------------------ 字幕翻译
 
     /**

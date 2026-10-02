@@ -21,6 +21,7 @@
     <string name="msp_settings_summary_tail_force_software">Forced software decoding</string>
     <string name="msp_settings_summary_tail_no_ffmpeg">No FFmpeg in this build</string>
     <string name="msp_settings_summary_tail_no_position">Position not saved</string>
+    <string name="msp_settings_summary_tail_no_recent">No play history</string>
 
     <string name="msp_settings_summary_long_press">Long-press %1$s</string>
     <string name="msp_settings_summary_model_unset">Model not set</string>
@@ -86,6 +87,15 @@
     <string name="msp_settings_remember_position">Remember playback position</string>
     <string name="msp_settings_remember_position_on">Resume from where you left off next time the same file is opened</string>
     <string name="msp_settings_remember_position_off">Always start from the beginning. Positions already remembered are not deleted; turning this back on makes them available again.</string>
+
+    <!--
+      Sits right above/below the row above, so both subtitles must make the difference
+      obvious: the two switches look alike, and getting this one wrong just means "nothing
+      new shows up in the list" later on, which nobody would connect to a switch.
+    -->
+    <string name="msp_settings_record_recent">Record recent plays</string>
+<string name="msp_settings_record_recent_on">What you play shows up on the Recent page, and opening it continues from where you stopped</string>
+<string name="msp_settings_record_recent_off">Stops recording new play history (resume positions are separate). What is already recorded is not deleted; turning this back on brings it back.</string>
 
     <string name="msp_settings_speed_normal">Normal speed</string>
     <string name="msp_settings_speed_default">Default</string>

@@ -104,10 +104,14 @@
     <string name="msp_recent_title">Recently played</string>
     <string name="msp_recent_refresh">Refresh</string>
     <string name="msp_recent_supporting">Stopped at %1$s - %2$s</string>
+    <string name="msp_recent_supporting_from_start">Played %1$s - no position kept</string>
     <string name="msp_recent_empty_title">Nothing played yet</string>
     <string name="msp_recent_empty_desc">What you play shows up here, remembering where you stopped.</string>
     <string name="msp_recent_blocked_title">Media library unavailable</string>
     <string name="msp_recent_blocked_desc">Recently played matches your history against the media library. Grant storage access on the Library tab first.</string>
+    <!-- When it is off it must say "you turned it off" and name the switch: this page is empty and the user has long forgotten why. -->
+    <string name="msp_recent_disabled_title">“Record recent plays” is off</string>
+    <string name="msp_recent_disabled_desc">Turn it back on under Settings - Playback to keep recording. What is already recorded is still here and has not been deleted.</string>
 
     <!-- ===== Playlists ===== -->
     <string name="msp_playlists_title">Playlists</string>

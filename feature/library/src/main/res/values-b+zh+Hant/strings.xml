@@ -103,10 +103,14 @@
     <string name="msp_recent_title">最近播放</string>
     <string name="msp_recent_refresh">重新整理</string>
     <string name="msp_recent_supporting">播放到 %1$s · %2$s</string>
+    <string name="msp_recent_supporting_from_start">上次播放於 %1$s · 不記位置</string>
     <string name="msp_recent_empty_title">還沒有播放記錄</string>
     <string name="msp_recent_empty_desc">播放過的內容會出現在這裡，並記住上次播到的位置。</string>
     <string name="msp_recent_blocked_title">讀不到媒體庫</string>
     <string name="msp_recent_blocked_desc">最近播放要靠媒體庫把記錄對上檔案。請先到媒體庫頁授權儲存權限。</string>
+    <!-- 關掉的時候必須說「是你關的」，而且要說出開關叫什麼、在哪裡：這一頁是空的，用户已經記不得原因了。 -->
+    <string name="msp_recent_disabled_title">已關閉「記錄最近播放」</string>
+    <string name="msp_recent_disabled_desc">在「設定 - 播放」裡重新打開就會繼續記錄。已經記下的內容還在，不會被刪掉。</string>
 
     <!-- ===== 播放清單頁 ===== -->
     <string name="msp_playlists_title">播放清單</string>

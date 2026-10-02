@@ -90,6 +90,7 @@ internal object SettingsSummaries {
         val aspect = playback.aspectRatioMode ?: AspectRatioMode.DEFAULT
         val forceSoftware = playback.forceSoftwareDecoding ?: false
         val rememberPosition = playback.rememberPosition ?: true
+        val recordRecentPlays = playback.recordRecentPlays ?: true
 
         return join(
             MspText.Plain(PlaybackSpeedOptions.format(speed)),
@@ -104,6 +105,7 @@ internal object SettingsSummaries {
             },
             if (softwareDecodingAvailable) null else MspText.Res(R.string.msp_settings_summary_tail_no_ffmpeg),
             if (rememberPosition) null else MspText.Res(R.string.msp_settings_summary_tail_no_position),
+            if (recordRecentPlays) null else MspText.Res(R.string.msp_settings_summary_tail_no_recent),
         )
     }
 

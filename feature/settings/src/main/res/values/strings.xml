@@ -49,6 +49,7 @@
     <!-- 「没有 FFmpeg」是安装包的事实，和开关无关，所以它单独说 -->
     <string name="msp_settings_summary_tail_no_ffmpeg">本包无 FFmpeg</string>
     <string name="msp_settings_summary_tail_no_position">不记位置</string>
+    <string name="msp_settings_summary_tail_no_recent">不记播放历史</string>
 
     <!-- 例：`长按 2×`。`%1$s` 是档位（1.5× / 2× …） -->
     <string name="msp_settings_summary_long_press">长按 %1$s</string>
@@ -138,6 +139,14 @@
     <string name="msp_settings_remember_position">记住播放位置</string>
     <string name="msp_settings_remember_position_on">下次打开同一个文件时接着上次的位置播</string>
     <string name="msp_settings_remember_position_off">每次都从头播。已经记住的位置不会被删掉，重新打开这个开关就能继续用。</string>
+
+    <!--
+      和上面那一条相邻，两句副标题必须把区别说透：两个开关的名字很像，
+      而关错了的后果是「过一阵子发现列表里没有新内容」——用户不会联想到这个开关。
+    -->
+    <string name="msp_settings_record_recent">记录最近播放</string>
+<string name="msp_settings_record_recent_on">播放过的内容会出现在「最近播放」页，点进去能接着上次的位置</string>
+<string name="msp_settings_record_recent_off">不再记录新的播放历史（续播位置另算）。已经记下的不会删掉，重新打开就能看到。</string>
 
     <!-- 选择对话框里的档位说明，两处都是「等同于默认」的意思 -->
     <string name="msp_settings_speed_normal">正常速度</string>

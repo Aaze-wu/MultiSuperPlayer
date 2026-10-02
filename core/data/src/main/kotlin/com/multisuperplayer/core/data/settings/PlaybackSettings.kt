@@ -54,6 +54,19 @@ data class PlaybackSettings(
     val rememberPosition: Boolean? = null,
 
     /**
+     * 是否记录「最近播放」。null = 没设置过（等价于 true）。
+     *
+     * 和 [rememberPosition] 是两个开关，不是同一个：那个管的是「续播位置」（下次接着播），
+     * 这个管的是「播过什么」（列表里有没有这一条）。三条组合都说得通——
+     * 只想在首页看到看过什么、但每次都从头播；或者反过来说「别记录我看过什么」。
+     *
+     * 关掉时**只影响以后**：已经记下的记录留在磁盘上，重新打开开关就能看到。
+     * 删数据是另一件事，而这个开关的语义是「别再记了」，不是「忘掉」——
+     * 顺手删掉用户的历史，代价和收益完全不成比例（见 [rememberPosition] 的同款说明）。
+     */
+    val recordRecentPlays: Boolean? = null,
+
+    /**
      * 按住画面时用的临时倍速。null = 没设置过（等价于 [SpeedBoostOptions.DEFAULT]）。
      *
      * 和 [speed] 一样是「跨文件保留」的偏好，但两者解决的是不同的问题：

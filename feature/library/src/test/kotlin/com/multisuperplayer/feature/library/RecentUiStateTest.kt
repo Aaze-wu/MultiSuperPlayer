@@ -126,4 +126,43 @@ class RecentUiStateTest {
         // 两处规则一旦分叉，用户看到的顺序就和「最近播放」这个名字对不上了。
         assertEquals(listOf("a1", "a2", "a3"), state.rows?.map { it.entry.id })
     }
+
+    @Test
+    fun `关掉开关时说的是开关关着，不是没有记录`() {
+        val state = recentUiState(ready, rows, enabled = false)
+
+        assertTrue(state.disabled)
+        assertFalse(state.blocked)
+        // 不是加载中：这一页已经有结论了（没在记录），转圈会更让人以为在等什么。
+        assertFalse(state.loading)
+        assertEquals(emptyList<RecentPlay>(), state.rows)
+    }
+
+    @Test
+    fun `关掉开关优先于读不到媒体库`() {
+        // 两件事同时成立时选「你自己关的」：那是用户**刚刚**做过的动作，
+        // 而权限提示会把他引到一个已经没用的方向（给了权限也一样是空的）。
+        val state = recentUiState(MediaLibraryState.NeedsPermission, null, enabled = false)
+
+        assertTrue(state.disabled)
+        assertFalse(state.blocked)
+    }
+
+    @Test
+    fun `开关打开时和以前完全一样`() {
+        val state = recentUiState(ready, rows, enabled = true)
+
+        assertFalse(state.disabled)
+        assertEquals(1, state.rows?.size)
+    }
+
+    @Test
+    fun `不传开关时按打开处理`() {
+        // 默认值必须是「记录」：它和 `PlaybackSettings.recordRecentPlays` 的默认值
+        // 是同一个决定的两半，一边改了另一边没改就会出现「设置里显示开着，
+        // 列表却说关着」这种自相矛盾的界面。
+        val state = recentUiState(ready, rows)
+
+        assertFalse(state.disabled)
+    }
 }

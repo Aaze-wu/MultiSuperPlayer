@@ -21,6 +21,7 @@
     <string name="msp_settings_summary_tail_force_software">強制軟解</string>
     <string name="msp_settings_summary_tail_no_ffmpeg">本包無 FFmpeg</string>
     <string name="msp_settings_summary_tail_no_position">不記位置</string>
+    <string name="msp_settings_summary_tail_no_recent">不記播放記錄</string>
 
     <string name="msp_settings_summary_long_press">長按 %1$s</string>
     <string name="msp_settings_summary_model_unset">未填模型名</string>
@@ -85,6 +86,14 @@
     <string name="msp_settings_remember_position">記住播放位置</string>
     <string name="msp_settings_remember_position_on">下次打開同一個檔案時接著上次的位置播</string>
     <string name="msp_settings_remember_position_off">每次都從頭播。已經記住的位置不會被刪掉，重新打開這個開關就能繼續用。</string>
+
+    <!--
+      和上面那一條相鄰，兩句副標題必須把區別說透：兩個開關的名字很像，
+      而關錯了的後果是「過一陣子發現列表裡沒有新內容」——用户不會聯想到這個開關。
+    -->
+    <string name="msp_settings_record_recent">記錄最近播放</string>
+    <string name="msp_settings_record_recent_on">播放過的內容會出現在「最近播放」頁，點進去能接著上次的位置</string>
+    <string name="msp_settings_record_recent_off">不再記錄新的播放歷史（續播位置另算）。已經記下的不會刪掉，重新打開就能看到。</string>
 
     <string name="msp_settings_speed_normal">正常速度</string>
     <string name="msp_settings_speed_default">預設值</string>

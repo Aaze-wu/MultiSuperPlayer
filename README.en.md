@@ -25,8 +25,23 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   horizontal drag seeks, double-tap on either side seeks ±10 s.
 - **Speed**: 10 steps from 0.25x to 4x, plus a separate "long-press speed" you can trigger by holding the screen.
 - **A-B repeat** with three states (set A, set B, clear).
-- **Resume position** for both audio and video. Reaching 95% counts as "finished" and clears it;
-  playback shorter than 15 seconds is not recorded.
+- **Resume position** for both audio and video. Reaching 95% counts as "finished", so the next
+  play starts from the beginning (the record is **kept**, not deleted); playback shorter than
+  15 seconds records "it was played" but no position.
+- **Two separate switches**: "Remember position" decides whether a position is **written**;
+  "Record recent plays" decides whether the list **gains new entries**. All four combinations
+  are meaningful (they are two independent choices, not two names for one bit):
+
+  | Remember position | Record recent plays | Result |
+  |---|---|---|
+  | on | on | Default: positions remembered, everything played shows up |
+  | on | off | Positions still recorded (resuming is unaffected), so something you watched halfway still leaves a resume record; the position-less "it was played" entries are no longer created, and existing entries stop having their timestamp refreshed |
+  | off | on | Always starts from the beginning, yet **you can still see what you have watched** (no position is written at all) |
+  | off | off | Nothing is recorded |
+
+  The third row works because "record that it was played" and "write a position" are two
+  different operations (`markPlayed` keeps the existing position and only pushes the timestamp);
+  one shared write could never express it.
 - **Fullscreen, landscape, screen lock** to avoid accidental touches.
 - **Also**: shuffle / repeat all / repeat one, previous / next, volume and brightness indicators,
   a playback service and notification controls.
@@ -115,6 +130,14 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   library cannot see at all, does not lose its subtitles either.
 - **Recent**: built from the resume records (position + timestamp), up to 50 entries; opening one resumes
   from where you stopped rather than from the beginning.
+- **No position still means it was played**: an item you opened for a few seconds keeps a position of 0
+  but **stays in the list**, rendered as "Played <time> - no position kept" rather than "00:00".
+  "Not worth resuming" and "never played" are two different things; earlier versions collapsed both
+  into one branch, so short clips could never appear on the Recent page.
+- **Can be turned off in Settings**: turning it off stops recording new items and **does not delete**
+  what is already recorded (otherwise the switch would be an irreversible delete, while all the user
+  meant was "stop recording"). With it off the Recent page says the switch is off instead of pretending
+  the list is empty.
 - **Playlists** store an id key plus a display snapshot (title / artist / duration). If the library
   temporarily cannot find a file, the entry **does not vanish**; the list marks it as currently absent
   while keeping its position in the queue — "the library can't find it" is not the same as "it can't be
@@ -190,7 +213,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | v0.5.6 | Media library rework: five-tab navigation, mini player, SAF folder browsing, recent, playlists | Done |
 | **v0.5.7** | **Built-in file browser: own directory listing, optional all-files access, attach a tapped subtitle file** | Done |
 | **v0.5.8** | **Media opened from the browser discovers sibling subtitles (by listing the directory, not the media library)** | Done |
-| **v0.5.9** | **Multi-select in the built-in file browser (select all / add to playlist / play)** | **Current** |
+| v0.5.9 | Multi-select in the built-in file browser (select all / add to playlist / play) | Done |
+| **v0.5.10** | **Recent page keeps short clips, new "Record recent plays" switch, auto-refresh on return** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 

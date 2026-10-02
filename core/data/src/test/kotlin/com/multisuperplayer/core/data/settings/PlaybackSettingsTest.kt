@@ -126,4 +126,47 @@ class PlaybackSettingsTest {
         assertNull(settings.boostSpeed)
         assertEquals(1.5f, settings.speed!!, 0f)
     }
+
+    @Test
+    fun `记录最近播放的键名是写入用户设备的契约`() {
+        // 同上的理由：改了字面量，已安装用户「关掉记录」的选择就读不出来，
+        // 表现为「升级之后又开始记播放历史了」——这种隐私相关的回退最容易被当成 bug。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.record_recent_plays") to false,
+        ).toPlaybackSettings()
+
+        assertEquals(false, settings.recordRecentPlays)
+    }
+
+    @Test
+    fun `没设置过记录最近播放时是 null`() {
+        // 这里的 null 有具体含义：**默认记**（内核按 `!= false` 判）。
+        // 换成 false 就等于「全新安装的用户不记播放历史」，而设置页显示的却是
+        // 开关打开——一个自相矛盾的界面，而且没有人会去查。
+        assertNull(preferencesOf().toPlaybackSettings().recordRecentPlays)
+    }
+
+    @Test
+    fun `记录最近播放不会被记住位置带出来`() {
+        // 两个键挨着放、名字也像，写错一个不会报错，只会让「关掉播放历史」
+        // 顺手把「接着播」也关掉（或者反过来）。它们必须是两个独立的键，
+        // 因为用户会想要「每次都从头播、但看得见看过什么」。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.remember_position") to false,
+        ).toPlaybackSettings()
+
+        assertEquals(false, settings.rememberPosition)
+        assertNull(settings.recordRecentPlays)
+    }
+
+    @Test
+    fun `记住位置不会被记录最近播放带出来`() {
+        // 反方向再钉一遍，免得将来只修一边。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.record_recent_plays") to false,
+        ).toPlaybackSettings()
+
+        assertEquals(false, settings.recordRecentPlays)
+        assertNull(settings.rememberPosition)
+    }
 }

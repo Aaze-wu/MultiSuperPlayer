@@ -68,6 +68,15 @@ class PlaybackSettingsRepository(
         it[Keys.REMEMBER_POSITION] = enabled
     }
 
+    /**
+     * 只影响**往后**记不记，已经在库里的记录不论开关都留着——
+     * 「关掉历史」如果顺手把历史删了，那这个开关就是一次不可逆的破坏，
+     * 而用户点它的时候想的是「别再记了」，不是「把以前的删掉」。
+     */
+    suspend fun setRecordRecentPlays(enabled: Boolean) = edit {
+        it[Keys.RECORD_RECENT_PLAYS] = enabled
+    }
+
     suspend fun setBoostSpeed(speed: Float) = edit {
         it[Keys.BOOST_SPEED] = speed
     }
@@ -91,6 +100,13 @@ class PlaybackSettingsRepository(
 
         val REMEMBER_POSITION = booleanPreferencesKey("playback.remember_position")
 
+        /**
+         * 和 [REMEMBER_POSITION] 相邻但要分清：那个是「下次接着播」，
+         * 这个是「列表里记不记这一条」。两个键分开存，因为用户会想要
+         * 「每次都从头播、但看得见看过什么」——共用一个键就永远做不到。
+         */
+        val RECORD_RECENT_PLAYS = booleanPreferencesKey("playback.record_recent_plays")
+
         /** 长按画面时的临时倍速（见 [PlaybackSettings.boostSpeed]）。 */
         val BOOST_SPEED = floatPreferencesKey("playback.boost_speed")
     }
@@ -111,5 +127,6 @@ internal fun Preferences.toPlaybackSettings(): PlaybackSettings = PlaybackSettin
         ?.let(AspectRatioMode::fromId),
     speed = this[PlaybackSettingsRepository.Keys.SPEED],
     rememberPosition = this[PlaybackSettingsRepository.Keys.REMEMBER_POSITION],
+    recordRecentPlays = this[PlaybackSettingsRepository.Keys.RECORD_RECENT_PLAYS],
     boostSpeed = this[PlaybackSettingsRepository.Keys.BOOST_SPEED],
 )

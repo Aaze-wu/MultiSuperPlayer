@@ -103,10 +103,14 @@
     <string name="msp_recent_title">最近播放</string>
     <string name="msp_recent_refresh">刷新</string>
     <string name="msp_recent_supporting">播放到 %1$s · %2$s</string>
+    <string name="msp_recent_supporting_from_start">上次播于 %1$s · 不记位置</string>
     <string name="msp_recent_empty_title">还没有播放记录</string>
     <string name="msp_recent_empty_desc">播放过的内容会出现在这里，并记住上次播到的位置。</string>
     <string name="msp_recent_blocked_title">读不到媒体库</string>
     <string name="msp_recent_blocked_desc">最近播放要靠媒体库把记录对上文件。请先到媒体库页授权存储权限。</string>
+    <!-- 关掉的时侯必须说「是你关的」，而且要说出开关叫什么、在哪里：这一页是空的，用户已经记不得原因了。 -->
+    <string name="msp_recent_disabled_title">已关闭「记录最近播放」</string>
+    <string name="msp_recent_disabled_desc">在「设置 - 播放」里重新打开就会继续记录。已记下的内容还在，不会被删掉。</string>
 
     <!-- ===== 播放列表页 ===== -->
     <string name="msp_playlists_title">播放列表</string>

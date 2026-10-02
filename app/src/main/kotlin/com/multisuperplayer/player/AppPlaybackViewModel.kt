@@ -59,6 +59,10 @@ class AppPlaybackViewModel(
                 controller.setForceSoftwareDecoding(settings.forceSoftwareDecoding == true)
                 // null = 用户没设置过 = 默认记住（见 PlaybackSettings.rememberPosition）。
                 controller.setRememberPosition(settings.rememberPosition != false)
+                // 同上，null = 默认记（见 PlaybackSettings.recordRecentPlays）。
+                // 两个开关分开下发：它们管的是不同的事，共用一个值会让用户
+                // 「只想关掉播放历史」时连「接着播」一起丢掉。
+                controller.setRecordRecentPlays(settings.recordRecentPlays != false)
 
                 // 倍速只在**什么都没在播**的时候下发。
                 //

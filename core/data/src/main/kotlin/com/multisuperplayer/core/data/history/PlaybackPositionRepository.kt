@@ -69,8 +69,37 @@ class PlaybackPositionRepository(
         Unit
     }
 
-    override suspend fun clear(mediaId: String) = withContext(dispatchers.io) {
-        store.edit { prefs -> prefs.remove(resumeKey(mediaId)) }
+    override suspend fun markPlayed(mediaId: String) = withContext(dispatchers.io) {
+        store.edit { prefs ->
+            val key = resumeKey(mediaId)
+            // 保住已有的位置（没有就按 0），只把时间戳推到现在。
+            // 位置 0 是合法值：读出来是 0 -> 内核从头播，最近播放里照旧显示这一条。
+            val position = ResumeCodec.decode(prefs[key])?.positionMs ?: 0L
+            prefs[key] = ResumeCodec.encode(
+                ResumeEntry(positionMs = position, savedAtMs = System.currentTimeMillis()),
+            )
+            evictOverflow(prefs)
+        }
+        Unit
+    }
+
+    override suspend fun resetPosition(mediaId: String) = withContext(dispatchers.io) {
+        store.edit { prefs ->
+            val key = resumeKey(mediaId)
+            val existing = ResumeCodec.decode(prefs[key])
+            // 没有记录就什么都不做——**不能**在这里补一条 0，否则「播完一个从没播过的
+            // 短片」会凭空多出一条播放记录，把「记录最近播放」的开关架空。
+            //
+            // 时间戳也原样保留。这一条只在「记录最近播放」关掉时才会走到（开着时归零走
+            // [write]），而那个开关关掉之后就不该再有任何东西记下「你什么时候看的它」——
+            // 顺手把 savedAt 推到今天的话，「最近播放」的排序仍然会在后台偷偷变化。
+            if (existing != null) {
+                prefs[key] = ResumeCodec.encode(
+                    ResumeEntry(positionMs = 0L, savedAtMs = existing.savedAtMs),
+                )
+                evictOverflow(prefs)
+            }
+        }
         Unit
     }
 

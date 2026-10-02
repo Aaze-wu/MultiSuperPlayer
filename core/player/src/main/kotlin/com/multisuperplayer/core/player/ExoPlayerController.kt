@@ -117,6 +117,18 @@ class ExoPlayerController(
     private var rememberPosition = true
 
     /**
+     * 用户是否允许记录「最近播放」（持久化的那份在 `:core:data`）。
+     *
+     * 和 [rememberPosition] 是两件事：那个管「位置记不记」，这个管「播放过什么记不记」。
+     * 它管的是**新条目**：关掉之后不再给「从没播过的」媒体建记录，已经在库里的条目
+     * 照旧更新（否则「已经记下的」就冻住了，而设置里那句文案说的是它们不会被删掉）。
+     * 两种建记录的方式都要挡住——「位置太短」（[PlaybackPositionStore.markPlayed]）
+     * 和「播完了」（`write(id, 0)`，见 [persistTrackedPosition]），漏掉后者时
+     * 一个从头看到尾的短片仍然会冒进列表，实测踩过。
+     */
+    private var recordRecentPlays = true
+
+    /**
      * 正在跟踪的媒体、它的位置和时长。
      *
      * 为什么要另存一份而不是每次现读 `player`：切条目之后
@@ -360,33 +372,39 @@ class ExoPlayerController(
     }
 
     /**
-     * 把 [trackedMediaId] 的位置落盘——**只在必要时写**。
+     * 把 [trackedMediaId] 的进度落盘。
      *
-     * 三种分支，第三种是最容易被写错的：
-     * - 值得记（看过一段、又没到结尾）→ 写；
-     * - 已经看到结尾 → **清掉**。留着它下次会从 99% 开始，看起来像文件坏了；
-     * - 其余（刚打开几秒、时长还没解析出来）→ **什么都不做**。
+     * 落什么由 [ResumePolicy.persistStep] 决定（纯函数，四种开关组合的边界都在那边的
+     * 单测里）：值得记就写位置；看完了就把位置归零；位置太短就只把时间戳推到今天。
      *
-     * 最后一条不能省：如果无条件写，那么「昨天看到 40 分钟、今天随手点开看一眼 3 秒"
-     * 会把 40 分钟那条记录改成 3 秒，而 40 分钟正是用户最需要的那一条。
-     * 同时也挡住了「续播定位还没生效时位置读成 0」这个中间态把记录写成 0。
+     * 两条容易搞错的边界，都在设备上踩过：
+     *
+     * - **「播完了」不能顺手新建记录。** 归零是必要的（留着 99% 下次会直接从片尾开始，
+     *   看起来像文件坏了），但 `write(id, 0)` 会**建出**一条记录，于是关掉「记录最近播放」
+     *   之后，一个从头看到尾的短片仍然会冒进列表里。所以关掉那个开关时改成
+     *   [PlaybackPositionStore.resetPosition]（只清已有记录，没有就什么都不做）。
+     * - **「位置太短」要保住已有位置。** 昨天看到 40 分钟的那条，不会被今天的 3 秒改写，
+     *   但「刚播过」这个事实要记下来——以前这里是「什么都不做」，所以一个 20 秒的片段
+     *   播到第 8 秒、或者一部电影看一眼就退出，磁盘上不会留下任何痕迹，用户刚播过的
+     *   东西在「最近播放」里根本不出现，看起来就像那个功能没做。
      */
     private fun persistTrackedPosition() {
-        if (!rememberPosition) return
         val id = trackedMediaId ?: return
+        val step = ResumePolicy.persistStep(
+            positionMs = trackedPositionMs,
+            durationMs = trackedDurationMs,
+            rememberPosition = rememberPosition,
+            recordRecentPlays = recordRecentPlays,
+        )
         val position = trackedPositionMs
-        val duration = trackedDurationMs
-        val action: suspend () -> Unit = when {
-            ResumePolicy.shouldRemember(position, duration) -> {
-                { positionStore.write(id, position) }
-            }
-
-            duration > 0L && position >= duration * ResumePolicy.COMPLETION_RATIO -> {
-                { positionStore.clear(id) }
-            }
-
-            else -> return
+        val action: (suspend () -> Unit)? = when (step) {
+            ResumePolicy.Persist.POSITION -> { { positionStore.write(id, position) } }
+            ResumePolicy.Persist.ZERO -> { { positionStore.write(id, 0L) } }
+            ResumePolicy.Persist.ZERO_IF_RECORDED -> { { positionStore.resetPosition(id) } }
+            ResumePolicy.Persist.MARK_PLAYED -> { { positionStore.markPlayed(id) } }
+            ResumePolicy.Persist.NOTHING -> null
         }
+        if (action == null) return
         // 不阻塞主线程：DataStore 要重写整个文件并 fsync，放在节拍里做
         // 会让位置条每 5 秒卡一下。失败也不能影响播放。
         scope.launch {
@@ -395,6 +413,14 @@ class ExoPlayerController(
         }
     }
 
+    /**
+     * 每 [SAVE_INTERVAL_MS] 落一次盘（只在「记住播放位置」开着时）。
+     *
+     * 「记住播放位置」关掉时这里直接返回，但**不等于什么都不记**：暂停、切条目、退出
+     * 播放器这几条路径都会直接调 [persistTrackedPosition]，那时 [ResumePolicy.persistStep]
+     * 仍然可能给出 `MARK_PLAYED`（用户要的是「每次从头播，但看得见看过什么」）。
+     * 节拍这条路只服务于「位置」，所以它认的是那个开关，而不是这个函数被谁调用。
+     */
     private fun savePositionIfDue() {
         if (!rememberPosition) return
         val now = SystemClock.elapsedRealtime()
@@ -801,6 +827,14 @@ class ExoPlayerController(
             // 关掉之前先落一次盘：否则「关掉记忆」会顺手把刚才那一段也丢掉。
             if (!enabled) persistTrackedPosition()
             rememberPosition = enabled
+        }
+    }
+
+    override fun setRecordRecentPlays(enabled: Boolean) {
+        onMain {
+            // 不需要像 [setRememberPosition] 那样先落盘：关掉这个开关只是不再写
+            // 「刚播过」，续播位置该写的时候照旧写（它是另一个开关管的）。
+            recordRecentPlays = enabled
         }
     }
 

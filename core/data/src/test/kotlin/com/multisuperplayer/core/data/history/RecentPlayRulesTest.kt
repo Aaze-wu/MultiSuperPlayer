@@ -77,14 +77,29 @@ class RecentPlayRulesTest {
     // --------------------------------------------------------------- 过滤
 
     @Test
-    fun `位置为 0 的记录被过滤`() {
-        // 写入方不应该写 0，但存储里可能留着了；位置 0 的「最近播放」没有任何意义。
+    fun `位置为 0 的记录仍然算播过`() {
+        // 这一条以前是反过来的（位置 0 被当成脏数据滤掉），而那个规则让整个
+        // 「最近播放」对短媒体永久失效：写入方对「刚播过但下次从头播」的记录
+        // **就是**按 0 写的，一滤掉那个文件就永远不出现在列表里。
+        // 记住区分：负数才是脏数据，0 是一个正常值。
         val result = project(
             listOf(record("audio:1", positionMs = 0L), record("audio:2", positionMs = 1L)),
             listOf(entry("audio:1"), entry("audio:2")),
         )
 
-        assertEquals(listOf("audio:2"), result.map { it.entry.id })
+        assertEquals(listOf("audio:1", "audio:2"), result.map { it.entry.id }.sorted())
+    }
+
+    @Test
+    fun `位置为 0 的记录也带着 0 而不是被改成别的值`() {
+        // 界面上靠这个 0 决定显示「不记位置」还是「播放到 00:00」——
+        // 这一层要是顺手把它变正数，那句话就再也不会出现。
+        val result = project(
+            listOf(record("audio:1", positionMs = 0L)),
+            listOf(entry("audio:1")),
+        )
+
+        assertEquals(0L, result.single().positionMs)
     }
 
     @Test
