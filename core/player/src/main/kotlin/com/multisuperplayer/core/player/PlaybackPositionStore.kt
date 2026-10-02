@@ -79,6 +79,39 @@ interface PlaybackPositionStore {
      */
     suspend fun resetPosition(mediaId: String)
 
+    /**
+     * 把这一条**整个忘掉**（位置、保存时间、「播过」这件事一起）。
+     *
+     * 和 [resetPosition] 的区别是这个字面上的「没了」：记录不存在后 [readAll] 不再
+     * 列出它，[read] 返回 null（下次从头播）。界面上这是「最近播放里删掉一条」，
+     * 而它顺便也就把续播位置一起删了——因为**两者本来就是同一条记录**：
+     * 这份存储只存了「位置 + 时间」，而「最近播放」正是从它投影出来的。
+     * 所以删除的界面文案必须承认这一点，否则用户会以为只是从列表里拿掉一行。
+     *
+     * 没有记录时什么都不做（不能顺手写一条 0——那是「记下播过」，与删除相反）。
+     */
+    suspend fun remove(mediaId: String)
+
+    /**
+     * 清空**全部**记录。
+     *
+     * 清的是整张表，而不只是当前列表里显示出来的那些：「最近播放」只投影出能对上
+     * 媒体库的那些记录（查不到的既不显示也不删，见 `RecentPlayRules.project`），
+     * 所以磁盘上的记录数**可以多于**屏幕上的行数。用户点「清空」是要「忘掉这些
+     * 历史」，留一半在磁盘上只会在下次拿到权限时突然冒回来——那就成了
+     * 「清空之后自己又长出来了」。
+     */
+    suspend fun clearAll()
+
+    /**
+     * 把一条记录**原样**写回去，包括 [PlaybackRecord.savedAtMs]。
+     *
+     * 给「删除 + 撤销」用。**不能用 [write] 代替**：那个会把时间戳换成现在，
+     * 而「最近播放」是按时间倒序排的，于是撤销之后那一行会跳到最上面——
+     * 用户会以为撤销把顺序弄坏了（实际上位置记录是对的，只是它在列表里的位置变了）。
+     */
+    suspend fun restore(record: PlaybackRecord)
+
     companion object {
         /**
          * 不存任何东西的实现。
@@ -93,6 +126,9 @@ interface PlaybackPositionStore {
             override suspend fun write(mediaId: String, positionMs: Long) = Unit
             override suspend fun markPlayed(mediaId: String) = Unit
             override suspend fun resetPosition(mediaId: String) = Unit
+            override suspend fun remove(mediaId: String) = Unit
+            override suspend fun clearAll() = Unit
+            override suspend fun restore(record: PlaybackRecord) = Unit
         }
     }
 }

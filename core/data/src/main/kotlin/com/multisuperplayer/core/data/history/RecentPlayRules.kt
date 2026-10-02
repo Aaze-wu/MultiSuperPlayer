@@ -49,4 +49,19 @@ internal object RecentPlayRules {
             .take(limit)
             .toList()
     }
+
+    /**
+     * [project] 的反向：把一行最近播放还原成它对应的续播记录。
+     *
+     * 给「删除 + 撤销」用（见 `RecentPlayRepository.restore`）。和 [project] 放在
+     * 一起，是因为它们必须关于「哪一列对应哪一个字段」达成一致：`project` 把
+     * `savedAtMs` 搬到 `playedAtMs` 上，还原时就必须搬回去，两边一旦分叉，
+     * 症状是撤销之后那一行**跳到列表最上面**（时间戳被当成「现在」重写了），
+     * 而不是任何报错。
+     */
+    fun recordOf(row: RecentPlay): PlaybackRecord = PlaybackRecord(
+        mediaId = row.entry.id,
+        positionMs = row.positionMs,
+        savedAtMs = row.playedAtMs,
+    )
 }

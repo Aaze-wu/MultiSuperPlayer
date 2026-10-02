@@ -111,6 +111,14 @@
     <!-- 关掉的时侯必须说「是你关的」，而且要说出开关叫什么、在哪里：这一页是空的，用户已经记不得原因了。 -->
     <string name="msp_recent_disabled_title">已关闭「记录最近播放」</string>
     <string name="msp_recent_disabled_desc">在「设置 - 播放」里重新打开就会继续记录。已记下的内容还在，不会被删掉。</string>
+    <string name="msp_recent_remove">从最近播放删除</string>
+    <string name="msp_recent_removed">已从最近播放删掉</string>
+    <string name="msp_recent_undo">撤销</string>
+    <string name="msp_recent_clear">清空</string>
+    <string name="msp_recent_clear_title">清空最近播放？</string>
+    <!-- 必须说出「续播位置也没了」和「文件没事」：一句话让人以为只是列表变短，另一句话让人以为文件被删了。 -->
+    <string name="msp_recent_clear_desc">列表会整个清空，这些条目记住的续播位置也会一起忘掉（下次从头播）。媒体库里的文件不受影响。</string>
+    <string name="msp_recent_cleared">已清空最近播放</string>
 
     <!-- ===== 播放列表页 ===== -->
     <string name="msp_playlists_title">播放列表</string>

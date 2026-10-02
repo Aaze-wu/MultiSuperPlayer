@@ -116,15 +116,66 @@ class RecentViewModel(
 
     fun refresh() = reload()
 
-    private fun reload() {
+    /**
+     * 删掉一条记录。
+     *
+     * 删的是**磁盘上的记录**（连带它的续播位置，见 [RecentPlayRepository]），
+     * 不是只从列表里拿掉一行——所以这里做完之后要重读一次，而不是本地过滤。
+     * 万一读失败（库不再就绪），列表会退回「拿不到」而不是「少了你删的那一条」，
+     * 那是更诚实的画面。
+     *
+     * 界面负责在这之后弹一句带「撤销」的提示，并把**这一条**原样交给
+     * [undoDelete]——撤销要还的是那一条，见 [undoDelete]。
+     */
+    fun delete(row: RecentPlay) {
         viewModelScope.launch {
-            // 开关关着就没什么可显示的，读了也是白读（见 [enabled]）。
-            // 这里不清空 [cached] 里已有的内容：重新打开开关时界面会先显示
-            // 上一次读到的列表，然后由下面的重读把它对齐——比先闪一个空列表好。
-            if (!enabled.value) return@launch
-            library.state.filterIsInstance<MediaLibraryState.Ready>().first()
-            cached.value = recent.recent()
+            recent.remove(row)
+            readRows()
         }
+    }
+
+    /**
+     * 撤销一次删除，把 [row] 原样写回去（位置和时间戳都按删除前的样子）。
+     *
+     * 参数是**那一条记录本身**，不是「最后删掉的那条」之类由 ViewModel 记住的
+     * 状态。连着删两条时界面会先后弹两句提示，第二句会把第一句顶掉；如果撤销去读
+     * 一个共享的「最后删除」字段，第一句提示上的「撤销」会还原**第二条**，
+     * 于是用户既没撤销成功、第一条记录又永远回不来了。把记录跟着提示走，
+     * 每个提示就都是自洽的。
+     */
+    fun undoDelete(row: RecentPlay) {
+        viewModelScope.launch {
+            recent.restore(row)
+            readRows()
+        }
+    }
+
+    /**
+     * 清空全部记录。
+     *
+     * 这里直接把 [cached] 置空而不重读：清空之后存储里一条记录都不剩，而这一页
+     * 显示的只能是「记录 ∩ 媒体库」，所以「空」是**已知的事实**，不需要再等
+     * 媒体库就绪。重读反而会在库没就绪时把这个确定的结论拖成转圈。
+     */
+    fun clearAll() {
+        viewModelScope.launch {
+            recent.clearAll()
+            cached.value = emptyList()
+        }
+    }
+
+    private fun reload() {
+        viewModelScope.launch { readRows() }
+    }
+
+    /** 读一次记录并要求媒体库已就绪。失败/未就绪的语义见 `recentUiState`。 */
+    private suspend fun readRows() {
+        // 开关关着就没什么可显示的，读了也是白读（见 [enabled]）。
+        // 这里不清空 [cached] 里已有的内容：重新打开开关时界面会先显示
+        // 上一次读到的列表，然后由下面的重读把它对齐——比先闪一个空列表好。
+        if (!enabled.value) return
+        library.state.filterIsInstance<MediaLibraryState.Ready>().first()
+        cached.value = recent.recent()
     }
 
     private companion object {
