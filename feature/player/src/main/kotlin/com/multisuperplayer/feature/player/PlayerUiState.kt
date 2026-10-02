@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.player.SpeedBoostOptions
 
 /**
  * 竖直拖动时屏幕中间那个提示泡的内容。
@@ -17,6 +18,27 @@ import com.multisuperplayer.core.data.settings.AspectRatioMode
  */
 @Immutable
 data class PlayerLevelHint(val isVolume: Boolean, val percent: Int)
+
+/**
+ * 屏幕中间那个「进度」提示泡的内容。
+ *
+ * 双击和水平拖动共用这一个类型，因为它们说的是**同一件事**（时间），只是信息
+ * 多寡不同；而 [PlayerLevelHint] 不能合并进来，那是另一回事（0–100 的百分比）。
+ *
+ * @param deltaMs 相对本次动作起点的变化：正数 = 快进，负数 = 快退。
+ *   双击就是 [PlayerGestures.DOUBLE_TAP_SEEK_MS]，拖动就是「目标位置 - 按下时的位置」。
+ *   之所以连正负号也一起存：提示泡上要写「+12 秒 / -8 秒」，而这个符号只有产生
+ *   这个提示的人手上有（拖动过程中还要用它来判断要不要写「已到头」）。
+ * @param targetMs 拖动时的目标位置。null = 没有目标位置（双击快进只能告诉我们
+ *   「跳了 10 秒」，最终落在哪里是内核算的，强行猜一个会和真实位置对不上）。
+ * @param durationMs 总时长，用来画「00:52 / 01:00」。0 = 不显示。
+ */
+@Immutable
+data class PlayerSeekHint(
+    val deltaMs: Long,
+    val targetMs: Long? = null,
+    val durationMs: Long = 0L,
+)
 
 /** 播放页上会弹出的两种选择面板。 */
 enum class PlayerSheet { SPEED, ASPECT_RATIO }
@@ -64,15 +86,26 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
         private set
 
     /**
-     * 双击快进的提示：正数 = 快进多少毫秒，负数 = 快退多少毫秒。null = 不显示。
+     * 双击快进 / 水平拖动的提示。null = 不显示。
      *
      * 和 [levelHint] 分开而不是合并成一个「提示」类型：两者的值域和含义毫无关系
-     * （一个是 0..100 的百分比，一个是带符号的时长），合并只会让两边都多一层
-     * 拆包、而拆错的时候没有任何东西会报错——只想显示「快进 10 秒」的时候
+     * （一个是 0..100 的百分比，一个是时间），合并只会让两边都多一层拆包、
+     * 而拆错的时候没有任何东西会报错——只想显示「快进 10 秒」的时候
      * 把 `10000` 当成百分比画成一根满格的进度条，是那种看一秒就知道不对、
      * 但在此之前得先跑一遍界面的错误。
      */
-    var seekHintMs: Long? by mutableStateOf(null)
+    var seekHint: PlayerSeekHint? by mutableStateOf(null)
+        private set
+
+    /**
+     * 按住画面时的临时倍速。null = 没在加速（提示泡也不显示）。
+     *
+     * 存的是**倍速值本身**而不是一个布尔：提示泡上要写「2× 播放中」，
+     * 而布尔每加一处使用就要在界面里再读一次设置；更要紧的是，界面上的值和
+     * 真正下给内核的值必须是同一个（都由 [SpeedBoostOptions.normalize] 算出来），
+     * 否则会出现「写着 2× 实际在放 3×」——这种偏差只有盯着听才分辩得出来。
+     */
+    var speedBoost: Float? by mutableStateOf(null)
         private set
 
     var openSheet: PlayerSheet? by mutableStateOf(null)
@@ -118,7 +151,14 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
     fun applyLocked(value: Boolean) {
         locked = value
         lockHintVisible = false
-        if (value) controlsVisible = false
+        if (value) {
+            controlsVisible = false
+            // 锁定时手势层会被整个停掉（见 PlayerScreen 的 gesturesEnabled），
+            // 「松手」那个回调在拖动中途被打断的情况下也会跑（手势层里有 finally），
+            // 但多一步兜底：提示泡上写着「2× 播放中」而实际早就恢复了，是那种
+            // 看一眼就明白、却完全不知道从哪查起的假信息。
+            speedBoost = null
+        }
     }
 
     fun toggleControls() {
@@ -146,9 +186,14 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
         levelHint = hint
     }
 
-    /** 显示/收起双击快进的提示。@param deltaMs 正数快进、负数快退，null = 收起。 */
-    fun setSeekHint(deltaMs: Long?) {
-        seekHintMs = deltaMs
+    /** 显示/收起进度提示。@param hint null = 收起。 */
+    fun applySeekHint(hint: PlayerSeekHint?) {
+        seekHint = hint
+    }
+
+    /** 开始/结束「按住加速」。@param speed null = 已松手。 */
+    fun applySpeedBoost(speed: Float?) {
+        speedBoost = speed
     }
 
     /**

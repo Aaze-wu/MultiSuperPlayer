@@ -13,6 +13,7 @@ import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SoftwareDecoderSupport
+import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.ConnectivityResult
 import com.multisuperplayer.core.translate.FailureText
 import com.multisuperplayer.core.translate.Glossary
@@ -141,6 +142,18 @@ class SettingsViewModel(
      */
     fun setSpeed(speed: Float) = persist("默认倍速") {
         playbackSettingsRepository.setSpeed(PlaybackSpeedOptions.nearestPreset(speed))
+    }
+
+    /**
+     * 长按画面时的临时倍速。
+     *
+     * 和 [setSpeed] 一样先把值夹进档位表：[SpeedBoostOptions.normalize] 做的是
+     * 「按档位表收敛」，顺手也把 null / NaN / 小于等于 0 都收成默认值——设置页
+     * 只会传真实档位，但这个方法将来可能被别的入口（恢复出厂、迁移旧设置）调到，
+     * 夹一次比在这里相信调用方便宜。
+     */
+    fun setBoostSpeed(speed: Float) = persist("长按倍速") {
+        playbackSettingsRepository.setBoostSpeed(SpeedBoostOptions.normalize(speed))
     }
 
     fun setRememberPosition(enabled: Boolean) = persist("记住播放位置=$enabled") {

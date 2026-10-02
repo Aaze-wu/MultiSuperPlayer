@@ -1,5 +1,7 @@
 package com.multisuperplayer.core.data.settings
 
+import com.multisuperplayer.core.player.SpeedBoostOptions
+
 /**
  * 播放内核相关的用户偏好。
  *
@@ -47,6 +49,19 @@ data class PlaybackSettings(
      * 想每次都从头听），所以做成开关而不是写死。
      */
     val rememberPosition: Boolean? = null,
+
+    /**
+     * 按住画面时用的临时倍速。null = 没设置过（等价于 [SpeedBoostOptions.DEFAULT]）。
+     *
+     * 和 [speed] 一样是「跨文件保留」的偏好，但两者解决的是不同的问题：
+     * [speed] 是「我打算用多快看完」，这个只是「按住的那两秒要多快」。
+     * 所以它可以比 [speed] 快，也可以比 [speed] 慢（按住反而变慢虽然奇怪，
+     * 但那是用户自己配的，播放器替他猜「其实你想更快」只会更莫名其妙）。
+     *
+     * 这里**只存值，不收敛**：档位表的唯一来源是 `:core:player` 的
+     * [SpeedBoostOptions.normalize]，数据层再抄一份就会有两处默认值。
+     */
+    val boostSpeed: Float? = null,
 )
 
 /**

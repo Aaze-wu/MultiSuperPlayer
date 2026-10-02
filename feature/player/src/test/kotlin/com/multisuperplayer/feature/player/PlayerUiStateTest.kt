@@ -131,15 +131,62 @@ class PlayerUiStateTest {
         // 但在此之前得先跑一遍界面的错误。
         val state = PlayerUiState()
         state.applyLevelHint(PlayerLevelHint(isVolume = true, percent = 60))
-        state.setSeekHint(-PlayerGestures.DOUBLE_TAP_SEEK_MS)
+        state.applySeekHint(PlayerSeekHint(deltaMs = -PlayerGestures.DOUBLE_TAP_SEEK_MS))
 
         assertEquals(PlayerLevelHint(isVolume = true, percent = 60), state.levelHint)
-        assertEquals(-PlayerGestures.DOUBLE_TAP_SEEK_MS, state.seekHintMs!!)
+        assertEquals(-PlayerGestures.DOUBLE_TAP_SEEK_MS, state.seekHint!!.deltaMs)
 
         // 收起快进提示不应该顺手把音量泡也清掉：一次双击之后音量泡还该显示一会儿。
-        state.setSeekHint(null)
-        assertNull(state.seekHintMs)
+        state.applySeekHint(null)
+        assertNull(state.seekHint)
         assertEquals(PlayerLevelHint(isVolume = true, percent = 60), state.levelHint)
+    }
+
+    @Test
+    fun `拖动提示带着落点`() {
+        // 双击只知道「跳了 10 秒」，拖动知道「会跳到哪儿」——两者共用一种提示类型，
+        // 但落点是分开的：双击时它是 null（落点由内核算，界面不猜），
+        // 拖动时它是具体的位置。混淆这一段的话拖动提示会显示成「0 秒」。
+        val state = PlayerUiState()
+        state.applySeekHint(
+            PlayerSeekHint(deltaMs = 12_000L, targetMs = 42_000L, durationMs = 60_000L),
+        )
+        assertEquals(42_000L, state.seekHint!!.targetMs)
+        assertEquals(60_000L, state.seekHint!!.durationMs)
+    }
+
+    @Test
+    fun `长按加速的提示记的是速度本身`() {
+        // 存布尔（「正在加速」）的话，提示泡要知道倍速就得再去问一次设置——
+        // 于是「提示写着 2×、实际下给内核的是 3×」这种事有了发生的余地。
+        val state = PlayerUiState()
+        assertNull(state.speedBoost)
+
+        state.applySpeedBoost(2f)
+        assertEquals(2f, state.speedBoost!!, 0f)
+
+        state.applySpeedBoost(null)
+        assertNull(state.speedBoost)
+    }
+
+    @Test
+    fun `锁定会顺手收掉加速提示`() {
+        // 按住画面的同时点了锁定：锁定是「把手从画面上拿开」的语义，
+        // 提示泡留在屏幕上会像一个关不掉的浮层。
+        val state = PlayerUiState()
+        state.applySpeedBoost(3f)
+        state.applyLocked(true)
+        assertNull(state.speedBoost)
+    }
+
+    @Test
+    fun `解锁不会自己亮起加速提示`() {
+        // 反向也要钉：如果 `applyLocked` 里写成了「按参数以外的逻辑」去设置
+        // speedBoost，解锁就会让一个从未按下的提示泡冒出来。
+        val state = PlayerUiState()
+        state.applyLocked(true)
+        state.applyLocked(false)
+        assertNull(state.speedBoost)
     }
 
     @Test

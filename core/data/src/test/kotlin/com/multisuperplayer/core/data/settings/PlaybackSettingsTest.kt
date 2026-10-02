@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.data.settings
 
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import org.junit.Assert.assertEquals
@@ -80,5 +81,49 @@ class PlaybackSettingsTest {
         ).toPlaybackSettings()
 
         assertNull(settings.forceSoftwareDecoding)
+    }
+
+    @Test
+    fun `长按倍速的键名也是写入用户设备的契约`() {
+        // 和软件解码开关同理：改了字面量，已安装用户的值就读不出来，
+        // 表现为「升级后长按倍速自己变回 2×」。数据层**不做收敛**
+        // （档位表在 core:player 的 SpeedBoostOptions 里，收敛只发生一次），
+        // 所以这里存进去什么就该读出来什么——包括一个不在档位上的值。
+        val settings = preferencesOf(
+            floatPreferencesKey("playback.boost_speed") to 3f,
+        ).toPlaybackSettings()
+
+        assertEquals(3f, settings.boostSpeed!!, 0f)
+    }
+
+    @Test
+    fun `没设置过长按倍速时是 null 而不是 0`() {
+        // 0 会被 `coerceIn` 之类的东西悄悄放过，然后在界面上显示成
+        // 「按住 = 0×」——按下去像卡住。null 才是「没设置过」，由
+        // SpeedBoostOptions 统一给出默认值。
+        val empty = preferencesOf().toPlaybackSettings()
+
+        assertNull(empty.boostSpeed)
+
+        // 但「写过 0」是**另一个**事实：数据层如实读出来，不替上层判断
+        // 这个值合不合理（上层有一次性的收敛，见 SpeedBoostOptions）。
+        val zero = preferencesOf(
+            floatPreferencesKey("playback.boost_speed") to 0f,
+        ).toPlaybackSettings()
+
+        assertNotNull(zero.boostSpeed)
+        assertEquals(0f, zero.boostSpeed!!, 0f)
+    }
+
+    @Test
+    fun `长按倍速不会被别的键带出来`() {
+        // 和 speed 挨着放的两个浮点键，写错了不会报错，只会让「默认倍速」
+        // 把「长按倍速」的值顶掉。
+        val settings = preferencesOf(
+            floatPreferencesKey("playback.speed") to 1.5f,
+        ).toPlaybackSettings()
+
+        assertNull(settings.boostSpeed)
+        assertEquals(1.5f, settings.speed!!, 0f)
     }
 }

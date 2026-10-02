@@ -41,14 +41,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.player.MspDecoderKind
 import com.multisuperplayer.core.player.MspPlaybackState
+import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
@@ -203,10 +206,10 @@ fun PlayerRoute(
         }
     }
 
-    LaunchedEffect(ui.seekHintMs) {
-        if (ui.seekHintMs != null) {
+    LaunchedEffect(ui.seekHint) {
+        if (ui.seekHint != null) {
             delay(GESTURE_HINT_TIMEOUT_MS)
-            ui.setSeekHint(null)
+            ui.applySeekHint(null)
         }
     }
 
@@ -216,6 +219,20 @@ fun PlayerRoute(
     // 不该让下一部也默认被裁（见 `PlaybackSettings.aspectRatioMode` 的注释）。
     // 存默认值的地方是设置页。
     val aspectRatio = ui.aspectRatio(settings.aspectRatioMode ?: AspectRatioMode.DEFAULT)
+
+    // 长按加速用的倍速。在这里算**一次**，同时交给手势层和提示泡——两边都走
+    // 同一个函数，就能保证「提示泡写 2×」和「真的下给内核的 2×」是同一个数。
+    val boostSpeed = SpeedBoostOptions.normalize(settings.boostSpeed)
+
+    // 离开播放页时把加速收掉。
+    //
+    // 手势层里的 `finally` 已经覆盖了绝大多数情况（协程被取消时会跑），但那是
+    // 「手势协程生命周期」的保证，而页面被换掉时还可能有别的顺序（比如这页的
+    // 组合先被丢掉、ViewModel 后清）。速度是全局的播放状态，漏收的后果是
+    // 「回到媒体库还在 2 倍速放着」——用户只会把它描述成「播放器抽风了」。
+    DisposableEffect(Unit) {
+        onDispose { viewModel.setSpeedBoost(false) }
+    }
 
     PlayerScreen(
         state = state,
@@ -227,6 +244,8 @@ fun PlayerRoute(
         aspectRatio = aspectRatio,
         isLandscape = isLandscape,
         windowController = windowController,
+        boostSpeed = boostSpeed,
+        onSpeedBoost = viewModel::setSpeedBoost,
         subtitleState = subtitleState,
         modifier = modifier,
         onTogglePlayPause = viewModel::togglePlayPause,
@@ -324,6 +343,7 @@ fun PlayerScreen(
     aspectRatio: AspectRatioMode = AspectRatioMode.DEFAULT,
     isLandscape: Boolean = false,
     windowController: PlayerWindowController? = null,
+    boostSpeed: Float = SpeedBoostOptions.DEFAULT,
     subtitleState: SubtitleUiState = SubtitleUiState(),
     onTogglePlayPause: () -> Unit = {},
     onSkipNext: () -> Unit = {},
@@ -334,6 +354,7 @@ fun PlayerScreen(
     onToggleShuffle: () -> Unit = {},
     onOpenSubtitles: () -> Unit = {},
     onCycleAbRepeat: () -> Unit = {},
+    onSpeedBoost: (Boolean) -> Unit = {},
 ) {
     // 手势只在视频上挂。音频页中间是可滚动的歌词/封面，一层吃掉全部触摸的
     // 手势层会和滚动直接抢事件——那种「歌词划不动」的 bug 极难归因。
@@ -341,6 +362,8 @@ fun PlayerScreen(
     val gestureModifier = Modifier.playerGestures(
         enabled = gesturesEnabled,
         controller = windowController,
+        positionMs = positionMs,
+        durationMs = state.durationMs,
         // 竖屏的控制条在画面外面、一直可见，轻点不需要做任何事（传 null）。
         onTap = if (isLandscape) ui::toggleControls else null,
         onDoubleTap = { side ->
@@ -350,9 +373,19 @@ fun PlayerScreen(
                 PlayerGestures.DOUBLE_TAP_SEEK_MS
             }
             onSeekBy(delta)
-            ui.setSeekHint(delta)
+            // 双击只知道「跳了 10 秒」，落点由内核算——所以不填 targetMs。
+            ui.applySeekHint(PlayerSeekHint(deltaMs = delta))
         },
+        // 拖动中只显示提示，松手才真的跳（见 PlayerGestureModifier 的 KDoc）。
+        onSeekPreview = ui::applySeekHint,
+        onSeekCommit = onSeekTo,
         onLevelChange = ui::applyLevelHint,
+        onSpeedBoost = { boosting ->
+            // 提示泡和真正的加速是同一件事的两个面，两者都在同一帧里完成，
+            // 不会出现「提示写着 2× 而声音还是原速」。
+            ui.applySpeedBoost(if (boosting) boostSpeed else null)
+            onSpeedBoost(boosting)
+        },
     )
 
     // 画面层做成一个「接收外框 modifier」的 lambda 在两套布局之间复用：
@@ -471,6 +504,12 @@ private fun PortraitLayout(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
             GestureHints(ui = ui, modifier = Modifier.align(Alignment.Center))
+            ui.speedBoost?.let { speed ->
+                PlayerBoostIndicator(
+                    speed = speed,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            }
         }
 
         TrackInfo(entry = entry, decoderKind = state.decoderKind)
@@ -559,6 +598,12 @@ private fun LandscapeLayout(
         }
 
         GestureHints(ui = ui, modifier = Modifier.align(Alignment.Center))
+        ui.speedBoost?.let { speed ->
+            PlayerBoostIndicator(
+                speed = speed,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        }
 
         // 出错时用居中的小胶囊而不是竖屏那条通栏横幅：横屏的上下两条已经被
         // 控制层占着，通栏横幅会盖住「退出全屏」那个按钮，而错误信息通常要
@@ -596,31 +641,35 @@ private fun LandscapeLayout(
 }
 
 /**
- * 手势反馈：亮度/音量提示、双击快进快退提示。
+ * 手势反馈：亮度/音量提示、拖动进度提示。
  *
- * 两处都放在画面正中间：手指在屏幕的上下两端拖动时，中间的提示不会被手挡住。
+ * 两者都放在画面正中间：手指在屏幕的上下两端拖动时，中间的提示不会被手挡住。
+ * 长按加速的提示泡不在这个组合里（它在顶部），见 [PlayerBoostIndicator]。
  */
 @Composable
 private fun GestureHints(ui: PlayerUiState, modifier: Modifier = Modifier) {
     ui.levelHint?.let { hint ->
         PlayerLevelIndicator(hint = hint, modifier = modifier)
     }
-    ui.seekHintMs?.let { delta ->
-        PlayerSeekIndicator(deltaMs = delta, modifier = modifier)
+    ui.seekHint?.let { hint ->
+        PlayerSeekIndicator(hint = hint, modifier = modifier)
     }
 }
 
 /**
- * 「快退 10 秒 / 快进 10 秒」的提示。
+ * 进度提示：双击时是「快进 10 秒」，水平拖动时是「会跳到 00:52 / 01:00」。
  *
  * 双击跳转本身在进度条上是看得见的（全屏时那条进度条正跟着控制层一起出现），
  * 但**全屏且控制层已淡出**的时候画面里什么都没有，用户会怀疑「是不是没反应」。
- * 这个胶囊就是那个「有反应」。
+ * 这个胶囊就是那个「有反应」。对水平拖动它还多一层作用：手指正按在画面上，
+ * 想看的位置常常就在手指底下，而这里写着松手会落到哪里。
  */
 @Composable
-private fun PlayerSeekIndicator(deltaMs: Long, modifier: Modifier = Modifier) {
-    val forward = deltaMs > 0
-    val seconds = kotlin.math.abs(deltaMs) / 1000
+private fun PlayerSeekIndicator(hint: PlayerSeekHint, modifier: Modifier = Modifier) {
+    // deltaMs == 0（拖出去又拖回原处）算「快进」：此时显示的是「+0 秒」，
+    // 方向和数字都是诚实的，没必要为这一个中间态再造一个图标。
+    val forward = hint.deltaMs >= 0
+    val target = hint.targetMs
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -636,8 +685,61 @@ private fun PlayerSeekIndicator(deltaMs: Long, modifier: Modifier = Modifier) {
                 imageVector = if (forward) Icons.Filled.FastForward else Icons.Filled.FastRewind,
                 contentDescription = null,
             )
-            Text(text = "$seconds 秒", style = MaterialTheme.typography.titleMedium)
+            if (target == null) {
+                // 双击：只知道「跳了多少」，落点由内核算，不猜。
+                Text(
+                    text = "${abs(hint.deltaMs) / 1000} 秒",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "${TimeFormat.clock(target)} / ${TimeFormat.clock(hint.durationMs)}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = signedSeconds(hint.deltaMs),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
+    }
+}
+
+/**
+ * 「2× 加速中」的提示。
+ *
+ * 加速是一个**没有别的反馈**的状态：画面完全没变，声音变快了很容易被当成
+ * 「手机卡了」或者「音画不同步」。这个胶囊是唯一能把这三种情况区分开的东西，
+ * 所以它得一直挂着（不像其他提示泡那样几秒后自己消失）。
+ *
+ * 放在顶部而不是中间：长按的时候手指是不动的，不需要避开；而中间那块要留给
+ * 「拖进度」的提示，两者虽然不会同时出现，但位置固定下来比猜「现在会不会撞"更可靠。
+ */
+@Composable
+private fun PlayerBoostIndicator(speed: Float, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = modifier,
+    ) {
+        Text(
+            text = "${SpeedBoostOptions.format(speed)} 加速中",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/** 「+12 秒」/「-8 秒」/「0 秒」。 */
+private fun signedSeconds(deltaMs: Long): String {
+    val seconds = abs(deltaMs) / 1000
+    return when {
+        deltaMs > 0L -> "+$seconds 秒"
+        deltaMs < 0L -> "-$seconds 秒"
+        else -> "0 秒"
     }
 }
 

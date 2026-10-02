@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
@@ -66,6 +67,7 @@ import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
+import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import org.koin.androidx.compose.koinViewModel
@@ -99,6 +101,7 @@ fun SettingsRoute(
         onSetForceSoftwareDecoding = viewModel::setForceSoftwareDecoding,
         onSetAspectRatioMode = viewModel::setAspectRatioMode,
         onSetSpeed = viewModel::setSpeed,
+        onSetBoostSpeed = viewModel::setBoostSpeed,
         onSetRememberPosition = viewModel::setRememberPosition,
         onOpenTranslationSettings = onOpenTranslationSettings,
     )
@@ -119,6 +122,7 @@ fun SettingsScreen(
     onSetForceSoftwareDecoding: (Boolean) -> Unit = {},
     onSetAspectRatioMode: (AspectRatioMode) -> Unit = {},
     onSetSpeed: (Float) -> Unit = {},
+    onSetBoostSpeed: (Float) -> Unit = {},
     onSetRememberPosition: (Boolean) -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
 ) {
@@ -272,6 +276,19 @@ fun SettingsScreen(
             }
 
             item {
+                // 长按画面的倍速。和「默认倍速」是两件事：默认倍速是「我想一直
+                // 用这个速度播」，这个是「我想临时听快一点」——所以它的档位表里
+                // 没有 0.5×/0.75× 这种「比原速慢」的值，最小值就是 1.5×。
+                SettingChoiceRow(
+                    icon = Icons.Outlined.FastForward,
+                    title = "长按倍速",
+                    value = SpeedBoostOptions.format(playback.boostSpeed),
+                    subtitle = "按住画面时用这个速度，松手回到原来的速度。",
+                    onClick = { openDialog = SettingsDialog.BOOST_SPEED },
+                )
+            }
+
+            item {
                 val remember = playback.rememberPosition ?: true
                 SettingsSwitchRow(
                     icon = { Icon(Icons.Outlined.History, contentDescription = null) },
@@ -326,6 +343,22 @@ fun SettingsScreen(
             description = { if (it == PlaybackSpeedOptions.DEFAULT) "正常速度" else null },
             onSelect = { speed ->
                 onSetSpeed(speed)
+                openDialog = null
+            },
+            onDismiss = { openDialog = null },
+        )
+
+        SettingsDialog.BOOST_SPEED -> ChoiceDialog(
+            title = "长按倍速",
+            // 注意这里**不能**用 `PlaybackSpeedOptions.PRESETS`：那张表有 10 档，
+            // 包含 0.5×/0.75×，而「按住反而变慢」既不是这个功能的意图，也会让
+            // 用户以为按住是在出问题。
+            options = SpeedBoostOptions.PRESETS,
+            selected = SpeedBoostOptions.normalize(playback.boostSpeed),
+            label = { SpeedBoostOptions.format(it) },
+            description = { if (it == SpeedBoostOptions.DEFAULT) "默认值" else null },
+            onSelect = { speed ->
+                onSetBoostSpeed(speed)
                 openDialog = null
             },
             onDismiss = { openDialog = null },
@@ -513,7 +546,7 @@ private fun AccentSwatch(
 // --------------------------------------------------------------------- 选择行 / 选择对话框
 
 /** 设置页上会弹出的选择对话框。 */
-private enum class SettingsDialog { ASPECT_RATIO, SPEED }
+private enum class SettingsDialog { ASPECT_RATIO, SPEED, BOOST_SPEED }
 
 /**
  * 「当前值 + 点开选择」的一行。

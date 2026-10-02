@@ -13,6 +13,8 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
 import com.multisuperplayer.core.player.PlaybackController
+import com.multisuperplayer.core.player.PlaybackSpeedOptions
+import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.player.clampPlaybackSpeed
 import com.multisuperplayer.core.ui.theme.ArtworkAccent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -132,9 +134,52 @@ class PlayerViewModel(
         }
     }
 
+    /**
+     * 长按画面的临时加速：`true` = 按下，`false` = 松手。
+     *
+     * ## 为什么不走 [setSpeed]
+     *
+     * [setSpeed] 会把速度**写回设置**。长按加速是「按住这两秒」的事，写盘的话
+     * 一次手滑就等于把用户的默认倍速永久改成了 2×（而且中途松手时的「恢复原速」
+     * 会变成「把默认倍速改成原速」——两个 bug 叠在一起，用户看到的是
+     * 「设置里的默认倍速自己变了」）。所以这里只下令给内核，不碰设置。
+     *
+     * ## 恢复用的是设置里的值，不是「加速前读到的值」
+     *
+     * 两者在正常情况下一样，但「加速前读一次」会在某个边界上出错：用户按住的同时
+     * 另一处把速度改了（比如倍速面板），恢复时就会把一个更旧的值写回去。
+     * 设置里的值才是「用户想要的速度」这本账。
+     *
+     * ## 为什么要一个字段记着「正在加速」
+     *
+     * 因为「松手」这个事件可能来两次（手势层的兜底 + 离开页面时的 onDispose），
+     * 也可能在从未加速过的时候就来一次。没有这个标记的话，一次多余的
+     * `setSpeedBoost(false)` 会把用户当前的倍速重设一遍——听起来无害，但用户如果
+     * 正好在加速期间用面板改了倍速，这一次重设就会把它抹掉。有标记之后这个调用
+     * 是幂等的。
+     */
+    fun setSpeedBoost(boosting: Boolean) {
+        if (boosting == speedBoostActive) return
+        speedBoostActive = boosting
+        if (boosting) {
+            controller.setSpeed(SpeedBoostOptions.normalize(settings.value.boostSpeed))
+        } else {
+            controller.setSpeed(
+                clampPlaybackSpeed(settings.value.speed ?: PlaybackSpeedOptions.DEFAULT),
+            )
+        }
+    }
+
+    /**
+     * 本次会话里「我们正主动改成加速倍速」这个事实。
+     *
+     * 它不是播放状态的副本（那个在内核的 `state` 里），内核也不知道「有根手指
+     * 正按着屏幕」——恢复原速这件事只能由发起方自己负责。
+     */
+    private var speedBoostActive = false
+
     /** A-B 循环按「空 → 定 A → 定 B → 清空」轮转。 */
     fun cycleAbRepeat() = controller.cycleAbRepeat()
-
     /** 循环模式按「关 → 单曲 → 列表」轮转。 */
     fun cycleRepeatMode() {
         val next = when (controller.state.value.repeatMode) {

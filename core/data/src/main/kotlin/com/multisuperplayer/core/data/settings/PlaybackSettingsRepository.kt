@@ -68,6 +68,10 @@ class PlaybackSettingsRepository(
         it[Keys.REMEMBER_POSITION] = enabled
     }
 
+    suspend fun setBoostSpeed(speed: Float) = edit {
+        it[Keys.BOOST_SPEED] = speed
+    }
+
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         withContext(dispatchers.io) { store.edit(block) }
     }
@@ -86,6 +90,9 @@ class PlaybackSettingsRepository(
         val SPEED = floatPreferencesKey("playback.speed")
 
         val REMEMBER_POSITION = booleanPreferencesKey("playback.remember_position")
+
+        /** 长按画面时的临时倍速（见 [PlaybackSettings.boostSpeed]）。 */
+        val BOOST_SPEED = floatPreferencesKey("playback.boost_speed")
     }
 }
 
@@ -104,4 +111,5 @@ internal fun Preferences.toPlaybackSettings(): PlaybackSettings = PlaybackSettin
         ?.let(AspectRatioMode::fromId),
     speed = this[PlaybackSettingsRepository.Keys.SPEED],
     rememberPosition = this[PlaybackSettingsRepository.Keys.REMEMBER_POSITION],
+    boostSpeed = this[PlaybackSettingsRepository.Keys.BOOST_SPEED],
 )

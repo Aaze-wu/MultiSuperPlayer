@@ -1,6 +1,8 @@
 package com.multisuperplayer.feature.player
 
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * 播放页手势的**数学部分**。
@@ -77,4 +79,70 @@ object PlayerGestures {
     /** 显示用的百分比（0–100 的整数）。 */
     fun levelPercent(level: Float): Int =
         if (level.isNaN()) 0 else (level.coerceIn(0f, 1f) * 100f).roundToInt()
+
+    // ---- 拖动方向 ----
+
+    /**
+     * 一次拖动被**锁定**到哪个方向。
+     *
+     * 这不是「这一帧往哪边动了多少」，而是一个一次性决定、之后整条手势都遵守的锁。
+     * 非做成锁不可的原因：竖直拖动（音量/亮度）和水平拖动（进度）都是拖动，
+     * 两者都会在超过 slop 时 `consume()` 事件，谁先被判定都会把事件吃掉。两个
+     * 检测器并排挂着的后果是**斜着划一下会同时改音量、跳进度**，而且改多少取决于
+     * 两个检测器各自收到事件的顺序——这种 bug 在手上表现为「有时候音量自己变了」，
+     * 极难复现。锁定之后，一次手势从头到尾只认一个方向。
+     */
+    enum class DragAxis { NONE, HORIZONTAL, VERTICAL }
+
+    /**
+     * 从按下点开始的位移 [dx]/[dy] 是否已经足够判定方向。
+     *
+     * 返回 [DragAxis.NONE] 表示「还看不出来」——手指没动，或者没动够 [slop]。
+     * 调用方要一直问，直到拿到非 NONE 或者手指抬起/长按超时。
+     *
+     * [slop] 必须传 `viewConfiguration.touchSlop`：那是系统认为「这已经不是一次点击」
+     * 的阈值，自己写一个 30px 之类的常数会在小屏上让点击被误判成拖动、在大屏上
+     * 让拖动迟钝。
+     *
+     * 平局（`abs(dx) == abs(dy)`，也就是正好 45°）判**竖直**：水平拖动会在**松手
+     * 那一刻**一次性跳转进度，竖直拖动是可以随手拖回来的连续量。两者一样近的时候，
+     * 选那个「万一猜错了、用户损失更小」的。
+     */
+    fun axisFor(dx: Float, dy: Float, slop: Float): DragAxis {
+        // NaN 会一路骗过所有比较（`NaN > x` 恒假），落到竖直分支上；
+        // 真出现 NaN 说明上游拿到的位置是坏的，此时什么也不做最安全。
+        if (!dx.isFinite() || !dy.isFinite()) return DragAxis.NONE
+        val ax = abs(dx)
+        val ay = abs(dy)
+        if (ax < slop && ay < slop) return DragAxis.NONE
+        return if (ax > ay) DragAxis.HORIZONTAL else DragAxis.VERTICAL
+    }
+
+    /**
+     * 水平拖动之后的播放位置。
+     *
+     * 「拖满整个宽度 = 跳过整片时长」：和 [levelAfterDrag] 一样，手感要跟屏幕的
+     * 比例走而不是跟像素走。1080p 的手机上拖 1px ≈ 长片（2 小时）的 6.7 秒，
+     * 拖过四分之一屏就是半小时——这正是各家播放器的比例，也刚好够「精确到几秒」。
+     *
+     * 结果一律夹在 `0..durationMs`：越界不夹的话会把负数或超过结尾的位置喂给
+     * `seekTo`，内核对超出结尾的位置会跳到结尾并从那儿继续（表现为「拖过头就播完了」）。
+     *
+     * 时长未知时返回**原位置**（不是 0）：时长未知只发生在起播阶段，此时用户
+     * 拖了一下却被弹回开头，比「拖了没反应」更像故障。[totalDx] 为 NaN 同理。
+     */
+    fun seekTarget(
+        startPositionMs: Long,
+        totalDx: Float,
+        width: Float,
+        durationMs: Long,
+    ): Long {
+        if (durationMs <= 0L || !totalDx.isFinite()) return startPositionMs.coerceAtLeast(0L)
+        val start = startPositionMs.coerceIn(0L, durationMs)
+        if (width <= 0f || !width.isFinite()) return start
+        // 用 Double 乘：一部 3 小时的片子是 1.08e7 毫秒，Float 只有 24 位有效位，
+        // 乘法后半段的精度会掉到几毫秒，长时间轴的拖动手感会变得一顿一顿的。
+        val offset = durationMs.toDouble() * (totalDx / width)
+        return (start + offset.roundToLong()).coerceIn(0L, durationMs)
+    }
 }
