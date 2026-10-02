@@ -104,9 +104,6 @@ class PlayerViewModel(
 
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
 
-    /** 快进/快退 10 秒。 */
-    fun seekBy(deltaMs: Long) = controller.seekBy(deltaMs)
-
     /**
      * 设置播放速度，并**记住**它。
      *

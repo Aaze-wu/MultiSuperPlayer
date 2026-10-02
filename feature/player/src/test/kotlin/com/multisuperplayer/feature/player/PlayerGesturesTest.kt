@@ -152,11 +152,6 @@ class PlayerGesturesTest {
         assertEquals(0, PlayerGestures.levelPercent(Float.NaN))
     }
 
-    @Test
-    fun `双击步长是 10 秒`() {
-        assertEquals(10_000L, PlayerGestures.DOUBLE_TAP_SEEK_MS)
-    }
-
     // ---- 拖动方向判定 ----
 
     @Test

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -67,11 +68,20 @@ private const val CONTROLS_TIMEOUT_MS = 4_000L
 private const val LOCK_HINT_TIMEOUT_MS = 3_000L
 
 /**
- * 亮度/音量提示泡、以及双击快进提示留在屏幕上的时长。
+ * 亮度/音量、拖动进度的提示泡留在屏幕上的时长。
  *
  * 比控制条短得多：这两个是**手指还在屏幕上的操作**的反馈，手指一松就该让开。
  */
 private const val GESTURE_HINT_TIMEOUT_MS = 800L
+
+/**
+ * 双击播放/暂停的提示留在屏幕上的时长。
+ *
+ * 比上一个长一点：它不是「手指还在屏幕上」的反馈（双击是一次已经做完的动作），
+ * 而是唯一能证明「双击起作用了」的东西——横屏全屏时控制条多半已经淡出，
+ * 按钮图标那个变化用户根本看不到，提示丢得太快跟没有提示几乎一样。
+ */
+private const val PLAY_PAUSE_HINT_TIMEOUT_MS = 1_000L
 
 /**
  * 播放页入口（有状态）。
@@ -213,6 +223,13 @@ fun PlayerRoute(
         }
     }
 
+    LaunchedEffect(ui.playPauseHint) {
+        if (ui.playPauseHint != null) {
+            delay(PLAY_PAUSE_HINT_TIMEOUT_MS)
+            ui.applyPlayPauseHint(null)
+        }
+    }
+
     // 画面比例 = 「这一部片子临时改过的」优先，否则用设置里的默认值。
     //
     // 这里**不**把临时改动写回设置：看一部老片时裁掉两边是这一部片子的事，
@@ -252,7 +269,6 @@ fun PlayerRoute(
         onSkipNext = viewModel::skipToNext,
         onSkipPrevious = viewModel::skipToPrevious,
         onSeekTo = viewModel::seekTo,
-        onSeekBy = viewModel::seekBy,
         onCycleRepeat = viewModel::cycleRepeatMode,
         onToggleShuffle = viewModel::toggleShuffle,
         onCycleAbRepeat = viewModel::cycleAbRepeat,
@@ -349,7 +365,6 @@ fun PlayerScreen(
     onSkipNext: () -> Unit = {},
     onSkipPrevious: () -> Unit = {},
     onSeekTo: (Long) -> Unit = {},
-    onSeekBy: (Long) -> Unit = {},
     onCycleRepeat: () -> Unit = {},
     onToggleShuffle: () -> Unit = {},
     onOpenSubtitles: () -> Unit = {},
@@ -366,15 +381,14 @@ fun PlayerScreen(
         durationMs = state.durationMs,
         // 竖屏的控制条在画面外面、一直可见，轻点不需要做任何事（传 null）。
         onTap = if (isLandscape) ui::toggleControls else null,
-        onDoubleTap = { side ->
-            val delta = if (side == PlayerGestures.Side.LEFT) {
-                -PlayerGestures.DOUBLE_TAP_SEEK_MS
-            } else {
-                PlayerGestures.DOUBLE_TAP_SEEK_MS
-            }
-            onSeekBy(delta)
-            // 双击只知道「跳了 10 秒」，落点由内核算——所以不填 targetMs。
-            ui.applySeekHint(PlayerSeekHint(deltaMs = delta))
+        // 双击 = 播放/暂停。
+        //
+        // 提示说的是**切换之后**的状态：手势回调手上只有「切换前」的状态，而切换
+        // 是异步的（命令要走到内核再传回来），等它回来再算会晚一拍。取反就是结果。
+        onDoubleTap = {
+            val willPlay = !state.isPlaying
+            onTogglePlayPause()
+            ui.applyPlayPauseHint(willPlay)
         },
         // 拖动中只显示提示，松手才真的跳（见 PlayerGestureModifier 的 KDoc）。
         onSeekPreview = ui::applySeekHint,
@@ -641,10 +655,12 @@ private fun LandscapeLayout(
 }
 
 /**
- * 手势反馈：亮度/音量提示、拖动进度提示。
+ * 手势反馈：亮度/音量提示、拖动进度提示、双击播放/暂停提示。
  *
- * 两者都放在画面正中间：手指在屏幕的上下两端拖动时，中间的提示不会被手挡住。
- * 长按加速的提示泡不在这个组合里（它在顶部），见 [PlayerBoostIndicator]。
+ * 三者都放在画面正中间：手指在屏幕上下两端拖动时，中间的提示不会被手挡住。
+ * 它们画在**同一个位置**上，所以 [PlayerUiState] 保证同一时刻最多只有一个非空
+ * （见那边的 `applyXxx`）。长按加速的提示泡不在这个组合里（它在顶部），
+ * 见 [PlayerBoostIndicator]。
  */
 @Composable
 private fun GestureHints(ui: PlayerUiState, modifier: Modifier = Modifier) {
@@ -654,22 +670,22 @@ private fun GestureHints(ui: PlayerUiState, modifier: Modifier = Modifier) {
     ui.seekHint?.let { hint ->
         PlayerSeekIndicator(hint = hint, modifier = modifier)
     }
+    ui.playPauseHint?.let { playing ->
+        PlayerPlayPauseIndicator(playing = playing, modifier = modifier)
+    }
 }
 
 /**
- * 进度提示：双击时是「快进 10 秒」，水平拖动时是「会跳到 00:52 / 01:00」。
+ * 进度提示：拖动中显示「会跳到 00:52 / 01:00」。
  *
- * 双击跳转本身在进度条上是看得见的（全屏时那条进度条正跟着控制层一起出现），
- * 但**全屏且控制层已淡出**的时候画面里什么都没有，用户会怀疑「是不是没反应」。
- * 这个胶囊就是那个「有反应」。对水平拖动它还多一层作用：手指正按在画面上，
- * 想看的位置常常就在手指底下，而这里写着松手会落到哪里。
+ * 拖动本身已经能说明手势被识别了（画面上的进度条在动），但它**说不出落点**，
+ * 而手指正按在画面上、想看的位置常常就在手指底下。这个胶囊就是那个落点。
  */
 @Composable
 private fun PlayerSeekIndicator(hint: PlayerSeekHint, modifier: Modifier = Modifier) {
-    // deltaMs == 0（拖出去又拖回原处）算「快进」：此时显示的是「+0 秒」，
+    // deltaMs == 0（拖出去又拖回原处）算「前进」：此时显示的是「+0 秒」，
     // 方向和数字都是诚实的，没必要为这一个中间态再造一个图标。
     val forward = hint.deltaMs >= 0
-    val target = hint.targetMs
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -685,24 +701,50 @@ private fun PlayerSeekIndicator(hint: PlayerSeekHint, modifier: Modifier = Modif
                 imageVector = if (forward) Icons.Filled.FastForward else Icons.Filled.FastRewind,
                 contentDescription = null,
             )
-            if (target == null) {
-                // 双击：只知道「跳了多少」，落点由内核算，不猜。
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "${abs(hint.deltaMs) / 1000} 秒",
+                    text = "${TimeFormat.clock(hint.targetMs)} / ${TimeFormat.clock(hint.durationMs)}",
                     style = MaterialTheme.typography.titleMedium,
                 )
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "${TimeFormat.clock(target)} / ${TimeFormat.clock(hint.durationMs)}",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = signedSeconds(hint.deltaMs),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                Text(
+                    text = signedSeconds(hint.deltaMs),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
+        }
+    }
+}
+
+/**
+ * 双击播放/暂停的提示。
+ *
+ * 用「图标 + 文字」而不是只弹一个大图标：播放/暂停这两个状态是互斥的，一个
+ * Pause 图标单看只能说「你点到了某个按钮」，而「已暂停」这三个字把状态一起说
+ * 清楚——它正是用户双击之后最需要确认的那件事。
+ *
+ * @param playing true = 刚切成播放中，false = 刚切成已暂停。
+ */
+@Composable
+private fun PlayerPlayPauseIndicator(playing: Boolean, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = if (playing) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                contentDescription = null,
+            )
+            Text(
+                text = if (playing) "播放中" else "已暂停",
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
     }
 }

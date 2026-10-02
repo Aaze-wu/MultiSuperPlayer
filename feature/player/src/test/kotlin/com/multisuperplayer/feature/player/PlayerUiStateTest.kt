@@ -125,34 +125,72 @@ class PlayerUiStateTest {
     }
 
     @Test
-    fun `两个提示泡互不干扰`() {
-        // 合并成一个「提示」类型的话，显示「快进 10 秒」时很容易把 10000
+    fun `收起一个提示不会顺手收掉另一个`() {
+        // 合并成一个「提示」类型的话，显示「+12 秒」时很容易把 12000
         // 当成百分比画成一根满格的进度条——那是个看一秒就知道不对、
         // 但在此之前得先跑一遍界面的错误。
         val state = PlayerUiState()
         state.applyLevelHint(PlayerLevelHint(isVolume = true, percent = 60))
-        state.applySeekHint(PlayerSeekHint(deltaMs = -PlayerGestures.DOUBLE_TAP_SEEK_MS))
+        state.applySeekHint(
+            PlayerSeekHint(deltaMs = -12_000L, targetMs = 18_000L, durationMs = 60_000L),
+        )
 
         assertEquals(PlayerLevelHint(isVolume = true, percent = 60), state.levelHint)
-        assertEquals(-PlayerGestures.DOUBLE_TAP_SEEK_MS, state.seekHint!!.deltaMs)
+        assertEquals(-12_000L, state.seekHint!!.deltaMs)
 
-        // 收起快进提示不应该顺手把音量泡也清掉：一次双击之后音量泡还该显示一会儿。
+        // 收起进度提示不应该顺手把音量泡也清掉：两条手势挨得近时（拖完进度接着
+        // 又竖直拖了一下）音量泡还该在屏幕上。
         state.applySeekHint(null)
         assertNull(state.seekHint)
         assertEquals(PlayerLevelHint(isVolume = true, percent = 60), state.levelHint)
     }
 
     @Test
-    fun `拖动提示带着落点`() {
-        // 双击只知道「跳了 10 秒」，拖动知道「会跳到哪儿」——两者共用一种提示类型，
-        // 但落点是分开的：双击时它是 null（落点由内核算，界面不猜），
-        // 拖动时它是具体的位置。混淆这一段的话拖动提示会显示成「0 秒」。
+    fun `拖动提示同时带着落点和总时长`() {
+        // 提示泡上写的是「00:52 / 01:00」，两半都得是拖动那一刻算出来的。
+        // 落点写成可空的话，界面里就得留一段「没有落点」的画法，而那个分支
+        // 已经没有任何东西能产生了。
         val state = PlayerUiState()
         state.applySeekHint(
             PlayerSeekHint(deltaMs = 12_000L, targetMs = 42_000L, durationMs = 60_000L),
         )
+        assertEquals(12_000L, state.seekHint!!.deltaMs)
         assertEquals(42_000L, state.seekHint!!.targetMs)
         assertEquals(60_000L, state.seekHint!!.durationMs)
+    }
+
+    @Test
+    fun `播放暂停提示的三种状态`() {
+        // 提示说的是**切换之后**的状态：true = 刚切成播放中，false = 刚切成已暂停，
+        // null = 不显示。三种状态用 `Boolean?` 表达，不需要再包一层类型。
+        val state = PlayerUiState()
+        assertNull(state.playPauseHint)
+
+        state.applyPlayPauseHint(false)
+        assertEquals(false, state.playPauseHint)
+
+        state.applyPlayPauseHint(true)
+        assertEquals(true, state.playPauseHint)
+
+        state.applyPlayPauseHint(null)
+        assertNull(state.playPauseHint)
+    }
+
+    @Test
+    fun `屏幕正中同一时刻只放一个提示泡`() {
+        // 三个提示泡都画在画面正中。同时非空就会叠在一起，看着像界面坏了，
+        // 所以规则是「新的顶掉旧的」——而且只在**显示**时顶：传 null 是「收起」，
+        // 一个提示泡的计时器到期不该把另一个无关的提示也扫掉。
+        val state = PlayerUiState()
+        state.applyPlayPauseHint(true)
+
+        state.applyLevelHint(PlayerLevelHint(isVolume = false, percent = 30))
+        assertNull("新的提示泡应该把中间那块让出来", state.playPauseHint)
+        assertEquals(PlayerLevelHint(isVolume = false, percent = 30), state.levelHint)
+
+        state.applyPlayPauseHint(false)
+        assertNull(state.levelHint)
+        assertEquals(false, state.playPauseHint)
     }
 
     @Test

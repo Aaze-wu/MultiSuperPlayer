@@ -14,13 +14,6 @@ import kotlin.math.roundToLong
  */
 object PlayerGestures {
 
-    /**
-     * 双击快进/快退的时长。
-     *
-     * 10 秒是各家的共识：5 秒太小（要点很多次），30 秒太大（一次就越过了要找的位置）。
-     */
-    const val DOUBLE_TAP_SEEK_MS = 10_000L
-
     /** 屏幕的哪一半。 */
     enum class Side { LEFT, RIGHT }
 

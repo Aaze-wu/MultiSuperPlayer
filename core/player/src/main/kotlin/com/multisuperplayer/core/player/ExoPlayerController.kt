@@ -724,10 +724,6 @@ class ExoPlayerController(
         }
     }
 
-    override fun seekBy(deltaMs: Long) {
-        seekTo(_positionMs.value + deltaMs)
-    }
-
     override fun skipToNext() {
         onMain {
             player.seekToNextMediaItem()

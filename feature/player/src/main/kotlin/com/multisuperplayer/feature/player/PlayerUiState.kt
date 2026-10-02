@@ -22,22 +22,24 @@ data class PlayerLevelHint(val isVolume: Boolean, val percent: Int)
 /**
  * 屏幕中间那个「进度」提示泡的内容。
  *
- * 双击和水平拖动共用这一个类型，因为它们说的是**同一件事**（时间），只是信息
- * 多寡不同；而 [PlayerLevelHint] 不能合并进来，那是另一回事（0–100 的百分比）。
+ * 只有**水平拖动**会产生它：手指正按在画面上，想看的位置常常就在手指底下，
+ * 所以提示要写清楚「松手会落到哪儿」。
  *
- * @param deltaMs 相对本次动作起点的变化：正数 = 快进，负数 = 快退。
- *   双击就是 [PlayerGestures.DOUBLE_TAP_SEEK_MS]，拖动就是「目标位置 - 按下时的位置」。
- *   之所以连正负号也一起存：提示泡上要写「+12 秒 / -8 秒」，而这个符号只有产生
- *   这个提示的人手上有（拖动过程中还要用它来判断要不要写「已到头」）。
- * @param targetMs 拖动时的目标位置。null = 没有目标位置（双击快进只能告诉我们
- *   「跳了 10 秒」，最终落在哪里是内核算的，强行猜一个会和真实位置对不上）。
- * @param durationMs 总时长，用来画「00:52 / 01:00」。0 = 不显示。
+ * 三个字段都必需、没有默认值。它曾经也服务「双击快进」（那时只知道跳了多少、
+ * 落点由内核算，于是 `targetMs` 是可空的）——双击改成播放/暂停之后那条生产
+ * 路径就没有了，而留着一个**永远不为 null** 的可空字段，等于给界面留一段永远
+ * 不会执行的画法：下一个人只会据此以为「双击快进还在」。
+ *
+ * @param deltaMs 相对按下时的变化：正数 = 前进，负数 = 后退。连正负号一起存是
+ *   因为提示泡上要写「+12 秒 / -8 秒」，而这个符号只有产生这个提示的人手上有。
+ * @param targetMs 松手时会落到的位置。
+ * @param durationMs 总时长，用来画「00:52 / 01:00」。
  */
 @Immutable
 data class PlayerSeekHint(
     val deltaMs: Long,
-    val targetMs: Long? = null,
-    val durationMs: Long = 0L,
+    val targetMs: Long,
+    val durationMs: Long,
 )
 
 /** 播放页上会弹出的两种选择面板。 */
@@ -86,15 +88,34 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
         private set
 
     /**
-     * 双击快进 / 水平拖动的提示。null = 不显示。
+     * 水平拖动的进度提示。null = 不显示。
      *
      * 和 [levelHint] 分开而不是合并成一个「提示」类型：两者的值域和含义毫无关系
      * （一个是 0..100 的百分比，一个是时间），合并只会让两边都多一层拆包、
-     * 而拆错的时候没有任何东西会报错——只想显示「快进 10 秒」的时候
-     * 把 `10000` 当成百分比画成一根满格的进度条，是那种看一秒就知道不对、
-     * 但在此之前得先跑一遍界面的错误。
+     * 而拆错的时候没有任何东西会报错——想把 `12000` 当成百分比画成一根满格的
+     * 进度条，是那种看一秒就知道不对、但在此之前得先跑一遍界面的错误。
      */
     var seekHint: PlayerSeekHint? by mutableStateOf(null)
+        private set
+
+    /**
+     * 双击播放/暂停的提示。null = 不显示，true = 刚切成「播放中」，
+     * false = 刚切成「已暂停」。
+     *
+     * ## 为什么是可空布尔
+     *
+     * 三种状态（不显示 / 播放中 / 已暂停）正好就是 `Boolean?` 的三个取值，
+     * 再包一层 data class 只会在每个读写点多一次拆包；而参数名写成 `playing`
+     * 之后，调用点 `applyPlayPauseHint(!state.isPlaying)` 一眼能读出「提示的是
+     * 切换**之后**的状态」。
+     *
+     * ## 为什么要有它
+     *
+     * 双击是唯一**没有别的反馈**的手势：横屏全屏时控制条多半已经淡出，用户看不到
+     * 播放键图标那个变化，双击之后画面完全没变——他会以为手势没生效，于是再双击
+     * 一次，播放/暂停又切了回去，看起来就像「双击没反应」。
+     */
+    var playPauseHint: Boolean? by mutableStateOf(null)
         private set
 
     /**
@@ -182,13 +203,37 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
         lockHintVisible = false
     }
 
+    /**
+     * 显示/收起亮度音量提示。
+     *
+     * 三个提示泡都画在**同一个位置**（画面正中），所以这里顺手把中间让出来：
+     * 双击播放/暂停之后一秒内又开始拖动的话，两个胶囊会叠在一起，看着像界面坏了。
+     *
+     * 让位只在**显示**时发生（`hint != null`）：传 null 是「收起」，而一个提示泡
+     * 的计时器到期不该把另一个无关的提示也收走。
+     */
     fun applyLevelHint(hint: PlayerLevelHint?) {
         levelHint = hint
+        if (hint != null) playPauseHint = null
     }
 
-    /** 显示/收起进度提示。@param hint null = 收起。 */
+    /** 显示/收起进度提示。@param hint null = 收起（让位规则见 [applyLevelHint]）。 */
     fun applySeekHint(hint: PlayerSeekHint?) {
         seekHint = hint
+        if (hint != null) playPauseHint = null
+    }
+
+    /**
+     * 显示/收起双击播放/暂停的提示。
+     *
+     * @param playing true = 刚切成播放中，false = 刚切成已暂停，null = 收起。
+     */
+    fun applyPlayPauseHint(playing: Boolean?) {
+        playPauseHint = playing
+        if (playing != null) {
+            levelHint = null
+            seekHint = null
+        }
     }
 
     /** 开始/结束「按住加速」。@param speed null = 已松手。 */

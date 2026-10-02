@@ -125,9 +125,6 @@ interface PlaybackController {
     /** 跳到指定位置（毫秒），负值会被夹到 0。 */
     fun seekTo(positionMs: Long)
 
-    /** 相对当前位置跳转，例如「后退 10 秒」传 -10_000。 */
-    fun seekBy(deltaMs: Long)
-
     /** 下一项（循环模式下会绕回）。 */
     fun skipToNext()
 

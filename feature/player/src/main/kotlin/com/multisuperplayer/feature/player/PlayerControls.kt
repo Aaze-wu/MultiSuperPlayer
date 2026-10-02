@@ -419,7 +419,7 @@ internal fun PlayerLevelIndicator(hint: PlayerLevelHint, modifier: Modifier = Mo
  * 这一层要盖在**整块屏幕**上（上下两条要能拉到边缘），但中间那一大块必须让
  * 手势穿过去——所以整层没有背景，也不常驻手势接收器。Compose 的命中测试
  * 只认有 `pointerInput` 的节点，因此中间那块空白区域的触摸会落到下面的手势层上，
- * 双击快进和竖直拖动照常工作。
+ * 双击播放/暂停和竖直拖动照常工作。
  *
  * **不要在根节点上挂一个常驻的 `pointerInput`。** 同一个 Box 的兄弟节点里，
  * 命中测试在第一个命中的节点处停下（`sharePointerInputWithSiblings` 默认为 false），

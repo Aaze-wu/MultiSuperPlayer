@@ -24,7 +24,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * - 竖直拖动：左半边亮度、右半边音量，一边拖一边下给系统。
  * - 水平拖动：进度。拖动中只显示「会跳到哪儿」，**松手才真正跳**。
  * - 长按：按住期间用加速倍速播放，松手立刻恢复。
- * - 单击 / 双击（左右各快退快进 10 秒）——在第二个 `pointerInput` 里。
+ * - 单击（横屏：显示/隐藏控制条）与双击（播放/暂停）——在第二个 `pointerInput` 里。
+ *   双击原来分左右做快退/快进 10 秒，改成播放/暂停之后它就没有左右之分了。
  *
  * ## 为什么竖直和水平必须写在**同一个**检测器里
  *
@@ -45,6 +46,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   猜出来的位置比「没反应」更糟。
  * @param onTap null = 这一层不处理单击。竖屏下不需要（控制条本来就在画面外面、
  *   一直可见），传 null 可以让轻点完全不产生任何效果。
+ * @param onDoubleTap 双击 = 播放/暂停。**不传触摸位置**：它没有左右之分，
+ *   传进来只会让读代码的人以为「左右两边还各管一件事」（以前确实是：左退右进）。
  * @param onSeekPreview 水平拖动的中间结果，用来显示「会跳到 00:52」。
  * @param onSeekCommit 松手时真正跳转。拖动中**不**跳是有意的：一边拖一边跳会让
  *   画面不停地闪，而且内核每次 seek 都是有代价的。
@@ -60,7 +63,7 @@ internal fun Modifier.playerGestures(
     positionMs: Long,
     durationMs: Long,
     onTap: (() -> Unit)?,
-    onDoubleTap: (PlayerGestures.Side) -> Unit,
+    onDoubleTap: () -> Unit,
     onSeekPreview: (PlayerSeekHint) -> Unit,
     onSeekCommit: (Long) -> Unit,
     onLevelChange: (PlayerLevelHint) -> Unit,
@@ -231,9 +234,7 @@ internal fun Modifier.playerGestures(
             if (!enabled) return@pointerInput
             detectTapGestures(
                 onTap = latestTap?.let { callback -> { callback() } },
-                onDoubleTap = { offset ->
-                    latestDoubleTap(PlayerGestures.sideOf(offset.x, size.width.toFloat()))
-                },
+                onDoubleTap = { latestDoubleTap() },
                 // 必须给一个**非 null** 的空实现。
                 //
                 // onLongPress 为 null 时 detectTapGestures 会把长按超时设成
