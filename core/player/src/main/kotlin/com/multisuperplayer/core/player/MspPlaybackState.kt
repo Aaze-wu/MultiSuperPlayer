@@ -36,6 +36,23 @@ data class MspPlaybackState(
     val shuffleEnabled: Boolean = false,
     val volume: Float = 1f,
     /**
+     * 视频画面的原始尺寸；没有视频轨（纯音频）或还没解析出来时是
+     * [MspVideoSize.Unknown]。
+     *
+     * 界面用它算「画面该占多大」（见 `feature:player` 里的画面比例功能）。
+     * 没有它的话，比例切换只能靠 `PlayerView` 自己按 16:9 猜——猜错的方向是
+     * 「竖向视频被拉成横向」，而那看起来像文件坏了。
+     */
+    val videoSize: MspVideoSize = MspVideoSize.Unknown,
+    /**
+     * A-B 循环状态。空的表示没用这个功能。
+     *
+     * 放在状态里（而不是留在界面上）是因为**内核才是执行者**：绕回 A 点这件事
+     * 发生在位置刷新里，界面只负责画 A/B 两个标记。分成两处的话，界面上的标记
+     * 和实际的循环区间迟早会不一致。
+     */
+    val abRepeat: AbRepeatState = AbRepeatState.None,
+    /**
      * 当前**实际在用**的解码器类型，见 [MspDecoderKind]。
      *
      * 这不是一个装饰性字段。软件解码比硬件解码显著更耗电，

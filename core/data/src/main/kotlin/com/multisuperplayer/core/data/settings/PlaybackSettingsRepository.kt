@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +56,18 @@ class PlaybackSettingsRepository(
         it[Keys.FORCE_SOFTWARE_DECODING] = enabled
     }
 
+    suspend fun setAspectRatioMode(mode: AspectRatioMode) = edit {
+        it[Keys.ASPECT_RATIO_MODE] = mode.id
+    }
+
+    suspend fun setSpeed(speed: Float) = edit {
+        it[Keys.SPEED] = speed
+    }
+
+    suspend fun setRememberPosition(enabled: Boolean) = edit {
+        it[Keys.REMEMBER_POSITION] = enabled
+    }
+
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         withContext(dispatchers.io) { store.edit(block) }
     }
@@ -66,6 +80,12 @@ class PlaybackSettingsRepository(
          * 但**需要和已有键不重名**，所以单测里按字面量锁住了它。
          */
         val FORCE_SOFTWARE_DECODING = booleanPreferencesKey("playback.force_software_decoding")
+
+        val ASPECT_RATIO_MODE = stringPreferencesKey("playback.aspect_ratio_mode")
+
+        val SPEED = floatPreferencesKey("playback.speed")
+
+        val REMEMBER_POSITION = booleanPreferencesKey("playback.remember_position")
     }
 }
 
@@ -78,4 +98,10 @@ class PlaybackSettingsRepository(
  */
 internal fun Preferences.toPlaybackSettings(): PlaybackSettings = PlaybackSettings(
     forceSoftwareDecoding = this[PlaybackSettingsRepository.Keys.FORCE_SOFTWARE_DECODING],
+    // 认不出来的字符串会落到 [AspectRatioMode.fromId] 里的 FIT，也就是默认值；
+    // 「键不存在」保持 null。两者对消费者等价，但 null 保留了「没设置过」这个信息。
+    aspectRatioMode = this[PlaybackSettingsRepository.Keys.ASPECT_RATIO_MODE]
+        ?.let(AspectRatioMode::fromId),
+    speed = this[PlaybackSettingsRepository.Keys.SPEED],
+    rememberPosition = this[PlaybackSettingsRepository.Keys.REMEMBER_POSITION],
 )

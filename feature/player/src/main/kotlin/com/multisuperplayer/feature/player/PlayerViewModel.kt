@@ -6,10 +6,14 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.multisuperplayer.core.data.artwork.ArtworkColors
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
+import com.multisuperplayer.core.data.settings.PlaybackSettings
+import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
+import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
 import com.multisuperplayer.core.player.PlaybackController
+import com.multisuperplayer.core.player.clampPlaybackSpeed
 import com.multisuperplayer.core.ui.theme.ArtworkAccent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * 播放页 ViewModel。
@@ -34,7 +39,22 @@ import kotlinx.coroutines.flow.stateIn
 class PlayerViewModel(
     private val controller: PlaybackController,
     artworkPalette: ArtworkPaletteRepository,
+    private val playbackSettings: PlaybackSettingsRepository,
 ) : ViewModel() {
+
+    /**
+     * 播放偏好（画面比例默认值用得到）。
+     *
+     * 初值是一个**全是 null** 的设置对象，也就是「什么都没设置过」。
+     * 这不是占位符：界面在首帧就按「默认值」画，而磁盘上的值几毫秒后到，
+     * 由 [com.multisuperplayer.core.data.settings.PlaybackSettings] 那套
+     * 「可空 = 没设置过」的约定保证两者语义一致。
+     *
+     * `WhileSubscribed` + 5 秒：转屏会让这一页重建，保留 5 秒可以避免
+     * 重建时跟着设置一起闪一下（与 [artworkAccent] 同一个理由）。
+     */
+    val settings: StateFlow<PlaybackSettings> = playbackSettings.settings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), PlaybackSettings())
 
     val state: StateFlow<MspPlaybackState> = controller.state
     val currentEntry: StateFlow<MediaEntry?> = controller.currentEntry
@@ -85,7 +105,35 @@ class PlayerViewModel(
     /** 快进/快退 10 秒。 */
     fun seekBy(deltaMs: Long) = controller.seekBy(deltaMs)
 
-    fun setSpeed(speed: Float) = controller.setSpeed(speed)
+    /**
+     * 设置播放速度，并**记住**它。
+     *
+     * 写回设置是有意的：用 1.5 倍听播客的人希望下一集也是 1.5 倍。
+     * 两件事必须一起做——先下令给内核（画面立刻变）、再写盘（下次生效）。
+     *
+     * 存的是 [clampPlaybackSpeed] 算出的**请求值**，而不是写完去回读
+     * `state.playbackSpeed`。回读看起来更「以内核为准」，实际是错的：内核命令要
+     * 切主线程，回读必然拿到**上一个**速度——实测就是「选 1.5×、界面显示 1.5×、
+     * 存进设置的却是 1.0，重启后回到 1×」。夹取规则只有一份（内核和这里共用
+     * 同一个函数），所以「请求的值」和「内核真正用的值」一定是同一个。
+     *
+     * 写盘失败只记日志：设置存不下来是小事，不该把正在播的东西打断
+     * （何况 `viewModelScope` 里漏出去的异常会直接崩掉应用）。
+     */
+    fun setSpeed(speed: Float) {
+        val applied = clampPlaybackSpeed(speed)
+        controller.setSpeed(applied)
+        viewModelScope.launch {
+            try {
+                playbackSettings.setSpeed(applied)
+            } catch (error: Exception) {
+                MspLog.w(TAG, error) { "倍速写盘失败，本次会话仍然生效" }
+            }
+        }
+    }
+
+    /** A-B 循环按「空 → 定 A → 定 B → 清空」轮转。 */
+    fun cycleAbRepeat() = controller.cycleAbRepeat()
 
     /** 循环模式按「关 → 单曲 → 列表」轮转。 */
     fun cycleRepeatMode() {
@@ -100,6 +148,8 @@ class PlayerViewModel(
     fun toggleShuffle() = controller.setShuffleEnabled(!controller.state.value.shuffleEnabled)
 
     private companion object {
+        const val TAG = "PlayerViewModel"
+
         /**
          * 停止订阅后继续保留上次的取色结果 5 秒。
          *

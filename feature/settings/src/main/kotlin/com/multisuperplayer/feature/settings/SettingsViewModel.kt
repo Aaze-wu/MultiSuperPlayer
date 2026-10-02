@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SoftwareDecoderSupport
 import com.multisuperplayer.core.translate.ConnectivityResult
 import com.multisuperplayer.core.translate.FailureText
@@ -118,6 +120,31 @@ class SettingsViewModel(
 
     fun setForceSoftwareDecoding(enabled: Boolean) = persist("强制软件解码=$enabled") {
         playbackSettingsRepository.setForceSoftwareDecoding(enabled)
+    }
+
+    /**
+     * 默认画面比例。
+     *
+     * 这里改的是**下一部片子**用什么比例。正在播的那一部不受影响：
+     * 播放页的面板改的是「这一部」，两者不应该互相干扰（见 `PlaybackSettings.aspectRatioMode`）。
+     * 所以走 [PlaybackSettingsRepository] 而不是去碰正在跑的控制器。
+     */
+    fun setAspectRatioMode(mode: AspectRatioMode) = persist("默认画面比例=${mode.id}") {
+        playbackSettingsRepository.setAspectRatioMode(mode)
+    }
+
+    /**
+     * 默认倍速。同样只影响之后新打开的文件。
+     *
+     * 值先夹到档位表里（[PlaybackSpeedOptions.nearestPreset]）：写进去的应该是一个
+     * 真实存在的档位，否则设置页将来改档位表时，这里会留下一个界面上根本选不中的值。
+     */
+    fun setSpeed(speed: Float) = persist("默认倍速") {
+        playbackSettingsRepository.setSpeed(PlaybackSpeedOptions.nearestPreset(speed))
+    }
+
+    fun setRememberPosition(enabled: Boolean) = persist("记住播放位置=$enabled") {
+        playbackSettingsRepository.setRememberPosition(enabled)
     }
 
     // ------------------------------------------------------------------ 字幕翻译

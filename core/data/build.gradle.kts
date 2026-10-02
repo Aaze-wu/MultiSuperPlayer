@@ -35,6 +35,11 @@ dependencies {
     implementation(project(":core:subtitle"))
     // 翻译设置的持久化要用它的类型：服务商预设、目标语言、术语表、引擎配置。
     api(project(":core:translate"))
+    // 续播位置的实现要实现 core:player 的 PlaybackPositionStore。
+    // 方向是 data → player 而不是反过来：内核不该知道 DataStore 的存在。
+    // 用 `implementation`：PlaybackPositionStore 里没有 Media3 类型，
+    // 不需要把它传给更上层。
+    implementation(project(":core:player"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.documentfile)

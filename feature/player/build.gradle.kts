@@ -50,6 +50,10 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    // WindowCompat / WindowInsetsControllerCompat：全屏时把状态栏和导航栏隐藏，
+    // 以及与它们交互后临时露出来的行为。这些是 androidx.core 的 API，
+    // 和底层的 media3/lifecycle 是否顺便带来同一份无关。
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     // rememberLauncherForActivityResult：导出译文时要走 SAF 让用户选保存位置。

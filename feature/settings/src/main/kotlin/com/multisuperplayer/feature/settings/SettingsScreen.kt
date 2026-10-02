@@ -13,21 +13,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -37,20 +45,27 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
+import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import org.koin.androidx.compose.koinViewModel
@@ -82,6 +97,9 @@ fun SettingsRoute(
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
         onSetForceSoftwareDecoding = viewModel::setForceSoftwareDecoding,
+        onSetAspectRatioMode = viewModel::setAspectRatioMode,
+        onSetSpeed = viewModel::setSpeed,
+        onSetRememberPosition = viewModel::setRememberPosition,
         onOpenTranslationSettings = onOpenTranslationSettings,
     )
 }
@@ -99,6 +117,9 @@ fun SettingsScreen(
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
     onSetForceSoftwareDecoding: (Boolean) -> Unit = {},
+    onSetAspectRatioMode: (AspectRatioMode) -> Unit = {},
+    onSetSpeed: (Float) -> Unit = {},
+    onSetRememberPosition: (Boolean) -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
@@ -107,6 +128,12 @@ fun SettingsScreen(
     // 避免下面三个开关各自写一遍 `?: true` / `?: false` 而写反其中一个。
     val artworkColorEnabled = theme.colorFromArtwork ?: false
     val dynamicColorPreferred = theme.useDynamicColor ?: true
+
+    // 当前打开的选择对话框（null = 没开）。
+    //
+    // 用「对话框 + 当前值」而不是像主题基底那样把选项全铺在页面上：画面比例 4 项、
+    // 倍速 10 项，全铺开会让「播放」这一段比你真正要改的那一行长三倍。
+    var openDialog: SettingsDialog? by remember { mutableStateOf(null) }
 
     Scaffold(
         modifier = modifier,
@@ -218,6 +245,48 @@ fun SettingsScreen(
                 )
             }
 
+            item {
+                // 画面比例的**默认值**。不是「当前值」：播放页里临时切到「裁剪」
+                // 看完一部片子，不应该让下一部也默认被裁掉两边。
+                val aspect = playback.aspectRatioMode ?: AspectRatioMode.DEFAULT
+                SettingChoiceRow(
+                    icon = Icons.Outlined.AspectRatio,
+                    title = "默认画面比例",
+                    value = aspect.label,
+                    subtitle = "只影响之后打开的文件。在播放页里临时改的比例不会写到这里。",
+                    onClick = { openDialog = SettingsDialog.ASPECT_RATIO },
+                )
+            }
+
+            item {
+                // 和画面比例相反，这个是**全局**的：播放页里点倍速也会写回同一个值，
+                // 所以这里显示的就是「下次打开会用的速度」，不需要额外说明。
+                val speed = playback.speed ?: PlaybackSpeedOptions.DEFAULT
+                SettingChoiceRow(
+                    icon = Icons.Outlined.Speed,
+                    title = "默认倍速",
+                    value = PlaybackSpeedOptions.format(speed),
+                    subtitle = "跨文件保留：播放页里改了倍速，这里也会跟着变。",
+                    onClick = { openDialog = SettingsDialog.SPEED },
+                )
+            }
+
+            item {
+                val remember = playback.rememberPosition ?: true
+                SettingsSwitchRow(
+                    icon = { Icon(Icons.Outlined.History, contentDescription = null) },
+                    title = "记住播放位置",
+                    subtitle = if (remember) {
+                        "下次打开同一个文件时接着上次的位置播"
+                    } else {
+                        "每次都从头播。已经记住的位置不会被删掉，重新打开这个开关就能继续用。"
+                    },
+                    checked = remember,
+                    enabled = true,
+                    onCheckedChange = onSetRememberPosition,
+                )
+            }
+
             item { SectionHeader("字幕翻译") }
             item {
                 TranslationSummaryRow(
@@ -226,6 +295,43 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    // 对话框画在 `Scaffold` 外面，而不是塞进 `LazyColumn` 的 item 里：
+    // 放进 item 的话它会随列表滚走，而对话框是浮层，本就不该有自己的滚动位置。
+    when (openDialog) {
+        SettingsDialog.ASPECT_RATIO -> ChoiceDialog(
+            title = "默认画面比例",
+            options = AspectRatioMode.entries,
+            selected = playback.aspectRatioMode ?: AspectRatioMode.DEFAULT,
+            label = { it.label },
+            description = { it.description },
+            // 选完就关：只有一个选项要选，让用户再去按一次「确定」是多余的一步。
+            onSelect = { mode ->
+                onSetAspectRatioMode(mode)
+                openDialog = null
+            },
+            onDismiss = { openDialog = null },
+        )
+
+        SettingsDialog.SPEED -> ChoiceDialog(
+            title = "默认倍速",
+            options = PlaybackSpeedOptions.PRESETS,
+            // 存的值可能不在档位表里（改了档位表、或被别的入口写进来的旧值）：
+            // 用最近档位高亮，不能一个都不亮——那看起来像「没设置过」。
+            selected = PlaybackSpeedOptions.nearestPreset(
+                playback.speed ?: PlaybackSpeedOptions.DEFAULT,
+            ),
+            label = { PlaybackSpeedOptions.format(it) },
+            description = { if (it == PlaybackSpeedOptions.DEFAULT) "正常速度" else null },
+            onSelect = { speed ->
+                onSetSpeed(speed)
+                openDialog = null
+            },
+            onDismiss = { openDialog = null },
+        )
+
+        null -> Unit
     }
 }
 
@@ -402,6 +508,121 @@ private fun AccentSwatch(
             )
         }
     }
+}
+
+// --------------------------------------------------------------------- 选择行 / 选择对话框
+
+/** 设置页上会弹出的选择对话框。 */
+private enum class SettingsDialog { ASPECT_RATIO, SPEED }
+
+/**
+ * 「当前值 + 点开选择」的一行。
+ *
+ * 右侧把当前值直接写出来，而不是只画一个箭头：用户扫一眼设置页就能知道
+ * 「默认画面比例是裁剪」，不用逐个点进去确认。
+ */
+@Composable
+private fun SettingChoiceRow(
+    icon: ImageVector,
+    title: String,
+    value: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = { Icon(icon, contentDescription = null) },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
+    Spacer(Modifier.height(4.dp))
+}
+
+/**
+ * 单选对话框。
+ *
+ * 每个选项都用 [selectable] + `Role.RadioButton`：整行是触控目标，读屏能念出
+ * 「已选中/未选中」，而不会让点击区域裂成「文字」和「小圆点」两块。
+ *
+ * 列表套 `verticalScroll` + `heightIn`：倍速有 10 个档位，小屏横屏时
+ * 全铺开会把对话框顶出屏幕外，而 `AlertDialog` 的内容区**不会**自己滚。
+ */
+@Composable
+private fun <T> ChoiceDialog(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    description: (T) -> String?,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                options.forEach { option ->
+                    val isSelected = option == selected
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(option) },
+                            )
+                            .padding(vertical = 6.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // onClick = null：整行已经接收点击了，再挂一次会点一下触发两次。
+                            RadioButton(selected = isSelected, onClick = null)
+                            Text(
+                                text = label(option),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                        // 说明文字缩进到和标题同一个左边缘，看起来是标题的补充而不是
+                        // 一个独立的选项行。为空时整块不画，不留一条空白。
+                        description(option)?.let { text ->
+                            Text(
+                                text = text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 48.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        // 只有「取消」：选择本身即生效，再放一个「确定」等于让人确认两次。
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 // --------------------------------------------------------------------- 开关行

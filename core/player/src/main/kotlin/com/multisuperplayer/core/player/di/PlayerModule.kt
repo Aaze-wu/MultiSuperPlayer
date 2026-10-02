@@ -24,11 +24,15 @@ val playerModule = module {
     // `single` 而不是 `factory`：它内部会 `System.loadLibrary`，重复创建没有意义。
     single<SoftwareDecoderSupport> { NextlibSoftwareDecoderSupport() }
 
+    // 续播位置的存取接口定义在 core:player，实现（DataStore）在 core:data。
+    // 这里只声明「内核需要它」，具体是谁由 dataModule 决定——内核因此不必
+    // 依赖 DataStore、AndroidKeyStore 这些东西。
     single<PlaybackController> {
         ExoPlayerController(
             context = androidContext(),
             dispatchers = get(),
             softwareDecoders = get(),
+            positionStore = get(),
         )
     }
 }

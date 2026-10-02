@@ -22,6 +22,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.multisuperplayer.core.ui.chrome.AppChromeState
+import com.multisuperplayer.core.ui.chrome.LocalAppChrome
+import com.multisuperplayer.core.ui.chrome.LocalAppChromeState
 import com.multisuperplayer.core.ui.theme.ArtworkAccentState
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
 import com.multisuperplayer.core.ui.theme.MspAccent
@@ -57,7 +60,14 @@ fun MspApp() {
     // 比从 App 往下打通一条参数链短得多。remember 保证只建一次。
     val artworkAccentState = remember { ArtworkAccentState() }
 
-    CompositionLocalProvider(LocalArtworkAccentState provides artworkAccentState) {
+    // 底部导航栏的显隐通道，同一种模式：播放页知道自己进全屏了，
+    // 而需要让位的 NavigationBar 在这上面好几层。
+    val chromeState = remember { AppChromeState() }
+
+    CompositionLocalProvider(
+        LocalArtworkAccentState provides artworkAccentState,
+        LocalAppChromeState provides chromeState,
+    ) {
         MspTheme(
             baseTheme = MspBaseTheme.fromId(theme.baseThemeId),
             accent = MspAccent.fromId(theme.accentId),
@@ -99,6 +109,7 @@ private fun MspAppScaffold() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val playbackViewModel: AppPlaybackViewModel = koinViewModel()
+    val chrome = LocalAppChrome
 
     // 切标签只在这里定义一次。播放页里的「去设置」也要走同一条路径：
     // 先摘掉播放页、再导航，否则返回栈里会叠成「播放页 → 设置」，
@@ -120,6 +131,14 @@ private fun MspAppScaffold() {
 
     Scaffold(
         bottomBar = {
+            // 全屏播放时整条导航栏都不画。
+            //
+            // 必须**连根拔掉**（不画）而不是画一个高度为 0 的容器：
+            // `Scaffold` 会先量 bottomBar、再把它的高度加进 `innerPadding`，
+            // 一个高度为 0 的 NavigationBar 仍会按自己的最小高度参与测量，
+            // 于是 `innerPadding.bottom` 不为零，全屏画面底部会白留一条。
+            // 而且这条留白只有在真机上才看得出来（预览里没有导航栏高度）。
+            if (!chrome.bottomBarVisible) return@Scaffold
             NavigationBar {
                 MspDestination.entries.forEach { destination ->
                     NavigationBarItem(

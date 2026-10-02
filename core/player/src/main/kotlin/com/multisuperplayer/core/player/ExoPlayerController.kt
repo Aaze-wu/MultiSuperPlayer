@@ -2,6 +2,8 @@ package com.multisuperplayer.core.player
 
 import android.content.Context
 import android.content.Intent
+import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -56,6 +58,11 @@ class ExoPlayerController(
      * Media3 播放器」，而不是启动就崩。
      */
     private val softwareDecoders: SoftwareDecoderSupport = SoftwareDecoderSupport.Unavailable,
+    /**
+     * 续播位置的存取。默认参数是「什么都不存」而不是 null：
+     * 见 [PlaybackPositionStore.None]。
+     */
+    private val positionStore: PlaybackPositionStore = PlaybackPositionStore.None,
 ) : PlaybackController {
 
     private val appContext: Context = context.applicationContext
@@ -102,6 +109,31 @@ class ExoPlayerController(
      * 第 7 条是 DTS」这种情况下后面的文件白白放弃回退机会。
      */
     private var fellBackMediaId: String? = null
+
+    /** A-B 循环状态。见 [AbRepeatPolicy]。 */
+    private var abRepeat: AbRepeatState = AbRepeatState.None
+
+    /** 用户是否允许记住播放进度（持久化的那份在 `:core:data`）。 */
+    private var rememberPosition = true
+
+    /**
+     * 正在跟踪的媒体、它的位置和时长。
+     *
+     * 为什么要另存一份而不是每次现读 `player`：切条目之后
+     * `player.currentPosition` 立刻变成 0、`player.duration` 变成新文件的时长，
+     * 于是「把上一条的位置存下来」这件事**已经没有数据可用了**。时长也一样，
+     * 不缓存它的话，[persistTrackedPosition] 会拿新文件的时长去判旧文件
+     * 「是不是看完了」，然后错误地清掉记录。
+     */
+    private var trackedMediaId: String? = null
+    private var trackedPositionMs = 0L
+    private var trackedDurationMs = 0L
+
+    /** 上一次落盘的时刻，用于限流。 */
+    private var lastSaveAtMs = 0L
+
+    /** 上一轮回调时是不是在播；用于识别「刚停下来」这个瞬间。 */
+    private var wasPlaying = false
 
     override val player: ExoPlayer = ExoPlayer.Builder(appContext)
         .apply {
@@ -187,6 +219,14 @@ class ExoPlayerController(
                  * 症状是「改了音量但 UI 不动」。
                  */
                 override fun onEvents(player: Player, events: Player.Events) {
+                    // 从「在播」变成「不在播」就是个关键时机：用户按了暂停、拔了耳机、
+                    // 丢了音频焦点、或者文件真的播完了。这些时刻正是用户要离开的时刻，
+                    // 等下一个 5 秒节拍可能已经被系统回收了。
+                    if (wasPlaying && !player.isPlaying) {
+                        trackPosition()
+                        persistTrackedPosition()
+                    }
+                    wasPlaying = player.isPlaying
                     publish()
                 }
 
@@ -212,6 +252,10 @@ class ExoPlayerController(
 
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     MspLog.d(TAG) { "切换到条目 ${mediaItem?.mediaId}（原因 $reason）" }
+                    // A-B 循环是「针对某一个文件里的一段」的状态。切到另一条之后，
+                    // 上一首的 A/B 毫无意义，而且很可能落在新文件外面（然后就是
+                    // 每个节拍都 seek 的死循环）。直接清掉。
+                    if (abRepeat != AbRepeatState.None) abRepeat = AbRepeatState.None
                     publish()
                 }
             },
@@ -220,8 +264,15 @@ class ExoPlayerController(
         scope.launch {
             while (isActive) {
                 // 只在播放中刷新位置：暂停时位置不会变，白刷就是白耗电。
-                if (player.isPlaying) refreshPosition()
-                delay(TICK_INTERVAL_MS)
+                if (player.isPlaying) {
+                    refreshPosition()
+                    trackPosition()
+                    enforceAbRepeat()
+                    savePositionIfDue()
+                }
+                // A-B 循环生效时把节拍提到 50ms：200ms 的粒度意味着一秒的循环区间
+                // 会被拉长两成，听感上是一个明显的「拖拍」。只在用它时才付这个代价。
+                delay(if (abRepeat.isActive) AB_TICK_INTERVAL_MS else TICK_INTERVAL_MS)
             }
         }
 
@@ -246,10 +297,13 @@ class ExoPlayerController(
             repeatMode = player.repeatMode.toMsp(),
             shuffleEnabled = player.shuffleModeEnabled,
             volume = player.volume,
+            videoSize = player.videoSize.toMspVideoSize(),
+            abRepeat = abRepeat,
             decoderKind = currentDecoderKind(),
             errorMessage = pendingErrorMessage,
         )
         syncCurrentEntry()
+        trackPosition()
         refreshPosition()
     }
 
@@ -265,6 +319,112 @@ class ExoPlayerController(
         if (position != _positionMs.value) _positionMs.value = position
         val buffered = player.bufferedPosition.coerceAtLeast(0L)
         if (buffered != _bufferedPositionMs.value) _bufferedPositionMs.value = buffered
+    }
+
+    // ------------------------------------------------------------------ 续播位置
+
+    private fun durationOfCurrentMedia(): Long =
+        player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: 0L
+
+    /**
+     * 把「正在跟踪的那条媒体」的最新位置和时长记下来。
+     *
+     * 两个时机：位置刷新（每 200ms）和发布状态时。必须在**换条目的那一刻**
+     * 还能拿到旧条目的位置与时长，所以才会有 [trackedPositionMs]/[trackedDurationMs]
+     * 这份副本——切完之后 `player` 上已经换人了。
+     */
+    private fun trackPosition() {
+        val id = player.currentMediaItem?.mediaId
+        if (id == null) {
+            trackedMediaId = null
+            trackedPositionMs = 0L
+            trackedDurationMs = 0L
+            return
+        }
+        if (id != trackedMediaId) {
+            // 先落上一条的盘，再开始跟踪新的。
+            persistTrackedPosition()
+            trackedMediaId = id
+            trackedPositionMs = 0L
+            trackedDurationMs = 0L
+            lastSaveAtMs = 0L
+        }
+        trackedPositionMs = player.currentPosition.coerceAtLeast(0L)
+        val duration = durationOfCurrentMedia()
+        if (duration > 0L) trackedDurationMs = duration
+    }
+
+    /**
+     * 把 [trackedMediaId] 的位置落盘——**只在必要时写**。
+     *
+     * 三种分支，第三种是最容易被写错的：
+     * - 值得记（看过一段、又没到结尾）→ 写；
+     * - 已经看到结尾 → **清掉**。留着它下次会从 99% 开始，看起来像文件坏了；
+     * - 其余（刚打开几秒、时长还没解析出来）→ **什么都不做**。
+     *
+     * 最后一条不能省：如果无条件写，那么「昨天看到 40 分钟、今天随手点开看一眼 3 秒"
+     * 会把 40 分钟那条记录改成 3 秒，而 40 分钟正是用户最需要的那一条。
+     * 同时也挡住了「续播定位还没生效时位置读成 0」这个中间态把记录写成 0。
+     */
+    private fun persistTrackedPosition() {
+        if (!rememberPosition) return
+        val id = trackedMediaId ?: return
+        val position = trackedPositionMs
+        val duration = trackedDurationMs
+        val action: suspend () -> Unit = when {
+            ResumePolicy.shouldRemember(position, duration) -> {
+                { positionStore.write(id, position) }
+            }
+
+            duration > 0L && position >= duration * ResumePolicy.COMPLETION_RATIO -> {
+                { positionStore.clear(id) }
+            }
+
+            else -> return
+        }
+        // 不阻塞主线程：DataStore 要重写整个文件并 fsync，放在节拍里做
+        // 会让位置条每 5 秒卡一下。失败也不能影响播放。
+        scope.launch {
+            runCatching { action() }
+                .onFailure { error -> MspLog.w(TAG, error) { "保存播放进度失败" } }
+        }
+    }
+
+    private fun savePositionIfDue() {
+        if (!rememberPosition) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSaveAtMs < SAVE_INTERVAL_MS) return
+        lastSaveAtMs = now
+        persistTrackedPosition()
+    }
+
+    /**
+     * A-B 循环的执行者：越过 B 点就绕回 A 点。
+     *
+     * 用「轮询 + `seekTo`」而不是 `MediaItem.ClippingConfiguration` + 单曲循环：
+     * 后者要重建 MediaItem、要抢用户的循环模式，而且会触发 `onMediaItemTransition`
+     * 从而把我们自己的「切条目就清 A-B」逻辑反过来打自己。这个功能只是个临时的
+     * 「反复听一段」工具，行为可预测比省一点 seek 开销重要得多。
+     */
+    private fun enforceAbRepeat() {
+        val range = abRepeat
+        if (!range.isActive) return
+        val start = range.startMs ?: return
+        val end = range.endMs ?: return
+        val duration = durationOfCurrentMedia()
+
+        // B 落在文件外面（换了更短的媒体，或者设 B 时时长还没解析出来）：
+        // 夹一次。不做这件事的后果不是「循环不准」，而是**每个节拍都 seek 一次**
+        // ——[AbRepeatState.hasPassedEnd] 会永远为真，播放器表现为卡死并疯狂重复解码。
+        if (duration > 0L && end > duration) {
+            val clamped = AbRepeatPolicy.clampTo(range, duration)
+            abRepeat = clamped
+            publish()
+            return
+        }
+
+        if (player.currentPosition < end) return
+        player.seekTo(start)
     }
 
     /**
@@ -285,9 +445,27 @@ class ExoPlayerController(
         return DECODER_KIND_SEVERITY.firstOrNull { it in kinds } ?: MspDecoderKind.UNKNOWN
     }
 
-    /** 把所有命令统一切到主线程。 */
+    /**
+     * 把所有命令统一切到主线程。
+     *
+     * 已经在主线程时**直接执行**，不绕一次调度。
+     *
+     * `scope` 用的是 `Dispatchers.Main`（不是 `Main.immediate`），无条件 `launch`
+     * 会把每个命令推迟一个主循环回合。对「点一下、等一帧」这种调用完全看不出来，
+     * 但它让「写 -> 立刻读」变成错的：`viewModelScope` 是 `Main.immediate`，
+     * 在点击回调里启动的协程会在**同一个主线程任务内**内联跑完，于是它读到的
+     * `state` 还是命令落地前的旧值。实测踩到的就是这个：选 1.5×，把回读到的速度
+     * 写进设置，存下去的是 1.0（`feature:player` 的 `PlayerViewModel.setSpeed`
+     * 现在改成自己算，不再回读）。
+     *
+     * 同步执行后 `publish()` 在返回前就把新状态发出去了，命令与状态在任何调用者
+     * 眼里都是同一时刻的事，不再依赖「内核恰好走到哪一步」。
+     *
+     * 线程约定没有变：[PlaybackController] 承诺的「任意线程可调」靠的仍然是下面
+     * 那个 `else` 分支，内部执行位置始终是主线程。
+     */
     private inline fun onMain(crossinline block: () -> Unit) {
-        scope.launch { block() }
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else scope.launch { block() }
     }
 
     /**
@@ -458,16 +636,29 @@ class ExoPlayerController(
 
     // ---------------------------------------------------------------------- 命令实现
 
-    override fun setQueue(entries: List<MediaEntry>, startIndex: Int, playWhenReady: Boolean) {
+    override fun setQueue(
+        entries: List<MediaEntry>,
+        startIndex: Int,
+        playWhenReady: Boolean,
+        resumePositionMs: Long?,
+    ) {
         if (entries.isEmpty()) {
             stopAndClear()
             return
         }
         val safeIndex = startIndex.coerceIn(0, entries.lastIndex)
         onMain {
+            // 先把上一条的位置落盘：换完队列 currentPosition 就归零了。
+            persistTrackedPosition()
+            trackedMediaId = null
+            trackedPositionMs = 0L
+            trackedDurationMs = 0L
+
             _queue.value = entries
             _currentIndex.value = safeIndex
             pendingErrorMessage = null
+            // 新的播放会话，A-B 状态不该跨会话残留。
+            abRepeat = AbRepeatState.None
             // 上一次播放自动回退到 FFmpeg 的状态到这里就结束。
             //
             // 在这里恢复而不是在 `onMediaItemTransition` 里：切换条目时调用
@@ -482,6 +673,9 @@ class ExoPlayerController(
                 C.TIME_UNSET,
             )
             player.prepare()
+            // 续播：seek 放在 prepare 之后、playWhenReady 之前。
+            // 反过来的话，内核会先把开头几十毫秒放出来再跳走（听起来像卡了一下）。
+            resumePositionMs?.takeIf { it > 0L }?.let { player.seekTo(it) }
             player.playWhenReady = playWhenReady
             if (playWhenReady) ensureServiceStarted()
             publish()
@@ -506,6 +700,9 @@ class ExoPlayerController(
     override fun pause() {
         onMain {
             player.pause()
+            // 用户主动暂停 = 用户要走了。不等到下一个 5 秒节拍。
+            trackPosition()
+            persistTrackedPosition()
             publish()
         }
     }
@@ -546,7 +743,7 @@ class ExoPlayerController(
     }
 
     override fun setSpeed(speed: Float) {
-        val clamped = speed.coerceIn(MIN_SPEED, MAX_SPEED)
+        val clamped = clampPlaybackSpeed(speed)
         onMain {
             player.setPlaybackSpeed(clamped)
             publish()
@@ -586,8 +783,31 @@ class ExoPlayerController(
         }
     }
 
+    override fun cycleAbRepeat() {
+        onMain {
+            abRepeat = AbRepeatPolicy.advance(
+                current = abRepeat,
+                positionMs = player.currentPosition,
+                durationMs = durationOfCurrentMedia(),
+            )
+            publish()
+        }
+    }
+
+    override fun setRememberPosition(enabled: Boolean) {
+        onMain {
+            if (rememberPosition == enabled) return@onMain
+            // 关掉之前先落一次盘：否则「关掉记忆」会顺手把刚才那一段也丢掉。
+            if (!enabled) persistTrackedPosition()
+            rememberPosition = enabled
+        }
+    }
+
     override fun stopAndClear() {
         onMain {
+            // 关掉播放器之前把位置存下来——这一条是「返回」路径上最常走的一步。
+            trackPosition()
+            persistTrackedPosition()
             player.stop()
             player.clearMediaItems()
             _queue.value = emptyList()
@@ -611,9 +831,19 @@ class ExoPlayerController(
     }
 
     private companion object {
-        /** 超过 4 倍速时 Sonic 的音质损失已经不可接受，超过 0.25 倍则几乎听不出内容。 */
-        const val MIN_SPEED = 0.25f
-        const val MAX_SPEED = 4.0f
+        // 倍速的上下界不在这一层：它是 [PlaybackController] 的契约（界面按它提供档位），
+        // 所以定义在接口那个文件里，这里直接用。
+
+        /**
+         * 播放进度落盘的间隔。
+         *
+         * 5 秒是「被系统杀掉时最多丢 5 秒」和「别每个节拍都写盘」之间的折中：
+         * DataStore 每次写都要重写整个文件并 fsync，1 秒一次在低端机上能看到掉帧。
+         */
+        const val SAVE_INTERVAL_MS = 5_000L
+
+        /** A-B 循环生效时的位置刷新间隔。见 [enforceAbRepeat]。 */
+        const val AB_TICK_INTERVAL_MS = 50L
     }
 }
 
@@ -622,6 +852,16 @@ private fun Int.toMsp(): MspRepeatMode = when (this) {
     Player.REPEAT_MODE_ALL -> MspRepeatMode.ALL
     else -> MspRepeatMode.OFF
 }
+
+private fun androidx.media3.common.VideoSize.toMspVideoSize(): MspVideoSize =
+    MspVideoSize(
+        widthPx = width,
+        heightPx = height,
+        // Media3 在还没解析出视频轨时给的是 0/0，pixelWidthHeightRatio 有可能是
+        // 0 或负数。这里不修正，交给 MspVideoSize.isValid 去判——修一个假的 1.0
+        // 进去反而会让「无效尺寸」和「1:1 视频」变得无法区分。
+        pixelWidthHeightRatio = pixelWidthHeightRatio,
+    )
 
 private fun MspRepeatMode.toMedia3(): Int = when (this) {
     MspRepeatMode.OFF -> Player.REPEAT_MODE_OFF
