@@ -94,6 +94,7 @@
     <string name="msp_player_subtitle_entry">字幕与歌词</string>
     <string name="msp_player_enter_fullscreen">全屏播放</string>
     <string name="msp_player_exit_fullscreen">退出全屏</string>
+    <string name="msp_player_collapse">收起</string>
     <string name="msp_player_speed">播放速度</string>
     <string name="msp_player_ab_repeat">A-B 循环</string>
     <string name="msp_player_aspect">画面比例</string>

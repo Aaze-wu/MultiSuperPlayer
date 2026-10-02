@@ -103,6 +103,11 @@ private const val PLAY_PAUSE_HINT_TIMEOUT_MS = 1_000L
 fun PlayerRoute(
     modifier: Modifier = Modifier,
     onOpenTranslationSettings: () -> Unit,
+    // 「收起」：离开播放页回到刚才那个列表（播放不停，底部会出现迷你播放器）。
+    //
+    // 它是一个**回调**而不是这里的一句 `popBackStack()`：这一层根本拿不到导航栈，
+    // 而且「收起等于弹掉这一页」是应用骨架的决定，不是播放页面自己的决定。
+    onCollapse: () -> Unit = {},
     pendingSubtitle: SubtitleSource? = null,
     onPendingSubtitleApplied: () -> Unit = {},
 ) {
@@ -294,6 +299,7 @@ fun PlayerRoute(
         onToggleShuffle = viewModel::toggleShuffle,
         onCycleAbRepeat = viewModel::cycleAbRepeat,
         onOpenSubtitles = { showSubtitleSheet = true },
+        onCollapse = onCollapse,
     )
 
     // 面板放在路由这一层而不是 PlayerScreen 里：它是窗口级的浮层（ModalBottomSheet），
@@ -391,6 +397,7 @@ fun PlayerScreen(
     onOpenSubtitles: () -> Unit = {},
     onCycleAbRepeat: () -> Unit = {},
     onSpeedBoost: (Boolean) -> Unit = {},
+    onCollapse: () -> Unit = {},
 ) {
     // 手势只在视频上挂。音频页中间是可滚动的歌词/封面，一层吃掉全部触摸的
     // 手势层会和滚动直接抢事件——那种「歌词划不动」的 bug 极难归因。
@@ -486,6 +493,7 @@ fun PlayerScreen(
             onToggleShuffle = onToggleShuffle,
             onOpenSubtitles = onOpenSubtitles,
             onCycleAbRepeat = onCycleAbRepeat,
+            onCollapse = onCollapse,
         )
     }
 }
@@ -495,6 +503,9 @@ fun PlayerScreen(
  *
  * 信息层次按「用户有多需要看它」从上到下排：画面 → 标题/解码方式 → 进度 →
  * 功能 → 传输控制。
+ *
+ * 左上角还叠着一个「收起」（[PlayerCollapseButton]），它不在这条层次里：
+ * 它不是「看片子」需要的信息，而是这一页的出口。
  */
 @Composable
 private fun PortraitLayout(
@@ -515,6 +526,7 @@ private fun PortraitLayout(
     onToggleShuffle: () -> Unit,
     onOpenSubtitles: () -> Unit,
     onCycleAbRepeat: () -> Unit,
+    onCollapse: () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         state.errorMessage?.let { ErrorBanner(it) }
@@ -545,6 +557,16 @@ private fun PortraitLayout(
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
             }
+            // 竖屏的出口。横屏不摆它：那边左上角已经是「退出全屏」的箭头，
+            // 两个入口叠在同一个位置只会让人犹疑点哪个（和 PlayerTransportControls
+            // 里 `fullscreen = null` 是同一条理由）。
+            //
+            // 声明在**最后**：同一个 Box 里后声明的节点画在上面、也先参与命中测试，
+            // 所以点在按钮上时事件归按钮，不会顺手触发下面手势层的双击播放/暂停。
+            PlayerCollapseButton(
+                onClick = onCollapse,
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+            )
         }
 
         TrackInfo(entry = entry, decoderKind = state.decoderKind)

@@ -43,6 +43,10 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   different operations (`markPlayed` keeps the existing position and only pushes the timestamp);
   one shared write could never express it.
 - **Fullscreen, landscape, screen lock** to avoid accidental touches.
+- **A visible way out**: a labelled *Collapse* button at the top-left of the portrait player —
+  an exit you can see, instead of having to guess the system back gesture (landscape keeps its
+  own *Exit fullscreen* arrow and gets no second button). Collapsing pops the player page only:
+  playback continues and the mini player takes over the bottom bar.
 - **Also**: shuffle / repeat all / repeat one, previous / next, volume and brightness indicators,
   a playback service and notification controls.
 
@@ -223,7 +227,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.8** | **Media opened from the browser discovers sibling subtitles (by listing the directory, not the media library)** | Done |
 | v0.5.9 | Multi-select in the built-in file browser (select all / add to playlist / play) | Done |
 | **v0.5.10** | **Recent page keeps short clips, new "Record recent plays" switch, auto-refresh on return** | Done |
-| **v0.5.11** | **Recent page: delete one entry (undoable) and clear all (confirmed)** | **Current** |
+| **v0.5.11** | **Recent page: delete one entry (undoable) and clear all (confirmed)** | Done |
+| **v0.5.12** | **Portrait player gets a *Collapse* button top-left (a visible exit that keeps playing)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 

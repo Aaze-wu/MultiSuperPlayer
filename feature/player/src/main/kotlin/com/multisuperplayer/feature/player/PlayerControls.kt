@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -175,6 +176,65 @@ internal fun PlayerSeekBar(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * 竖屏画面左上角的「收起」。
+ *
+ * ## 它解决的是什么问题
+ *
+ * 离开播放页的办法本来只有两个：系统返回手势/按键，或者点底部导航的某个标签。
+ * 前者在竖屏下没有任何可见的提示（横屏至少还有一个「退出全屏」的箭头），
+ * 用户刚换手机、或者手势导航设置不一样时就会**找不到出口**；后者虽然能走，
+ * 但它看起来像「切标签」而不是「把播放器收起来」——两件事的后果也确实不一样
+ * （切标签是丢掉播放页，收起是回到刚才那个列表，两者都会继续播放）。
+ *
+ * 所以给它一个和横屏左上角那个箭头**同一个位置**的出口：图标 + 文字。
+ *
+ * ## 为什么带文字，而不是只有一个箭头
+ *
+ * 图标用的是和横屏左上角那个「退出全屏」**同一个箭头**：两处都是「离开这一页」，
+ * 换一个图标只会让人以为两个按钮干的是不同的事。但箭头本身只能表达「回上一页」，
+ * 而这里真正的后果是「播放**不停**，只是把这一页收起来」，所以旁边写一个字。
+ * 这和倍速/比例那三个按钮的取舍一样（见 [PlayerActionChips]）：
+ * 存在歧义的地方，写出来是零成本的。
+ *
+ * 半透明底是必须的：它压在画面（或者音频封面/歌词）上，而那张图的颜色不由我们决定。
+ * 底色和横屏控制层用同一个 `surface`：这个按钮只是「换个地方」，不是
+ * 一个需要被注意到的动作，抢眼反而会盖住画面里正在发生的事。
+ *
+ * @param onClick 由路由层决定（弹出播放页，回到刚才那个列表）。
+ */
+@Composable
+internal fun PlayerCollapseButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(R.string.msp_player_collapse)
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                // 左边留得少、右边留得多：箭头自己就有一圈空白，再套一层内边距
+                // 会让「收起」两个字看上去离图标很远。
+                .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp)
+                // 无障碍读出来的应该是这个动作（「收起」），而不是箭头图标的
+                // 「返回」之类的默认描述——所以图标自己不带描述。
+                .semantics { contentDescription = label },
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+            )
+            Text(text = label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

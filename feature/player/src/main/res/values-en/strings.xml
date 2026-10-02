@@ -85,6 +85,7 @@
     <string name="msp_player_subtitle_entry">Subtitles and lyrics</string>
     <string name="msp_player_enter_fullscreen">Fullscreen</string>
     <string name="msp_player_exit_fullscreen">Exit fullscreen</string>
+    <string name="msp_player_collapse">Collapse</string>
     <string name="msp_player_speed">Playback speed</string>
     <string name="msp_player_ab_repeat">A-B repeat</string>
     <string name="msp_player_aspect">Aspect ratio</string>

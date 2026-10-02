@@ -88,6 +88,7 @@
     <string name="msp_player_subtitle_entry">字幕與歌詞</string>
     <string name="msp_player_enter_fullscreen">全螢幕播放</string>
     <string name="msp_player_exit_fullscreen">離開全螢幕</string>
+    <string name="msp_player_collapse">收起</string>
     <string name="msp_player_speed">播放速度</string>
     <string name="msp_player_ab_repeat">A-B 循環</string>
     <string name="msp_player_aspect">畫面比例</string>
