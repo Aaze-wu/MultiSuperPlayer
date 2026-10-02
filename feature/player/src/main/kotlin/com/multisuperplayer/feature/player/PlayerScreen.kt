@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +76,19 @@ fun PlayerRoute(modifier: Modifier = Modifier) {
     val bufferedMs by viewModel.bufferedPositionMs.collectAsStateWithLifecycle()
     val artworkAccent by viewModel.artworkAccent.collectAsStateWithLifecycle()
 
+    val subtitleViewModel: SubtitleViewModel = koinViewModel()
+    val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
+    var showSubtitleSheet by remember { mutableStateOf(false) }
+
+    // 直接把「哪条媒体」推给字幕 ViewModel，而不是让它去订阅播放内核：
+    // 这个 LaunchedEffect 就是两者之间唯一的连接点，读代码时一眼能看到。
+    // key 用整个 entry（而不是 entry.id）：换歌、以及同一条片子重新构造
+    // （队列刷新）都会重新绑一次，而 `bindEntry` 自己会把同 id 的那一次
+    // 降级为「只刷对象、不重扫」。
+    LaunchedEffect(entry) {
+        subtitleViewModel.bindEntry(entry)
+    }
+
     // 用 LaunchedEffect 而不是直接把值写进去：写入发生在组合期间会造成
     // 「在组合中改 state」，Compose 会直接报错或产生一帧的错色。
     //
@@ -91,6 +106,7 @@ fun PlayerRoute(modifier: Modifier = Modifier) {
         positionMs = positionMs,
         bufferedMs = bufferedMs,
         player = viewModel.player,
+        subtitleState = subtitleState,
         modifier = modifier,
         onTogglePlayPause = viewModel::togglePlayPause,
         onSkipNext = viewModel::skipToNext,
@@ -98,13 +114,30 @@ fun PlayerRoute(modifier: Modifier = Modifier) {
         onSeekTo = viewModel::seekTo,
         onCycleRepeat = viewModel::cycleRepeatMode,
         onToggleShuffle = viewModel::toggleShuffle,
+        onOpenSubtitles = { showSubtitleSheet = true },
     )
+
+    // 面板放在路由这一层而不是 PlayerScreen 里：它是窗口级的浮层（ModalBottomSheet），
+    // 不是页面内容的一部分；放在页面里会被归入「无状态页面」的职责里，
+    // 而那个组合函数的全部意义就是「给它什么画什么」。
+    if (showSubtitleSheet) {
+        SubtitleTrackPicker(
+            state = subtitleState,
+            onDismiss = { showSubtitleSheet = false },
+            onSelectMode = subtitleViewModel::setDisplayMode,
+            onSelectSource = subtitleViewModel::selectSource,
+            onUseAuto = subtitleViewModel::useAutoSelection,
+            onRescan = subtitleViewModel::rescan,
+        )
+    }
 }
 
 /**
  * 播放页（无状态）。
  *
  * @param player 只交给 `PlayerView` 用。整个页面除了那一处，任何地方都不碰它。
+ * @param subtitleState 当前字幕状态。默认值是「什么都没挂」，这样预览和单测
+ *   可以直接 omit 它。
  */
 @Composable
 fun PlayerScreen(
@@ -114,12 +147,14 @@ fun PlayerScreen(
     bufferedMs: Long,
     player: Player?,
     modifier: Modifier = Modifier,
+    subtitleState: SubtitleUiState = SubtitleUiState(),
     onTogglePlayPause: () -> Unit = {},
     onSkipNext: () -> Unit = {},
     onSkipPrevious: () -> Unit = {},
     onSeekTo: (Long) -> Unit = {},
     onCycleRepeat: () -> Unit = {},
     onToggleShuffle: () -> Unit = {},
+    onOpenSubtitles: () -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         state.errorMessage?.let { ErrorBanner(it) }
@@ -132,8 +167,23 @@ fun PlayerScreen(
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             if (entry.kind == MediaKind.VIDEO) {
                 VideoSurface(player = player, isPlaying = state.isPlaying)
+                // 字幕层叠在画面**上面**，与 VideoSurface 同一个 Box，
+                // 所以它跟着画面的实际高度走，而不会跑到黑边里。
+                SubtitleOverlay(
+                    state = subtitleState,
+                    positionMs = positionMs,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
             } else {
-                AudioArtwork(entry = entry)
+                AudioStage(
+                    entry = entry,
+                    subtitleState = subtitleState,
+                    positionMs = positionMs,
+                    onSeekTo = onSeekTo,
+                )
             }
             if (state.isBuffering) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -154,11 +204,51 @@ fun PlayerScreen(
 
         TransportControls(
             state = state,
+            subtitlesActive = subtitleState.isRendering,
             onTogglePlayPause = onTogglePlayPause,
             onSkipNext = onSkipNext,
             onSkipPrevious = onSkipPrevious,
             onCycleRepeat = onCycleRepeat,
             onToggleShuffle = onToggleShuffle,
+            onOpenSubtitles = onOpenSubtitles,
+        )
+    }
+}
+
+/**
+ * 音频页的主体：封面 + 歌词。
+ *
+ * 有歌词时封面**缩小并上移**，把中间那块让给歌词；没歌词时保持原来那个大封面。
+ * 不做「封面 + 歌词叠加」是因为两条信息会互相遮：封面是图，歌词是字。
+ */
+@Composable
+private fun AudioStage(
+    entry: MediaEntry,
+    subtitleState: SubtitleUiState,
+    positionMs: Long,
+    onSeekTo: (Long) -> Unit,
+) {
+    val document = subtitleState.document
+    if (!subtitleState.isRendering || document == null) {
+        AudioArtwork(entry = entry)
+        return
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AudioArtwork(
+            entry = entry,
+            size = 112.dp,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        LyricsPane(
+            document = document,
+            positionMs = positionMs,
+            mode = subtitleState.effectiveMode,
+            onSeekTo = onSeekTo,
+            modifier = Modifier.fillMaxWidth().weight(1f),
         )
     }
 }
@@ -201,10 +291,14 @@ private fun VideoSurface(player: Player?, isPlaying: Boolean) {
  * 再用 palette-ktx 从封面里取主题色。现在先只画一个音符。
  */
 @Composable
-private fun AudioArtwork(entry: MediaEntry) {
+private fun AudioArtwork(
+    entry: MediaEntry,
+    size: Dp = 220.dp,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier
-            .size(220.dp)
+        modifier = modifier
+            .size(size)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
@@ -213,7 +307,8 @@ private fun AudioArtwork(entry: MediaEntry) {
             imageVector = Icons.Filled.MusicNote,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(96.dp),
+            // 图标跟着封面等比缩：写死 96dp 的话，缩小的封面里会被音符撑满。
+            modifier = Modifier.size(size * 0.44f),
         )
     }
 }
@@ -307,11 +402,13 @@ private fun SeekBar(
 @Composable
 private fun TransportControls(
     state: MspPlaybackState,
+    subtitlesActive: Boolean,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
     onCycleRepeat: () -> Unit,
     onToggleShuffle: () -> Unit,
+    onOpenSubtitles: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
@@ -366,6 +463,20 @@ private fun TransportControls(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.primary
+                },
+            )
+        }
+
+        // 字幕入口。高亮 = 现在屏幕上真的有字幕在显示，而不是「挂了字幕但关着」：
+        // 只表达前者，用户扫一眼就知道现在这个按钮该不该点。
+        IconButton(onClick = onOpenSubtitles) {
+            Icon(
+                imageVector = Icons.Filled.Subtitles,
+                contentDescription = "字幕与歌词",
+                tint = if (subtitlesActive) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
         }

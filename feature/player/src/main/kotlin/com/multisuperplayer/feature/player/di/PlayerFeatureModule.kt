@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.player.di
 
 import com.multisuperplayer.feature.player.PlayerViewModel
+import com.multisuperplayer.feature.player.SubtitleViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -13,4 +14,8 @@ import org.koin.dsl.module
  */
 val playerFeatureModule = module {
     viewModelOf(::PlayerViewModel)
+    // 字幕单独一个 ViewModel：它的生命周期跟着「播放页这个导航项」，而字幕轨
+    // 的加载是异步的、会失败、会被切歌打断——把这些塞进 PlayerViewModel 会让
+    // 那个「刻意什么都不做」的转发层变成唯一一个有状态的地方。
+    viewModelOf(::SubtitleViewModel)
 }

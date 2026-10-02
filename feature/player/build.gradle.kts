@@ -21,6 +21,12 @@ android {
         compose = true
     }
 
+    testOptions {
+        // 纯 JVM 单测不去真正加载 Android 框架：没桩的方法返回默认值。
+        // 这里测的是状态合成规则（纯函数），碰不到这些方法，但保持和其他模块一致。
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         abortOnError = false
     }

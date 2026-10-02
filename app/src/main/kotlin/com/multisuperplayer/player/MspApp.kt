@@ -37,8 +37,13 @@ import org.koin.androidx.compose.koinViewModel
  * 应用级脚手架：主题 + 底部导航 + 导航图。
  *
  * 三个标签页都是**顶层**目的地，互相之间是平级切换而不是压栈，
- * 所以用 [findStartDestination] + `launchSingleTop` + `restoreState` 这一套
- * 标准写法：重复点同一个标签不会越点越深，切回来还能恢复上次的滚动位置。
+ * 所以切标签时用 [findStartDestination] + `launchSingleTop` 把栈压回起点，
+ * 重复点同一个标签不会越点越深。
+ *
+ * **刻意不用**官方那套 `saveState + restoreState`：它的存/取 key 是「起始目的地」，
+ * 也就是媒体库，于是所有压在媒体库之上的页面（尤其是播放页）都会变成
+ * 「媒体库标签的返回栈」的一部分，切回来时被一起恢复。详见 [MspAppScaffold]
+ * 里那段切换逻辑上的注释。
  */
 @Composable
 fun MspApp() {
@@ -93,12 +98,27 @@ private fun MspAppScaffold() {
                     NavigationBarItem(
                         selected = currentRoute == destination.route,
                         onClick = {
+                            // 切标签前先把播放页**摘掉**（丢弃，不保存）。
+                            //
+                            // 播放页不是标签页，而是从媒体库推上来的普通目的地。
+                            // 如果把 "saveState + restoreState" 那套标准写法直接用在这里，
+                            // 存/取的 key 是「起始目的地」＝媒体库，于是**媒体库之上的一切**
+                            // 都会被打包成「媒体库标签的返回栈」，播放页也在里面；
+                            // 下一次点「媒体库」时 restoreState 会把它原样恢复回来。
+                            // 表现就是：在播放页点「媒体库」没反应，从设置页点「媒体库」
+                            // 反而莫名其妙跳回播放页。
+                            //
+                            // 直接丢弃没有任何代价：播放页显示什么完全由 PlayerViewModel
+                            // 从 PlaybackController（Koin 单例）读出来，不靠导航参数，
+                            // 也不在导航状态里存任何东西——底层播放也照旧继续。
+                            navController.popBackStack(MspDestination.PLAYER.route, inclusive = true)
                             navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                // 这里**不**写 saveState/restoreState：三个标签页各自都是
+                                // 单页，真正需要留住的状态（列表滚动位置、筛选词）挂在
+                                // **媒体库自己的** NavBackStackEntry 上，而它作为栈底
+                                // 永远不会被弹出，不必靠「存取返回栈」来保。
+                                popUpTo(navController.graph.findStartDestination().id)
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = { Icon(destination.icon, contentDescription = null) },

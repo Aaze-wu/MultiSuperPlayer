@@ -193,4 +193,73 @@ data class SubtitleDocument(
         }
         return null
     }
+
+    /**
+     * 时间轴上最后一个**已经开始**的 cue——它可能已经结束了，只是后面还没有下一行。
+     *
+     * ## 为什么不复用 [cueAt]（两者不能互换）
+     *
+     * - [cueAt] 回答「此刻屏幕上该有字幕吗」：两条 cue 之间的空档返回 `null`。
+     *   一部片子里大量静默段落不该继续挂着上一句台词。
+     * - [cueFocusedAt] 回答「此刻该高亮哪一行」：LRC 只记录每行的开始时间、
+     *   根本没有结束概念，用 [cueAt] 会让高亮在每句末尾闪一下或者整句消失。
+     *
+     * 所以：视频字幕层用 [cueAt]，歌词页与「跳到当前行」用 [cueFocusedAt]。
+     * 两个方法都假定 `cues` 已按 `startMs` 升序排列（解析器的 `CuePostProcess` 保证）。
+     *
+     * @return 位置早于第一条 cue 时返回 `null`。
+     */
+    fun cueFocusedAt(positionMs: Long): SubtitleCue? =
+        cues.getOrNull(cueFocusIndexAt(positionMs))
+
+    /** [cueFocusedAt] 的下标版本；没有命中时返回 `-1`。 */
+    fun cueFocusIndexAt(positionMs: Long): Int {
+        var low = 0
+        var high = cues.size - 1
+        var found = -1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            if (cues[mid].startMs <= positionMs) {
+                found = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return found
+    }
+}
+
+/**
+ * 逐字高亮的时间轴：把时长为 0 的片段补成可插值的区间。
+ *
+ * ## 为什么必须有这一步
+ *
+ * LRC 的内联标记 `<mm:ss.xx>` 只标**每一段的开始时间**，最后一段后面没有东西了，
+ * 所以解析器只能给它 `durationMs = 0`（`LrcParser` 与 `WebVttParser` 的收尾片段
+ * 都是这样）。ASS 的 `\k` 同理：末段时长取决于下一句什么时候来，文件里没写。
+ *
+ * 直接拿原始片段去插值，症状是**最后一句永远不会被高亮扫过去**——它在整句里占的
+ * 比例是 0，看起来就像歌手漏唱了最后几个字。而这恰恰是最容易被忽略的：
+ * 前面每句都正常，只有每行末尾差一点。
+ *
+ * 补的规则：
+ * - 中间片段 → 下一段的开始时间；
+ * - 最后一段 → 整句的结束时间（LRC 里就是下一行开始之前，也就是这一句被拉长的那一刻）；
+ * - 连整句都没有结束时间（`endMs <= startMs`）→ 仍然是 0，
+ *   此时渲染层按「一旦开始就整段高亮」处理，不会除以 0。
+ *
+ * 时长本来就大于 0 的片段原样返回，不做任何修正——解析器给出的明确时间优先。
+ */
+fun SubtitleCue.karaokeTimeline(): List<KaraokeSegment> {
+    if (karaoke.isEmpty()) return emptyList()
+    return karaoke.mapIndexed { index, segment ->
+        if (segment.durationMs > 0L) {
+            segment
+        } else {
+            val nextStartMs = karaoke.getOrNull(index + 1)?.startMs
+            val resolvedEndMs = nextStartMs ?: endMs
+            segment.copy(durationMs = (resolvedEndMs - segment.startMs).coerceAtLeast(0L))
+        }
+    }
 }

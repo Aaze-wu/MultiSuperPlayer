@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import kotlinx.coroutines.flow.Flow
@@ -20,19 +19,10 @@ import java.io.IOException
 private const val TAG = "ThemeSettings"
 
 /**
- * DataStore 实例。
- *
- * **必须是顶层属性**：`preferencesDataStore` 这个委托保证「同一个文件只创建一个
- * 实例」，而 DataStore 对同一个文件同时存在两个实例会直接抛
- * `IllegalStateException: There are multiple DataStores active for the same file`。
- * 如果把它写在类里、每次 `single { }` 都新建一个，就会踩到那个异常。
- */
-private val Context.themeSettingsStore: DataStore<Preferences> by preferencesDataStore(
-    name = "msp_settings",
-)
-
-/**
  * 主题偏好的读写。
+ *
+ * 与 [SubtitleSettingsRepository] 共用 `msp_settings` 这一个文件——
+ * 声明在 [mspSettingsStore] 里，那个文件同时说明了为什么这里只能有一份。
  *
  * 写入不走内存缓存：DataStore 自己就是「写盘成功才更新 Flow」的语义，
  * 多加一层缓存反而会出现「界面显示了但没落盘」。
@@ -42,7 +32,7 @@ class ThemeSettingsRepository(
     private val dispatchers: DispatcherProvider,
 ) {
     private val appContext = context.applicationContext
-    private val store: DataStore<Preferences> get() = appContext.themeSettingsStore
+    private val store: DataStore<Preferences> get() = appContext.mspSettingsStore
 
     /**
      * 读取失败**不能**让整个界面崩掉，也不能卡在「永远没有值」。

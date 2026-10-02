@@ -30,6 +30,9 @@ kotlin {
 dependencies {
     api(project(":core:model"))
     implementation(project(":core:common"))
+    // 外挂字幕的读取与解析。解析器本身在 core:subtitle（纯逻辑、可单测），
+    // 这里只负责「找到文件 → 读字节 → 交给解析器」。
+    implementation(project(":core:subtitle"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.documentfile)
