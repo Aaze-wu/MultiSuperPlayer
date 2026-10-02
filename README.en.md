@@ -138,6 +138,14 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   what is already recorded (otherwise the switch would be an irreversible delete, while all the user
   meant was "stop recording"). With it off the Recent page says the switch is off instead of pretending
   the list is empty.
+- **Rows can be deleted one by one, and the whole list can be cleared.** The ✕ on the right of a row
+  removes that entry; the sweep icon in the top bar clears everything (behind a confirmation dialog).
+  **Deleting a row also forgets the resume position it holds**, because the row *is* the resume record.
+  A snackbar offers **Undo**, which writes the record back **with its original timestamp**, so the row
+  returns to the same place in the list. The clear-all copy states both halves at once: resume
+  positions are forgotten (playback starts from the beginning next time) and **files in the library
+  are untouched** — saying what is lost and what is not is the only way this is not read as "deletes
+  my files".
 - **Playlists** store an id key plus a display snapshot (title / artist / duration). If the library
   temporarily cannot find a file, the entry **does not vanish**; the list marks it as currently absent
   while keeping its position in the queue — "the library can't find it" is not the same as "it can't be
@@ -214,7 +222,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.7** | **Built-in file browser: own directory listing, optional all-files access, attach a tapped subtitle file** | Done |
 | **v0.5.8** | **Media opened from the browser discovers sibling subtitles (by listing the directory, not the media library)** | Done |
 | v0.5.9 | Multi-select in the built-in file browser (select all / add to playlist / play) | Done |
-| **v0.5.10** | **Recent page keeps short clips, new "Record recent plays" switch, auto-refresh on return** | **Current** |
+| **v0.5.10** | **Recent page keeps short clips, new "Record recent plays" switch, auto-refresh on return** | Done |
+| **v0.5.11** | **Recent page: delete one entry (undoable) and clear all (confirmed)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 

@@ -1,6 +1,39 @@
 package com.multisuperplayer.core.data.history
 
 /**
+ * 键名规则：哪些键是一条续播记录。
+ *
+ * 「列出记录」「清掉读不出来的脏值」「清空全部」是三件事，但它们判定的**必须是
+ * 同一件事**——一个键属于这张表，还是不属于。这三处的判定以前各写了一遍
+ * `startsWith(前缀)`/`substring(前缀长度)`，加一处新用途就要再抄一遍，抄错一处
+ * 的症状是「清空之后还剩一条」（少删）或者「清空顺手删掉了别的键」（多删，
+ * 这一份存储只放续播记录所以现在看不出问题，但那是巧合而不是保证）。
+ */
+internal object ResumeKeys {
+
+    /**
+     * 是不是一条续播记录。
+     *
+     * 注意前缀里带那个点：键名是 `"resume." + 媒体 id`，而媒体 id 里可以出现点
+     * （`content://…`、`file:/…`）。只比到 `"resume"` 会把 `"resumex.a"` 这类
+     * 键也认成本表记录——现在不存在这种键，但删错了是**不可逆**的，
+     * 而这个判断只多一个字符。
+     */
+    fun isResumeKey(name: String): Boolean = name.startsWith(RESUME_KEY_PREFIX)
+
+    /**
+     * 取出这条记录对应的媒体 id；不是本表记录、或者 id 是空串时返回 null。
+     *
+     * 空 id 的键（`"resume."`）在协议上是坏值：它对应的记录没法被 `read` 找到
+     * （`read("")` 不会有人调用），列出来会变成一行无名记录。
+     */
+    fun mediaIdOf(name: String): String? {
+        if (!isResumeKey(name)) return null
+        return name.removePrefix(RESUME_KEY_PREFIX).ifEmpty { null }
+    }
+}
+
+/**
  * 一条续播记录。
  *
  * 除了位置还存了**保存时间**：淘汰要按「最近还在看的」排序，没时间戳就只能靠

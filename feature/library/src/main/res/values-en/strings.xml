@@ -112,6 +112,14 @@
     <!-- When it is off it must say "you turned it off" and name the switch: this page is empty and the user has long forgotten why. -->
     <string name="msp_recent_disabled_title">“Record recent plays” is off</string>
     <string name="msp_recent_disabled_desc">Turn it back on under Settings - Playback to keep recording. What is already recorded is still here and has not been deleted.</string>
+    <string name="msp_recent_remove">Remove from recent plays</string>
+    <string name="msp_recent_removed">Removed from recent plays</string>
+    <string name="msp_recent_undo">Undo</string>
+    <string name="msp_recent_clear">Clear</string>
+    <string name="msp_recent_clear_title">Clear recently played?</string>
+    <!-- It must say both "the resume positions go too" and "your files are safe": one missing line reads as "the list just gets shorter", the other as "this deletes my files". -->
+    <string name="msp_recent_clear_desc">The list will be emptied, and the resume positions these entries remembered are forgotten too (they will play from the start next time). Files in your library are not affected.</string>
+    <string name="msp_recent_cleared">Recently played cleared</string>
 
     <!-- ===== Playlists ===== -->
     <string name="msp_playlists_title">Playlists</string>
