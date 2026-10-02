@@ -9,16 +9,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -156,6 +165,77 @@ internal fun EmptyState(
 
 /** 一行里两个元素并排时的间距。放在这里是为了三个页面用同一个值。 */
 internal val EntryRowTrailingSpacing = 4.dp
+
+/**
+ * 多选集合存成一个 list 才能进 `rememberSaveable`（`Set` 不是可保存类型）。
+ *
+ * 存在这里而不是某个页面里：媒体库页和浏览页的选中集合是同一个东西，
+ * 两个页面各写一份 saver，迟早会有一边忘了处理空集（restore 出一个 `null`）。
+ */
+internal val MEDIA_SELECTION_SAVER = listSaver<Set<String>, String>(
+    save = { it.toList() },
+    restore = { it.toSet() },
+)
+
+/**
+ * 多选时的操作条。
+ *
+ * 标题位置放「已选 N 项」，返回图标当「退出多选」——
+ * 用户按下返回键的直觉就是「取消当前这个状态」，没必要为它单独发明一个按钮。
+ *
+ * 媒体库页和浏览页共用这一条：两个页面上的手势、图标、文案完全一样，
+ * 而复制一份的代价是以后加一个动作时会漏掉其中一边。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SelectionTopBar(
+    count: Int,
+    allSelected: Boolean,
+    onExit: () -> Unit,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onPlay: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.msp_library_selection_count, count)) },
+        navigationIcon = {
+            IconButton(onClick = onExit) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = stringResource(R.string.msp_library_exit_selection),
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = if (allSelected) onClearSelection else onSelectAll) {
+                if (allSelected) {
+                    Icon(
+                        imageVector = Icons.Outlined.Deselect,
+                        contentDescription = stringResource(R.string.msp_library_clear_selection),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.SelectAll,
+                        contentDescription = stringResource(R.string.msp_library_select_all),
+                    )
+                }
+            }
+            IconButton(onClick = onAddToPlaylist) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
+                    contentDescription = stringResource(R.string.msp_library_add_to_playlist),
+                )
+            }
+            IconButton(onClick = onPlay) {
+                Icon(
+                    imageVector = Icons.Outlined.PlayArrow,
+                    contentDescription = stringResource(R.string.msp_library_play_selection),
+                )
+            }
+        },
+    )
+}
 
 /** 把「时长 + 自定义按钮」拼成一个 trailing 组合。 */
 @Composable

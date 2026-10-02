@@ -126,6 +126,25 @@ class BrowserEntryTest {
         assertEquals("", media.relativePath ?: "")
     }
 
+    // ------------------------------------------------------------ 身份
+
+    @Test
+    fun `mediaId 与转出来的媒体条目 id 是同一个`() {
+        // 两处各写一遍 `file:` 前缀的话，多选集合（按 mediaId 存）和播放列表
+        // （按 MediaEntry.id 存）迟早会对不上，而症状只是「勾了却播不了」。
+        val entry = file("movie.mp4", kind = MediaKind.VIDEO)
+        assertEquals(BrowserEntry.MEDIA_ID_PREFIX + entry.ref, entry.mediaId)
+        assertEquals(entry.mediaId, requireNotNull(entry.toMediaEntry()).id)
+    }
+
+    @Test
+    fun `只有自己的前缀算浏览页的条目`() {
+        assertTrue(BrowserEntry.isBrowserMediaId(BrowserEntry.mediaIdOf("/x/a.mp4")))
+        // 媒体库的数字 id 与 SAF 的 `saf:` 都不是——猜错会让字幕查找走错分支。
+        assertFalse(BrowserEntry.isBrowserMediaId("12345"))
+        assertFalse(BrowserEntry.isBrowserMediaId("saf:primary:Music/a.mp3"))
+    }
+
     // ------------------------------------------------------------ 工具
 
     private fun file(name: String, kind: MediaKind? = MediaKind.VIDEO): BrowserEntry = BrowserEntry(

@@ -25,7 +25,7 @@ plugins {
 // 注意 **major 是 0**，所以现在这一串是三位数——别再照着「0.5.4 → 50400」去核对，
 // 那是我一开始写错的示例值（把 minor 当成了 major）。
 // 约束：必须严格递增（否则安装器拒绝覆盖），且小于 2100000000（Google Play 的硬上限）。
-val appVersionName: String = "0.5.8"
+val appVersionName: String = "0.5.9"
 val appVersionCode: Int = run {
     val parts = appVersionName.split('.')
     require(parts.size == 3) { "版本号必须是 x.y.z 三段，当前是 \"$appVersionName\"" }

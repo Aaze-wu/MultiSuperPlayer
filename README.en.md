@@ -103,7 +103,8 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   sorts last.
 - **Multi-select**: long-press to enter selection mode, then select all / clear / add to playlist / play.
   Duplicates are skipped and the app **says how many it skipped** ("added 10, 1 was already in the
-  list") instead of quietly adding 9.
+  list") instead of quietly adding 9. The **built-in file browser uses the same multi-select**
+  (section 1.7); both pages share one action bar.
 - **SAF folder browsing**: grant a folder through the system picker and the grant is persisted. Its
   contents are **merged** with the system media library and de-duplicated by relative path + file name +
   size, so the same file never appears twice. SAF entries are prefixed with `saf:` and cannot collide
@@ -118,7 +119,15 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   temporarily cannot find a file, the entry **does not vanish**; the list marks it as currently absent
   while keeping its position in the queue — "the library can't find it" is not the same as "it can't be
   played". Limits: 100 playlists, 5 000 items each, 80-character names; hitting a limit refuses the
-  action and says why.
+  action and says why. An entry restored from a playlist derives its source from the id prefix
+  (browser entries carry `file:`), so a file played *from a playlist* still finds its sibling
+  subtitles — otherwise it would be looked up as media-library media and hit the "cannot tell which
+  folder this file is in" wall again. "Is this entry still there?" is decided **per source** too:
+  the library is consulted first, and only when that misses *and* the id carries the `file:` prefix
+  (added from the browser) is the absolute path it recorded checked against the file system. A
+  library-only check mislabels **every** browser entry as "file is gone", because the library does
+  not index those paths in the first place. A failed file-system probe always counts as "gone" —
+  better to over-label one row than to claim a deleted file still plays.
 
 ### 1.7 Built-in file browser
 
@@ -143,6 +152,12 @@ system picker.
   instead of quietly returning fewer rows.
 - **Tapping a playable file** builds the queue from **every playable entry in the current directory**
   (not the whole library) and starts at the one you tapped.
+- **Multi-select**: long-press any row to enter selection mode, then select all / clear / add to playlist /
+  play (the same action bar the library uses). Only **playable files** can be selected: directories and
+  subtitle files are still listed, but their checkbox is disabled — they never enter the queue, so
+  selecting them would have nothing to act on. In selection mode a tap **toggles** instead of descending,
+  and Back leaves selection mode first rather than going up a directory. Entering another directory
+  clears the selection, because what is selected is "these files in *this* directory".
 - **Tapping a subtitle file** (`.srt` / `.ass` / `.ssa` / `.vtt` / `.lrc` / `.ttml` / `.dfxp` and friends)
   does **not** queue it for playback — it is attached as an **external subtitle to the video you are
   currently playing**. That is the intended entry point for "pick a subtitle by hand for this video".
@@ -174,7 +189,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | v0.5.5 | Localization + documentation | Done |
 | v0.5.6 | Media library rework: five-tab navigation, mini player, SAF folder browsing, recent, playlists | Done |
 | **v0.5.7** | **Built-in file browser: own directory listing, optional all-files access, attach a tapped subtitle file** | Done |
-| **v0.5.8** | **Media opened from the browser discovers sibling subtitles (by listing the directory, not the media library)** | **Current** |
+| **v0.5.8** | **Media opened from the browser discovers sibling subtitles (by listing the directory, not the media library)** | Done |
+| **v0.5.9** | **Multi-select in the built-in file browser (select all / add to playlist / play)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
@@ -471,8 +487,16 @@ These are deliberate for this release, not oversights:
    can still pick a sibling `.srt` / `.ass` by hand in the sheet, and that path works.
    (Media opened through the built-in browser is **not affected**: it takes the "list the directory"
    route, see section 1.7.)
-10. **The built-in browser does not take part in multi-select**, and writes nothing to the media library.
-    Its queue is **every playable entry in the current directory**.
+10. **The built-in browser writes nothing to the media library.** Browsing is browsing: files opened
+    this way do not enter the library or the Recent list. Since v0.5.9 it **does take part in
+    multi-select** (it can "add to playlist" exactly like the library), but the selected entries still
+    are not written back to the library — "add to playlist" writes to the playlist table, a different
+    table.
+11. **Playlist entries do not keep a "display name".** Entries are stored by id key, so restoring one
+    only brings back the title / artist / duration snapshot fields. What this costs is the **subtitle
+    discovery log line**: it writes "looking for subtitles for xxx", and for an entry restored from a
+    playlist that one field is missing (everything else is there). Fixing it means changing the storage
+    format and writing a migration, which is disproportionate for one name in one log line.
 
 ---
 

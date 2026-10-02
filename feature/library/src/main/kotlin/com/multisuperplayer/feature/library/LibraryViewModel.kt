@@ -2,7 +2,6 @@ package com.multisuperplayer.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
@@ -113,16 +112,8 @@ internal fun buildLibraryUiState(
 }
 
 /**
- * 一条**一次性**的提示（Snackbar）。
- *
- * [nonce] 看起来多余，实际是必需的：只把文案放进状态时，用户连着两次「加入 N 项」
- * 会得到两个**结构相等**的状态，Compose 的 `LaunchedEffect(text)` 认为 key 没变，
- * 第二次的提示就再也不显示了。所以让每一次事件都带上一个只增不减的序号，
- * 界面拿它当 key。
+ * 排列相关的三个维度。单独打成一个包是为了配合 `combine` 的重载个数（最多 5 个）。
  */
-data class LibraryMessage(val text: MspText, val nonce: Long)
-
-/** 排列相关的三个维度。单独打成一个包是为了配合 `combine` 的重载个数（最多 5 个）。 */
 private data class LibraryViewOptions(
     val sort: LibrarySort,
     val groupMode: LibraryGroupMode,
@@ -137,8 +128,10 @@ private data class LibraryViewOptions(
  */
 class LibraryViewModel(
     private val repository: MediaLibraryRepository,
-    private val playlistStore: PlaylistStore,
+    playlistStore: PlaylistStore,
 ) : ViewModel() {
+
+    private val playlistEditing = PlaylistEditing(playlistStore)
 
     private val filter = MutableStateFlow(LibraryFilter.ALL)
     private val query = MutableStateFlow("")
@@ -150,10 +143,10 @@ class LibraryViewModel(
         LibraryViewOptions(s, g, v)
     }
 
-    private val _message = MutableStateFlow<LibraryMessage?>(null)
+    private val _message = MutableStateFlow<UiMessage?>(null)
 
-    /** 一次性提示。界面用 [LibraryMessage.nonce] 当 key 显示，不需要「已消费」回调。 */
-    val message: StateFlow<LibraryMessage?> = _message.asStateFlow()
+    /** 一次性提示。界面用 [UiMessage.nonce] 当 key 显示，不需要「已消费」回调。 */
+    val message: StateFlow<UiMessage?> = _message.asStateFlow()
 
     private val messageNonce = AtomicLong()
 
@@ -163,7 +156,7 @@ class LibraryViewModel(
      * `WhileSubscribed` + 5 秒超时：退出媒体库之后再回来不用重新读一遍 DataStore，
      * 但真的离开之后订阅会被取消，不会为了一个看不见的对话框常驻一个 DataStore 观察者。
      */
-    val playlists: StateFlow<List<Playlist>> = playlistStore.playlists.stateIn(
+    val playlists: StateFlow<List<Playlist>> = playlistEditing.playlists.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         initialValue = emptyList(),
@@ -216,43 +209,27 @@ class LibraryViewModel(
     fun addToPlaylist(playlistId: String, entries: List<MediaEntry>) {
         if (entries.isEmpty()) return
         viewModelScope.launch {
-            val added = playlistStore.addItems(playlistId, entries)
+            val added = playlistEditing.addTo(playlistId, entries)
             // 去重发生在存储层（PlaylistRules.withAdded），所以「几项被跳过」只有它能告诉我们。
             // 这里如实报告，而不是一律说「已加入」——否则用户会以为点了两次就真的加了两遍。
-            publishAdded(added, entries.size)
+            publish(addedToPlaylistText(added, entries.size))
         }
     }
 
     /** 新建播放列表并把 [entries] 放进去。 */
     fun createPlaylistWith(name: String, entries: List<MediaEntry>) {
         viewModelScope.launch {
-            val id = playlistStore.create(name)
-            // create() 在数量达到上限时**不会写入**，但仍然返回一个 id。直接拿它去
-            // addItems 会静默地加进一个不存在的列表，用户看到的是「已加入 0 项」。
-            // 所以回读一次，确认它真的落盘了。
-            if (playlistStore.playlist(id) == null) {
-                MspLog.w(TAG) { "新建播放列表没有落盘（可能已达上限）" }
+            val added = playlistEditing.createWith(name, entries)
+            if (added == null) {
                 publish(MspText.Res(R.string.msp_library_playlist_create_failed))
                 return@launch
             }
-            val added = playlistStore.addItems(id, entries)
-            publishAdded(added, entries.size)
+            publish(addedToPlaylistText(added, entries.size))
         }
     }
 
-    private fun publishAdded(added: Int, requested: Int) {
-        val skipped = requested - added
-        publish(
-            if (skipped > 0) {
-                MspText.Res(R.string.msp_library_added_to_playlist_skipped, added, skipped)
-            } else {
-                MspText.Res(R.string.msp_library_added_to_playlist, added)
-            },
-        )
-    }
-
     private fun publish(text: MspText) {
-        _message.value = LibraryMessage(text = text, nonce = messageNonce.incrementAndGet())
+        _message.value = UiMessage(text = text, nonce = messageNonce.incrementAndGet())
     }
 
     fun refresh() {

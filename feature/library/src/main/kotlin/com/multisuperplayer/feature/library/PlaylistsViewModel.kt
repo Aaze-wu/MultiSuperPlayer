@@ -2,15 +2,18 @@ package com.multisuperplayer.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -43,11 +46,15 @@ data class PlaylistsUiState(
  *
  * 打开的那个列表**查不到就当作没打开**（而不是保留上一次的详情）：用户可能
  * 在别处把它删了，这时应该退回列表页。
+ *
+ * @param fileExists 浏览页条目的「路径还在不在」。库查不到不等于文件没了，
+ *   详见 [resolvePlaylistItem]。默认值一律当作不在，理由见 `PlaylistRows.build`。
  */
 internal fun buildPlaylistsUiState(
     playlists: List<Playlist>,
     library: MediaLibraryState,
     openId: String?,
+    fileExists: (String) -> Boolean = { false },
 ): PlaylistsUiState {
     val byId = (library as? MediaLibraryState.Ready)?.entries?.associateBy { it.id }.orEmpty()
     val playlist = openId?.let { id -> playlists.firstOrNull { it.id == id } }
@@ -57,7 +64,7 @@ internal fun buildPlaylistsUiState(
             PlaylistDetail(
                 id = it.id,
                 name = it.name,
-                rows = PlaylistRows.build(it.items, byId),
+                rows = PlaylistRows.build(it.items, byId, fileExists),
                 queue = PlaylistRows.queue(it.items, byId),
             )
         },
@@ -75,6 +82,7 @@ internal fun buildPlaylistsUiState(
 class PlaylistsViewModel(
     library: MediaLibraryRepository,
     private val store: PlaylistStore,
+    private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
     private val openId = MutableStateFlow<String?>(null)
@@ -84,12 +92,24 @@ class PlaylistsViewModel(
         library.state,
         openId,
     ) { playlists, libraryState, open ->
-        buildPlaylistsUiState(playlists, libraryState, open)
-    }.stateIn(
+        buildPlaylistsUiState(playlists, libraryState, open, fileExists = ::fileExists)
+    }.flowOn(dispatchers.io).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         initialValue = PlaylistsUiState(),
     )
+
+    /**
+     * 浏览页条目的「路径还在不在」。
+     *
+     * 这是这一页唯一会碰文件系统的地方（整个 flow 在 `flowOn(dispatchers.io)` 上），
+     * 代价是一个 `stat`，换来的是「文件确实删了」这条信息；不查的话从浏览器加进来的
+     * 条目就只能一律按「不确定」处理。
+     *
+     * 失败一律算**不在**：判断不了的路径当「还在」就会让用户点进去才撞上错误。
+     */
+    private fun fileExists(path: String): Boolean =
+        path.isNotEmpty() && runCatching { File(path).exists() }.getOrDefault(false)
 
     fun open(id: String) {
         openId.value = id

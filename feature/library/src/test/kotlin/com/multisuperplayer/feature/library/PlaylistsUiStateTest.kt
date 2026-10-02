@@ -1,8 +1,10 @@
 package com.multisuperplayer.feature.library
 
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.model.BrowserEntry
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.model.MediaSource
 import com.multisuperplayer.core.model.Playlist
 import com.multisuperplayer.core.model.PlaylistItem
 import org.junit.Assert.assertEquals
@@ -120,5 +122,51 @@ class PlaylistsUiStateTest {
         assertEquals(0, state.open!!.rows.size)
         assertEquals(0, state.open!!.queue.size)
         assertEquals(0, state.open!!.missingCount)
+    }
+
+    @Test
+    fun `探针会被接到详情里的每一行`() {
+        val path = "/sdcard/Movies/a.mp4"
+        val browsed = PlaylistItem.of(
+            MediaEntry(
+                id = BrowserEntry.mediaIdOf(path),
+                uri = path,
+                title = "a",
+                kind = MediaKind.VIDEO,
+                source = MediaSource.FILE_SYSTEM,
+            ),
+        )
+        val mixed = Playlist(id = "pl-3", name = "混着", createdAtMs = 3L, items = listOf(item1, browsed))
+
+        val asked = mutableListOf<String>()
+        val state = buildPlaylistsUiState(listOf(mixed), ready, "pl-3") { p ->
+            asked.add(p)
+            true
+        }
+
+        // 真机上的表现是：从浏览器加进播放列表的两条，一进详情就被标成「文件已不在」，
+        // 顶部还挂一句「播的时候可能失败」。库查不到 ≠ 文件没了。
+        assertEquals(0, state.open!!.missingCount)
+        assertEquals(listOf(path), asked)
+    }
+
+    @Test
+    fun `不传探针时浏览页条目仍然算未解析`() {
+        val path = "/sdcard/Movies/a.mp4"
+        val browsed = PlaylistItem.of(
+            MediaEntry(
+                id = BrowserEntry.mediaIdOf(path),
+                uri = path,
+                title = "a",
+                kind = MediaKind.VIDEO,
+                source = MediaSource.FILE_SYSTEM,
+            ),
+        )
+        val mixed = Playlist(id = "pl-4", name = "混着", createdAtMs = 4L, items = listOf(browsed))
+
+        val state = buildPlaylistsUiState(listOf(mixed), ready, "pl-4")
+
+        // 保守默认：宁可多标一条「文件已不在」，也不要把删掉的文件说成还在。
+        assertEquals(1, state.open!!.missingCount)
     }
 }

@@ -3,6 +3,7 @@ package com.multisuperplayer.feature.library
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.browser.BrowserContent
 import com.multisuperplayer.core.data.browser.BrowserRepository
 import com.multisuperplayer.core.data.browser.BrowserRoot
@@ -10,17 +11,23 @@ import com.multisuperplayer.core.data.browser.BrowserSort
 import com.multisuperplayer.core.data.browser.BrowserTrail
 import com.multisuperplayer.core.data.browser.StorageAccess
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
+import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.model.BrowserEntry
+import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.model.Playlist
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 「浏览」这一页的界面状态。
@@ -93,7 +100,10 @@ class BrowseViewModel(
     private val library: MediaLibraryRepository,
     private val browser: BrowserRepository,
     private val storage: StorageAccess,
+    playlistStore: PlaylistStore,
 ) : ViewModel() {
+
+    private val playlistEditing = PlaylistEditing(playlistStore)
 
     private val trail = MutableStateFlow<BrowserTrail?>(null)
     private val sort = MutableStateFlow(BrowserSort.NAME_ASC)
@@ -195,6 +205,57 @@ class BrowseViewModel(
     fun addTree(uri: String) = library.addTree(uri)
 
     fun removeTree(uri: String) = library.removeTree(uri)
+
+    /**
+     * 「加入播放列表」要选的列表清单。
+     *
+     * 只在多选的操作条按下去的时候才会用到，所以照样是 `WhileSubscribed`：
+     * 用户没进多选时不该常驻一个 DataStore 观察者。
+     */
+    val playlists: StateFlow<List<Playlist>> = playlistEditing.playlists.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptyList(),
+    )
+
+    private val _message = MutableStateFlow<UiMessage?>(null)
+
+    /** 一次性提示（「已加入 N 项」/「新建失败」）。用 [UiMessage.nonce] 当 key 显示。 */
+    val message: StateFlow<UiMessage?> = _message.asStateFlow()
+
+    private val messageNonce = AtomicLong()
+
+    /**
+     * 把多选中的条目追加到某个已有播放列表。
+     *
+     * 这里传的是 [MediaEntry]（渲染时由 `BrowserEntry.toMediaEntry()` 得到）而不是
+     * 浏览条目本身：写进列表的就是它们，而它们带着 `file:` 前缀的 id 与
+     * [com.multisuperplayer.core.model.MediaSource.FILE_SYSTEM]——回放时靠这两个字段
+     * 才能还原成「这是个文件系统里的文件」（见 `PlaylistItem.sourceOf`）。
+     */
+    fun addToPlaylist(playlistId: String, entries: List<MediaEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch {
+            val added = playlistEditing.addTo(playlistId, entries)
+            publish(addedToPlaylistText(added, entries.size))
+        }
+    }
+
+    /** 新建一个播放列表并把多选中的条目放进去。 */
+    fun createPlaylistWith(name: String, entries: List<MediaEntry>) {
+        viewModelScope.launch {
+            val added = playlistEditing.createWith(name, entries)
+            if (added == null) {
+                publish(MspText.Res(R.string.msp_library_playlist_create_failed))
+                return@launch
+            }
+            publish(addedToPlaylistText(added, entries.size))
+        }
+    }
+
+    private fun publish(text: MspText) {
+        _message.value = UiMessage(text = text, nonce = messageNonce.incrementAndGet())
+    }
 
     /**
      * 「所有文件访问」的授权入口。

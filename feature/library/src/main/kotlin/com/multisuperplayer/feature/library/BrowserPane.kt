@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.library
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -31,6 +33,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -62,6 +67,8 @@ import com.multisuperplayer.core.ui.text.string
  * （[BrowserContent.NotADirectory]）是**两个不同的出口**，必须分别说：
  * 前者要用户重新授权或换位置，后者说明这个位置在别处被改名/删除了。
  * 合成一句的话，用户会去授权一个根本没坏的地方。
+ *
+ * [selection] 是这一页的多选接线：`mode` 为真时顶栏换成操作条、行前面出现勾选框。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +78,8 @@ internal fun DirectoryBrowser(
     sort: BrowserSort,
     showHidden: Boolean,
     modifier: Modifier = Modifier,
+    selection: BrowserSelection = BrowserSelection(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onUp: () -> Unit = {},
     onEnterDirectory: (BrowserEntry) -> Unit = {},
     onOpenCrumb: (Int) -> Unit = {},
@@ -83,49 +92,64 @@ internal fun DirectoryBrowser(
 
     Scaffold(
         modifier = modifier,
+        // 提示条（「已加入 3 项」）挂在**目录页自己的** Scaffold 上：
+        // 来源清单是另一个 Scaffold，挂在那边会在进目录后被遮住。
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = trail.current.label.string(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onUp) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            // 同一个按钮两种语义：还在深层时是「上一层」，
-                            // 已经在来源根上时才是「回来源列表」。读屏用户
-                            // 听到的必须是当下真正会发生的那件事。
-                            contentDescription = stringResource(
-                                if (trail.canGoUp) {
-                                    R.string.msp_browser_up
-                                } else {
-                                    R.string.msp_browser_back_sources
-                                },
-                            ),
+            if (selection.mode) {
+                SelectionTopBar(
+                    count = selection.count,
+                    allSelected = selection.allSelected,
+                    onExit = selection.onExit,
+                    onSelectAll = selection.onSelectAll,
+                    onClearSelection = selection.onClear,
+                    onAddToPlaylist = selection.onAddToPlaylist,
+                    onPlay = selection.onPlay,
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = trail.current.label.string(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.Sort,
-                            contentDescription = stringResource(R.string.msp_library_sort_label),
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onUp) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                // 同一个按钮两种语义：还在深层时是「上一层」，
+                                // 已经在来源根上时才是「回来源列表」。读屏用户
+                                // 听到的必须是当下真正会发生的那件事。
+                                contentDescription = stringResource(
+                                    if (trail.canGoUp) {
+                                        R.string.msp_browser_up
+                                    } else {
+                                        R.string.msp_browser_back_sources
+                                    },
+                                ),
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.Sort,
+                                contentDescription = stringResource(R.string.msp_library_sort_label),
+                            )
+                        }
+                        BrowserMenu(
+                            expanded = menuOpen,
+                            sort = sort,
+                            showHidden = showHidden,
+                            onDismiss = { menuOpen = false },
+                            onSortChange = onSortChange,
+                            onShowHiddenChange = onShowHiddenChange,
                         )
-                    }
-                    BrowserMenu(
-                        expanded = menuOpen,
-                        sort = sort,
-                        showHidden = showHidden,
-                        onDismiss = { menuOpen = false },
-                        onSortChange = onSortChange,
-                        onShowHiddenChange = onShowHiddenChange,
-                    )
-                },
-            )
+                    },
+                )
+            }
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -133,6 +157,7 @@ internal fun DirectoryBrowser(
             HorizontalDivider()
             BrowserBody(
                 content = content,
+                selection = selection,
                 onEnterDirectory = onEnterDirectory,
                 onOpenFile = onOpenFile,
                 onOpenSubtitle = onOpenSubtitle,
@@ -180,6 +205,7 @@ private fun CrumbRow(trail: BrowserTrail, onOpenCrumb: (Int) -> Unit) {
 @Composable
 private fun BrowserBody(
     content: BrowserContent,
+    selection: BrowserSelection,
     onEnterDirectory: (BrowserEntry) -> Unit,
     onOpenFile: (BrowserEntry) -> Unit,
     onOpenSubtitle: (BrowserEntry) -> Unit,
@@ -235,6 +261,9 @@ private fun BrowserBody(
                     items(items = content.entries, key = { it.ref }) { entry ->
                         BrowserEntryRow(
                             entry = entry,
+                            selected = entry.mediaId in selection.ids,
+                            selectionMode = selection.mode,
+                            onToggleSelection = { selection.onToggle(entry.mediaId) },
                             onEnterDirectory = onEnterDirectory,
                             onOpenFile = onOpenFile,
                             onOpenSubtitle = onOpenSubtitle,
@@ -259,10 +288,23 @@ private fun BrowserBody(
  * 「给正在看的那个片子当外挂字幕」，其余文件是「交给播放器」。
  * 字幕这一支尤其不能混：`.srt` 自己没有画面，当成媒体交给播放器只会弹一句失败，
  * 而用户在这一页点它的**唯一**意图就是选字幕。
+ *
+ * ## 多选
+ *
+ * 多选态下单击是切换选中，**不再是**进入目录或播放：这时候整页的动作是
+ * 「对选中的一批做什么」，忽然跳到另一个目录会把用户正在选的东西丢在背后。
+ *
+ * 长按**可选的**那一行才会进多选（与媒体库页同一个手势）。目录和字幕行长按没反应：
+ * 它们本来就不进队列，让它们进去只会得到一个「已选 0 项、某一行却画着对勾」的界面
+ * （实测过的坑）——一个按不动的勾选框比没有勾选框更难理解。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BrowserEntryRow(
     entry: BrowserEntry,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onToggleSelection: () -> Unit,
     onEnterDirectory: (BrowserEntry) -> Unit,
     onOpenFile: (BrowserEntry) -> Unit,
     onOpenSubtitle: (BrowserEntry) -> Unit,
@@ -271,60 +313,85 @@ private fun BrowserEntryRow(
     // 字幕的后缀清单只有一份（`subtitleFileExtensions`）：自动查找和手动指定必须
     // 对「什么算字幕」给出同一个答案，不然会出现「同目录里扫得到、在这里却点不着」。
     val subtitle = entry.isFile && entry.extension in subtitleFileExtensions
-    ListItem(
-        modifier = Modifier.clickable {
-            when {
-                directory -> onEnterDirectory(entry)
-                subtitle -> onOpenSubtitle(entry)
-                else -> onOpenFile(entry)
-            }
+    // 可选的才是「会被交给播放器/播放列表」的那一批。目录和字幕进不了队列，
+    // 所以它们既不能被勾，也不给选中底色——看得见却做不了任何事的勾选框比
+    // 没有勾选框更难理解。
+    val selectable = entry.playable
+    Surface(
+        color = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
         },
-        leadingContent = {
-            Icon(
-                // 目录用文件夹图标；文件按类型画（视频/音频/字幕/其他）。
-                // 三种一眼可分，比统一的文件图标多一层信息，代价只有一个 `when`。
-                imageVector = when {
-                    directory -> Icons.Outlined.FolderOpen
-                    // 字幕图标只有 Filled 一种变体（Material Icons 没给 Outlined）。
-                    // 与播放页控制栏上的字幕按钮用同一个，用户一眼能对上。
-                    subtitle -> Icons.Filled.Subtitles
-                    else -> entry.kind?.icon ?: Icons.AutoMirrored.Outlined.Article
-                },
-                contentDescription = null,
-                tint = if (directory || entry.playable || subtitle) {
-                    MaterialTheme.colorScheme.primary
+        modifier = Modifier.combinedClickable(
+            onClick = {
+                if (selectionMode) {
+                    // 禁用状态的勾选框不该能吃点击：目录行在多选态里是「看得见、
+                    // 但没事可做」，所以点它什么也不发生。
+                    if (selectable) onToggleSelection()
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        },
-        headlineContent = {
-            Text(text = entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        // 后缀用大写显示：它在视觉上是「标签」而不是句子的一部分，
-        // 而且在小字号下大写比小写更容易和文件名分开。
-        trailingContent = when {
-            directory -> {
-                {
+                    when {
+                        directory -> onEnterDirectory(entry)
+                        subtitle -> onOpenSubtitle(entry)
+                        else -> onOpenFile(entry)
+                    }
+                }
+            },
+            onLongClick = { if (!selectionMode && selectable) onToggleSelection() },
+        ),
+    ) {
+        ListItem(
+            leadingContent = {
+                if (selectionMode) {
+                    Checkbox(checked = selected, onCheckedChange = null, enabled = selectable)
+                } else {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        // 目录用文件夹图标；文件按类型画（视频/音频/字幕/其他）。
+                        // 三种一眼可分，比统一的文件图标多一层信息，代价只有一个 `when`。
+                        imageVector = when {
+                            directory -> Icons.Outlined.FolderOpen
+                            // 字幕图标只有 Filled 一种变体（Material Icons 没给 Outlined）。
+                            // 与播放页控制栏上的字幕按钮用同一个，用户一眼能对上。
+                            subtitle -> Icons.Filled.Subtitles
+                            else -> entry.kind?.icon ?: Icons.AutoMirrored.Outlined.Article
+                        },
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (directory || entry.playable || subtitle) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                 }
-            }
-            entry.extension.isNotEmpty() -> {
-                {
-                    Text(
-                        text = entry.extension.uppercase(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            },
+            headlineContent = {
+                Text(text = entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
+            // 后缀用大写显示：它在视觉上是「标签」而不是句子的一部分，
+            // 而且在小字号下大写比小写更容易和文件名分开。
+            trailingContent = when {
+                directory -> {
+                    {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            }
-            else -> null
-        },
-    )
+                entry.extension.isNotEmpty() -> {
+                    {
+                        Text(
+                            text = entry.extension.uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                else -> null
+            },
+        )
+    }
 }
 
 /**

@@ -68,6 +68,15 @@ data class BrowserEntry(
      */
     val playable: Boolean get() = isFile && kind != null
 
+    /**
+     * 这一行在 [MediaEntry.id] 里的身份（[toMediaEntry] 用的就是它）。
+     *
+     * 界面的多选集合键在它上面：集合里存的是**媒体 id**而不是 [ref]，
+     * 因为「选中」这件事最终要变成「交给播放器/写进播放列表」这两件都以媒体 id 为准的事。
+     * 不可播的条目也有 id（id 与「能不能播」无关，[playable] 才是那个判据）。
+     */
+    val mediaId: String get() = mediaIdOf(ref)
+
     /** 全小写的后缀，不含点；没有后缀时是空串。 */
     val extension: String get() = name.substringAfterLast('.', "").lowercase()
 
@@ -98,6 +107,11 @@ data class BrowserEntry(
      * ——一条恰好叫 `saf:` 开头的路径（理论上存在）会和媒体库的记录撞上。
      * 加个前缀就等于把「这条记录来自文件浏览器」写进主键，代价是两个字符。
      *
+     * 这个前缀也是**事后认出「这条记录是浏览页给的」的唯一依据**：写进播放列表之后
+     * 就只剩一个字符串了，回放时得靠它把来源还原成 [MediaSource.FILE_SYSTEM]
+     * （见 `PlaylistItem.sourceOf`）——按媒体库那条路去查同目录字幕必然查不到。
+     * 所以前缀只有 [mediaIdOf] 一个出处，读写两侧都走它。
+     *
      * ## `relativePath` 故意留空
      *
      * 它唯一的用途是媒体库的「按文件夹分组」（`MediaStore.Files` 的字幕查找也用它，
@@ -115,7 +129,7 @@ data class BrowserEntry(
         if (isDirectory) return null
         val mediaKind = kind ?: return null
         return MediaEntry(
-            id = "file:$ref",
+            id = mediaId,
             uri = ref,
             title = displayTitle,
             kind = mediaKind,
@@ -125,5 +139,23 @@ data class BrowserEntry(
             displayName = name,
             dateAddedSeconds = if (lastModifiedMs > 0L) lastModifiedMs / 1000L else 0L,
         )
+    }
+
+    companion object {
+
+        /**
+         * 浏览页条目在 [MediaEntry.id] 上的前缀。
+         *
+         * 写进任何持久化记录（播放列表、播放进度）之后，这是**唯一**还能说明
+         * 「这条来自文件浏览器」的东西，所以读的一侧也必须有它——
+         * 见 `PlaylistItem.sourceOf`。
+         */
+        const val MEDIA_ID_PREFIX = "file:"
+
+        /** [ref] 对应的 [MediaEntry.id]。 */
+        fun mediaIdOf(ref: String): String = "$MEDIA_ID_PREFIX$ref"
+
+        /** 这个 [MediaEntry.id] 是不是浏览页给的。 */
+        fun isBrowserMediaId(id: String): Boolean = id.startsWith(MEDIA_ID_PREFIX)
     }
 }

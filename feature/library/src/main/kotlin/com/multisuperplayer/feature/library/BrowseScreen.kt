@@ -25,12 +25,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -87,8 +93,42 @@ fun BrowseRoute(
 ) {
     val viewModel: BrowseViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 选择集是**界面瞬态**（和媒体库页一样，不进 ViewModel、不落盘）。
+    var selectedIds by rememberSaveable(stateSaver = MEDIA_SELECTION_SAVER) {
+        mutableStateOf(emptySet<String>())
+    }
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
+
+    val browsed = (state.content as? BrowserContent.Ready)?.entries.orEmpty()
+    val selectable = remember(browsed) { selectableMedia(browsed) }
+
+    // 选择集必须先剪掉「已经不在这个目录里的 id」。
+    // 不剪的话：进了另一个目录、换了排序、文件被删之后，操作条会显示一个
+    // 含不可见条目的数字（「已选 5 项」但屏上只有 2 行勾上），而且「播放」
+    // 会播到看不见的东西。key 用这份**可播清单**而不是它的长度：
+    // 两个目录行数一样是常事，而长度相同时 effect 根本不会重启。
+    LaunchedEffect(selectable) {
+        val pruned = pruneSelection(selectedIds, selectable)
+        // 没变就**不要**写回：`pruneSelection` 没变时返回同一个实例，
+        // 不判断的话每次进目录都会白写一次状态、白重组一次。
+        if (pruned !== selectedIds) selectedIds = pruned
+    }
+
+    val selectedEntries = LibrarySelectionRules.resolve(selectable, selectedIds)
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val messageText = message?.text?.string()
+    LaunchedEffect(message?.nonce) {
+        val text = messageText ?: return@LaunchedEffect
+        // nonce 而不是 text 做 key：连续两次「已加入 3 项」是完全相等的对象，
+        // 只按文本判断的话第二条不会显示，用户会以为第二次点击没生效。
+        snackbarHostState.showSnackbar(text)
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -119,9 +159,32 @@ fun BrowseRoute(
     // （那才是「离开这个标签页 / 退出应用」的正常语义）。
     BackHandler(enabled = state.browsing) { viewModel.goBack() }
 
+    // 多选时返回键的语义变成「退出多选」，而不是「回上一层目录」——
+    // 用户刚勾了几项，按返回的直觉是取消这个状态。
+    //
+    // 必须写在上一句**后面**：`OnBackPressedDispatcher` 是后注册者优先
+    // （它用倒序遍历回调查表），两个都启用时最后注册的那个才会被调用。
+    BackHandler(enabled = selectedIds.isNotEmpty()) { selectedIds = emptySet() }
+
+    // 动作条、行的勾选框、两个动作（播放 / 加入播放列表）都从这里往下传，
+    // 界面层不再各自判断「现在是多选还是平常」。
+    val selection = BrowserSelection(
+        ids = selectedIds,
+        count = selectedEntries.size,
+        allSelected = LibrarySelectionRules.allSelected(selectedIds, selectable),
+        onToggle = { id -> selectedIds = toggleSelection(selectedIds, selectable, id) },
+        onExit = { selectedIds = emptySet() },
+        onSelectAll = { selectedIds = LibrarySelectionRules.addAll(selectedIds, selectable) },
+        onClear = { selectedIds = LibrarySelectionRules.removeAll(selectedIds, selectable) },
+        onAddToPlaylist = { pickerOpen = true },
+        onPlay = { if (selectedEntries.isNotEmpty()) onPlayRequest(selectedEntries, 0) },
+    )
+
     BrowseScreen(
         state = state,
         modifier = modifier,
+        selection = selection,
+        snackbarHostState = snackbarHostState,
         onEnterSource = viewModel::enterSource,
         onEnterDirectory = viewModel::enterDirectory,
         onOpenCrumb = viewModel::openCrumb,
@@ -144,19 +207,18 @@ fun BrowseRoute(
         onOpenFile = { entry ->
             // 队列 = 当前这份目录清单里**可播的**条目（保持用户当前看到的排序），
             // 被点的那一项为起点。子目录和不可播的文件由 `toMediaEntry()` 自然剔掉。
+            // 与多选的「播放」用**同一份**清单（`selectable`），
+            // 两条路径各算一次迟早会有一天算出不同的东西。
             //
             // 这里**不**把条目写进媒体库：用户的意思是「翻到哪儿放一下」，
             // 不是「把整个 Download 目录收进库」。写库会让媒体库标签页突然
             // 多出几百个条目，而用户从没同意过这件事。
-            val queue = (state.content as? BrowserContent.Ready)
-                ?.entries
-                .orEmpty()
-                .mapNotNull { it.toMediaEntry() }
+            //
             // 按 id 找回索引，而不是先筛一遍再数位置：两者一旦因为
             // 「某个文件构造不出 MediaEntry」而错位，就会放到别的文件上。
             // 目标 id 为 null（不可播）时永远匹配不上，就是「点了没反应」。
-            val index = queue.indexOfFirst { it.id == entry.toMediaEntry()?.id }
-            if (index >= 0) onPlayRequest(queue, index)
+            val index = selectable.indexOfFirst { it.id == entry.mediaId }
+            if (index >= 0) onPlayRequest(selectable, index)
         },
         onOpenSubtitle = { entry ->
             // 转换放在路由层，`BrowseScreen` 只报「用户点了这一行」。
@@ -165,6 +227,26 @@ fun BrowseRoute(
             onOpenSubtitle(subtitleSourceOf(entry.ref, entry.name, entry.sizeBytes))
         },
     )
+
+    if (pickerOpen) {
+        PlaylistPickerDialog(
+            playlists = playlists,
+            onDismiss = { pickerOpen = false },
+            // 选完就退出多选：动作已经落地，接着还勾着一批东西会让用户
+            // 以为「刚才那一批还没加进去」。消息由 ViewModel 发，
+            // 「加了几个 / 跳过几个」只有它（存储层）知道。
+            onPick = { playlistId ->
+                viewModel.addToPlaylist(playlistId, selectedEntries)
+                pickerOpen = false
+                selectedIds = emptySet()
+            },
+            onCreate = { name ->
+                viewModel.createPlaylistWith(name, selectedEntries)
+                pickerOpen = false
+                selectedIds = emptySet()
+            },
+        )
+    }
 }
 
 /**
@@ -172,11 +254,16 @@ fun BrowseRoute(
  *
  * 停在来源清单还是已经进了目录，只看 `state.trail` 是不是 null——
  * 不另设一个「当前是哪个形态」的字段，两个字段迟早会互相矛盾。
+ *
+ * `internal`：模块对外的入口是 [BrowseRoute]；这一层的参数里有模块内的多选接线
+ * （[BrowserSelection]），把它公开等于公开一个界面的内部结构。
  */
 @Composable
-fun BrowseScreen(
+internal fun BrowseScreen(
     state: BrowseUiState,
     modifier: Modifier = Modifier,
+    selection: BrowserSelection = BrowserSelection(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onEnterSource: (BrowserRoot) -> Unit = {},
     onEnterDirectory: (BrowserEntry) -> Unit = {},
     onOpenCrumb: (Int) -> Unit = {},
@@ -206,6 +293,8 @@ fun BrowseScreen(
             sort = state.sort,
             showHidden = state.showHidden,
             modifier = modifier,
+            selection = selection,
+            snackbarHostState = snackbarHostState,
             onUp = onBack,
             onEnterDirectory = onEnterDirectory,
             onOpenCrumb = onOpenCrumb,

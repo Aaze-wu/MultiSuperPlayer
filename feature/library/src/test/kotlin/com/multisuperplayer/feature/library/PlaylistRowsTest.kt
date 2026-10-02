@@ -1,7 +1,9 @@
 package com.multisuperplayer.feature.library
 
+import com.multisuperplayer.core.model.BrowserEntry
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.model.MediaSource
 import com.multisuperplayer.core.model.PlaylistItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -100,5 +102,118 @@ class PlaylistRowsTest {
     fun `空列表两种调用都返回空`() {
         assertTrue(PlaylistRows.build(emptyList(), emptyMap()).isEmpty())
         assertTrue(PlaylistRows.queue(emptyList(), emptyMap()).isEmpty())
+    }
+
+    // ── 浏览页条目（file: 前缀）────────────────────────────────────────────────
+
+    /**
+     * 浏览页写进来的条目：id 带 `file:` 前缀，uri 就是绝对路径。
+     *
+     * `PlaylistItem.of` 记的就是浏览页条目传过来的那两个字段（见 `BrowserEntry.toMediaEntry`）。
+     */
+    private fun browserItem(path: String, title: String = path.substringAfterLast('/')) =
+        PlaylistItem.of(
+            MediaEntry(
+                id = BrowserEntry.mediaIdOf(path),
+                uri = path,
+                title = title,
+                kind = MediaKind.VIDEO,
+                source = MediaSource.FILE_SYSTEM,
+            ),
+        )
+
+    @Test
+    fun `文件还在的浏览页条目不标成已不在`() {
+        val item = browserItem("/sdcard/Movies/a.mp4", "a")
+
+        val rows = PlaylistRows.build(listOf(item), emptyMap()) { it == "/sdcard/Movies/a.mp4" }
+
+        assertFalse(rows[0].missing)
+        assertEquals(item.mediaId, rows[0].display.id)
+    }
+
+    @Test
+    fun `文件被删掉的浏览页条目还是标成已不在`() {
+        val item = browserItem("/sdcard/Movies/gone.mp4", "gone")
+
+        val rows = PlaylistRows.build(listOf(item), emptyMap()) { false }
+
+        assertTrue(rows[0].missing)
+        // 标成不在也要能画出一行：标题走快照，否则界面上就是一行空白。
+        assertEquals("gone", rows[0].display.title)
+    }
+
+    @Test
+    fun `没传探针时浏览页条目按不在算`() {
+        val rows = PlaylistRows.build(listOf(browserItem("/sdcard/Movies/a.mp4")), emptyMap())
+
+        // 默认值故意选坏的那一边：忘了传探针只会多标一条「文件已不在」，
+        // 反过来会把已经删掉的文件说成还能播。
+        assertTrue(rows[0].missing)
+    }
+
+    @Test
+    fun `探针问的是条目自己写下来的那个 uri`() {
+        val item = browserItem("/sdcard/Movies/a.mp4", "a")
+        val asked = mutableListOf<String>()
+
+        PlaylistRows.build(listOf(item), emptyMap()) { path ->
+            asked.add(path)
+            true
+        }
+
+        assertEquals(listOf("/sdcard/Movies/a.mp4"), asked)
+    }
+
+    @Test
+    fun `库里查得到的条目不去问文件系统`() {
+        val live = entry("a1", "晴天")
+        var probeCalls = 0
+
+        val rows = PlaylistRows.build(listOf(item("a1")), mapOf("a1" to live)) {
+            probeCalls++
+            false
+        }
+
+        assertSame(live, rows[0].entry)
+        assertEquals(0, probeCalls)
+    }
+
+    @Test
+    fun `库里的条目即使路径也还在也不走快照`() {
+        // 同一个 id 两边都能解释时必须以库为准：库里有 artist/duration，快照里没有，
+        // 走错一边的后果是「有的行有艺术家、有的行没有」。
+        val live = entry("a1", "晴天")
+
+        val rows = PlaylistRows.build(listOf(item("a1")), mapOf("a1" to live)) { true }
+
+        assertSame(live, rows[0].entry)
+    }
+
+    @Test
+    fun `库查不到的非浏览页条目不会靠路径蒙混过去`() {
+        // MediaStore 的 id 和 `file:` 前缀是两套东西；数字 id 不可能变成合法路径，
+        // 所以这一支连探针都不该问。
+        var probeCalls = 0
+
+        val rows = PlaylistRows.build(listOf(item("12345")), emptyMap()) {
+            probeCalls++
+            true
+        }
+
+        assertTrue(rows[0].missing)
+        assertEquals(0, probeCalls)
+    }
+
+    @Test
+    fun `浏览页条目的队列项带着文件系统来源`() {
+        val item = browserItem("/sdcard/Movies/a.mp4", "a")
+
+        val restored = PlaylistRows.queue(listOf(item), emptyMap()).single()
+
+        // 来源错了字幕就找不到（见 `PlaylistItem.sourceOf`）：播放列表里的浏览页条目
+        // 必须仍然按路径去列同目录，而不是去 MediaStore 查相对路径。
+        assertEquals(MediaSource.FILE_SYSTEM, restored.source)
+        assertEquals("/sdcard/Movies/a.mp4", restored.uri)
     }
 }

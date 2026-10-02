@@ -23,22 +23,17 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SearchOff
-import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -140,7 +135,7 @@ fun LibraryRoute(
 fun LibraryScreen(
     state: LibraryUiState,
     modifier: Modifier = Modifier,
-    message: LibraryMessage? = null,
+    message: UiMessage? = null,
     playlists: List<Playlist> = emptyList(),
     onRequestPermission: () -> Unit = {},
     onRefresh: () -> Unit = {},
@@ -156,7 +151,7 @@ fun LibraryScreen(
     // 只需要 partial / truncated 这两个信息，分支判定整个交给 state.pane（纯函数，有单测）。
     val ready = state.library as? MediaLibraryState.Ready
 
-    var selectedIds by rememberSaveable(stateSaver = SELECTION_SAVER) {
+    var selectedIds by rememberSaveable(stateSaver = MEDIA_SELECTION_SAVER) {
         mutableStateOf(emptySet<String>())
     }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -343,14 +338,6 @@ fun LibraryScreen(
     }
 }
 
-/**
- * 多选状态存成一个 list 才能进 `rememberSaveable`（`Set` 不是可保存类型）。
- */
-private val SELECTION_SAVER = listSaver<Set<String>, String>(
-    save = { it.toList() },
-    restore = { it.toSet() },
-)
-
 @Composable
 private fun LibraryToolbar(
     state: LibraryUiState,
@@ -484,63 +471,6 @@ private fun LibraryGroupMenu(current: LibraryGroupMode, onSelect: (LibraryGroupM
             }
         }
     }
-}
-
-/**
- * 多选时的操作条。
- *
- * 标题位置放「已选 N 项」，返回图标当「退出多选」——
- * 用户按下返回键的直觉就是「取消当前这个状态」，没必要为它单独发明一个按钮。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SelectionTopBar(
-    count: Int,
-    allSelected: Boolean,
-    onExit: () -> Unit,
-    onSelectAll: () -> Unit,
-    onClearSelection: () -> Unit,
-    onAddToPlaylist: () -> Unit,
-    onPlay: () -> Unit,
-) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.msp_library_selection_count, count)) },
-        navigationIcon = {
-            IconButton(onClick = onExit) {
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = stringResource(R.string.msp_library_exit_selection),
-                )
-            }
-        },
-        actions = {
-            IconButton(onClick = if (allSelected) onClearSelection else onSelectAll) {
-                if (allSelected) {
-                    Icon(
-                        imageVector = Icons.Outlined.Deselect,
-                        contentDescription = stringResource(R.string.msp_library_clear_selection),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.SelectAll,
-                        contentDescription = stringResource(R.string.msp_library_select_all),
-                    )
-                }
-            }
-            IconButton(onClick = onAddToPlaylist) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                    contentDescription = stringResource(R.string.msp_library_add_to_playlist),
-                )
-            }
-            IconButton(onClick = onPlay) {
-                Icon(
-                    imageVector = Icons.Outlined.PlayArrow,
-                    contentDescription = stringResource(R.string.msp_library_play_selection),
-                )
-            }
-        },
-    )
 }
 
 // Banner 也已搬到 EntryRows.kt：播放列表页要用同一条提示条。

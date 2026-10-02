@@ -70,8 +70,18 @@ data class PlaylistItem(
     /** 列表里显示的副标题：沿用 [MediaEntry.subtitle] 的取舍（缺项优雅降级）。 */
     val subtitle: String get() = artist?.takeIf { it.isNotBlank() }.orEmpty()
 
-    /** 当这一条可以直接交给播放器时用的 [MediaEntry]。 */
-    fun toEntry(source: MediaSource = MediaSource.MEDIA_STORE): MediaEntry = MediaEntry(
+    /**
+     * 当这一条可以直接交给播放器时用的 [MediaEntry]。
+     *
+     * [source] 默认**从 [mediaId] 推导**，而不是写死媒体库。
+     *
+     * 写死的代价不是「少个功能」而是「功能静默出错」：浏览页加进来的文件带着
+     * `file:` 前缀的 id（见 `BrowserEntry.toMediaEntry`），如果回放时当成媒体库条目，
+     * 找同目录字幕就会走 MediaStore 的相对路径那条路——而那个文件压根不在媒体库里，
+     * 结果永远是「无法确定这个文件夹」。id 是唯一还能说出真相的东西，
+     * 所以来源就跟着 id 走（v0.5.8 刚把字幕查找按来源分了三条路，这里是同一件事的另一半）。
+     */
+    fun toEntry(source: MediaSource = sourceOf(mediaId)): MediaEntry = MediaEntry(
         id = mediaId,
         uri = uri,
         title = title,
@@ -91,6 +101,18 @@ data class PlaylistItem(
             durationMs = entry.durationMs,
             kind = entry.kind,
         )
+
+        /**
+         * 从 [MediaEntry.id] 反推来源。
+         *
+         * 只有**浏览页自己造的那个前缀**能反推（它是我们写进去的，见
+         * `BrowserEntry.MEDIA_ID_PREFIX`）；其余（MediaStore 的数字 id、
+         * `saf:` 开头的字符串）一律算媒体库——不能因为「看起来不像数字」就下结论，
+         * 猜错会把 SAF 条目送去按文件路径查字幕（同样是查不到）。
+         */
+        fun sourceOf(mediaId: String): MediaSource =
+            if (BrowserEntry.isBrowserMediaId(mediaId)) MediaSource.FILE_SYSTEM
+            else MediaSource.MEDIA_STORE
     }
 }
 
