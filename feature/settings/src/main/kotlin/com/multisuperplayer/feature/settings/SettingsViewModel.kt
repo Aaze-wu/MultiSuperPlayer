@@ -86,8 +86,15 @@ class SettingsViewModel(
         themeSettings.setBaseTheme(theme.id)
     }
 
+    /**
+     * 选强调色。
+     *
+     * 它同时会关掉「封面取色」和「跟随系统取色」——那两个的优先级都在强调色
+     * 之上，不关掉的话，在 Android 12+ 上点这一行就是零反馈。
+     * 三个键在同一个事务里写，详见 [ThemeSettingsRepository.selectAccent]。
+     */
     fun selectAccent(accent: MspAccent) = persist("强调色=${accent.id}") {
-        themeSettings.setAccent(accent.id)
+        themeSettings.selectAccent(accent.id)
     }
 
     fun setDynamicColor(enabled: Boolean) = persist("系统取色=$enabled") {

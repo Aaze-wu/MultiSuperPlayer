@@ -75,14 +75,45 @@ enum class MspAccent(
 }
 
 /**
+ * 两个「取色」开关的默认值。
+ *
+ * 单独抽出来是因为同一个默认值有**三个**读者：[MspTheme] 的参数默认值、
+ * `MspApp` 组装主题时的 `?:` 兜底、设置页显示开关状态时的 `?:` 兜底。
+ * 以前这三处各写一遍字面量，于是「默认开」这个错值被复制了三份，
+ * 改一处等于没改——而这正是「强调色点了没反应」的成因。
+ */
+object MspThemeDefaults {
+    /**
+     * 「跟随系统取色」（莫奈）默认**关**。
+     *
+     * 默认开的后果在 Android 12+ 上直接可见：系统取色的优先级高于强调色，
+     * 于是设置页里那排强调色成了一个点了没有任何反应的死控件，
+     * 而新装用户第一次进来必然踩到它。
+     *
+     * 系统主题色确实是用户对整台设备的一致选择，但它不能盖掉
+     * 「应用内更细的选择应该赢」这条规则——想要莫奈的人自己去开，
+     * 那里有明确的开关和说明。
+     */
+    const val USE_DYNAMIC_COLOR: Boolean = false
+
+    /**
+     * 「封面取色」默认**关**。
+     *
+     * 它由「当前正在播的内容」驱动，只能在用户看过它是什么样之后才打开；
+     * 默认打开等于让整个应用的配色由随手点开的第一首歌决定。
+     */
+    const val COLOR_FROM_ARTWORK: Boolean = false
+}
+
+/**
  * 生成完整配色方案。
  *
- * 只覆盖主色族（primary / secondary / tertiary）+ 纯黑基底需要的 surface 系列，
- * 其余角色交给 Material 3 的基线值：它们本来就是整套调好的中性灰，
- * 混进任何强调色都不会难看。
+ * 强调色族（primary / secondary / tertiary 三族的每个角色）全部由种子推导，
+ * 中性色取自 M3 基线但去掉了紫偏。两条取色路径（预设 / 封面）共用
+ * [composeColorSchemeFromSeeds]，规则只有一份。
  *
- * @param oledBlack 是否把中性色压到纯黑。true 时只对**中性**角色生效，
- *   强调色不受影响（否则整屏只剩黑白，品牌色全丢）。
+ * @param baseTheme 主题基底；[MspBaseTheme.BLACK] 会把中性色压到纯黑。
+ * @param isDark 已解析过的明暗（基底是 FOLLOW_SYSTEM 时由调用方解析）。
  */
 fun composeColorScheme(
     accent: MspAccent,
@@ -117,14 +148,21 @@ fun composeColorScheme(
 )
 
 /**
- * 生成完整配色方案。
+ * 生成完整配色方案。三步，顺序不能换：
  *
- * 只覆盖主色族（primary / secondary / tertiary）+ 纯黑基底需要的 surface 系列，
- * 其余角色交给 Material 3 的基线值：它们本来就是整套调好的中性灰，
- * 混进任何强调色都不会难看。
+ * 1. 取 M3 基线的中性色，并**去掉色偏**。基线那套是以「紫」为种子调出来的，
+ *    连背景、分割线、底部导航栏底色这些没有任何语义颜色的角色都带一点紫。
+ * 2. 纯黑基底把中性角色压到纯黑（强调色角色不动，否则整屏只剩黑白）。
+ * 3. 把强调色族的**每一个**角色都写进去。
  *
- * @param oledBlack 是否把中性色压到纯黑。true 时只对**中性**角色生效，
- *   强调色不受影响（否则整屏只剩黑白，品牌色全丢）。
+ * 第 3 步以前只写了 primary / secondary / tertiary 三个主色，没写到的角色
+ * 一律保留**基线值**，而基线的品牌色是紫。用户看到的就是「强调色换了，
+ * 可底部导航栏选中那一下、筛选项选中的 chip、只授权部分权限时的提示条
+ * 仍然是紫的」：前两个读 `secondaryContainer`，第三个读 `tertiaryContainer`，
+ * 都没人给值。
+ *
+ * 所以：**这里漏一个角色，那个角色显示的就是别人的品牌色**，不是中性灰。
+ * 加角色时必须同时在 `MspColorSchemeTest` 里加断言。
  */
 private fun composeColorSchemeFromSeeds(
     lightPrimary: Color,
@@ -134,56 +172,180 @@ private fun composeColorSchemeFromSeeds(
     baseTheme: MspBaseTheme,
     isDark: Boolean,
 ): ColorScheme {
+    // 亮色侧、暗色侧各算一遍派生值，而不是只算用得到的那一侧：
+    // 「固定」色族（*Fixed）按定义**不随明暗切换**，只能用亮色种子推导。
+    val lightSecondary = lightPrimary.desaturate(SECONDARY_DESATURATION)
+    val lightSecondaryContainer = lightContainer.desaturate(SECONDARY_CONTAINER_DESATURATION)
+    val lightTertiaryContainer = lightContainer.desaturate(TERTIARY_CONTAINER_DESATURATION)
+    val darkSecondary = darkPrimary.desaturate(SECONDARY_DESATURATION)
+    val darkSecondaryContainer = darkContainer.desaturate(SECONDARY_CONTAINER_DESATURATION)
+    val darkTertiaryContainer = darkContainer.desaturate(TERTIARY_CONTAINER_DESATURATION)
+
     val primary = if (isDark) darkPrimary else lightPrimary
     val container = if (isDark) darkContainer else lightContainer
-    val onPrimary = onColorFor(primary)
+    val secondary = if (isDark) darkSecondary else lightSecondary
+    val secondaryContainer = if (isDark) darkSecondaryContainer else lightSecondaryContainer
+    val tertiaryContainer = if (isDark) darkTertiaryContainer else lightTertiaryContainer
     val onContainer = onColorFor(container)
-
-    // 次要/第三色直接用主色的低饱和版本，保证整套配色同源。
-    val secondary = if (isDark) darkPrimary.copy(alpha = 0.86f) else lightPrimary.copy(alpha = 0.86f)
-    val tertiary = if (isDark) darkContainer else lightContainer
 
     val oledBlack = baseTheme == MspBaseTheme.BLACK
 
-    return if (isDark) {
-        darkColorScheme(
-            primary = primary,
-            onPrimary = onPrimary,
-            primaryContainer = container,
-            onPrimaryContainer = onContainer,
-            secondary = secondary,
-            tertiary = tertiary,
-            background = if (oledBlack) Color.Black else darkColorScheme().background,
-            onBackground = if (oledBlack) Color(0xFFEDEDED) else darkColorScheme().onBackground,
-            surface = if (oledBlack) Color.Black else darkColorScheme().surface,
-            onSurface = if (oledBlack) Color(0xFFEDEDED) else darkColorScheme().onSurface,
-            surfaceVariant = if (oledBlack) Color(0xFF141414) else darkColorScheme().surfaceVariant,
-            onSurfaceVariant = if (oledBlack) Color(0xFFB8B8B8) else darkColorScheme().onSurfaceVariant,
-            surfaceContainer = if (oledBlack) Color(0xFF0A0A0A) else darkColorScheme().surfaceContainer,
-            surfaceContainerHigh = if (oledBlack) Color(0xFF151515) else darkColorScheme().surfaceContainerHigh,
-            surfaceContainerHighest = if (oledBlack) Color(0xFF1E1E1E) else darkColorScheme().surfaceContainerHighest,
-            surfaceContainerLow = if (oledBlack) Color(0xFF050505) else darkColorScheme().surfaceContainerLow,
-            outline = if (oledBlack) Color(0xFF3A3A3A) else darkColorScheme().outline,
-            outlineVariant = if (oledBlack) Color(0xFF262626) else darkColorScheme().outlineVariant,
-        )
+    // 第一步（去色偏）+ 第二步（纯黑基底）。只动中性角色。
+    val baseline = (if (isDark) darkColorScheme() else lightColorScheme()).withNeutralGreys()
+    val neutrals = if (!oledBlack) {
+        baseline
     } else {
-        lightColorScheme(
-            primary = primary,
-            onPrimary = onPrimary,
-            primaryContainer = container,
-            onPrimaryContainer = onContainer,
-            secondary = secondary,
-            tertiary = tertiary,
+        baseline.copy(
+            background = Color.Black,
+            onBackground = OledOnSurface,
+            surface = Color.Black,
+            onSurface = OledOnSurface,
+            surfaceVariant = Color(0xFF141414),
+            onSurfaceVariant = Color(0xFFB8B8B8),
+            surfaceContainerLow = Color(0xFF050505),
+            surfaceContainer = Color(0xFF0A0A0A),
+            surfaceContainerHigh = Color(0xFF151515),
+            surfaceContainerHighest = Color(0xFF1E1E1E),
+            outline = Color(0xFF3A3A3A),
+            outlineVariant = Color(0xFF262626),
         )
     }
+
+    // 第三步：强调色族。一个都不能漏。
+    return neutrals.copy(
+        primary = primary,
+        onPrimary = onColorFor(primary),
+        primaryContainer = container,
+        onPrimaryContainer = onContainer,
+        inversePrimary = if (isDark) lightPrimary else darkPrimary,
+        primaryFixed = lightContainer,
+        primaryFixedDim = darkPrimary,
+        onPrimaryFixed = onColorFor(lightContainer),
+        onPrimaryFixedVariant = lightPrimary,
+
+        secondary = secondary,
+        onSecondary = onColorFor(secondary),
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = onColorFor(secondaryContainer),
+        secondaryFixed = lightSecondaryContainer,
+        secondaryFixedDim = darkSecondaryContainer,
+        onSecondaryFixed = onColorFor(lightSecondaryContainer),
+        onSecondaryFixedVariant = lightSecondary,
+
+        // `tertiary` 保持「容器」这个亮色调：播放页把它当深色遮罩上的提示文字用
+        // （见 SubtitleTrackPicker），换成主色会在遮罩上糊掉。
+        tertiary = container,
+        onTertiary = onContainer,
+        tertiaryContainer = tertiaryContainer,
+        onTertiaryContainer = onColorFor(tertiaryContainer),
+        tertiaryFixed = lightTertiaryContainer,
+        tertiaryFixedDim = darkTertiaryContainer,
+        onTertiaryFixed = onColorFor(lightTertiaryContainer),
+        onTertiaryFixedVariant = onColorFor(lightContainer),
+
+        // 抬升（elevation）时往表面里混的那个色调。不写就还是基线紫。
+        // 纯黑基底给透明：它承诺的是「像素真的断电」，混任何颜色都破坏这个承诺。
+        surfaceTint = if (oledBlack) Color.Transparent else primary,
+    )
+}
+
+/** 次要色族的降饱和比例。 */
+private const val SECONDARY_DESATURATION = 0.35f
+
+/** 次要容器色族（底部导航选中指示器、选中态 chip 的底色）。 */
+private const val SECONDARY_CONTAINER_DESATURATION = 0.25f
+
+/** 第三容器色族（「只授权了部分媒体访问」这类提示条），比次要再软一点。 */
+private const val TERTIARY_CONTAINER_DESATURATION = 0.45f
+
+/** 纯黑基底上的前景色。不用纯白——纯白压在纯黑上太刺眼。 */
+private val OledOnSurface = Color(0xFFEDEDED)
+
+/**
+ * 把中性角色全部换成同亮度的灰。
+ *
+ * M3 基线配色是以紫色为种子调出来的，`background` / `surfaceContainer` /
+ * `outline` / `onSurfaceVariant` 这些**没有语义颜色**的角色也带着紫偏。
+ * 强调色一带上，这种偏色就露出来了：底部导航栏底色、输入框描边、次要文字
+ * 全都「灰得发紫」。
+ *
+ * 只处理中性角色，强调色角色本来就该有颜色。
+ */
+private fun ColorScheme.withNeutralGreys(): ColorScheme = copy(
+    background = background.dehued(),
+    onBackground = onBackground.dehued(),
+    surface = surface.dehued(),
+    onSurface = onSurface.dehued(),
+    surfaceVariant = surfaceVariant.dehued(),
+    onSurfaceVariant = onSurfaceVariant.dehued(),
+    surfaceContainerLowest = surfaceContainerLowest.dehued(),
+    surfaceContainerLow = surfaceContainerLow.dehued(),
+    surfaceContainer = surfaceContainer.dehued(),
+    surfaceContainerHigh = surfaceContainerHigh.dehued(),
+    surfaceContainerHighest = surfaceContainerHighest.dehued(),
+    surfaceDim = surfaceDim.dehued(),
+    surfaceBright = surfaceBright.dehued(),
+    outline = outline.dehued(),
+    outlineVariant = outlineVariant.dehued(),
+    inverseSurface = inverseSurface.dehued(),
+    inverseOnSurface = inverseOnSurface.dehued(),
+)
+
+/**
+ * 去掉色偏，只留亮度。
+ *
+ * 用三通道平均，而不是从 [Color.luminance] 反解：这些都是「已经很接近灰」的
+ * 颜色（三通道最大差几个 1/255），两种算法给出的结果肉眼分不出来，
+ * 而平均不用在 sRGB 和线性空间之间来回换算。
+ */
+private fun Color.dehued(): Color {
+    val grey = (red + green + blue) / 3f
+    return copy(red = grey, green = grey, blue = grey)
 }
 
 /**
- * 取一个在该背景上可读的前景色。
+ * 同色调降饱和：往自己的灰上混。
  *
- * 阈值 0.5 是按 WCAG 的相对亮度定的：亮背景配近黑，暗背景配白。
+ * 以前这里写的是 `copy(alpha = 0.86f)`，那是错的：它给出来的是**半透明**色，
+ * 画在什么背景上就变成什么颜色，同一个角色在两种背景上会呈现两种颜色。
+ * 配色角色必须是不透明的。
+ */
+private fun Color.desaturate(amount: Float): Color {
+    val grey = dehued()
+    return copy(
+        red = red + (grey.red - red) * amount,
+        green = green + (grey.green - green) * amount,
+        blue = blue + (grey.blue - blue) * amount,
+    )
+}
+
+/**
+ * 取一个在该背景上可读的前景色：在「近黑」和「白」之间选**对比度更高**的那个。
+ *
+ * 以前是按亮度阈值 0.5 挑的，那是错的：阈值法的前提是两个候选的对比度交点
+ * 正好落在 0.5，而近黑是 [DarkOnColor]（相对亮度 ≈ 0.008），交点在 L ≈ 0.196。
+ * 于是 0.196～0.5 这一段（中等亮度的强调色）全被判给白色，对比度只有
+ * 1.9～3.6——青碧的深色模式就踩到了：darkPrimary 降饱和后 L = 0.493，
+ * 「白字」→ 对比度 1.94，几乎看不见。
+ *
+ * 候选只有两个，直接比对比度就不用维护任何阈值：以后换种子也不会跑偏。
+ *
  * 用 [Color.luminance]（已做 sRGB 线性化）而不是简单取 RGB 平均，
  * 否则纯黄这类高感知亮度色会被判成「暗色」而配出黑字。
  */
 private fun onColorFor(background: Color): Color =
-    if (background.luminance() > 0.5f) Color(0xFF191919) else Color(0xFFFFFFFF)
+    if (contrastRatio(background, DarkOnColor) >= contrastRatio(background, Color.White)) {
+        DarkOnColor
+    } else {
+        Color.White
+    }
+
+/** 「亮背景上的前景色」。不用纯黑：纯黑压在彩色上显得脏。 */
+private val DarkOnColor = Color(0xFF191919)
+
+/** WCAG 对比度。1 表示完全一样，21 表示纯黑配纯白。 */
+private fun contrastRatio(a: Color, b: Color): Float {
+    val la = a.luminance()
+    val lb = b.luminance()
+    return (la.coerceAtLeast(lb) + 0.05f) / (la.coerceAtMost(lb) + 0.05f)
+}

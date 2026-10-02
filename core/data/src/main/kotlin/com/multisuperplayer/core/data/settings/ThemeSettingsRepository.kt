@@ -54,7 +54,21 @@ class ThemeSettingsRepository(
 
     suspend fun setBaseTheme(id: String) = edit { it[Keys.BASE_THEME] = id }
 
-    suspend fun setAccent(id: String) = edit { it[Keys.ACCENT] = id }
+    /**
+     * 选中一个强调色。
+     *
+     * 这个动作同时会把两个「取色」开关关掉，因为它们的优先级都在强调色之上
+     * ——只要它们还开着，用户点强调色就等于什么都没发生。
+     *
+     * 注意这与「打开封面取色」是**不对称**的，并且是故意的：
+     * 打开封面取色只是「我想试试封面取色」，不该顺手改掉用户之前选的强调色
+     * （所以那个开关仍然只写自己的键）；而点一个具体的强调色是一个明确的
+     * 「我要这个颜色」，此时上面盖着它的东西必须让位。
+     *
+     * 三处写入必须在**同一个** edit 事务里：分开写会让 Flow 先吐出一个
+     * 「强调色已改但系统取色还开着」的中间态，那一帧的配色仍然是被盖住的旧色。
+     */
+    suspend fun selectAccent(id: String) = edit { it.applyAccentSelection(id) }
 
     suspend fun setUseDynamicColor(enabled: Boolean) = edit { it[Keys.DYNAMIC_COLOR] = enabled }
 
@@ -94,3 +108,18 @@ internal fun Preferences.toThemeSettings(): ThemeSettings = ThemeSettings(
     useDynamicColor = this[ThemeSettingsRepository.Keys.DYNAMIC_COLOR],
     colorFromArtwork = this[ThemeSettingsRepository.Keys.COLOR_FROM_ARTWORK],
 )
+
+/**
+ * 「选中强调色」对存储的全部影响，抽成纯函数是为了能测。
+ *
+ * [ThemeSettingsRepository] 的构造要一个 `Context` 和一个真的 DataStore 文件，
+ * 而这里要锁的恰恰是「一共写了哪几个键」——这件事写错了只会表现为
+ * 「点了强调色没反应」，单看代码是看不出来的。
+ *
+ * 见 [ThemeSettingsRepository.selectAccent] 里「为什么要把两个取色开关一并关掉」。
+ */
+internal fun MutablePreferences.applyAccentSelection(id: String) {
+    this[ThemeSettingsRepository.Keys.ACCENT] = id
+    this[ThemeSettingsRepository.Keys.DYNAMIC_COLOR] = false
+    this[ThemeSettingsRepository.Keys.COLOR_FROM_ARTWORK] = false
+}

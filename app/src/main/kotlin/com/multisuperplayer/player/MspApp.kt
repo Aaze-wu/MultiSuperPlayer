@@ -30,6 +30,7 @@ import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspTheme
+import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import com.multisuperplayer.feature.library.LibraryRoute
 import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
@@ -71,9 +72,9 @@ fun MspApp() {
         MspTheme(
             baseTheme = MspBaseTheme.fromId(theme.baseThemeId),
             accent = MspAccent.fromId(theme.accentId),
-            // null = 用户没设置过，用默认（开）。
-            useDynamicColor = theme.useDynamicColor ?: true,
-            colorFromArtwork = theme.colorFromArtwork ?: false,
+            // null = 用户没设置过，用 [MspThemeDefaults] 里的默认值（两个都是关）。
+            useDynamicColor = theme.useDynamicColor ?: MspThemeDefaults.USE_DYNAMIC_COLOR,
+            colorFromArtwork = theme.colorFromArtwork ?: MspThemeDefaults.COLOR_FROM_ARTWORK,
         ) {
             MspAppScaffold()
         }

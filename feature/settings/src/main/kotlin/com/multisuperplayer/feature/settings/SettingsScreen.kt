@@ -70,6 +70,7 @@ import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
+import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -128,10 +129,21 @@ fun SettingsScreen(
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
     val accent = MspAccent.fromId(theme.accentId)
-    // 封面取色与系统取色都是「有值才生效」的可空布尔；读的地方统一在这里兜底一次，
-    // 避免下面三个开关各自写一遍 `?: true` / `?: false` 而写反其中一个。
-    val artworkColorEnabled = theme.colorFromArtwork ?: false
-    val dynamicColorPreferred = theme.useDynamicColor ?: true
+    // 两个「取色」开关都是「有值才生效」的可空布尔；读的地方统一在这里兜底一次，
+    // 避免下面几处各自写一遍 `?:` 而写反其中一个。默认值只从
+    // [MspThemeDefaults] 来，不写字面量——这里以前写的是 `?: true`，
+    // 正是「点强调色没反应」的成因。
+    val artworkColorEnabled = theme.colorFromArtwork ?: MspThemeDefaults.COLOR_FROM_ARTWORK
+    val dynamicColorPreferred = theme.useDynamicColor ?: MspThemeDefaults.USE_DYNAMIC_COLOR
+    // 系统取色的两个前置条件。算在这里而不是下面那个 item 里，是因为
+    // 「关于主题」那段文案也要用——只在本系统取色真的生效时才能说「配色来自系统取色」。
+    // 纯黑模式下系统取色给的是一堆深灰，正好把「省像素」这件事毁掉，
+    // 所以那套基底下面即使系统支持也不走系统取色。
+    val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val dynamicColorBlockedByOled = baseTheme == MspBaseTheme.BLACK
+    val dynamicColorUsable = dynamicColorSupported && !dynamicColorBlockedByOled
+    // 真正生效的那个取色来源：两者都开着时封面取色赢。
+    val dynamicColorActive = dynamicColorUsable && dynamicColorPreferred && !artworkColorEnabled
 
     // 当前打开的选择对话框（null = 没开）。
     //
@@ -176,25 +188,19 @@ fun SettingsScreen(
             }
 
             item {
-                val dynamicSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                // 纯黑模式下系统取色给的是一堆深灰，正好把「省像素」这件事毁掉，
-                // 所以那套基底下面即使系统支持也不走系统取色——开关这时是禁用的，
-                // 并且必须说明原因，否则用户只会觉得开关坏了。
-                val blockedByOled = baseTheme == MspBaseTheme.BLACK
-                val usable = dynamicSupported && !blockedByOled
                 // 被封面取色盖住时也禁用，但**勾选状态仍然按用户自己的选择显示**：
                 // 把勾去掉会让他以为「这个开关被系统关了」，而不是「被另一个开关盖住了」。
-                val enabled = usable && !artworkColorEnabled
-                val checked = usable && dynamicColorPreferred
+                val enabled = dynamicColorUsable && !artworkColorEnabled
+                val checked = dynamicColorUsable && dynamicColorPreferred
 
                 SettingsSwitchRow(
                     icon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
                     title = "跟随系统取色",
                     subtitle = when {
                         artworkColorEnabled -> "已被封面取色覆盖"
-                        !dynamicSupported -> "需要 Android 12 及以上"
-                        blockedByOled -> "纯黑模式下不可用（系统取色会给出一堆深灰）"
-                        else -> "使用系统壁纸生成的主题色"
+                        !dynamicColorSupported -> "需要 Android 12 及以上"
+                        dynamicColorBlockedByOled -> "纯黑模式下不可用（系统取色会给出一堆深灰）"
+                        else -> "使用系统壁纸生成的主题色（选强调色时会自动关掉）"
                     },
                     checked = checked,
                     enabled = enabled,
@@ -204,17 +210,19 @@ fun SettingsScreen(
 
             item { SectionHeader("关于主题") }
             item {
-                // 说清楚「为什么我选的颜色没生效」——这是本页最容易让人困惑的一点：
-                // 上面两个开关打开时，选强调色是不会立刻看到变化的。
+                // 说清楚「为什么我选的颜色没生效」——这是本页最容易让人困惑的一点。
+                // 但光描述现象没用：选强调色**会自动**关掉盖住它的那两个开关，
+                // 所以每条文案都要给出下一步动作。
                 InfoNote(
                     text = when {
                         artworkColorEnabled ->
-                            "优先级：封面取色 > 系统取色 > 强调色。封面里没有可用的颜色时" +
-                                "（比如黑白封面）会回退到下面选的强调色，所以强调色仍然有用。"
+                            "现在的配色来自封面取色。它盖住了强调色，但选一个强调色就可以" +
+                                "切回来（那会自动关掉封面取色）；封面里没有可用颜色时（比如黑白封面）" +
+                                "会回退到强调色，所以强调色仍然有用。"
 
-                        dynamicColorPreferred && baseTheme != MspBaseTheme.BLACK ->
-                            "系统取色开启时，下面的强调色在选择后不会立刻生效；" +
-                                "关掉系统取色即可使用。"
+                        dynamicColorActive ->
+                            "现在的配色来自系统取色。选一个强调色就会自动关掉系统取色，" +
+                                "配色立刻跟随强调色。"
 
                         else ->
                             "强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。"

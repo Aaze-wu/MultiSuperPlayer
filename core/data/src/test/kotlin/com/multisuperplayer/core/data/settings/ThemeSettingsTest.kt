@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.data.settings
 
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import org.junit.Assert.assertEquals
@@ -76,13 +77,45 @@ class ThemeSettingsTest {
 
     @Test
     fun `显式关掉系统取色与从未设置过是两种状态`() {
-        // 关键：false 不能被当成「没设置过」，否则用户关掉开关、重启之后
-        // 它会自己变回打开——因为默认值是 true。
+        // 关键：显式值不能被当成「没设置过」，否则用户手动拨过开关、重启之后
+        // 它会自己弹回默认值——两个方向都会失效，所以两种状态必须可分辨。
         val off = preferencesOf(booleanPreferencesKey("theme.dynamic_color") to false).toThemeSettings()
         assertEquals(false, off.useDynamicColor)
 
         val unset = preferencesOf().toThemeSettings()
         assertNull(unset.useDynamicColor)
+    }
+
+    @Test
+    fun `选中强调色会同时关掉两个取色开关`() {
+        // 这两个开关的优先级都在强调色之上：只要它们还开着，用户点强调色就等于
+        // 什么都没发生（Android 12+ 上系统取色永远赢）。所以「选强调色」这个动作
+        // 必须一并把它们关掉，而且要写在**同一个**事务里——分开写会让 Flow 先
+        // 吐出一个「强调色已改、但系统取色还开着」的中间态，那一帧仍然是被盖住的旧色。
+        //
+        // 这里先摆上两个都打开的旧状态，再把「选强调色」应用上去：
+        // 如果哪天有人把这三行拆开、或者漏写一个键，这条会红。
+        val settings = emptyPreferences().toMutablePreferences().apply {
+            this[booleanPreferencesKey("theme.dynamic_color")] = true
+            this[booleanPreferencesKey("theme.color_from_artwork")] = true
+            applyAccentSelection("amber")
+        }.toThemeSettings()
+
+        assertEquals("amber", settings.accentId)
+        assertEquals(false, settings.useDynamicColor)
+        assertEquals(false, settings.colorFromArtwork)
+    }
+
+    @Test
+    fun `选中强调色不会动主题基底`() {
+        // 多写一个键的代价是看不见的：用户只是换个颜色，主题基底却跟着回默认了。
+        val settings = emptyPreferences().toMutablePreferences().apply {
+            this[stringPreferencesKey("theme.base")] = "black"
+            applyAccentSelection("rose")
+        }.toThemeSettings()
+
+        assertEquals("black", settings.baseThemeId)
+        assertEquals("rose", settings.accentId)
     }
 
     @Test

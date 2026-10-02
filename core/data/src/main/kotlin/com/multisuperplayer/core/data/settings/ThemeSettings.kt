@@ -23,14 +23,25 @@ data class ThemeSettings(
     val baseThemeId: String? = null,
     /** @see com.multisuperplayer.core.ui.theme.MspAccent.id */
     val accentId: String? = null,
-    /** 是否启用系统「莫奈取色」。null = 没设置过。 */
+    /**
+     * 是否启用系统「莫奈取色」。null = 没设置过，默认值见
+     * `MspThemeDefaults.USE_DYNAMIC_COLOR`（关）。
+     *
+     * 存成可空布尔而不是布尔，是为了让「用户手动关掉」和「从没设置过」保持
+     * 两种状态：后者跟着默认值走，前者不跟。
+     */
     val useDynamicColor: Boolean? = null,
     /**
-     * 是否用当前封面取色。null = 没设置过。
+     * 是否用当前封面取色。null = 没设置过，默认值见
+     * `MspThemeDefaults.COLOR_FROM_ARTWORK`（关）。
      *
      * 开了它之后，[accentId] 和 [useDynamicColor] 都会被盖住（优先级见
      * `MspTheme`），但**两个字段仍然要原样保留**：用户关掉这个开关之后，
      * 应当回到他之前亲手选的强调色，而不是回到默认值。
+     *
+     * 用户「选中某个强调色」时，这个开关会被自动关掉——见
+     * [ThemeSettingsRepository.selectAccent] 里为什么这与「打开封面取色」
+     * 是不对称的。
      */
     val colorFromArtwork: Boolean? = null,
 )

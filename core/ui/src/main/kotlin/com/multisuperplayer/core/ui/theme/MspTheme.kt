@@ -21,16 +21,18 @@ import androidx.compose.ui.unit.dp
  *
  * 封面取色 > 系统取色（莫奈）> 用户选的预设。
  *
- * 「封面取色」压过系统取色是**故意**的：默认情况下系统取色是开着的，
- * 如果让系统取色赢，那 Android 12+ 的用户打开「封面取色」会看不到任何
- * 变化，只能得出结论「这个功能坏了」。两个开关里必须有一个明确地赢，
- * 而且要在设置页里把这件事写出来。
+ * 两个「取色」开关的默认值见 [MspThemeDefaults]：**都是关**。
+ * 默认关不是保守，而是因为这两个开关一旦默认打开，最上面那个「强调色」
+ * 选择器就变成一个点了没反应的死控件——系统取色的优先级高于它，
+ * 而 Android 12+ 上它又永远可用。
+ *
+ * 补齐这件事的是设置页：**选强调色时会主动关掉这两个开关**，
+ * 因为那是一个明确的「我要这个颜色」。
  *
  * @param baseTheme 浅色 / 深色 / 纯黑 / 跟随系统。
  * @param accent 强调色预设；被 [useDynamicColor] 或 [colorFromArtwork] 覆盖。
- * @param useDynamicColor 是否启用「莫奈取色」。默认开——用户的系统主题色
- *   是他对整台设备的一致选择，播放器没理由唱反调。纯黑模式除外：
- *   系统取色会给出一堆深灰，正好破坏纯黑省的像素。
+ * @param useDynamicColor 是否启用「莫奈取色」，默认见 [MspThemeDefaults]。
+ *   纯黑模式除外：系统取色会给出一堆深灰，正好破坏纯黑省的像素。
  * @param colorFromArtwork 是否用当前封面（[LocalArtworkAccentState] 里的值）取色。
  * @param content 内容。
  */
@@ -38,8 +40,8 @@ import androidx.compose.ui.unit.dp
 fun MspTheme(
     baseTheme: MspBaseTheme = MspBaseTheme.FOLLOW_SYSTEM,
     accent: MspAccent = MspAccent.DEFAULT,
-    useDynamicColor: Boolean = true,
-    colorFromArtwork: Boolean = false,
+    useDynamicColor: Boolean = MspThemeDefaults.USE_DYNAMIC_COLOR,
+    colorFromArtwork: Boolean = MspThemeDefaults.COLOR_FROM_ARTWORK,
     content: @Composable () -> Unit,
 ) {
     val isDark = when (baseTheme) {
