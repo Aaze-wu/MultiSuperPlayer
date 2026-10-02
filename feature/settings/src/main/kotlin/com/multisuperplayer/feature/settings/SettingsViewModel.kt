@@ -2,6 +2,7 @@ package com.multisuperplayer.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.data.settings.AspectRatioMode
@@ -70,6 +71,16 @@ class SettingsViewModel(
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
     private val dispatchers: DispatcherProvider,
+    /**
+     * 构建信息。设置入口页的「关于」那一行要显示版本号。
+     *
+     * 由 `:app` 的 `appModule` 提供（`BuildConfig` 是每个模块各自生成的，
+     * 只有 `:app` 那一份带着 git 信息）。它是纯数据、构造零成本，
+     * 所以放在这个**在应用启动时就会被创建**的 ViewModel 里没有代价。
+     * 反例是设备信息采集（要查 WindowManager），那个只在关于页自己的
+     * ViewModel 里做，见 `AboutViewModel`。
+     */
+    val buildInfo: AppBuildInfo = AppBuildInfo.Unknown,
 ) : ViewModel() {
 
     /**

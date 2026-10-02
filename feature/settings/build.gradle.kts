@@ -50,6 +50,12 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    // 「关于」页导出日志要用 `rememberLauncherForActivityResult` +
+    // `ActivityResultContracts.CreateDocument`（SAF 让用户自己选保存位置）。
+    // 不用 FileProvider + 分享：那个要在 `:app` 的清单里加一个 provider，
+    // 而 SAF 只需要这一个依赖，且文件落点由用户决定（Android 11 起
+    // `Android/data` 不可浏览，写到自己的外部私有目录等于写进黑洞）。
+    implementation(libs.androidx.activity.compose)
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.android)
 

@@ -70,4 +70,19 @@ object TimeFormat {
             "%.1f %s".format(value, units[unitIndex])
         }
     }
+
+    /**
+     * `2026-10-02 15:30`（本地时区）。
+     *
+     * 刻意不写秒：它出现在「构建时间」和「日志文件时间」上，读的人只需要知道大概，
+     * 而秒会让同一件事在两个地方显示出不同的值，反而引起「是不是不同版本」的怀疑。
+     *
+     * 非法值（`<= 0`，例如构建脚本没能取到时间戳）返回 `--`，不返回 1970 年——
+     * 一个假的日期比一个明显的占位符更容易误导。
+     */
+    fun dateTime(ms: Long): String {
+        if (ms <= 0) return "--"
+        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+            .format(java.util.Date(ms))
+    }
 }

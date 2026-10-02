@@ -33,6 +33,9 @@ import com.multisuperplayer.core.ui.theme.MspTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import com.multisuperplayer.feature.library.LibraryRoute
 import com.multisuperplayer.feature.player.PlayerRoute
+import com.multisuperplayer.feature.settings.AboutRoute
+import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
+import com.multisuperplayer.feature.settings.PlaybackSettingsRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
 import com.multisuperplayer.feature.settings.TranslationSettingsRoute
@@ -103,6 +106,18 @@ private enum class MspDestination(
  * 而他只是想把这一页关掉。
  */
 private const val TRANSLATION_SETTINGS_ROUTE = "settings/translation"
+
+/**
+ * 设置入口页底下的四张子页面。
+ *
+ * 它们和 [TRANSLATION_SETTINGS_ROUTE] 是同一回事：都是真目的地。
+ * 返回键只会弹掉当前这一张，回到设置入口页，而不是直接退出设置。
+ *
+ * 路径前缀统一为 `settings/`：将来要加子页面时，光看字符串就知道它挂在设置下面。
+ */
+private const val APPEARANCE_SETTINGS_ROUTE = "settings/appearance"
+private const val PLAYBACK_SETTINGS_ROUTE = "settings/playback"
+private const val ABOUT_ROUTE = "settings/about"
 
 @Composable
 private fun MspAppScaffold() {
@@ -205,12 +220,26 @@ private fun MspAppScaffold() {
             // 上面 MspTheme 的实参会立刻跟着变。若这里改成独立作用域，
             // 主题就会变成「要重启才生效」。
             composable(MspDestination.SETTINGS.route) {
+                // 设置页现在只是入口：只列条目和「当前状态」，设置项本身在子页面里。
+                // 这样加新设置项只会让这个列表变长一行，不会把一页堆成一千行。
                 SettingsRoute(
+                    onOpenAppearance = { navController.navigate(APPEARANCE_SETTINGS_ROUTE) },
+                    onOpenPlayback = { navController.navigate(PLAYBACK_SETTINGS_ROUTE) },
                     onOpenTranslationSettings = { navController.navigate(TRANSLATION_SETTINGS_ROUTE) },
+                    onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
                 )
             }
             composable(TRANSLATION_SETTINGS_ROUTE) {
                 TranslationSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(APPEARANCE_SETTINGS_ROUTE) {
+                AppearanceSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(PLAYBACK_SETTINGS_ROUTE) {
+                PlaybackSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(ABOUT_ROUTE) {
+                AboutRoute(onBack = { navController.popBackStack() })
             }
         }
     }

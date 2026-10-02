@@ -4,13 +4,13 @@ import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
 import android.provider.Settings
-import android.util.Log
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import com.multisuperplayer.core.common.log.MspLog
 
 /**
  * 播放页手势要改写的两个**窗口级**的量：亮度、系统媒体音量。
@@ -74,7 +74,7 @@ class PlayerWindowController(
         } catch (e: Exception) {
             // 厂商定制系统上偶发 SecurityException / SettingNotFoundException。
             // 读不到亮度不该让手势崩掉，退化成 1.0（= 不覆盖）即可。
-            Log.w(TAG, "读取系统亮度失败，按 1.0 处理", e)
+            MspLog.w(TAG, e) { "读取系统亮度失败，按 1.0 处理" }
             1f
         }
     }
@@ -107,7 +107,7 @@ class PlayerWindowController(
         } catch (e: SecurityException) {
             // 勿扰模式 / 厂商策略会拒绝改音量。手势在那种机器上是无效的，
             // 但绝不能因此崩溃。
-            Log.w(TAG, "设置系统音量被拒绝", e)
+            MspLog.w(TAG, e) { "设置系统音量被拒绝" }
         }
     }
 
