@@ -138,6 +138,19 @@ internal object SettingsSummaries {
         )
     }
 
+    /**
+     * 文件访问：`已开启` / `未开启` / `本机系统版本不支持`。
+     *
+     * 三种说法**必须**分开，与 `BrowserRootIssue` 那边是同一个理由：
+     * 「系统太旧」和「用户没开」在界面上一个是灰的、一个是能点的。
+     * 合成一句「未开启」会让 Android 10 的用户去一个没有这一项的设置页里翻找。
+     */
+    fun fileAccess(supported: Boolean, granted: Boolean): MspText = when {
+        !supported -> MspText.Res(R.string.msp_settings_file_access_unsupported)
+        granted -> MspText.Res(R.string.msp_settings_file_access_on)
+        else -> MspText.Res(R.string.msp_settings_file_access_off)
+    }
+
     /** 关于：只放版本号。检查更新、开源许可、导出日志都在这一页里，不必再挤进副标题。 */
     fun about(buildInfo: AppBuildInfo): MspText = buildInfo.summaryText()
 

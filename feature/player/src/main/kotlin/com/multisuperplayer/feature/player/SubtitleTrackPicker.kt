@@ -225,6 +225,20 @@ private fun StatusBlock(state: SubtitleUiState) {
     }
 }
 
+/**
+ * 候选为空时要不要画那句「这个文件夹里没有找到可用的字幕文件」。
+ *
+ * 抽成纯函数是为了能测：这句话是一个**断言**（「查过了，这个文件夹里没有能用的字幕」），
+ * 而 [SubtitleUiState.issue] 不为空时，屏幕上已经有一句话在讲真正的原因
+ * （「无法确定这个文件所在的文件夹，没法自动找同名字幕」/「读不到这个文件所在的文件夹」
+ * /「查找字幕时出错」），两句话并排出现就是自相矛盾——上面说「我不知道是哪个文件夹」，
+ * 下面说「那个文件夹里没有」。用户会照后者去反复改字幕文件名，而问题在权限或来路上。
+ *
+ * `issue == NoSubtitles` 时也是同理：同一件事说两遍不如说一遍。
+ */
+internal fun showsNoUsableSubtitleHint(state: SubtitleUiState): Boolean =
+    state.candidates.isEmpty() && !state.isLoading && state.issue == null
+
 @Composable
 private fun CandidateList(
     state: SubtitleUiState,
@@ -255,7 +269,7 @@ private fun CandidateList(
             )
         }
 
-        if (state.candidates.isEmpty() && !state.isLoading) {
+        if (showsNoUsableSubtitleHint(state)) {
             Text(
                 text = stringResource(R.string.msp_player_no_usable_subtitle),
                 style = MaterialTheme.typography.bodySmall,

@@ -16,7 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -26,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.ui.chrome.AppChromeState
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
@@ -177,6 +180,26 @@ private fun MspAppScaffold() {
         navController.navigate(PLAYER_ROUTE) { launchSingleTop = true }
     }
 
+    // 用户在文件浏览页点了一条字幕文件 —— 跨页信箱，就一个值。
+    //
+    // 为什么住在这一层（而不是某个 ViewModel 里）：它是浏览页和播放页之间**唯一**的
+    // 通道。两个页面属于互不认识的模块（`feature:library` / `feature:player`），
+    // 而 `SubtitleViewModel` 是播放页私有的（`PlayerRoute` 里 `koinViewModel()`，
+    // 离开播放页就销毁）——没有一个共同的祖先能同时拿到两端，只有导航图这一层能。
+    //
+    // 用 `remember` 而不是 `rememberSaveable` 是故意的：[SubtitleSource] 不是可序列化
+    // 类型，而旋转会丢的也只是「用户得再点一次这条字幕」——它生效了就会立刻被消费掉，
+    // 能被旋转丢掉的只可能是还没生效的那一个。
+    var pendingSubtitle by remember { mutableStateOf<SubtitleSource?>(null) }
+
+    val openSubtitle: (SubtitleSource) -> Unit = { source ->
+        pendingSubtitle = source
+        // 直接跳到播放页看结果：用户在这一页点字幕的全部意图就是「给正在看的那个
+        // 片子挂上」，停在这一页只会让他以为没生效。`launchSingleTop` 与 [playFrom]
+        // 同一条理由。
+        navController.navigate(PLAYER_ROUTE) { launchSingleTop = true }
+    }
+
     Scaffold(
         bottomBar = {
             // 全屏播放时整条导航栏都不画。
@@ -250,7 +273,10 @@ private fun MspAppScaffold() {
                 )
             }
             composable(MspDestination.BROWSE.route) {
-                BrowseRoute()
+                BrowseRoute(
+                    onPlayRequest = playFrom,
+                    onOpenSubtitle = openSubtitle,
+                )
             }
             composable(MspDestination.RECENT.route) {
                 RecentRoute(onPlayRequest = playFrom)
@@ -260,6 +286,12 @@ private fun MspAppScaffold() {
             }
             composable(PLAYER_ROUTE) {
                 PlayerRoute(
+                    // 用户在文件浏览页指定的字幕（如果有）。取走即清空：这条请求只对
+                    // 「刚跳过来的这一次」有效，留着它会让下一次从媒体库进播放页时
+                    // 莫名其妙又挂上同一条。清空必须发生在**应用之后**，所以由
+                    // 播放页在真的调完 selectSource 后回调告诉我们。
+                    pendingSubtitle = pendingSubtitle,
+                    onPendingSubtitleApplied = { pendingSubtitle = null },
                     // 字幕面板里的「去设置」：没配置翻译服务时，用户要在同一个界面里
                     // 走到填密钥的地方。非要他先退出面板、再点底部设置，是没必要的绕路。
                     // 直接落到翻译设置页，而不是设置页的第一屏（那里全是主题）。

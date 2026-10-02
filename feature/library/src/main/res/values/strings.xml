@@ -92,7 +92,7 @@
     <!-- ===== 浏览（SAF 授权目录） ===== -->
     <string name="msp_browse_title">浏览</string>
     <string name="msp_browse_add">添加文件夹</string>
-    <string name="msp_browse_hint">授权的文件夹会和系统媒体库的内容合并显示在媒体库页。系统媒体库里的内容不需要在这里授权。</string>
+    <string name="msp_browse_hint">这里列的是可以开始浏览的位置。系统媒体库里的内容不需要在这里授权。</string>
     <string name="msp_browse_empty_title">还没有授权任何文件夹</string>
     <string name="msp_browse_empty_desc">点右上角的 + 选一个文件夹。适合放系统媒体库看不到的内容（例如 SD 卡上的音乐）。</string>
     <string name="msp_browse_volume_root">存储根目录</string>
@@ -123,5 +123,24 @@
     <string name="msp_playlists_item_missing">文件已不在</string>
     <string name="msp_playlists_missing_banner">其中 %1$d 条文件已不在，播放时可能失败。</string>
     <string name="msp_playlists_remove_item">从播放列表移除</string>
+
+    <!-- ============================================================
+         目录浏览（点进某个来源之后）
+         ============================================================ -->
+    <string name="msp_browser_access_off">未开启「所有文件访问」</string>
+    <string name="msp_browser_access_unsupported">本机系统版本不支持</string>
+    <string name="msp_browser_access_open">去开启</string>
+    <string name="msp_browser_empty_dir">这个文件夹是空的</string>
+    <string name="msp_browser_empty_dir_desc">里面没有任何文件或子文件夹。</string>
+    <string name="msp_browser_only_hidden">这里只有隐藏项</string>
+    <string name="msp_browser_only_hidden_desc">打开「显示隐藏文件」就可以看到。</string>
+    <string name="msp_browser_unreadable">读不到这个文件夹</string>
+    <string name="msp_browser_unreadable_desc">它可能已经被删除，或者授权被系统收回了。</string>
+    <string name="msp_browser_not_directory">这里已经不是文件夹了</string>
+    <string name="msp_browser_not_directory_desc">它可能在别处被改名或删除了。往上翻一层再找找。</string>
+    <string name="msp_browser_show_hidden">显示隐藏文件</string>
+    <string name="msp_browser_truncated">内容太多，只列出了前 %1$d 项</string>
+    <string name="msp_browser_up">上一层</string>
+    <string name="msp_browser_back_sources">返回来源列表</string>
 
 </resources>

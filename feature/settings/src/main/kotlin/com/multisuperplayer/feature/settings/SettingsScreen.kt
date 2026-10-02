@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -15,10 +16,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.data.settings.PlaybackSettings
@@ -28,7 +34,7 @@ import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 设置**入口页**：四行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
+ * 设置**入口页**：五行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
  * 为什么把它拆成入口页 + 四个子页，而不是继续把设置项铺在一页里：
  *
@@ -54,6 +60,20 @@ fun SettingsRoute(
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val translation by viewModel.translation.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
+    val fileAccessGranted by viewModel.fileAccessGranted.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 「所有文件访问」是系统设置项，**没有回调**：用户去系统设置里开完再回到这里，
+    // 除了重新问一次没有别的办法知道。所以订阅 `ON_RESUME`，而不是只读一次构造值——
+    // 那样用户会看到「我明明开了，这里还写着未开启」。
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshFileAccess()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     SettingsScreen(
         theme = theme,
@@ -61,11 +81,17 @@ fun SettingsRoute(
         playback = playback,
         translation = translation,
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
+        fileAccessSupported = viewModel.fileAccessSupported,
+        fileAccessGranted = fileAccessGranted,
         modifier = modifier,
         onOpenAppearance = onOpenAppearance,
         onOpenPlayback = onOpenPlayback,
         onOpenTranslationSettings = onOpenTranslationSettings,
         onOpenAbout = onOpenAbout,
+        // 「系统没有这一项」的情况由 `fileAccessSupported` 在下面挡住
+        // （`SettingActionRow.enabled`），所以这里**不**再包一层「能不能跳」的判断：
+        // 多一个 if 就多一条可能与界面不一致的真相。
+        onOpenFileAccess = { context.startActivity(viewModel.fileAccessIntent()) },
     )
 }
 
@@ -83,10 +109,13 @@ fun SettingsScreen(
     playback: PlaybackSettings = PlaybackSettings(),
     translation: TranslationSettings = TranslationSettings(),
     softwareDecodingAvailable: Boolean = true,
+    fileAccessSupported: Boolean = true,
+    fileAccessGranted: Boolean = false,
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenFileAccess: () -> Unit = {},
 ) {
     // 系统取色要 Android 12。判断放这里而不是塞进 [SettingsSummaries]：
     // `Build.VERSION.SDK_INT` 在 JVM 单测里恒为 0，进了纯函数就测不了「支持」那条分支。
@@ -127,6 +156,19 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_translation),
                     subtitle = SettingsSummaries.translation(translation).string(),
                     onClick = onOpenTranslationSettings,
+                )
+            }
+            item {
+                SettingActionRow(
+                    icon = Icons.Outlined.FolderOpen,
+                    title = stringResource(R.string.msp_settings_file_access),
+                    subtitle = SettingsSummaries.fileAccess(
+                        supported = fileAccessSupported,
+                        granted = fileAccessGranted,
+                    ).string(),
+                    onClick = onOpenFileAccess,
+                    // 系统没有这一页时置灰：点进去也找不到开关（见 `SettingActionRow`）。
+                    enabled = fileAccessSupported,
                 )
             }
             item {

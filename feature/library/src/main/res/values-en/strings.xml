@@ -93,7 +93,7 @@
     <!-- ===== Browse (SAF folders) ===== -->
     <string name="msp_browse_title">Browse</string>
     <string name="msp_browse_add">Add folder</string>
-    <string name="msp_browse_hint">Folders you grant here are merged with the system media library on the Library tab. Nothing in the system media library needs to be added here.</string>
+    <string name="msp_browse_hint">These are the places you can browse. Nothing in the system media library needs to be added here.</string>
     <string name="msp_browse_empty_title">No folders granted yet</string>
     <string name="msp_browse_empty_desc">Tap + in the top right to pick a folder. Useful for media the system library cannot see, such as music on an SD card.</string>
     <string name="msp_browse_volume_root">Storage root</string>
@@ -124,5 +124,24 @@
     <string name="msp_playlists_item_missing">File is gone</string>
     <string name="msp_playlists_missing_banner">%1$d item(s) point to files that are gone; playback may fail.</string>
     <string name="msp_playlists_remove_item">Remove from playlist</string>
+
+    <!-- ============================================================
+         目录浏览（点进某个来源之后）
+         ============================================================ -->
+    <string name="msp_browser_access_off">All files access is off</string>
+    <string name="msp_browser_access_unsupported">Not supported on this Android version</string>
+    <string name="msp_browser_access_open">Turn on</string>
+    <string name="msp_browser_empty_dir">This folder is empty</string>
+    <string name="msp_browser_empty_dir_desc">No files or subfolders in it.</string>
+    <string name="msp_browser_only_hidden">Only hidden items here</string>
+    <string name="msp_browser_only_hidden_desc">Turn on the hidden-files option to see them.</string>
+    <string name="msp_browser_unreadable">Can not read this folder</string>
+    <string name="msp_browser_unreadable_desc">It may have been deleted, or the grant was revoked.</string>
+    <string name="msp_browser_not_directory">This is no longer a folder</string>
+    <string name="msp_browser_not_directory_desc">It may have been renamed or deleted elsewhere. Try going up one level.</string>
+    <string name="msp_browser_show_hidden">Show hidden files</string>
+    <string name="msp_browser_truncated">Too many items, showing the first %1$d</string>
+    <string name="msp_browser_up">Up one level</string>
+    <string name="msp_browser_back_sources">Back to sources</string>
 
 </resources>

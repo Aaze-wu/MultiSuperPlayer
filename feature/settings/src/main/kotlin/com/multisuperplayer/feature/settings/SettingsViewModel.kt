@@ -1,11 +1,13 @@
 package com.multisuperplayer.feature.settings
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.browser.StorageAccess
 import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
@@ -74,6 +76,7 @@ class SettingsViewModel(
     private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
+    private val storage: StorageAccess,
     private val dispatchers: DispatcherProvider,
     /**
      * 构建信息。设置入口页的「关于」那一行要显示版本号。
@@ -86,6 +89,35 @@ class SettingsViewModel(
      */
     val buildInfo: AppBuildInfo = AppBuildInfo.Unknown,
 ) : ViewModel() {
+
+    /**
+     * 有没有「所有文件访问」。这是一个**系统设置项**，没有回调：用户去系统设置里
+     * 开完再回来，进程还活着，我们收不到任何通知。所以界面必须在外层
+     * `ON_RESUME` 时调 [refreshFileAccess] 重新问一次。
+     *
+     * 构造时同步读一次（`Environment.isExternalStorageManager()` 是本地查询，不碰盘）。
+     * 初值不能省：这一行的副标题就是当前状态，先显示「未开启」再跳成「已开启」
+     * 会让用户以为刚才自己看错了。
+     */
+    private val fileAccessState = MutableStateFlow(storage.hasAllFilesAccess())
+    val fileAccessGranted: StateFlow<Boolean> = fileAccessState.asStateFlow()
+
+    /**
+     * 本机有没有这个概念。API < 30 上系统设置里根本没有这一页，界面要把这一行置灰
+     * （见 `SettingsScreen`），**不能**给一个点了没反应的入口。
+     */
+    val fileAccessSupported: Boolean = storage.supported()
+
+    fun refreshFileAccess() {
+        fileAccessState.value = storage.hasAllFilesAccess()
+    }
+
+    /**
+     * 去系统设置页。先试本应用的那一页，系统没有时才退到总开关列表——
+     * 这个筛选在 `StorageAccess.preferredSettingsIntent()` 里，因为它需要
+     * `PackageManager`，不属于 ViewModel 的职责。
+     */
+    fun fileAccessIntent(): Intent = storage.preferredSettingsIntent()
 
     /**
      * 用 `Eagerly` 而不是 `WhileSubscribed`：主题要在界面出现之前就位，

@@ -14,6 +14,22 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
+    <!--
+        可选：内置文件浏览器里的「内部存储 / 存储卡」来源。
+
+        它**不是**媒体库需要的权限——媒体库走 READ_MEDIA_* / SAF，一行都不依赖它。
+        没有它时应用完全可用，只是文件浏览器少一个来源（`StorageAccess` 会如实
+        报告状态）。所以这里既不放进默认申请路径，也不该有 `maxSdkVersion`：
+        它是「所有文件访问」这个特殊权限，从 API 30 起才有，且只能由用户
+        在系统设置页里手动开。
+
+        `tools:ignore="ScopedStorage"`：lint 对这个权限有专门告警（Play 政策要求
+        说明核心用途）。我们保留这个权限是有意的，理由写在 StorageAccess 的类注释里。
+    -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
     <!-- 后台播放 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />

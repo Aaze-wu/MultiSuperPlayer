@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.MediaEntry
@@ -102,6 +103,8 @@ private const val PLAY_PAUSE_HINT_TIMEOUT_MS = 1_000L
 fun PlayerRoute(
     modifier: Modifier = Modifier,
     onOpenTranslationSettings: () -> Unit,
+    pendingSubtitle: SubtitleSource? = null,
+    onPendingSubtitleApplied: () -> Unit = {},
 ) {
     val viewModel: PlayerViewModel = koinViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -141,6 +144,21 @@ fun PlayerRoute(
     // 降级为「只刷对象、不重扫」。
     LaunchedEffect(entry) {
         subtitleViewModel.bindEntry(entry)
+    }
+
+    // 用户在文件浏览页亲手挑了一条字幕。
+    //
+    // **必须排在上面那个 `bindEntry` 之后**：`bindEntry` 会把手动选择重置回
+    // 「自动」（一条手动指定的字幕只对那一条媒体有效），而首次组合时两个
+    // `LaunchedEffect` 是按声明顺序启动的——顺序反过来，刚挂上的字幕会被
+    // 同一次组合里的重置抹掉，症状是「点了字幕跳过来，面板里却是自动匹配」。
+    //
+    // 消费（而不是订阅）也是故意的：留着它，用户下次从媒体库进播放页会被再挂一次，
+    // 而他这次想要的是自动匹配——「莫名挂上了上次的字幕」是解释不出来的。
+    LaunchedEffect(pendingSubtitle) {
+        val source = pendingSubtitle ?: return@LaunchedEffect
+        subtitleViewModel.selectSource(source)
+        onPendingSubtitleApplied()
     }
 
     // 播放进度 → 字幕 ViewModel。自动翻译就挂在这条线上（“翻到当前位置”），

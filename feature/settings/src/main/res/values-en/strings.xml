@@ -9,6 +9,7 @@
     <string name="msp_settings_appearance">Appearance</string>
     <string name="msp_settings_playback">Playback</string>
     <string name="msp_settings_translation">Subtitle translation</string>
+    <string name="msp_settings_file_access">File access</string>
     <string name="msp_settings_about">About</string>
 
     <!-- Separator between summary fragments. -->
@@ -30,6 +31,16 @@
     <!-- `%1$d` files, `%2$s` total size -->
     <string name="msp_settings_summary_log_usage">%1$d file(s) · %2$s</string>
     <string name="msp_settings_summary_no_range">—</string>
+
+    <!--
+      The three states of file access. They must stay separate: the `unsupported`
+      row is greyed out (there is no system page to open on that device), while the
+      `off` row is tappable. Collapsing them into one "Off" sends Android 10 users
+      hunting for a setting that does not exist there.
+    -->
+    <string name="msp_settings_file_access_on">On — you can browse any folder</string>
+    <string name="msp_settings_file_access_off">Off — tap to turn it on in system settings</string>
+    <string name="msp_settings_file_access_unsupported">Not supported on this Android version</string>
 
     <string name="msp_settings_section_base_theme">Base theme</string>
     <string name="msp_settings_section_color_source">Colour source</string>

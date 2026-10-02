@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.5.5**
+- Current version: **0.5.7**
 - License: [GPL-3.0](LICENSE)
 
 中文文档：[README.md](README.md)
@@ -73,7 +73,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   outermost level and distributes both the base color scheme and the accent, so `Scaffold`, dialogs,
   dropdown menus and scroll containers never leak a white background.
 
-### 1.5 Localization (delivered in this release)
+### 1.5 Localization
 
 - **Follow system / Simplified Chinese / Traditional Chinese / English**, switchable in-app under
   Settings → Appearance → Language.
@@ -82,7 +82,76 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - On Android 13+ these languages are registered with the system, so the OS-level per-app language picker
   works too — the two can't drift apart.
 
-### 1.6 Roadmap
+### 1.6 Media library and playlists
+
+- **Five tabs**: Library / Browse / Recent / Playlists / Settings. "Now playing" is a **real page**
+  rather than a tab, so Back returns to the list you came from instead of exiting the app.
+- **A mini player** sits above the navigation bar (hidden on the player page): tap it to return to the
+  player, tap pause to pause in place. Its progress line is the **only** widget that subscribes to
+  playback position (200 ms), so the surrounding lists do not redraw every second.
+- **View options**: list / grid; 6 sort orders (title asc/desc, newest, oldest, longest, largest);
+  4 groupings (none / artist / album / folder). Group headers always sort by title and do not jitter
+  with the sort order; entries with no artist/album/folder fall into an "unknown" group that always
+  sorts last.
+- **Multi-select**: long-press to enter selection mode, then select all / clear / add to playlist / play.
+  Duplicates are skipped and the app **says how many it skipped** ("added 10, 1 was already in the
+  list") instead of quietly adding 9.
+- **SAF folder browsing**: grant a folder through the system picker and the grant is persisted. Its
+  contents are **merged** with the system media library and de-duplicated by relative path + file name +
+  size, so the same file never appears twice. SAF entries are prefixed with `saf:` and cannot collide
+  with MediaStore's numeric ids. The scan has four guard rails (max depth 8, max 20 000 entries,
+  audio/video extensions only, no directory entered twice) so a malformed tree cannot stall it.
+- **Subtitles inside SAF folders are still found**: when playing inside a granted tree the sibling
+  subtitle files are enumerated and scored — so media inside a `.nomedia` folder, which the system media
+  library cannot see at all, does not lose its subtitles either.
+- **Recent**: built from the resume records (position + timestamp), up to 50 entries; opening one resumes
+  from where you stopped rather than from the beginning.
+- **Playlists** store an id key plus a display snapshot (title / artist / duration). If the library
+  temporarily cannot find a file, the entry **does not vanish**; the list marks it as currently absent
+  while keeping its position in the queue — "the library can't find it" is not the same as "it can't be
+  played". Limits: 100 playlists, 5 000 items each, 80-character names; hitting a limit refuses the
+  action and says why.
+
+### 1.7 Built-in file browser
+
+`ACTION_OPEN_DOCUMENT` only lets the user pick files in locations that have already been granted, and
+places like Download or the root of a storage card can never be granted that way. So besides SAF trees,
+the Browse tab has a **built-in file browser** that lists directories itself instead of going through the
+system picker.
+
+- **Two kinds of source side by side**: `Internal storage` and `SD card` (these need an "all files
+  access" permission), plus every granted SAF tree. Each source carries a **status line**; when the
+  permission is missing it says "not enabled, tap to open system settings" instead of a bare failure.
+- **The permission is explicit and optional**: "all files access" (`MANAGE_EXTERNAL_STORAGE`) is **off by
+  default** and is **never requested on first launch**. Settings has a "File access" row with three
+  distinct states (granted / not granted / unsupported on this device); tapping it jumps to the system
+  permission page, and returning from that page **refreshes the state automatically** instead of keeping
+  a stale conclusion.
+- **Crumbs record the route taken, not a recomputed path**: walking into a SAF folder and back follows
+  one chain in one tree, so no path-splicing rule can land you somewhere that does not exist.
+- **4 sort orders** inside a directory (name asc/desc, newest, oldest) plus a show-hidden-files switch.
+  **Directories always come before files**, regardless of the selected order.
+- **5 000 entries per directory** maximum: beyond that the listing is truncated, and it **says so**
+  instead of quietly returning fewer rows.
+- **Tapping a playable file** builds the queue from **every playable entry in the current directory**
+  (not the whole library) and starts at the one you tapped.
+- **Tapping a subtitle file** (`.srt` / `.ass` / `.ssa` / `.vtt` / `.lrc` / `.ttml` / `.dfxp` and friends)
+  does **not** queue it for playback — it is attached as an **external subtitle to the video you are
+  currently playing**. That is the intended entry point for "pick a subtitle by hand for this video".
+  A hand-picked subtitle **does not depend on the directory scan**, so it attaches even where automatic
+  discovery has no way to run.
+- **Nothing is written to the media library**: browsing is browsing. Files opened this way do not enter
+  the library or the Recent list.
+
+> Directory rows show the **original name with its extension** (`Movie.zh-CN.ass` shows as
+> `Movie.zh-CN.ass`), because the point of this list is finding one specific file, and the extension and
+> language tag are exactly the information you need for that.
+
+> Known trade-off: media opened through the built-in browser **does not automatically look for sibling
+> subtitles** (such entries have no relative path, and auto-discovery depends on it). That is deliberate;
+> see "Known limitations". Picking a subtitle from the same directory by hand does work.
+
+### 1.8 Roadmap
 
 | Version | Content | Status |
 | --- | --- | --- |
@@ -91,7 +160,9 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 | v0.3 | Subtitle translation (local + cloud APIs) | Done |
 | v0.4 | FFmpeg software decoding, automatic fallback, force-software switch | Done |
 | v0.5 | Playback: fullscreen/landscape, aspect modes, gestures, speed, A-B repeat, resume | Done |
-| **v0.5.5** | **Localization + documentation** | **Current** |
+| v0.5.5 | Localization + documentation | Done |
+| v0.5.6 | Media library rework: five-tab navigation, mini player, SAF folder browsing, recent, playlists | Done |
+| **v0.5.7** | **Built-in file browser: own directory listing, optional all-files access, attach a tapped subtitle file** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
@@ -188,7 +259,7 @@ The version lives in `appVersionName` at the top of `app/build.gradle.kts`; `ver
 are both derived from it:
 
 ```text
-versionCode = major * 10000 + minor * 100 + patch      // 0.5.5 -> 505
+versionCode = major * 10000 + minor * 100 + patch      // 0.5.7 -> 507
 ```
 
 Do not write a second copy of the number in `defaultConfig`. That was how it used to work, and the result
@@ -323,7 +394,7 @@ Text(row.label.string())          // import com.multisuperplayer.core.ui.text.st
 ```
 
 When a sentence is assembled from several parts, do **not** use `buildString` or `"$a · $b"` — the
-separator itself is part of the language (Chinese uses `·`, English uses `, `), and the order of the parts
+separator itself is part of the language (Chinese uses `·`, English uses `,`), and the order of the parts
 may need to change in another language. Use:
 
 ```kotlin
@@ -374,6 +445,23 @@ These are deliberate for this release, not oversights:
 6. **The translation target's "name shown to the model" is fixed to Chinese**
    (`TranslationTarget.promptName`). It describes *what to translate into*, is independent of the UI
    language, and pinning it is what keeps the cache key stable.
+7. **Sorting the library by title uses Unicode code points for Chinese, not pinyin order.** Pinyin
+   ordering needs an extra mapping table (otherwise 张 sorts after 王), and the cost is out of proportion
+   to the benefit. Equal titles fall back to sorting by id, which at least keeps the order **stable** —
+   it does not change on every refresh.
+8. **No artwork in lists, only type icons (audio / video).** Doing it properly means adding an image
+   loading library and owning decode, caching and OOM; this release chooses not to, rather than shipping
+   a version that OOMs.
+9. **Media opened through the built-in browser does not auto-discover sibling subtitles.** Auto-discovery
+   lists the parent directory by the media file's **relative path**, and entries that came in through the
+   browser have none (see `BrowserEntry.toMediaEntry()`), so that step necessarily has no directory to
+   work with. The UI **states the reason** ("cannot tell which folder this file is in, so same-name
+   subtitles cannot be found automatically") instead of pretending "this folder has no subtitles"; you
+   can still pick a sibling `.srt` / `.ass` by hand in the sheet, and that path works. Fixing it properly
+   needs a **direct directory listing**, not a trip through the system media library (a `.nomedia`
+   directory is invisible there).
+10. **The built-in browser does not take part in multi-select**, and writes nothing to the media library.
+    Its queue is **every playable entry in the current directory**.
 
 ---
 

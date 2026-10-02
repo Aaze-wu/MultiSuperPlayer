@@ -246,6 +246,33 @@ class SettingsSummariesTest {
         assertText("Ollama（本地） · qwen2.5 · 译成简体中文", SettingsSummaries.translation(settings))
     }
 
+    // ------------------------------------------------------------------ 文件访问
+
+    @Test
+    fun `文件访问 - 已开启时只说已开启`() {
+        assertText(
+            "已开启，可以浏览任意文件夹",
+            SettingsSummaries.fileAccess(supported = true, granted = true),
+        )
+    }
+
+    @Test
+    fun `文件访问 - 没开启时说的是去开启而不是一句不能浏览`() {
+        assertText(
+            "未开启，点这里去系统设置开启",
+            SettingsSummaries.fileAccess(supported = true, granted = false),
+        )
+    }
+
+    @Test
+    fun `文件访问 - 系统不支持时说的不是未开启`() {
+        // 三种状态里最容易写歪的就是这一条：「系统太旧」和「用户没开」在界面上
+        // 一个是灰的、一个是能点的。合成一句「未开启」等于让用户去找一个不存在的
+        // 开关，而这种情况下的 `granted` 恒为 false（系统根本不会给我们这个权限）。
+        assertText("本机系统版本不支持", SettingsSummaries.fileAccess(supported = false, granted = false))
+        assertText("本机系统版本不支持", SettingsSummaries.fileAccess(supported = false, granted = true))
+    }
+
     // ------------------------------------------------------------------ 关于
 
     @Test

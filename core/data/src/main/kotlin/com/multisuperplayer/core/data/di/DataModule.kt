@@ -1,6 +1,8 @@
 package com.multisuperplayer.core.data.di
 
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
+import com.multisuperplayer.core.data.browser.BrowserRepository
+import com.multisuperplayer.core.data.browser.StorageAccess
 import com.multisuperplayer.core.data.history.PlaybackPositionRepository
 import com.multisuperplayer.core.data.history.RecentPlayRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
@@ -30,6 +32,21 @@ val dataModule = module {
     single { SafTreeScanner(context = androidContext()) }
 
     single { SafTreeStore(context = androidContext(), dispatchers = get()) }
+
+    // 「所有文件访问」的状态与授权入口。默认关闭、永不主动申请，
+    // 详情与理由见 StorageAccess 的类注释。
+    single { StorageAccess(context = androidContext()) }
+
+    // 内置文件浏览器（只读）。依赖上面三个，所以排在这里。
+    single {
+        BrowserRepository(
+            context = androidContext(),
+            safTreeStore = get(),
+            safScanner = get(),
+            storage = get(),
+            dispatchers = get(),
+        )
+    }
 
     single {
         MediaLibraryRepository(

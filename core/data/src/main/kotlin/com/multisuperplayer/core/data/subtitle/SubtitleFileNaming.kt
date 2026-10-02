@@ -24,7 +24,15 @@ internal object SubtitleFileNaming {
     /** 关联打分：`0` 表示「不是这条媒体的字幕」。 */
     const val NO_MATCH = 0
 
-    private const val SCORE_EXACT = 100
+    /**
+     * 「字幕名与媒体名去掉后缀后完全相同」。
+     *
+     * 故意不做 `private`：`SubtitleFiles.subtitleSourceOf` 也要用它——用户在文件
+     * 浏览器里**亲手点中**的那个文件，关联分本来就是满分（他指定的就是它）。
+     * 那边另写一个字面量 100 的话，两处迟早会分家。
+     */
+    const val SCORE_EXACT = 100
+
     private const val SCORE_PREFIX = 90
     private const val SCORE_PREFIX_REVERSED = 85
 

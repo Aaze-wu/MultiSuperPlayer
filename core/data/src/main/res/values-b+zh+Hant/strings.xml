@@ -39,4 +39,17 @@
     <string name="msp_aspect_original_label">原始</string>
     <string name="msp_aspect_original_desc">按片源像素顯示，不放大也不縮小</string>
 
+    <!-- ============================================================
+         內建檔案瀏覽器
+         ============================================================ -->
+    <string name="msp_browser_storage_internal">內部儲存空間</string>
+    <string name="msp_browser_storage_removable">記憶卡</string>
+    <string name="msp_browser_sort_name_asc">名稱（A-Z）</string>
+    <string name="msp_browser_sort_name_desc">名稱（Z-A）</string>
+    <string name="msp_browser_sort_newest">最新在前</string>
+    <string name="msp_browser_sort_oldest">最舊在前</string>
+
+    <!-- 兜底文案：用户授权的是某个卷的根，但树里没带名字，我们也不知道是哪一张卡。 -->
+    <string name="msp_browser_volume_root">儲存根目錄</string>
+
 </resources>

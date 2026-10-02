@@ -121,7 +121,7 @@ internal fun SettingChoiceRow(
 }
 
 /**
- * 「点开一页」的一行，用在设置首页的四个入口上。
+ * 「点开一页」的一行，用在设置首页的入口上。
  *
  * 和 [SettingChoiceRow] 的区别只有一个：右边**不写当前值**。
  * 入口页的右侧如果也堆一段摘要文字，一屏四行的右侧就会挤成三条长短不一的句子，
@@ -130,6 +130,10 @@ internal fun SettingChoiceRow(
  *
  * [subtitle] 必须是**当前状态**，不是功能说明：「默认 1.0×・长按 2.0×」比
  * 「调整播放速度」有用得多——后者在四行里等于占位符。
+ *
+ * [enabled] 只用在「这一项在本机根本不存在」的情况（系统版本太低、系统设置里
+ * 没有对应页面）。置灰的同时**不画右侧箭头**：一个灰掉的箭头仍然在说
+ * 「点我一下会到别处」，而那一下什么都不会发生。
  */
 @Composable
 internal fun SettingActionRow(
@@ -137,25 +141,37 @@ internal fun SettingActionRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     ListItem(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
         },
-        headlineContent = { Text(title) },
+        headlineContent = {
+            Text(
+                text = title,
+                color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         supportingContent = { Text(subtitle) },
         trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (enabled) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
     )
 }

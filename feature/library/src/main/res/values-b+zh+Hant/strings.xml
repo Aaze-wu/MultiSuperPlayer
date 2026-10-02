@@ -92,7 +92,7 @@
     <!-- ===== 瀏覽（SAF 授權目錄） ===== -->
     <string name="msp_browse_title">瀏覽</string>
     <string name="msp_browse_add">新增資料夾</string>
-    <string name="msp_browse_hint">授權的資料夾會和系統媒體庫的內容合併顯示在媒體庫頁。系統媒體庫裡的內容不需要在這裡授權。</string>
+    <string name="msp_browse_hint">這裡列出的是可以開始瀏覽的位置。系統媒體庫裡的內容不需要在這裡授權。</string>
     <string name="msp_browse_empty_title">還沒有授權任何資料夾</string>
     <string name="msp_browse_empty_desc">點右上角的 + 選一個資料夾。適合放系統媒體庫看不到的內容（例如 SD 卡上的音樂）。</string>
     <string name="msp_browse_volume_root">儲存根目錄</string>
@@ -123,5 +123,24 @@
     <string name="msp_playlists_item_missing">檔案已不在</string>
     <string name="msp_playlists_missing_banner">其中 %1$d 條檔案已不在，播放時可能失敗。</string>
     <string name="msp_playlists_remove_item">從播放清單移除</string>
+
+    <!-- ============================================================
+         目录浏览（点进某个来源之后）
+         ============================================================ -->
+    <string name="msp_browser_access_off">未開啟「所有檔案存取」</string>
+    <string name="msp_browser_access_unsupported">本機系統版本不支援</string>
+    <string name="msp_browser_access_open">去開啟</string>
+    <string name="msp_browser_empty_dir">這個資料夾是空的</string>
+    <string name="msp_browser_empty_dir_desc">裡面沒有任何檔案或子資料夾。</string>
+    <string name="msp_browser_only_hidden">這裡只有隱藏項目</string>
+    <string name="msp_browser_only_hidden_desc">開啟「顯示隱藏檔案」就可以看到。</string>
+    <string name="msp_browser_unreadable">讀不到這個資料夾</string>
+    <string name="msp_browser_unreadable_desc">它可能已經被刪除，或授權被系統收回了。</string>
+    <string name="msp_browser_not_directory">這裡已經不是資料夾了</string>
+    <string name="msp_browser_not_directory_desc">它可能在別的地方被改名或刪除了。往上翻一層再找找。</string>
+    <string name="msp_browser_show_hidden">顯示隱藏檔案</string>
+    <string name="msp_browser_truncated">內容太多，只列出了前 %1$d 項</string>
+    <string name="msp_browser_up">上一層</string>
+    <string name="msp_browser_back_sources">返回來源清單</string>
 
 </resources>

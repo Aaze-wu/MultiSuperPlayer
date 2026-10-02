@@ -361,41 +361,16 @@ class SubtitleViewModel(
         emit(SubtitleLoadState(phase = SubtitlePhase.SCANNING, autoSelected = autoSelected))
 
         val scan = repository.scan(entry)
-        when (scan) {
-            SubtitleScan.NoDirectory -> {
-                emit(
-                    SubtitleLoadState(
-                        phase = SubtitlePhase.READY,
-                        autoSelected = autoSelected,
-                        issue = SubtitleIssue.NoDirectory,
-                    ),
-                )
-                return@flow
-            }
 
-            SubtitleScan.DirectoryInvisible -> {
-                emit(
-                    SubtitleLoadState(
-                        phase = SubtitlePhase.READY,
-                        autoSelected = autoSelected,
-                        issue = SubtitleIssue.DirectoryInvisible,
-                    ),
-                )
-                return@flow
-            }
-
-            is SubtitleScan.Failed -> {
-                emit(
-                    SubtitleLoadState(
-                        phase = SubtitlePhase.READY,
-                        autoSelected = autoSelected,
-                        issue = SubtitleIssue.ScanFailed(scan.message),
-                    ),
-                )
-                return@flow
-            }
-
-            is SubtitleScan.Found -> scanFound(target, scan.sources, autoSelected)
+        when (val step = decideScanStep(scan, target.selection)) {
+            is ScanStep.Proceed -> scanFound(target, step.candidates, autoSelected)
+            is ScanStep.Stop -> emit(
+                SubtitleLoadState(
+                    phase = SubtitlePhase.READY,
+                    autoSelected = autoSelected,
+                    issue = step.issue,
+                ),
+            )
         }
     }
 
@@ -474,6 +449,54 @@ internal sealed interface SubtitleSelection {
     data object Auto : SubtitleSelection
 
     data class Source(val source: SubtitleSource) : SubtitleSelection
+}
+
+/** 目录扫描之后该干什么。 */
+internal sealed interface ScanStep {
+    /**
+     * 可以挑了。[candidates] 是这次扫出来的候选，**可能为空**——
+     * 手选的字幕不依赖目录，扫不出来时这里就是空的。
+     */
+    data class Proceed(val candidates: List<SubtitleSource>) : ScanStep
+
+    /** 没法继续，按 [issue] 提示用户。 */
+    data class Stop(val issue: SubtitleIssue) : ScanStep
+}
+
+/**
+ * 扫描结果 + 当前选择 ⇒ 接下来干什么。
+ *
+ * 抽成顶层**纯函数**是因为这里有一条曾经写错过的规则：**手选的字幕与目录扫描无关**。
+ * 写成 `when (scan) { 三个失败分支 -> emit + return }` 的话，「用户亲手点了一条字幕、
+ * 而那个目录恰好扫不出来」会把加载整个吞掉。
+ *
+ * 而这个组合恰恰是最常见的：需要手动指定字幕的地方就是扫描最容易失败的地方——
+ * `Download/` 根、`.nomedia` 目录、媒体库不索引的路径，这些文件在
+ * `BrowserEntry.toMediaEntry()` 里根本拿不到 `relativePath`，扫描必然回
+ * [SubtitleScan.NoDirectory]。那时界面只剩一句「目录不可用」，
+ * 用户会以为自己挑的格式不对，而功能其实一次都没跑起来过。
+ *
+ * 纯函数才能把这条钉在测试里——插在协程管线中间的那段 `if` 只有跑真机才验得到。
+ */
+internal fun decideScanStep(scan: SubtitleScan, selection: SubtitleSelection): ScanStep {
+    // 扫到了：手选和自动走同一条路（候选里手选的那条会带单选框）。
+    if (scan is SubtitleScan.Found) return ScanStep.Proceed(scan.sources)
+
+    // 扫不到，但用户亲手指过一条 —— 照旧加载它，候选列表留空。
+    // 不要把那条手选的字幕塞进 candidates：面板里「当前挂着的」来自 `attached`，
+    // 凭空造一条候选会让「候选」这个列表的含义变成两种。
+    if (selection is SubtitleSelection.Source) return ScanStep.Proceed(emptyList())
+
+    return ScanStep.Stop(
+        when (scan) {
+            SubtitleScan.NoDirectory -> SubtitleIssue.NoDirectory
+            SubtitleScan.DirectoryInvisible -> SubtitleIssue.DirectoryInvisible
+            is SubtitleScan.Failed -> SubtitleIssue.ScanFailed(scan.message)
+            // 不可达（上面已返回），写出来是为了让 `when` 保持为表达式：
+            // 将来给 `SubtitleScan` 加分支时编译器会在这里报错提醒。
+            is SubtitleScan.Found -> error("Found 已在上面返回")
+        },
+    )
 }
 
 /** 加载阶段。 */

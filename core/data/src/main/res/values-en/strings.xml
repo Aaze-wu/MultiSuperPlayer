@@ -32,4 +32,15 @@
     <string name="msp_aspect_original_label">Original</string>
     <string name="msp_aspect_original_desc">Uses the source pixels, neither enlarged nor shrunk</string>
 
+    <!-- ==== Built-in file browser ==== -->
+    <string name="msp_browser_storage_internal">Internal storage</string>
+    <string name="msp_browser_storage_removable">SD card</string>
+    <string name="msp_browser_sort_name_asc">Name (A-Z)</string>
+    <string name="msp_browser_sort_name_desc">Name (Z-A)</string>
+    <string name="msp_browser_sort_newest">Newest first</string>
+    <string name="msp_browser_sort_oldest">Oldest first</string>
+
+    <!-- 兜底文案：用户授权的是某个卷的根，但树里没带名字，我们也不知道是哪一张卡。 -->
+    <string name="msp_browser_volume_root">Storage root</string>
+
 </resources>

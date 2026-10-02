@@ -9,6 +9,7 @@
     <string name="msp_settings_appearance">外觀</string>
     <string name="msp_settings_playback">播放</string>
     <string name="msp_settings_translation">字幕翻譯</string>
+    <string name="msp_settings_file_access">檔案存取</string>
     <string name="msp_settings_about">關於</string>
 
     <!-- 摘要片段之間的分隔符。 -->
@@ -30,6 +31,15 @@
     <!-- `%1$d` 是檔案數，`%2$s` 是總大小 -->
     <string name="msp_settings_summary_log_usage">%1$d 個 · %2$s</string>
     <string name="msp_settings_summary_no_range">—</string>
+
+    <!--
+      檔案存取的三種狀態，**必須分開**：`unsupported` 那一行在介面上是灰的
+      （系統根本沒有那一頁可去），`off` 那一行能點。合成一句「未開啟」會讓
+      Android 10 的使用者去一個沒有這一項的設定頁裡翻找。
+    -->
+    <string name="msp_settings_file_access_on">已開啟，可以瀏覽任意資料夾</string>
+    <string name="msp_settings_file_access_off">未開啟，點這裡去系統設定開啟</string>
+    <string name="msp_settings_file_access_unsupported">本機系統版本不支援</string>
 
     <string name="msp_settings_section_base_theme">主題基底</string>
     <string name="msp_settings_section_color_source">取色來源</string>
