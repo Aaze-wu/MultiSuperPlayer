@@ -181,7 +181,11 @@ internal fun PlayerSeekBar(
 }
 
 /**
- * 竖屏画面左上角的「收起」。
+ * 左上角的出口胶囊：一个返回箭头 + 一句话。
+ *
+ * 两处用它：竖屏画面左上角的「收起」（弹出播放页，回刚才那个列表），以及横屏音频页
+ * 左上角的「退出全屏」——音频横屏没有覆盖式控制层，那个位置本来空着，而它需要
+ * 一个常驻的、看得见的出口。
  *
  * ## 它解决的是什么问题
  *
@@ -191,13 +195,16 @@ internal fun PlayerSeekBar(
  * 但它看起来像「切标签」而不是「把播放器收起来」——两件事的后果也确实不一样
  * （切标签是丢掉播放页，收起是回到刚才那个列表，两者都会继续播放）。
  *
- * 所以给它一个和横屏左上角那个箭头**同一个位置**的出口：图标 + 文字。
+ * 所以给它一个位置固定的出口，和横屏左上角那个箭头**在同一个角**：图标 + 文字。
  *
  * ## 为什么带文字，而不是只有一个箭头
  *
- * 图标用的是和横屏左上角那个「退出全屏」**同一个箭头**：两处都是「离开这一页」，
- * 换一个图标只会让人以为两个按钮干的是不同的事。但箭头本身只能表达「回上一页」，
- * 而这里真正的后果是「播放**不停**，只是把这一页收起来」，所以旁边写一个字。
+ * 图标两处都用同一个 `ArrowBack`：两处都是「离开这一页」，换一个图标只会让人
+ * 以为两个按钮干的是不同的事；而第一版用 `KeyboardArrowDown`（⌄）时，实机截图
+ * 一眼就是「展开/折叠面板」的错误暗示。但箭头本身只能表达「回上一页」，说不清
+ * 后果是「收起这一页、播放不停」还是「退出全屏」，所以旁边必须写字——两个具名的
+ * 出口（[R.string.msp_player_collapse] / [R.string.msp_player_exit_fullscreen]）
+ * 用同一个组件、`label` 由调用方给，就是为了让这两个名字各自被说出口。
  * 这和倍速/比例那三个按钮的取舍一样（见 [PlayerActionChips]）：
  * 存在歧义的地方，写出来是零成本的。
  *
@@ -205,14 +212,16 @@ internal fun PlayerSeekBar(
  * 底色和横屏控制层用同一个 `surface`：这个按钮只是「换个地方」，不是
  * 一个需要被注意到的动作，抢眼反而会盖住画面里正在发生的事。
  *
- * @param onClick 由路由层决定（弹出播放页，回到刚才那个列表）。
+ * @param label 这个出口叫什么。**必须**是「离开这里会发生什么」的说法，
+ *   而不是「上一页」这种方位词。
+ * @param onClick 由路由层决定（弹出播放页，或者退出全屏）。
  */
 @Composable
-internal fun PlayerCollapseButton(
+internal fun PlayerExitChip(
+    label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val label = stringResource(R.string.msp_player_collapse)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -381,19 +390,15 @@ internal fun PlayerTransportControls(
  * 「倍速」用秒表、「A-B」用循环箭头、「比例」用方框——每一个都需要用户停下来
  * 猜一次，而它们各自只有一个状态要表达。直接写「1.5×」「A-B」「裁剪」是零歧义的。
  * 文字短，三个按钮加起来的宽度比原来那一堆 `IconButton` 还小。
- *
- * @param horizontalArrangement 竖屏下用 `Center`（下面还有一整行控制按钮，居中最稳），
- *   横屏的顶栏里也用 `Center`。
  */
 @Composable
 internal fun PlayerActionChips(
     speed: Float,
-    aspectRatioLabel: String,
     abRepeat: AbRepeatState,
     onOpenSpeed: () -> Unit,
-    onOpenAspectRatio: () -> Unit,
     onCycleAbRepeat: () -> Unit,
     modifier: Modifier = Modifier,
+    aspectRatio: AspectRatioChip? = null,
 ) {
     Row(
         modifier = modifier,
@@ -412,14 +417,30 @@ internal fun PlayerActionChips(
             onClick = onCycleAbRepeat,
             description = stringResource(R.string.msp_player_ab_repeat),
         )
-        ChipButton(
-            text = aspectRatioLabel,
-            active = false,
-            onClick = onOpenAspectRatio,
-            description = stringResource(R.string.msp_player_aspect),
-        )
+        // 画面比例只在有画面的地方出现。做成一个整体的可选参数而不是两个可空的
+        // 字段：文字和动作必须同时有或同时没有，拆成两个参数就多了一种
+        // 「有文字没动作」的非法组合要防。
+        aspectRatio?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = false,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_aspect),
+            )
+        }
     }
 }
+
+/**
+ * 「画面比例」按钮的配置。
+ *
+ * `null`（不给）表示这一处没有「画面比例」这件事——音频页就是这种情况：
+ * 声音没有画面比例可调，把它画出来只会让用户点开一个永远无效的面板。
+ */
+internal data class AspectRatioChip(
+    val label: String,
+    val onClick: () -> Unit,
+)
 
 /**
  * A-B 按钮上的文字。
@@ -631,11 +652,13 @@ internal fun PlayerControlsOverlay(
                     }
                     PlayerActionChips(
                         speed = speed,
-                        aspectRatioLabel = aspectRatioLabel,
                         abRepeat = state.abRepeat,
                         onOpenSpeed = onOpenSpeed,
-                        onOpenAspectRatio = onOpenAspectRatio,
                         onCycleAbRepeat = onCycleAbRepeat,
+                        aspectRatio = AspectRatioChip(
+                            label = aspectRatioLabel,
+                            onClick = onOpenAspectRatio,
+                        ),
                     )
                     IconButton(onClick = onToggleLock) {
                         Icon(

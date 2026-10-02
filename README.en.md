@@ -43,6 +43,12 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   different operations (`markPlayed` keeps the existing position and only pushes the timestamp);
   one shared write could never express it.
 - **Fullscreen, landscape, screen lock** to avoid accidental touches.
+- **Landscape audio gets a layout of its own**: artwork and track info on the left, lyrics on the
+  right, and the control strip pinned under the lyrics. Audio has no picture to protect, so the
+  constraint is the opposite of video — the controls are **permanent**, not a fading overlay, which
+  also means there is no "it faded out and can never be brought back" (landscape audio has no gesture
+  layer, so a faded overlay really is gone). When there are no lyrics that column says which case it
+  is — loading / turned off / none found / failed — and offers a way to pick a subtitle file.
 - **A visible way out**: a labelled *Collapse* button at the top-left of the portrait player —
   an exit you can see, instead of having to guess the system back gesture (landscape keeps its
   own *Exit fullscreen* arrow and gets no second button). Collapsing pops the player page only:
@@ -228,7 +234,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | v0.5.9 | Multi-select in the built-in file browser (select all / add to playlist / play) | Done |
 | **v0.5.10** | **Recent page keeps short clips, new "Record recent plays" switch, auto-refresh on return** | Done |
 | **v0.5.11** | **Recent page: delete one entry (undoable) and clear all (confirmed)** | Done |
-| **v0.5.12** | **Portrait player gets a *Collapse* button top-left (a visible exit that keeps playing)** | **Current** |
+| **v0.5.12** | **Portrait player gets a *Collapse* button top-left (a visible exit that keeps playing)** | Done |
+| **v0.5.13** | **Landscape layout dedicated to audio: cover left, lyrics right, permanent control strip (also fixes controls that could not be brought back)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 

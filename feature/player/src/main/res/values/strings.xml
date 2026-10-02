@@ -92,6 +92,11 @@
     <string name="msp_player_repeat_all">列表循环</string>
     <string name="msp_player_repeat_one">单曲循环</string>
     <string name="msp_player_subtitle_entry">字幕与歌词</string>
+    <string name="msp_player_lyrics_loading">正在加载歌词…</string>
+    <string name="msp_player_lyrics_off">歌词已关闭</string>
+    <string name="msp_player_lyrics_empty">暂无歌词</string>
+    <string name="msp_player_lyrics_failed">歌词加载失败</string>
+    <string name="msp_player_lyrics_pick">选择字幕与歌词</string>
     <string name="msp_player_enter_fullscreen">全屏播放</string>
     <string name="msp_player_exit_fullscreen">退出全屏</string>
     <string name="msp_player_collapse">收起</string>

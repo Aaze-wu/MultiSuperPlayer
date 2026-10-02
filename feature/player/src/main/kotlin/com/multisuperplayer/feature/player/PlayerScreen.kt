@@ -5,10 +5,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -20,11 +24,13 @@ import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -504,7 +512,7 @@ fun PlayerScreen(
  * 信息层次按「用户有多需要看它」从上到下排：画面 → 标题/解码方式 → 进度 →
  * 功能 → 传输控制。
  *
- * 左上角还叠着一个「收起」（[PlayerCollapseButton]），它不在这条层次里：
+ * 左上角还叠着一个「收起」（[PlayerExitChip]），它不在这条层次里：
  * 它不是「看片子」需要的信息，而是这一页的出口。
  */
 @Composable
@@ -563,7 +571,8 @@ private fun PortraitLayout(
             //
             // 声明在**最后**：同一个 Box 里后声明的节点画在上面、也先参与命中测试，
             // 所以点在按钮上时事件归按钮，不会顺手触发下面手势层的双击播放/暂停。
-            PlayerCollapseButton(
+            PlayerExitChip(
+                label = stringResource(R.string.msp_player_collapse),
                 onClick = onCollapse,
                 modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
             )
@@ -584,11 +593,13 @@ private fun PortraitLayout(
 
         PlayerActionChips(
             speed = state.playbackSpeed,
-            aspectRatioLabel = aspectRatio.label.string(),
             abRepeat = state.abRepeat,
             onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
-            onOpenAspectRatio = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
             onCycleAbRepeat = onCycleAbRepeat,
+            aspectRatio = AspectRatioChip(
+                label = aspectRatio.label.string(),
+                onClick = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -612,6 +623,11 @@ private fun PortraitLayout(
  *
  * 这一层里**没有** `TrackInfo` 那种常驻文字：横屏时每一个常驻元素都是在永久地
  * 吃掉画面。标题和解码方式挪进了顶栏（跟着控制层一起出现/消失）。
+ *
+ * 唯一的例外是**音频**：它没有画面可吃，于是约束正好反过来——满屏空白才是浪费，
+ * 控制条应该常驻。所以音频横屏走 [AudioLandscapeLayout]（左封面、右歌词、
+ * 控制压在歌词底下），视频继续走下面这套覆盖层。两种媒体在这里分道扬镳，
+ * 而不是硬凑一套能同时待两边的控件。
  */
 @Composable
 private fun LandscapeLayout(
@@ -642,11 +658,21 @@ private fun LandscapeLayout(
         if (entry.kind == MediaKind.VIDEO) {
             videoLayer(Modifier.fillMaxSize())
         } else {
-            AudioStage(
+            AudioLandscapeLayout(
+                state = state,
                 entry = entry,
-                subtitleState = subtitleState,
                 positionMs = positionMs,
+                bufferedMs = bufferedMs,
+                ui = ui,
+                subtitleState = subtitleState,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipNext = onSkipNext,
+                onSkipPrevious = onSkipPrevious,
                 onSeekTo = onSeekTo,
+                onCycleRepeat = onCycleRepeat,
+                onToggleShuffle = onToggleShuffle,
+                onOpenSubtitles = onOpenSubtitles,
+                onCycleAbRepeat = onCycleAbRepeat,
             )
         }
 
@@ -669,31 +695,298 @@ private fun LandscapeLayout(
             ErrorBadge(message = message, modifier = Modifier.align(Alignment.Center))
         }
 
-        PlayerControlsOverlay(
-            visible = ui.controlsVisible,
-            locked = ui.locked,
-            lockHintVisible = ui.lockHintVisible,
-            state = state,
-            entry = entry,
-            positionMs = positionMs,
-            bufferedMs = bufferedMs,
-            speed = state.playbackSpeed,
-            aspectRatioLabel = aspectRatio.label.string(),
-            subtitlesActive = subtitleState.isRendering,
-            onExitFullscreen = { ui.applyFullscreen(false) },
-            onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
-            onOpenAspectRatio = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
-            onCycleAbRepeat = onCycleAbRepeat,
-            onToggleLock = { ui.applyLocked(!ui.locked) },
-            onRevealLockedControls = ui::revealLockedControls,
-            onTogglePlayPause = onTogglePlayPause,
-            onSkipNext = onSkipNext,
-            onSkipPrevious = onSkipPrevious,
-            onSeekTo = onSeekTo,
-            onCycleRepeat = onCycleRepeat,
-            onToggleShuffle = onToggleShuffle,
-            onOpenSubtitles = onOpenSubtitles,
+        // 覆盖式控制层只给视频。音频横屏的控制条常驻在自己的版面里（见
+        // AudioLandscapeLayout），如果再叠一层：
+        // 1. 上下就会出现两套「退出全屏」；
+        // 2. 那一层淡出之后音频页没有手势层可以把它唤回来（手势层的条件是
+        //    `kind == VIDEO`，音频在横屏下根本收不到点击）——这正是 v0.5.12
+        //    验证时发现的「控制条消失后找不回来」。常驻是结构性修法。
+        if (entry.kind == MediaKind.VIDEO) {
+            PlayerControlsOverlay(
+                visible = ui.controlsVisible,
+                locked = ui.locked,
+                lockHintVisible = ui.lockHintVisible,
+                state = state,
+                entry = entry,
+                positionMs = positionMs,
+                bufferedMs = bufferedMs,
+                speed = state.playbackSpeed,
+                aspectRatioLabel = aspectRatio.label.string(),
+                subtitlesActive = subtitleState.isRendering,
+                onExitFullscreen = { ui.applyFullscreen(false) },
+                onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
+                onOpenAspectRatio = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
+                onCycleAbRepeat = onCycleAbRepeat,
+                onToggleLock = { ui.applyLocked(!ui.locked) },
+                onRevealLockedControls = ui::revealLockedControls,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipNext = onSkipNext,
+                onSkipPrevious = onSkipPrevious,
+                onSeekTo = onSeekTo,
+                onCycleRepeat = onCycleRepeat,
+                onToggleShuffle = onToggleShuffle,
+                onOpenSubtitles = onOpenSubtitles,
+            )
+        }
+    }
+}
+
+/**
+ * 横屏音频：左边封面与曲目信息，右边歌词，控制条压在歌词底下常驻。
+ *
+ * ## 为什么音频不能用视频那一套
+ *
+ * 视频横屏的版面是「画面铺满 + 控制层浮在上面自动淡出」，其中的两条约束（不挡画面、
+ * 不留空）对音频都不成立：音频没有画面可挡，而满屏的封面/歌词之间的空白也不该空着。
+ * 所以这里反过来：**什么都不淡出**，控制条永远在。
+ *
+ * ## 为什么控制条不浮起来（不是覆盖层）
+ *
+ * 视频那套是「常驻 = 永久吃掉画面」，音频没有这个代价；更关键的是，音频横屏没有手势
+ * 层（见 `PlayerRoute` 里 `gesturesEnabled` 的条件），浮层一旦淡出就**再也唤不回来**。
+ * 用一个 `Row` 把版面真分成两栏、控制条占一条真实的高度，这个 bug 就不存在了：
+ * 没有「隐藏」这个状态，也就没有「找回来」这件事。
+ *
+ * ## 锁定在这里没有意义（但必须处理）
+ *
+ * 锁定挡的是「拖动亮度/音量」和「双击播放暂停」这两种误触，而这两件事只发生在
+ * 有手势层的画面上。音频横屏没有手势层，锁定没有东西可挡。但 `ui.locked` 是
+ * `PlayerUiState` 上的状态、跟着播放页活着：从视频横屏带着 locked=true 转过来，
+ * 这一页既不画锁定按钮也不会解析放按钮，用户就永远解不开了。所以进来主动解掉。
+ */
+@Composable
+private fun AudioLandscapeLayout(
+    state: MspPlaybackState,
+    entry: MediaEntry,
+    positionMs: Long,
+    bufferedMs: Long,
+    ui: PlayerUiState,
+    subtitleState: SubtitleUiState,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+    onCycleRepeat: () -> Unit,
+    onToggleShuffle: () -> Unit,
+    onOpenSubtitles: () -> Unit,
+    onCycleAbRepeat: () -> Unit,
+) {
+    LaunchedEffect(Unit) {
+        if (ui.locked) ui.applyLocked(false)
+    }
+
+    Row(modifier = Modifier.fillMaxSize()) {
+        // 左栏固定占 1/3：封面是正方形的，宽度定下来它的高度也就定下来了，
+        // 剩下两栏不用跟着封面换算。
+        BoxWithConstraints(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        ) {
+            val artworkSize = AudioLandscapeRules.artworkSize(
+                availableWidth = maxWidth,
+                availableHeight = maxHeight,
+            )
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // 出口。位置和视频横屏的「退出全屏」**在同一个角**（左上），
+                // 只是那一处是跟着覆盖层淡出的，这里常驻。
+                PlayerExitChip(
+                    label = stringResource(R.string.msp_player_exit_fullscreen),
+                    onClick = { ui.applyFullscreen(false) },
+                    modifier = Modifier.align(Alignment.Start).padding(top = 8.dp),
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    AudioArtwork(entry = entry, size = artworkSize)
+                    // 和竖屏是同一个 composable：标题 + 「格式 · 解码方式」。
+                    // 复用而不是另写一份，就不会出现「竖屏写了、横屏忘了」的偏差。
+                    TrackInfo(entry = entry, decoderKind = state.decoderKind)
+                }
+            }
+        }
+
+        // 右栏：歌词（占满剩余高度）+ 常驻控制条。
+        Column(modifier = Modifier.weight(2f).fillMaxHeight()) {
+            val slot = AudioLandscapeRules.lyricsSlot(subtitleState)
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                when (slot) {
+                    is LyricsSlot.Lines -> LyricsPane(
+                        document = slot.document,
+                        positionMs = positionMs,
+                        mode = subtitleState.effectiveMode,
+                        onSeekTo = onSeekTo,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+
+                    is LyricsSlot.Notice -> LyricsNotice(
+                        kind = slot.kind,
+                        onOpenSubtitles = onOpenSubtitles,
+                    )
+                }
+
+                // 只在真的在画歌词时铺：说明态是居中的一块，本来就不贴边，
+                // 铺上去反而会把那句说明的上下沾上一层灰。
+                if (slot is LyricsSlot.Lines) {
+                    val fade = MaterialTheme.colorScheme.surface
+                    LyricEdgeFade(Alignment.TopCenter, listOf(fade, Color.Transparent))
+                    LyricEdgeFade(Alignment.BottomCenter, listOf(Color.Transparent, fade))
+                }
+            }
+
+            AudioLandscapeControls(
+                state = state,
+                ui = ui,
+                subtitleState = subtitleState,
+                positionMs = positionMs,
+                bufferedMs = bufferedMs,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipNext = onSkipNext,
+                onSkipPrevious = onSkipPrevious,
+                onSeekTo = onSeekTo,
+                onCycleRepeat = onCycleRepeat,
+                onToggleShuffle = onToggleShuffle,
+                onOpenSubtitles = onOpenSubtitles,
+                onCycleAbRepeat = onCycleAbRepeat,
+            )
+        }
+    }
+}
+
+/**
+ * 横屏音频歌词区上下两条渐变的高度。
+ *
+ * 歌词是可滚动的，视口上下必然切在某一行中间。硬切看上去像渲染错了：
+ * 下半行正好贴在控制条上，像被压掉一块。铺一条渐变就变成「这一行滑出去了」。
+ */
+private val LYRIC_EDGE_FADE = 28.dp
+
+/**
+ * 歌词区一条边缘渐变。
+ *
+ * 铺在歌词**上面**，但只有 `background`、没有任何指针输入，所以不参与命中测试：
+ * 歌词行还是能点（点歌词跳到那一句），渐变不会变成一层挡手的膜。
+ *
+ * 颜色由调用方给全：写「顶边从底色到透明、底边从透明到底色」比在这里用
+ * `Alignment` 反推方向读起来直接。
+ */
+@Composable
+private fun BoxScope.LyricEdgeFade(edge: Alignment, colors: List<Color>) {
+    Box(
+        modifier = Modifier
+            .align(edge)
+            .fillMaxWidth()
+            .height(LYRIC_EDGE_FADE)
+            .background(Brush.verticalGradient(colors)),
+    )
+}
+
+/**
+ * 横屏音频右栏底部的常驻控制条：进度 → 倍速/A-B → 传输控制。
+ *
+ * 里面**没有**画面比例按钮：音频没有画面比例可调，摆出来只会让人点开一个
+ * 永远无效的面板（呼应 [PlayerActionChips] 里那个可选参数）。
+ *
+ * 铺一层很淡的 `surfaceVariant`：不为了好看，而是让「这一条是控件区」和上面
+ * 可滚动的歌词在视觉上分开——歌词自己也有点按高亮，两者同色会糊成一片。
+ */
+@Composable
+private fun AudioLandscapeControls(
+    state: MspPlaybackState,
+    ui: PlayerUiState,
+    subtitleState: SubtitleUiState,
+    positionMs: Long,
+    bufferedMs: Long,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+    onCycleRepeat: () -> Unit,
+    onToggleShuffle: () -> Unit,
+    onOpenSubtitles: () -> Unit,
+    onCycleAbRepeat: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            PlayerSeekBar(
+                positionMs = positionMs,
+                bufferedMs = bufferedMs,
+                durationMs = state.durationMs,
+                enabled = state.hasKnownDuration,
+                onSeekTo = onSeekTo,
+                abRepeat = state.abRepeat,
+            )
+            PlayerActionChips(
+                speed = state.playbackSpeed,
+                abRepeat = state.abRepeat,
+                onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
+                onCycleAbRepeat = onCycleAbRepeat,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PlayerTransportControls(
+                state = state,
+                subtitlesActive = subtitleState.isRendering,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipNext = onSkipNext,
+                onSkipPrevious = onSkipPrevious,
+                onCycleRepeat = onCycleRepeat,
+                onToggleShuffle = onToggleShuffle,
+                onOpenSubtitles = onOpenSubtitles,
+                // 这一行不提供全屏按钮：横屏**就是**全屏，左上角那个「退出全屏」
+                // 才是有意义的那一个（和视频横屏同一条理由）。
+                fullscreen = null,
+                onToggleFullscreen = {},
+                compact = true,
+            )
+        }
+    }
+}
+
+/**
+ * 右栏「没有歌词可看」时的说明 + 去选字幕的入口。
+ *
+ * 说明和入口是两个东西：说明回答「现在是什么情况」（四种，见 [LyricsPlaceholder]），
+ * 入口回答「我能做什么」。只给说明，用户得自己去上面那排图标里找字幕；只给入口，
+ * 用户不知道自己是「没有歌词」还是「歌词坏了」。
+ */
+@Composable
+private fun LyricsNotice(
+    kind: LyricsPlaceholder,
+    onOpenSubtitles: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Subtitles,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text(
+            text = stringResource(kind.messageRes),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        TextButton(
+            onClick = onOpenSubtitles,
+            modifier = Modifier.padding(top = 4.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.msp_player_lyrics_pick),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
     }
 }
 
@@ -902,9 +1195,13 @@ private fun AudioArtwork(
 }
 
 @Composable
-private fun TrackInfo(entry: MediaEntry, decoderKind: MspDecoderKind) {
+private fun TrackInfo(
+    entry: MediaEntry,
+    decoderKind: MspDecoderKind,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(

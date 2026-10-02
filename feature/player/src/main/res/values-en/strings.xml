@@ -82,8 +82,11 @@
     <string name="msp_player_repeat_off">Repeat is off</string>
     <string name="msp_player_repeat_all">Repeat all</string>
     <string name="msp_player_repeat_one">Repeat one</string>
-    <string name="msp_player_subtitle_entry">Subtitles and lyrics</string>
-    <string name="msp_player_enter_fullscreen">Fullscreen</string>
+    <string name="msp_player_subtitle_entry">Subtitles and lyrics</string>    <string name="msp_player_lyrics_loading">Loading lyrics…</string>
+    <string name="msp_player_lyrics_off">Lyrics are turned off</string>
+    <string name="msp_player_lyrics_empty">No lyrics yet</string>
+    <string name="msp_player_lyrics_failed">Could not load lyrics</string>
+    <string name="msp_player_lyrics_pick">Choose subtitles or lyrics</string>    <string name="msp_player_enter_fullscreen">Fullscreen</string>
     <string name="msp_player_exit_fullscreen">Exit fullscreen</string>
     <string name="msp_player_collapse">Collapse</string>
     <string name="msp_player_speed">Playback speed</string>
