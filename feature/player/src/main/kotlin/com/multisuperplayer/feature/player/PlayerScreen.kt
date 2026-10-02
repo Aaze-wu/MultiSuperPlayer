@@ -1,5 +1,7 @@
 package com.multisuperplayer.feature.player
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +60,8 @@ import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
 import com.multisuperplayer.core.player.progressOf
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
+import com.multisuperplayer.core.translate.SubtitleExportFormat
+import com.multisuperplayer.core.translate.SubtitleExportMode
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -68,7 +72,10 @@ import org.koin.androidx.compose.koinViewModel
  * 「哪个是当前条目」和「主题的最外层在哪」。
  */
 @Composable
-fun PlayerRoute(modifier: Modifier = Modifier) {
+fun PlayerRoute(
+    modifier: Modifier = Modifier,
+    onOpenTranslationSettings: () -> Unit,
+) {
     val viewModel: PlayerViewModel = koinViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val entry by viewModel.currentEntry.collectAsStateWithLifecycle()
@@ -78,7 +85,26 @@ fun PlayerRoute(modifier: Modifier = Modifier) {
 
     val subtitleViewModel: SubtitleViewModel = koinViewModel()
     val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
+    val translationState by subtitleViewModel.translationState.collectAsStateWithLifecycle()
+    val exportMessage by subtitleViewModel.exportMessage.collectAsStateWithLifecycle()
     var showSubtitleSheet by remember { mutableStateOf(false) }
+
+    // 导出要分两步：先记住用户选的是「哪种格式 + 哪种模式」（弹菜单的那一刻就知道），
+    // 再等 SAF 回来拿到目标 uri（可能要过好几分钟，用户还得翻目录）。
+    // 把两者同时从 launcher 回调里取出来是不行的：回调里只有 uri。
+    var pendingExport by remember { mutableStateOf<Pair<SubtitleExportFormat, SubtitleExportMode>?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(
+        // octet-stream 而不是 text/plain：DocumentsUI 不会给已知的文本类型补扩展名/改名字，
+        // 文件名里自己带的 .srt / .ass 才能原样保留。
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        val pending = pendingExport
+        pendingExport = null
+        // uri 为 null = 用户取消了。此时什么都不做，不要编一句「导出成功」。
+        if (uri != null && pending != null) {
+            subtitleViewModel.exportTo(uri, pending.first, pending.second)
+        }
+    }
 
     // 直接把「哪条媒体」推给字幕 ViewModel，而不是让它去订阅播放内核：
     // 这个 LaunchedEffect 就是两者之间唯一的连接点，读代码时一眼能看到。
@@ -87,6 +113,13 @@ fun PlayerRoute(modifier: Modifier = Modifier) {
     // 降级为「只刷对象、不重扫」。
     LaunchedEffect(entry) {
         subtitleViewModel.bindEntry(entry)
+    }
+
+    // 播放进度 → 字幕 ViewModel。自动翻译就挂在这条线上（“翻到当前位置”），
+    // 所以它必须在面板关着的时候也一直跑：用户开的就是「边看边译」。
+    // 这里不管节流：onPositionChanged 自己拿 cue 序号去重，同一句只会触发一次。
+    LaunchedEffect(positionMs) {
+        subtitleViewModel.onPositionChanged(positionMs)
     }
 
     // 用 LaunchedEffect 而不是直接把值写进去：写入发生在组合期间会造成
@@ -123,11 +156,23 @@ fun PlayerRoute(modifier: Modifier = Modifier) {
     if (showSubtitleSheet) {
         SubtitleTrackPicker(
             state = subtitleState,
+            translation = translationState,
+            exportMessage = exportMessage,
             onDismiss = { showSubtitleSheet = false },
             onSelectMode = subtitleViewModel::setDisplayMode,
             onSelectSource = subtitleViewModel::selectSource,
             onUseAuto = subtitleViewModel::useAutoSelection,
             onRescan = subtitleViewModel::rescan,
+            onTranslateAll = subtitleViewModel::translateAll,
+            onTranslateUpTo = { subtitleViewModel.translateUpTo(positionMs) },
+            onCancelTranslation = subtitleViewModel::cancelTranslation,
+            onRetryFailed = subtitleViewModel::retryFailedTranslation,
+            onOpenTranslationSettings = onOpenTranslationSettings,
+            onExport = { format, mode ->
+                pendingExport = format to mode
+                exportLauncher.launch(subtitleViewModel.suggestedExportName(format, mode))
+            },
+            onDismissExportMessage = subtitleViewModel::clearExportMessage,
         )
     }
 }

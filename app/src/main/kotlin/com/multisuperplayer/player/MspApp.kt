@@ -31,6 +31,7 @@ import com.multisuperplayer.feature.library.LibraryRoute
 import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
+import com.multisuperplayer.feature.settings.TranslationSettingsRoute
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -84,12 +85,38 @@ private enum class MspDestination(
     }
 }
 
+/**
+ * 翻译设置不是标签页，而是从设置页（或播放页字幕面板）推上来的普通目的地。
+ * 它必须是一个**真的导航目的地**，而不是设置页内部的一个 `if (showX)`：
+ * 否则用户在那里按返回键就会直接退出设置（甚至退出应用），
+ * 而他只是想把这一页关掉。
+ */
+private const val TRANSLATION_SETTINGS_ROUTE = "settings/translation"
+
 @Composable
 private fun MspAppScaffold() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val playbackViewModel: AppPlaybackViewModel = koinViewModel()
+
+    // 切标签只在这里定义一次。播放页里的「去设置」也要走同一条路径：
+    // 先摘掉播放页、再导航，否则返回栈里会叠成「播放页 → 设置」，
+    // 而用户点底部「设置」看到的是另一番景象（返回键回不到播放页）。
+    // 复制一份逻辑到播放页迟早会和这里分叉——一处改了另一处没改，
+    // 症状是「从字幕面板去设置之后返回键失灵」。
+    val navigateToTab: (MspDestination) -> Unit = { destination ->
+        navController.popBackStack(MspDestination.PLAYER.route, inclusive = true)
+        navController.navigate(destination.route) {
+            // 这里**不**写 saveState/restoreState：三个标签页各自都是单页，
+            // 真正需要留住的状态（列表滚动位置、筛选词）挂在**媒体库自己的**
+            // NavBackStackEntry 上，而它作为栈底永远不会被弹出，不必靠
+            // 「存取返回栈」来保。而一旦写上，播放页会被当成「媒体库标签的状态」
+            // 一起保存，于是「在播放页点媒体库」会立刻把它恢复回来——看起来就是没反应。
+            popUpTo(navController.graph.findStartDestination().id)
+            launchSingleTop = true
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -111,15 +138,7 @@ private fun MspAppScaffold() {
                             // 直接丢弃没有任何代价：播放页显示什么完全由 PlayerViewModel
                             // 从 PlaybackController（Koin 单例）读出来，不靠导航参数，
                             // 也不在导航状态里存任何东西——底层播放也照旧继续。
-                            navController.popBackStack(MspDestination.PLAYER.route, inclusive = true)
-                            navController.navigate(destination.route) {
-                                // 这里**不**写 saveState/restoreState：三个标签页各自都是
-                                // 单页，真正需要留住的状态（列表滚动位置、筛选词）挂在
-                                // **媒体库自己的** NavBackStackEntry 上，而它作为栈底
-                                // 永远不会被弹出，不必靠「存取返回栈」来保。
-                                popUpTo(navController.graph.findStartDestination().id)
-                                launchSingleTop = true
-                            }
+                            navigateToTab(destination)
                         },
                         icon = { Icon(destination.icon, contentDescription = null) },
                         label = { Text(destination.label) },
@@ -145,13 +164,34 @@ private fun MspAppScaffold() {
                     },
                 )
             }
-            composable(MspDestination.PLAYER.route) { PlayerRoute() }
+            composable(MspDestination.PLAYER.route) {
+                PlayerRoute(
+                    // 字幕面板里的「去设置」：没配置翻译服务时，用户要在同一个界面里
+                    // 走到填密钥的地方。非要他先退出面板、再点底部设置，是没必要的绕路。
+                    // 直接落到翻译设置页，而不是设置页的第一屏（那里全是主题）。
+                    onOpenTranslationSettings = {
+                        navController.popBackStack(MspDestination.PLAYER.route, inclusive = true)
+                        navController.navigate(MspDestination.SETTINGS.route) {
+                            popUpTo(navController.graph.findStartDestination().id)
+                            launchSingleTop = true
+                        }
+                        navController.navigate(TRANSLATION_SETTINGS_ROUTE) { launchSingleTop = true }
+                    },
+                )
+            }
 
             // 这里**不**新建 SettingsViewModel：viewModelStoreOwner 是 Activity，
             // 所以拿到的和 MspApp 顶层那个是同一个实例 —— 用户在设置页改主题，
             // 上面 MspTheme 的实参会立刻跟着变。若这里改成独立作用域，
             // 主题就会变成「要重启才生效」。
-            composable(MspDestination.SETTINGS.route) { SettingsRoute() }
+            composable(MspDestination.SETTINGS.route) {
+                SettingsRoute(
+                    onOpenTranslationSettings = { navController.navigate(TRANSLATION_SETTINGS_ROUTE) },
+                )
+            }
+            composable(TRANSLATION_SETTINGS_ROUTE) {
+                TranslationSettingsRoute(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

@@ -6,24 +6,61 @@ import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
+import com.multisuperplayer.core.data.settings.TranslationSettings
+import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.translate.ConnectivityResult
+import com.multisuperplayer.core.translate.FailureText
+import com.multisuperplayer.core.translate.Glossary
+import com.multisuperplayer.core.translate.ModelListResult
+import com.multisuperplayer.core.translate.TranslationProbe
+import com.multisuperplayer.core.translate.TranslationTarget
+import com.multisuperplayer.core.translate.describeTranslationFailure
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val TAG = "SettingsViewModel"
 
 /**
+ * 「测试连接」的界面状态。
+ *
+ * 成功时把模型真正翻出来的那一句带回来，而不是一句「连接成功」：
+ * 只报连接成功的话，「密钥对、地址对、模型名写错」这种最常见的配置事故会得到
+ * 一个绿色的对钩，而用户回到播放页依旧什么都翻不出来。
+ */
+data class ConnectionTestState(
+    val running: Boolean = false,
+    val sample: String? = null,
+    val translated: String? = null,
+    val failure: FailureText? = null,
+) {
+    val hasResult: Boolean get() = translated != null || failure != null
+}
+
+/** 「拉取模型列表」的界面状态。失败只是拉不到列表，**不代表配置不对**（很多自建服务不实现这个端点）。 */
+data class ModelListState(
+    val loading: Boolean = false,
+    val models: List<String> = emptyList(),
+    val failure: FailureText? = null,
+)
+
+/**
  * 设置页的状态。
  *
- * 这里**只装载当前内核已经会读的设置项**。像「字幕字号」「翻译服务地址」这些
- * 还没有消费者的项，等对应的内核做实了再加——写一个没人读的开关，
- * 用户拨它只会得到一个「看起来生效了但什么都没发生」的界面。
+ * 这里**只装载当前内核已经会读的设置项**。像「字幕字号」这类还没有消费者的项，
+ * 等对应的内核做实了再加——写一个没人读的开关，用户拨它只会得到一个
+ * 「看起来生效了但什么都没发生」的界面。
  */
 class SettingsViewModel(
     private val themeSettings: ThemeSettingsRepository,
+    private val translationSettings: TranslationSettingsRepository,
+    private val probe: TranslationProbe,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -51,6 +88,129 @@ class SettingsViewModel(
 
     fun setColorFromArtwork(enabled: Boolean) = persist("封面取色=$enabled") {
         themeSettings.setColorFromArtwork(enabled)
+    }
+
+    // ------------------------------------------------------------------ 字幕翻译
+
+    /**
+     * 用 `Eagerly`：设置页一打开就要显示「当前服务商/模型」和「还差什么」，
+     * 用 `WhileSubscribed` 的话首帧是空的，会先闪一个「未配置」。
+     */
+    val translation: StateFlow<TranslationSettings> = translationSettings.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, TranslationSettings())
+
+    private val mutableConnectionTest = MutableStateFlow(ConnectionTestState())
+
+    val connectionTest: StateFlow<ConnectionTestState> = mutableConnectionTest.asStateFlow()
+
+    private val mutableModelList = MutableStateFlow(ModelListState())
+
+    val modelList: StateFlow<ModelListState> = mutableModelList.asStateFlow()
+
+    fun selectProvider(providerId: String) {
+        // 换服务商会让地址/模型/密钥归属全变，上一次的探测结论也就作废了。
+        // 不清掉的话，用户在 A 家测出「成功」，切到 B 家仍看到那个绿对钩。
+        mutableConnectionTest.value = ConnectionTestState()
+        mutableModelList.value = ModelListState()
+        persist("服务商=$providerId") { translationSettings.setProvider(providerId) }
+    }
+
+    fun setBaseUrl(baseUrl: String) = persist("翻译地址") { translationSettings.setBaseUrl(baseUrl) }
+
+    fun setModel(model: String) = persist("翻译模型=$model") { translationSettings.setModel(model) }
+
+    fun setTarget(target: TranslationTarget) = persist("目标语言=${target.code}") {
+        translationSettings.setTarget(target)
+    }
+
+    fun setAutoTranslate(enabled: Boolean) = persist("自动翻译=$enabled") {
+        translationSettings.setAutoTranslate(enabled)
+    }
+
+    fun setGlossary(glossary: Glossary) = persist("术语表（${glossary.size} 条）") {
+        translationSettings.setGlossary(glossary)
+    }
+
+    /**
+     * 保存密钥。
+     *
+     * 空输入**不调用**仓库：它的语义是「不动」，界面上也不该出现一个
+     * 「按下去什么都不会发生」的按钮。所以这里直接把空值挡在门外，
+     * 并用返回值告诉界面「到底改成没改」。
+     */
+    fun saveApiKey(raw: String, onDone: (Boolean) -> Unit = {}) {
+        val providerId = translation.value.providerId
+        // 回到主线程再回调：`onDone` 那头是 Compose 状态，别在 IO 线程上写它。
+        viewModelScope.launch {
+            val stored = withContext(dispatchers.io) {
+                runCatching { translationSettings.setApiKey(providerId, raw) }
+                    .onFailure { error -> MspLog.w(TAG, error) { "保存密钥失败" } }
+                    .getOrDefault(false)
+            }
+            // 密钥写完，之前的探测结论必须作废：用户刚刚改的正是被探测的东西。
+            if (stored) mutableConnectionTest.value = ConnectionTestState()
+            onDone(stored)
+        }
+    }
+
+    fun clearApiKey() {
+        val providerId = translation.value.providerId
+        mutableConnectionTest.value = ConnectionTestState()
+        persist("清除密钥") { translationSettings.clearApiKey(providerId) }
+    }
+
+    /**
+     * 测试连接。
+     *
+     * 走的是**真实的翻译流程**（一篇一行字幕），不是 `GET /models`：
+     * 后者只能证明地址和密钥没问题，对「模型名对不对」「这家厂商收不收这个请求形状」
+     * 「推理模式有没有把输出预算吃光」一句话都不说。
+     */
+    fun testConnection() {
+        if (mutableConnectionTest.value.running) return
+        mutableConnectionTest.value = ConnectionTestState(running = true)
+        viewModelScope.launch {
+            val config = runCatching { translationSettings.currentConfig() }.getOrNull()
+            if (config == null) {
+                mutableConnectionTest.value = ConnectionTestState(
+                    failure = FailureText(message = "读取设置失败，请重试。"),
+                )
+                return@launch
+            }
+
+            val providerName = translation.value.provider.displayName
+            mutableConnectionTest.value = when (val result = probe.test(config)) {
+                is ConnectivityResult.Ok -> ConnectionTestState(
+                    sample = result.sample,
+                    translated = result.translated,
+                )
+
+                is ConnectivityResult.Failed -> ConnectionTestState(
+                    failure = describeTranslationFailure(result.failure, providerName, config.model),
+                )
+            }
+        }
+    }
+
+    fun fetchModels() {
+        if (mutableModelList.value.loading) return
+        mutableModelList.value = ModelListState(loading = true)
+        viewModelScope.launch {
+            val current = translation.value
+            val apiKey = runCatching { translationSettings.apiKeyFor(current.providerId) }.getOrNull()
+            mutableModelList.value = when (val result = probe.listModels(current.baseUrl, apiKey)) {
+                is ModelListResult.Ok -> ModelListState(models = result.models)
+
+                is ModelListResult.Failed -> ModelListState(
+                    // 拉不到列表 ≠ 配置错，文案里要写清楚，否则用户会去改一个本来没错的地址。
+                    failure = describeTranslationFailure(
+                        result.failure,
+                        current.provider.displayName,
+                        current.model,
+                    ),
+                )
+            }
+        }
     }
 
     /**

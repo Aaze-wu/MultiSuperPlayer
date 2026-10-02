@@ -3,8 +3,11 @@ package com.multisuperplayer.core.data.di
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
+import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
+import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import org.koin.android.ext.koin.androidContext
@@ -25,9 +28,23 @@ val dataModule = module {
 
     single { SubtitleSettingsRepository(context = androidContext(), dispatchers = get()) }
 
+    // API Key 加密存起来（AndroidKeyStore + AES/GCM），密文进 msp_settings 这个 DataStore。
+    single { ApiKeyStore(context = androidContext(), dispatchers = get()) }
+
+    single {
+        TranslationSettingsRepository(
+            context = androidContext(),
+            dispatchers = get(),
+            apiKeys = get(),
+        )
+    }
+
     single { ArtworkPaletteRepository(context = androidContext(), dispatchers = get()) }
 
     single { SubtitleFileLocator(context = androidContext()) }
+
+    // 导出译文用。走 SAF，不申请存储权限。
+    single { SubtitleExportWriter(context = androidContext(), dispatchers = get()) }
 
     // parserRegistry 来自 core:subtitle 的 subtitleModule，由 MspApplication 一并加载。
     single {

@@ -3,6 +3,7 @@ package com.multisuperplayer.feature.settings
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.settings.ThemeSettings
+import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import org.koin.androidx.compose.koinViewModel
@@ -58,17 +60,23 @@ import org.koin.androidx.compose.koinViewModel
  * 这样它既能在预览里直接喂假数据，也能被以后的主题实时预览复用。
  */
 @Composable
-fun SettingsRoute(modifier: Modifier = Modifier) {
+fun SettingsRoute(
+    modifier: Modifier = Modifier,
+    onOpenTranslationSettings: () -> Unit = {},
+) {
     val viewModel: SettingsViewModel = koinViewModel()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val translation by viewModel.translation.collectAsStateWithLifecycle()
 
     SettingsScreen(
         theme = theme,
+        translation = translation,
         modifier = modifier,
         onSelectBaseTheme = viewModel::selectBaseTheme,
         onSelectAccent = viewModel::selectAccent,
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
+        onOpenTranslationSettings = onOpenTranslationSettings,
     )
 }
 
@@ -77,10 +85,12 @@ fun SettingsRoute(modifier: Modifier = Modifier) {
 fun SettingsScreen(
     theme: ThemeSettings,
     modifier: Modifier = Modifier,
+    translation: TranslationSettings = TranslationSettings(),
     onSelectBaseTheme: (MspBaseTheme) -> Unit = {},
     onSelectAccent: (MspAccent) -> Unit = {},
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
+    onOpenTranslationSettings: () -> Unit = {},
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
     val accent = MspAccent.fromId(theme.accentId)
@@ -171,14 +181,66 @@ fun SettingsScreen(
                     },
                 )
             }
+
+            item { SectionHeader("字幕翻译") }
+            item {
+                TranslationSummaryRow(
+                    translation = translation,
+                    onOpen = onOpenTranslationSettings,
+                )
+            }
         }
+    }
+}
+
+/**
+ * 设置页里的翻译入口。
+ *
+ * 这一行不直接把所有设置摊开，而是先显示「现在是什么状态」：
+ * 服务商/模型/目标语言，以及一句「还差什么」。用户从播放页翻不出来时
+ * 通常只想确认这两件事，不该让他先点进三个子页。
+ */
+@Composable
+private fun TranslationSummaryRow(translation: TranslationSettings, onOpen: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clickable(onClick = onOpen),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = translation.provider.displayName,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            text = buildString {
+                append(translation.model.ifBlank { "未填模型名" })
+                append("\n译成：")
+                append(translation.target.label)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = when {
+                translation.ready -> "已就绪，点这里可以改服务商、密钥或术语表"
+                else -> "还不能翻译（缺：${translation.missingItems.joinToString("、")}），点这里去填"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (translation.ready) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+        )
     }
 }
 
 // --------------------------------------------------------------------- 分区
 
 @Composable
-private fun SectionHeader(title: String) {
+internal fun SectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
@@ -309,13 +371,13 @@ private fun AccentSwatch(
 // --------------------------------------------------------------------- 开关行
 
 @Composable
-private fun SettingsSwitchRow(
-    icon: @Composable () -> Unit,
+internal fun SettingsSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    icon: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     ListItem(
         // 整行可点，不只是那个开关：小屏上点 32dp 的开关很容易失手。

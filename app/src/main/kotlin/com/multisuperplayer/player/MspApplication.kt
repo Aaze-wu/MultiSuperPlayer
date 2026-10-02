@@ -6,6 +6,7 @@ import com.multisuperplayer.core.common.di.commonModule
 import com.multisuperplayer.core.data.di.dataModule
 import com.multisuperplayer.core.player.di.playerModule
 import com.multisuperplayer.core.subtitle.di.subtitleModule
+import com.multisuperplayer.core.translate.di.translateModule
 import com.multisuperplayer.feature.library.di.libraryModule
 import com.multisuperplayer.feature.player.di.playerFeatureModule
 import com.multisuperplayer.feature.settings.di.settingsFeatureModule
@@ -38,6 +39,7 @@ class MspApplication : Application() {
                 commonModule,
                 dataModule,
                 subtitleModule,
+                translateModule,
                 playerModule,
                 libraryModule,
                 playerFeatureModule,

@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
+import com.multisuperplayer.core.translate.SubtitleExportFormat
+import com.multisuperplayer.core.translate.SubtitleExportMode
 
 /**
  * 字幕选择面板。
@@ -40,11 +42,20 @@ import com.multisuperplayer.core.data.subtitle.SubtitleSource
 @Composable
 internal fun SubtitleTrackPicker(
     state: SubtitleUiState,
+    translation: TranslationUiState,
+    exportMessage: String?,
     onDismiss: () -> Unit,
     onSelectMode: (SubtitleDisplayMode) -> Unit,
     onSelectSource: (SubtitleSource) -> Unit,
     onUseAuto: () -> Unit,
     onRescan: () -> Unit,
+    onTranslateAll: () -> Unit,
+    onTranslateUpTo: () -> Unit,
+    onCancelTranslation: () -> Unit,
+    onRetryFailed: () -> Unit,
+    onOpenTranslationSettings: () -> Unit,
+    onExport: (SubtitleExportFormat, SubtitleExportMode) -> Unit,
+    onDismissExportMessage: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -72,6 +83,19 @@ internal fun SubtitleTrackPicker(
             TextButton(onClick = onRescan, enabled = !state.isLoading) {
                 Text("重新扫描字幕")
             }
+            
+            TranslationSection(
+                translation = translation,
+                subtitle = state,
+                exportMessage = exportMessage,
+                onTranslateAll = onTranslateAll,
+                onTranslateUpTo = onTranslateUpTo,
+                onCancel = onCancelTranslation,
+                onRetryFailed = onRetryFailed,
+                onOpenSettings = onOpenTranslationSettings,
+                onExport = onExport,
+                onDismissExportMessage = onDismissExportMessage,
+            )
         }
     }
 }

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.multisuperplayer.core.data"
+    namespace = "com.multisuperplayer.core.translate"
     compileSdk = 36
 
     defaultConfig {
@@ -14,6 +14,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     lint {
@@ -29,20 +33,10 @@ kotlin {
 
 dependencies {
     api(project(":core:model"))
+    // HttpURLConnection 是 JDK/android.jar 自带的，所以这个模块**不引入任何 HTTP 依赖**：
+    // 只多一个 kotlinx-serialization-json（版本目录里已经有）用来读写请求体与缓存。
     implementation(project(":core:common"))
-    // 外挂字幕的读取与解析。解析器本身在 core:subtitle（纯逻辑、可单测），
-    // 这里只负责「找到文件 → 读字节 → 交给解析器」。
-    implementation(project(":core:subtitle"))
-    // 翻译设置的持久化要用它的类型：服务商预设、目标语言、术语表、引擎配置。
-    api(project(":core:translate"))
-
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.documentfile)
-    implementation(libs.androidx.datastore.preferences)
-
-    // 从封面里量化出种子色（ArtworkPaletteRepository）
-    implementation(libs.androidx.palette.ktx)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.koin.android)
 

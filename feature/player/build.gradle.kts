@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    // rememberLauncherForActivityResult：导出译文时要走 SAF 让用户选保存位置。
+    // 不用 MediaStore 直接写：SAF 里用户自己选目录，我们不需要任何存储权限。
+    implementation(libs.androidx.activity.compose)
     // koinViewModel()：把 ViewModel 与依赖容器的绑定做成一次调用。
     implementation(libs.koin.androidx.compose)
     // viewModel { } DSL（本模块自己注册自己的 ViewModel）。

@@ -1,9 +1,12 @@
 package com.multisuperplayer.feature.player
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
+import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleLoadResult
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import com.multisuperplayer.core.data.subtitle.SubtitleScan
@@ -11,14 +14,27 @@ import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.bestAutoMatch
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.SubtitleDocument
+import com.multisuperplayer.core.translate.SubtitleExportFormat
+import com.multisuperplayer.core.translate.SubtitleExportMode
+import com.multisuperplayer.core.translate.TranslationCacheStore
+import com.multisuperplayer.core.translate.TranslationEditsStore
+import com.multisuperplayer.core.translate.TranslationRunner
+import com.multisuperplayer.core.translate.buildExportedSubtitle
+import com.multisuperplayer.core.translate.exportFileName
+import com.multisuperplayer.core.translate.translatableIndices
+import com.multisuperplayer.core.translate.translatedCount
+import com.multisuperplayer.core.translate.translationMediaKey
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -49,7 +65,45 @@ import kotlinx.coroutines.launch
 class SubtitleViewModel(
     private val repository: SubtitleRepository,
     private val settingsRepository: SubtitleSettingsRepository,
+    translationSettings: TranslationSettingsRepository,
+    translationRunner: TranslationRunner,
+    translationCache: TranslationCacheStore,
+    translationEdits: TranslationEditsStore,
+    private val exportWriter: SubtitleExportWriter,
 ) : ViewModel() {
+
+    /**
+     * 翻译的状态机。放在这里而不是另一个 ViewModel，是因为它需要的东西
+     * （当前字幕文档、当前下标）正好是这个类唯一持有的那两样。
+     */
+    private val translation = SubtitleTranslationController(
+        runner = translationRunner,
+        settings = translationSettings,
+        cache = translationCache,
+        edits = translationEdits,
+        scope = viewModelScope,
+    )
+
+    /** 翻译状态（设置、进度、失败）。 */
+    val translationState: StateFlow<TranslationUiState> get() = translation.state
+
+    /** 当前生效的译文，供逐句编辑界面读取。 */
+    internal val translationTexts: StateFlow<TranslationTexts> get() = translation.texts
+
+    /**
+     * 自动翻译开关。
+     *
+     * 这里用 `Eagerly` 而不是 `WhileSubscribed`：面板关着的时候也要能预取，
+     * 而 `WhileSubscribed` 在没人订阅时 `value` 会停在初始值上，
+     * 于是「开了自动翻译但一直不生效」——这种 bug 从界面上看不出任何线索。
+     */
+    private val autoTranslate = translationSettings.settings
+        .map { it.autoTranslate }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 上一次自动预取是停在哪一句上的（防止同一句反复重试把接口打爆）。 */
+    private var lastAutoCueIndex = -1
 
     private val entry = MutableStateFlow<MediaEntry?>(null)
 
@@ -80,24 +134,57 @@ class SubtitleViewModel(
         )
 
     /**
-     * 显示给界面的状态 = 加载结果 + 用户偏好。
+     * 显示给界面的状态 = 加载结果 + 用户偏好 + 译文。
      *
      * ## 为什么显示模式不参与上面的加载管线
      *
      * 它是**纯渲染**的开关：关掉字幕不该取消已经解析好的结果、再打开时也不该
      * 重新扫一遍目录（用户会觉得卡一下）。所以模式只在这一层合并进来，
      * 加载管线完全看不见它。
+     *
+     * ## 译文只在这一层套上去
+     *
+     * 加载管线里的 document 永远是**原文**那份。译文是叠加层：一旦写进加载结果，
+     * 「重新扫描」就会把刚翻译好的几百行又变回没有译文（因为重新解析出来的
+     * 文档里没有它们），而用户会以为是翻译白做了。
+     *
+     * `hasTranslation` 必须跟着重算：手动翻译完一份本来没译文的字幕后，
+     * 若仍沿用加载时算出的 `false`，「仅译文」模式会一直降级成「仅原文」，
+     * 用户看到的是「翻译成功了但字幕没变」。
      */
     val state: StateFlow<SubtitleUiState> = combine(
         loadState,
         settingsRepository.settings,
-    ) { load, settings ->
-        resolveSubtitleState(load, settings.displayMode)
+        translation.texts,
+    ) { load, settings, texts ->
+        val merged = load.document?.let { texts.appliedTo(it, load.translationToken()) }
+        resolveSubtitleState(
+            load = if (merged == null) load else load.copy(
+                document = merged,
+                hasTranslation = merged.hasTranslation(),
+            ),
+            displayMode = settings.displayMode,
+        )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS),
         SubtitleUiState(),
     )
+
+    init {
+        // 字幕加载完成就把磁盘上的人工修正、以及上次翻好的缓存挂回来。
+        // 不用 `state` 那条管线：那是给界面看的合成结果，而这里是个副作用。
+        viewModelScope.launch {
+            loadState.collect { load ->
+                if (load.phase != SubtitlePhase.READY) return@collect
+                translation.bindDocument(
+                    token = load.translationToken(),
+                    mediaKey = translationMediaKey(entry.value?.uri?.toString()),
+                    document = load.document,
+                )
+            }
+        }
+    }
 
     /** 播放页在「当前条目」变化时调用。条目为 null 表示队列空了。 */
     fun bindEntry(mediaEntry: MediaEntry?) {
@@ -112,10 +199,16 @@ class SubtitleViewModel(
         // 手动选择只对「那条媒体」有效。留着它会让用户在下一首歌上
         // 看到「明明没选过却挂着一条字幕」，而且看不出是哪来的。
         selection.value = SubtitleSelection.Auto
+        // 译文同理，而且后果更重：按位置存的译文套到另一部片子上会“每句都在、全都错位”。
+        translation.detach()
+        lastAutoCueIndex = -1
     }
 
     /** 用户从候选列表里选了一条。 */
     fun selectSource(source: SubtitleSource) {
+        // 换字幕文件后下标含义全变了，旧译文必须先丢掉（新的那份会重新 bind）。
+        translation.detach()
+        lastAutoCueIndex = -1
         selection.value = SubtitleSelection.Source(source)
     }
 
@@ -127,6 +220,114 @@ class SubtitleViewModel(
     /** 重新扫目录（用户刚把字幕文件拷进来、或者上次查询失败）。 */
     fun rescan() {
         revision.value += 1
+    }
+
+    // ------------------------------------------------------------------ 翻译
+
+    /** 翻译全文。已有的译文不会重新花钱（会命中缓存）。 */
+    fun translateAll() {
+        translation.start(currentDocument() ?: return, pendingIndices = null)
+    }
+
+    /** 只翻「已经播过的部分」。拖到中间点一下就能看前面，不必等整部片。 */
+    fun translateUpTo(positionMs: Long) {
+        val document = currentDocument() ?: return
+        translation.start(document, translatableUpTo(document, positionMs))
+    }
+
+    fun cancelTranslation() = translation.cancel()
+
+    /** 只重试上次失败的行。整篇重翻会白花已经付过的钱。 */
+    fun retryFailedTranslation() {
+        translation.retryFailed(currentDocument() ?: return)
+    }
+
+    /** 人工改一句。空文本 = 把这一句的译文清掉。 */
+    fun editTranslation(cueIndex: Int, text: String) {
+        val cue = currentDocument()?.cues?.getOrNull(cueIndex) ?: return
+        translation.applyEdit(cueIndex, cue.text, text)
+    }
+
+    /** 撤销人工修改，退回模型译文。 */
+    fun revertTranslation(cueIndex: Int) {
+        val cue = currentDocument()?.cues?.getOrNull(cueIndex) ?: return
+        translation.revertEdit(cueIndex, cue.text)
+    }
+
+    /**
+     * 播放进度变化。
+     *
+     * 只在「换到新的一句」时才可能发起预取：轮询式的判断不能每次都发请求，
+     * 否则一次失败会让它每 200ms 重试一次，半分钟就把免费额度吃完。
+     */
+    fun onPositionChanged(positionMs: Long) {
+        val document = currentDocument() ?: return
+        val cueIndex = document.cues.indexOfFirst { positionMs in it.startMs until it.endMs }
+        if (cueIndex < 0 || cueIndex == lastAutoCueIndex) return
+        lastAutoCueIndex = cueIndex
+
+        if (!autoTranslate.value || translation.isRunning) return
+        val pending = translatableWindow(document, positionMs)
+        if (pending.isEmpty()) return
+        translation.start(document, pending)
+    }
+
+    /**
+     * 当前字幕文档（带已生效的译文）。
+     *
+     * 翻译的输入必须是这份合并后的文档：不然「哪些行已经有译文」无从得知，
+     * 已经翻过的行会被再请求一遍（命中缓存所以不花钱，但进度条会从 0 重新爬）。
+     */
+    private fun currentDocument(): SubtitleDocument? {
+        val load = loadState.value
+        return translation.texts.value.appliedTo(load.document, load.translationToken())
+    }
+
+    // ------------------------------------------------------------------ 导出
+
+    /** 导出结果的一句话。写完不自动消失，要用户自己关——他需要时间看清是哪一步失败了。 */
+    private val mutableExportMessage = MutableStateFlow<String?>(null)
+    val exportMessage: StateFlow<String?> = mutableExportMessage.asStateFlow()
+
+    fun clearExportMessage() {
+        mutableExportMessage.value = null
+    }
+
+    /** 建议的文件名（不含目录）。带上目标语言代码，免得同一目录里互相覆盖。 */
+    fun suggestedExportName(format: SubtitleExportFormat, mode: SubtitleExportMode): String =
+        exportFileName(
+            sourceFileName = loadState.value.attached?.fileName.orEmpty(),
+            target = translationState.value.target,
+            format = format,
+            mode = mode,
+        )
+
+    /**
+     * 写导出文件。
+     *
+     * 用**当前生效的译文**（人工修正压过模型译文），而不是重新去算一遍，
+     * 否则用户刚改的那几句会在他自己导出的文件里消失。
+     *
+     * 也不重新调模型：导出的东西必须就是屏幕上正在显示的那份。
+     */
+    fun exportTo(uri: Uri, format: SubtitleExportFormat, mode: SubtitleExportMode) {
+        val document = loadState.value.document ?: return
+        val text = buildExportedSubtitle(
+            document = document,
+            translations = translation.texts.value.effective,
+            format = format,
+            mode = mode,
+        )
+        val name = suggestedExportName(format, mode)
+
+        viewModelScope.launch {
+            val ok = exportWriter.write(uri, text)
+            mutableExportMessage.value = if (ok) {
+                "已导出 $name"
+            } else {
+                "导出失败：$name 没能写入（文件可能已被删除，或者那个位置不允许写入）。"
+            }
+        }
     }
 
     fun setDisplayMode(mode: SubtitleDisplayMode) {
@@ -327,7 +528,10 @@ data class SubtitleLoadState(
     val hasTranslation: Boolean = false,
     /** 当前用的是「自动挑选」还是用户手选的那一条。只影响选择面板的单选框。 */
     val autoSelected: Boolean = true,
-)
+) {
+    /** 这份译文属于哪份字幕。用 uri 而不是文件名：同名文件在两部片子里都存在。 */
+    internal fun translationToken(): String? = attached?.uri?.toString()
+}
 
 /** 界面可见的字幕状态。 */
 data class SubtitleUiState(
@@ -352,9 +556,12 @@ data class SubtitleUiState(
     val translationUnavailable: Boolean = false,
     /** 当前用的是自动挑选还是手选的那一条，供选择面板画单选框。 */
     val autoSelected: Boolean = true,
+    /** 已有译文的行数（含人工修正）。面板上显示「已译 120/308」用。 */
+    val translatedCount: Int = 0,
+    /** 可翻的行数（不算注释行和空行）。0 表示这份字幕没什么可翻的。 */
+    val translatableCount: Int = 0,
 ) {
     val isLoading: Boolean get() = phase == SubtitlePhase.SCANNING || phase == SubtitlePhase.LOADING
-
     /** 屏幕上有东西可画吗。 */
     val isRendering: Boolean
         get() = effectiveMode != SubtitleDisplayMode.OFF &&
@@ -389,6 +596,8 @@ internal fun resolveSubtitleState(
         warnings = document?.warnings.orEmpty(),
         translationUnavailable = fallbackNeeded,
         autoSelected = load.autoSelected,
+        translatedCount = document?.cues?.translatedCount() ?: 0,
+        translatableCount = document?.translatableIndices()?.size ?: 0,
     )
 }
 
