@@ -230,6 +230,8 @@ private fun MspAppScaffold() {
                             navController.navigate(PLAYER_ROUTE) { launchSingleTop = true }
                         },
                         onTogglePlayPause = playbackViewModel::togglePlayPause,
+                        onSkipPrevious = playbackViewModel::skipToPrevious,
+                        onSkipNext = playbackViewModel::skipToNext,
                     )
                 }
                 NavigationBar {

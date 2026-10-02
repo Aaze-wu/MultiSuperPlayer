@@ -79,6 +79,12 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   are broken.
 - **Manual edits**: any translated line can be corrected by hand. Corrections are persisted separately and
   survive re-translation.
+- **Pick a subtitle file yourself**: the subtitle panel has a *Choose subtitle file…* button that opens the
+  system file picker for any location. That candidate scores **full marks** — the user pointed at it, so
+  there is nothing to guess about "is the name similar", and it sorts ahead of anything auto-discovery
+  found. A manual pick is deliberately **not remembered**: switching media goes back to auto-selection,
+  because otherwise last item's pick would follow the next one, which looks exactly like subtitles being
+  attached to the wrong media — and nothing on screen would say a manual pick was ever in effect.
 
 ### 1.3 Subtitle translation
 
@@ -120,8 +126,12 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - **Five tabs**: Library / Browse / Recent / Playlists / Settings. "Now playing" is a **real page**
   rather than a tab, so Back returns to the list you came from instead of exiting the app.
 - **A mini player** sits above the navigation bar (hidden on the player page): tap it to return to the
-  player, tap pause to pause in place. Its progress line is the **only** widget that subscribes to
-  playback position (200 ms), so the surrounding lists do not redraw every second.
+  player, tap pause to pause in place, and use the previous / next buttons next to it to change track
+  **in place without leaving the current page**. Its progress line is the **only** widget that subscribes to
+  playback position (200 ms), so the surrounding lists do not redraw every second. Those two buttons are
+  **never greyed out**: the playback state carries no "is there a next item" flag, and guessing wrong
+  (greyed out but it works, or enabled but nothing happens) is worse than always-tappable — at the end of
+  the queue skipping simply stays where it is, with no side effect.
 - **View options**: list / grid; 6 sort orders (title asc/desc, newest, oldest, longest, largest);
   4 groupings (none / artist / album / folder). Group headers always sort by title and do not jitter
   with the sort order; entries with no artist/album/folder fall into an "unknown" group that always
@@ -235,7 +245,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.10** | **Recent page keeps short clips, new "Record recent plays" switch, auto-refresh on return** | Done |
 | **v0.5.11** | **Recent page: delete one entry (undoable) and clear all (confirmed)** | Done |
 | **v0.5.12** | **Portrait player gets a *Collapse* button top-left (a visible exit that keeps playing)** | Done |
-| **v0.5.13** | **Landscape layout dedicated to audio: cover left, lyrics right, permanent control strip (also fixes controls that could not be brought back)** | **Current** |
+| **v0.5.13** | **Landscape layout dedicated to audio: cover left, lyrics right, permanent control strip (also fixes controls that could not be brought back)** | Done |
+| **v0.5.14** | **"Choose subtitle file…" in the subtitle panel; previous / next buttons on the bottom bar; fixes playback controls never appearing in the notification (the Media3 session was never registered)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 

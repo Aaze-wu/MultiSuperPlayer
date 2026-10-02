@@ -53,6 +53,7 @@ internal fun SubtitleTrackPicker(
     onSelectSource: (SubtitleSource) -> Unit,
     onUseAuto: () -> Unit,
     onRescan: () -> Unit,
+    onPickFile: () -> Unit,
     onTranslateAll: () -> Unit,
     onTranslateUpTo: () -> Unit,
     onCancelTranslation: () -> Unit,
@@ -87,10 +88,22 @@ internal fun SubtitleTrackPicker(
                 onSelectSource = onSelectSource,
             )
 
-            TextButton(onClick = onRescan, enabled = !state.isLoading) {
-                Text(stringResource(R.string.msp_player_rescan))
+            // 「重新扫描」和「选择字幕文件」并排放，是因为它们是同一件事的两种找法：
+            // 一个是让应用去猜（扫媒体文件所在目录），一个是人来指定。
+            //
+            // 两个按钮的 enabled 刻意不同：扫描期间「重新扫描」要禁用（避免并发扫描），
+            // 而**手动选文件必须一直可点**——自动发现失败、扫到一半卡住、目录根本
+            // 看不见（SAF 授权被回收）这些情况下，手动这条路是唯一的出口。
+            // 把它一起禁用掉，用户就只能关面板、看着一份说明文字发呆。
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onRescan, enabled = !state.isLoading) {
+                    Text(stringResource(R.string.msp_player_rescan))
+                }
+                TextButton(onClick = onPickFile) {
+                    Text(stringResource(R.string.msp_player_pick_file))
+                }
             }
-            
+
             TranslationSection(
                 translation = translation,
                 subtitle = state,

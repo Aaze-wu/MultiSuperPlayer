@@ -129,4 +129,17 @@ class AppPlaybackViewModel(
     val positionMs: StateFlow<Long> get() = controller.positionMs
 
     fun togglePlayPause() = controller.togglePlayPause()
+
+    /**
+     * 迷你播放器上的上一首/下一首。
+     *
+     * 直接转发内核，和播放页控制条走的是同一个方法，也**不在这一层加「有没有
+     * 下一首」的判断**：那个判断只在内核里成立——队列里没有下一首时它是空操作，
+     * 而 `seekToPrevious` 在播过 3 秒之后本来就会被内核解释成「把这一条重头播」。
+     * 在这一层再猜一次，同一个按钮就会在两个页面上一个亮一个灰，
+     * 而它们调的是同一个方法，差别没有任何依据。
+     */
+    fun skipToPrevious() = controller.skipToPrevious()
+
+    fun skipToNext() = controller.skipToNext()
 }

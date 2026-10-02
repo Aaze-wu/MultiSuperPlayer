@@ -8,4 +8,6 @@
     <string name="msp_nav_now_playing">正在播放</string>
     <string name="msp_mini_player_play">播放</string>
     <string name="msp_mini_player_pause">暫停</string>
+    <string name="msp_mini_player_previous">上一首</string>
+    <string name="msp_mini_player_next">下一首</string>
 </resources>

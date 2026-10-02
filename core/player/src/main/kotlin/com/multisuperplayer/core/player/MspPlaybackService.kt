@@ -59,6 +59,25 @@ class MspPlaybackService : MediaSessionService(), KoinComponent {
 
         mediaSession = session
         setMediaNotificationProvider(buildNotificationProvider())
+
+        // 必须显式注册会话，否则**通知栏根本不会出现**。
+        //
+        // Media3 的 `MediaNotificationManager.updateNotification()` 第一件事就是
+        // `if (!mediaSessionService.isSessionAdded(session) || !shouldShowNotification(session))
+        //      removeNotification();`
+        // 而 `isSessionAdded` 只在两种情况成立：调过 `addSession()`，或者有控制器
+        // 通过 `onGetSession()` 连上来（父类在 `MediaSessionServiceStub.connect()` 里
+        // 补调 `addSession`）。
+        //
+        // 我们这套架构里 UI 直接持有 `ExoPlayer`（见类注释），**没有任何
+        // `MediaController`**，于是这个条件永远为假：通知不出现、服务也不会转为前台
+        // （`isPlaybackOngoing()` 取的就是 `startedInForeground`）。表现就是
+        // 「播放正常、MediaSession 也注册了，但通知栏和锁屏什么都没有」，
+        // 而且日志里连一条错误都没有——非常难从现象反查。
+        //
+        // 官方文档说 `onGetSession` 返回的会话会被自动接管、不需要手动 `addSession`，
+        // 那句话成立的前提正是「有人会连上来」。
+        addSession(session)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession

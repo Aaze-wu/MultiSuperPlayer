@@ -10,6 +10,7 @@
     <!-- ===== Subtitle panel ===== -->
     <string name="msp_player_subtitles_title">Subtitles</string>
     <string name="msp_player_rescan">Rescan for subtitles</string>
+    <string name="msp_player_pick_file">Choose a subtitle file…</string>
     <string name="msp_player_scanning">Looking for subtitles…</string>
     <string name="msp_player_reading">Reading subtitles…</string>
     <string name="msp_player_cues">%1$s · %2$d line(s)</string>

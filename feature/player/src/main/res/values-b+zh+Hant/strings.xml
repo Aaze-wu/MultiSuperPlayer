@@ -13,6 +13,7 @@
     <!-- ===== 字幕面板 ===== -->
     <string name="msp_player_subtitles_title">字幕</string>
     <string name="msp_player_rescan">重新掃描字幕</string>
+    <string name="msp_player_pick_file">選擇字幕檔案…</string>
     <string name="msp_player_scanning">正在尋找字幕…</string>
     <string name="msp_player_reading">正在讀取字幕…</string>
     <string name="msp_player_cues">%1$s · %2$d 條</string>

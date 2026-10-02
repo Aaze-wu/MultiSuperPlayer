@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -41,9 +43,17 @@ import kotlinx.coroutines.flow.StateFlow
  * 2. 点它才进播放页，其余时候用户该干嘛干嘛；
  * 3. 全屏播放时整条 bottomBar（含它）一起消失，见 `MspApp` 里的说明。
  *
- * 只放「标题 + 一行副标题 + 播放/暂停 + 一条进度细线」，不放时间码。
+ * 只放「标题 + 一行副标题 + 上一首/播放暂停/下一首 + 一条进度细线」，不放时间码。
  * 时间码每 200ms 变一次，放上来会让人盯着一个跳动的数字看，而那正是
  * 播放页存在的意义。
+ *
+ * ## 为什么这里不放「启用/禁用」
+ *
+ * 播放页那一条控制条里的上一首/下一首**也是永远可点的**（内核的 `seekToNext` /
+ * `seekToPrevious` 在任何时候都能调用，单条队列时后者还会退化成「重头播」）。
+ * 这里加一套「队列里有没有下一首」的判断，就会出现「同一个按钮在两个页面上
+ * 一个亮一个灰」——而两处调用的是同一个方法，差别没有任何依据。
+ * 真要做得更好，应该由内核报「下一步到底会不会有变化」，那是另一个版本的事。
  */
 @Composable
 internal fun MiniPlayer(
@@ -52,6 +62,8 @@ internal fun MiniPlayer(
     position: StateFlow<Long>,
     onClick: () -> Unit,
     onTogglePlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -89,6 +101,18 @@ internal fun MiniPlayer(
                         )
                     }
                 }
+                // 两个跳转按钮排在文字列**后面**。
+                //
+                // 整行有一个 `clickable(onClick)`（点进播放页），而 Compose 命中的是
+                // 「最后画上去的那个」——把按钮写在文字前面的话，它们会被行点击盖住，
+                // 看得见却点不动。
+                IconButton(onClick = onSkipPrevious) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipPrevious,
+                        contentDescription = stringResource(R.string.msp_mini_player_previous),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 IconButton(onClick = onTogglePlayPause) {
                     Icon(
                         imageVector = if (state.isPlaying) {
@@ -102,6 +126,13 @@ internal fun MiniPlayer(
                         } else {
                             stringResource(R.string.msp_mini_player_play)
                         },
+                    )
+                }
+                IconButton(onClick = onSkipNext) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = stringResource(R.string.msp_mini_player_next),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

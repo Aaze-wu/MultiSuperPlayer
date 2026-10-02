@@ -1,5 +1,14 @@
 package com.multisuperplayer.core.data.subtitle
 
+import android.content.ContentResolver
+import android.database.Cursor
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
+import com.multisuperplayer.core.common.log.MspLog
+
+private const val TAG = "SubtitleFiles"
+
 /**
  * 能当外挂字幕挂上的后缀（小写，不带点）。
  *
@@ -46,6 +55,123 @@ fun subtitleSourceOf(path: String, fileName: String, sizeBytes: Long = 0L): Subt
         matchScore = SubtitleFileNaming.SCORE_EXACT,
         trailingTagCount = info.trailingTagCount,
     )
+}
+
+/**
+ * 系统文件选择器（`ActivityResultContracts.OpenDocument`）交回来的那个 uri → 一条候选。
+ *
+ * ## 和 [subtitleSourceOf] 的关系
+ *
+ * 只多做一件事：**问出这个文件叫什么**。选择器只回一个 uri，而文件名是这条候选
+ * 的全部信息来源——界面上的标题、后缀推出来的格式、语言标记、`forced`、双语标记
+ * 都挂在它身上。拿不到名字，这条候选就没有意义（不能拿 uri 当标题：用户会看到
+ * 一长串 `content://com.android.externalstorage.documents/…` 而认不出自己选了哪个）。
+ *
+ * ## 为什么 MIME 过滤救不了这个问题
+ *
+ * 打开选择器时只能传通配 MIME：字幕文件的 MIME 是供应商随手给的
+ * （`text/plain` / `application/octet-stream` / 甚至 `video/mp2t` 因为 `.ts`），
+ * 按 MIME 白名单过滤的后果是「我明明有这个文件，选择器里灰的/根本看不见」。
+ * 所以多选进来的杂文件**不在这里拦**，交给解析器报「无法解析这个字幕文件」——
+ * 那是一句说得清的话，而「选择器里找不到文件」说不清。
+ *
+ * 注：这一段原来写的是那个通配 MIME 的字面量（星号 斜杠 星号），
+ * 结果**提前闭合了 KDoc 块注释**——后面整段注释都变成顶层垃圾代码，编译器报出
+ * 几十条 `Expecting a top level declaration`，而 IDE 的语法检查当时还是绿的。
+ * 真要写这个字面量，用 HTML 实体 `&#42;/&#42;` 拼，不要直接打出来。
+ */
+fun subtitleSourceOfDocument(resolver: ContentResolver, uri: Uri): SubtitleSource {
+    val columns = queryDocumentColumns(resolver, uri)
+    return subtitleSourceOf(
+        path = uri.toString(),
+        fileName = pickDisplayName(
+            openableName = columns.openableName,
+            documentName = columns.documentName,
+            lastPathSegment = uri.lastPathSegment?.let(Uri::decode),
+            uriText = uri.toString(),
+        ),
+        sizeBytes = columns.sizeBytes ?: 0L,
+    )
+}
+
+/**
+ * 从几路候选里挑出「这个文件叫什么」。
+ *
+ * 抽成纯函数（不碰 `ContentResolver`）是因为这里每一条分支都只在**别的 provider**
+ * 上生效，实机上很难穷举：下载管理器给 `OpenableColumns`，文档 provider 给
+ * `DocumentsContract` 的列，还有 provider 什么都不给。编不出名字时退到 uri 最后一段，
+ * 再不行才退到整个 uri——是一条**有顺序的**退让，不是一个 `?:`。
+ *
+ * 最后一段还要切一刀：`content://…/document/primary%3ADownload%2Fa.srt` 的最后一段是
+ * `primary:Download/a.srt`，那是**一条路径**而不是文件名，直接当标题用就是一长串。
+ *
+ * @param lastPathSegment 调用方已经 `Uri.decode` 过（纯函数不引 `android.net.Uri`，
+ *   否则 JVM 单测里会撞上「not mocked」）。
+ * @param uriText 兜底值，必须非空（`Uri.toString()` 保证）。
+ */
+internal fun pickDisplayName(
+    openableName: String?,
+    documentName: String?,
+    lastPathSegment: String?,
+    uriText: String,
+): String {
+    val fromPath = lastPathSegment
+        ?.substringAfterLast('/')
+        ?.substringAfterLast(':')
+    return listOf(openableName, documentName, fromPath)
+        .firstOrNull { !it.isNullOrBlank() }
+        ?.trim()
+        ?: uriText
+}
+
+/** [queryDocumentColumns] 的结果。三个字段都可以是 null——provider 有权什么都不给。 */
+private class DocumentColumns(
+    val openableName: String?,
+    val documentName: String?,
+    val sizeBytes: Long?,
+)
+
+/**
+ * 一次查询同时问两组列名：不同 provider 认的列名不一样，而多查一组列名的代价是零。
+ *
+ * 不抛异常：这里是「问不出名字」，不是「读不了文件」。读不了的判断在真正读盘那一层
+ * （`SubtitleRepository.readBytes` 的 `openInputStream == null`）——两件事合起来报，
+ * 用户会收到一句和真实原因不符的提示。
+ */
+private fun queryDocumentColumns(resolver: ContentResolver, uri: Uri): DocumentColumns {
+    val projection = arrayOf(
+        OpenableColumns.DISPLAY_NAME,
+        OpenableColumns.SIZE,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_SIZE,
+    )
+    val empty = DocumentColumns(null, null, null)
+    return try {
+        resolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use empty
+            DocumentColumns(
+                openableName = cursor.stringOrNull(OpenableColumns.DISPLAY_NAME),
+                documentName = cursor.stringOrNull(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                sizeBytes = cursor.longOrNull(OpenableColumns.SIZE)
+                    ?: cursor.longOrNull(DocumentsContract.Document.COLUMN_SIZE),
+            )
+        } ?: empty
+    } catch (error: Exception) {
+        // SecurityException（授权被回收）最常见，但这里一律降级而不是失败：
+        // 名字能从 uri 上推出来，文件本身还是能读的。
+        MspLog.w(TAG, error) { "查不出所选文件的名字/大小，退回 uri 推断：$uri" }
+        empty
+    }
+}
+
+private fun Cursor.stringOrNull(columnName: String): String? {
+    val index = getColumnIndex(columnName)
+    return if (index < 0 || isNull(index)) null else getString(index)
+}
+
+private fun Cursor.longOrNull(columnName: String): Long? {
+    val index = getColumnIndex(columnName)
+    return if (index < 0 || isNull(index)) null else getLong(index)
 }
 
 /**

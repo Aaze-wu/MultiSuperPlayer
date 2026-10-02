@@ -507,6 +507,14 @@ class ExoPlayerController(
      * 系统会直接判 ANR 崩溃。这里从用户的前台操作发起，`startService` 完全合法，
      * 服务转为前台的时机交给 Media3 自己按 `isPlaybackOngoing()` 判断。
      *
+     * 上面这句话**依赖**服务侧的一件事：`MspPlaybackService.onCreate` 里必须调
+     * `addSession(session)`。Media3 的 `MediaNotificationManager` 第一行就是
+     * `if (!isSessionAdded(session) || !shouldShowNotification(session)) { 撤掉通知; return }`，
+     * 而 `isSessionAdded` 只在 `addSession()` 或者有 `MediaController` 连上来之后才为真——
+     * 本项目界面直接持有 `ExoPlayer`，一个 `MediaController` 都没有。少了那一行，
+     * 症状是「能播、`dumpsys media_session` 里状态是 PLAYING，但通知栏什么都没有、
+     * 没有任何日志」，而且 `isPlaybackOngoing()` 也跟着是 false，于是前台服务也起不来。
+     *
      * 失败不抛：通知栏控制是增强功能，拿不到它不应该让播放本身不可用。
      */
     private fun ensureServiceStarted() {

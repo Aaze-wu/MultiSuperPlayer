@@ -8,4 +8,6 @@
     <string name="msp_nav_now_playing">Now Playing</string>
     <string name="msp_mini_player_play">Play</string>
     <string name="msp_mini_player_pause">Pause</string>
+    <string name="msp_mini_player_previous">Previous</string>
+    <string name="msp_mini_player_next">Next</string>
 </resources>

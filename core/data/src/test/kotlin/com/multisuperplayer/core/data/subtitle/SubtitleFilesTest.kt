@@ -109,4 +109,73 @@ class SubtitleFilesTest {
         assertEquals(0L, subtitleSourceOf("/x/a.srt", "a.srt").sizeBytes)
         assertEquals(2_048L, subtitleSourceOf("/x/a.srt", "a.srt", sizeBytes = 2_048L).sizeBytes)
     }
+
+    // ------------------------------------------------ 系统文件选择器（OpenDocument）
+
+    @Test
+    fun `选择器给的名字优先，别的来源都让位`() {
+        // `OpenableColumns` 是「打开这个 uri 之后它叫什么」的标准列，最可信。
+        // 后面的候选不是备选的写法，而是**别的 provider 才会给**的东西：
+        // 下载管理器只给 OpenableColumns，文档 provider 常常只给
+        // DocumentsContract 那两组（连 size 都可能不给）。
+        assertEquals(
+            "Show.chs.srt",
+            pickDisplayName(
+                openableName = "Show.chs.srt",
+                documentName = "另一个名字.srt",
+                lastPathSegment = "primary:Download/又不是这个.srt",
+                uriText = "content://provider/document/1",
+            ),
+        )
+    }
+
+    @Test
+    fun `只有一组列时也能拿到名字`() {
+        // 下载管理器那条路：只有 OpenableColumns。
+        assertEquals(
+            "a.srt",
+            pickDisplayName("a.srt", null, null, "content://downloads/document/1"),
+        )
+        // 文档 provider 那条路：只有 DocumentsContract 的列。
+        assertEquals(
+            "b.srt",
+            pickDisplayName(null, "b.srt", null, "content://documents/document/2"),
+        )
+    }
+
+    @Test
+    fun `两条列都没有时从 uri 最后一段里取出文件名`() {
+        // `content://com.android.externalstorage.documents/document/primary%3ADownload%2Fa.srt`
+        // 解码后的最后一段是 `primary:Download/a.srt`——那是一条**路径**，
+        // 直接当标题就是「primary:Download/a.srt」这一长串。
+        assertEquals(
+            "a.srt",
+            pickDisplayName(null, null, "primary:Download/a.srt", "content://p/document/3"),
+        )
+    }
+
+    @Test
+    fun `空白名字不算名字`() {
+        // provider 完全可以回一个空串或者一串空格。空文件名会让界面出现一行
+        // **没有标题**的字幕，比退到 uri 更糟：用户看不出自己选的是哪个文件。
+        assertEquals(
+            "b.srt",
+            pickDisplayName("   ", "b.srt", null, "content://p/document/4"),
+        )
+        assertEquals(
+            "b.srt",
+            pickDisplayName("", "b.srt", null, "content://p/document/4"),
+        )
+    }
+
+    @Test
+    fun `什么都问不出来时退到 uri 本身`() {
+        // 退到这里就说明这条候选**大概**挂不上（后缀都推不出来，解析会报
+        // 「无法解析这个字幕文件」）。但退到 uri 仍然比让 `fileName` 变成空串好：
+        // 空标题在界面上是一行看不见的东西，用户连「选了哪个」都不知道。
+        assertEquals(
+            "content://p/document/5",
+            pickDisplayName(null, null, null, "content://p/document/5"),
+        )
+    }
 }

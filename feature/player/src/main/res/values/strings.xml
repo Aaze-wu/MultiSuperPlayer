@@ -18,6 +18,7 @@
     <!-- ===== 字幕面板 ===== -->
     <string name="msp_player_subtitles_title">字幕</string>
     <string name="msp_player_rescan">重新扫描字幕</string>
+    <string name="msp_player_pick_file">选择字幕文件…</string>
     <string name="msp_player_scanning">正在查找字幕…</string>
     <string name="msp_player_reading">正在读取字幕…</string>
     <string name="msp_player_cues">%1$s · %2$d 条</string>

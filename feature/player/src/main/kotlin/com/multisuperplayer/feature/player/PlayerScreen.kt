@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
+import com.multisuperplayer.core.data.subtitle.subtitleSourceOfDocument
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.MediaEntry
@@ -147,6 +149,25 @@ fun PlayerRoute(
         // uri 为 null = 用户取消了。此时什么都不做，不要编一句「导出成功」。
         if (uri != null && pending != null) {
             subtitleViewModel.exportTo(uri, pending.first, pending.second)
+        }
+    }
+
+    // 手动挑字幕文件。
+    //
+    // 用 `OpenDocument(arrayOf("*/*"))` 而不是按 MIME 过滤：字幕文件没有可靠的 MIME
+    // （`.srt` 常常是 `application/octet-stream`，`.ts` 甚至是 `video/mp2t`），
+    // 过滤的后果是「我明明有这个文件，选择器里根本看不见」。挑错了由解析器报
+    // 「无法解析这个字幕文件」，那句话说得出原因，而「找不到文件」说不出。
+    //
+    // 不需要 `takePersistableUriPermission`：这个选择**不记忆**（换条目就回到自动），
+    // 一次性的读权限足够读完它，而长期持有会白占一个持久授权名额。
+    val context = LocalContext.current
+    val manualSubtitleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        // uri 为 null = 用户取消了。此时什么都不做，不要编一句「已挂上字幕」。
+        if (uri != null) {
+            subtitleViewModel.selectSource(subtitleSourceOfDocument(context.contentResolver, uri))
         }
     }
 
@@ -323,6 +344,7 @@ fun PlayerRoute(
             onSelectSource = subtitleViewModel::selectSource,
             onUseAuto = subtitleViewModel::useAutoSelection,
             onRescan = subtitleViewModel::rescan,
+            onPickFile = { manualSubtitleLauncher.launch(arrayOf("*/*")) },
             onTranslateAll = subtitleViewModel::translateAll,
             onTranslateUpTo = { subtitleViewModel.translateUpTo(positionMs) },
             onCancelTranslation = subtitleViewModel::cancelTranslation,
