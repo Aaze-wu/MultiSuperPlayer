@@ -7,7 +7,6 @@ import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.R
 import com.multisuperplayer.core.model.MediaEntry
-import com.multisuperplayer.core.model.MediaSource
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleOrigin
@@ -40,6 +39,7 @@ class SubtitleRepository(
     context: Context,
     private val locator: SubtitleFileLocator,
     private val safLocator: SafSubtitleLocator,
+    private val fileSystemLocator: FileSystemSubtitleLocator,
     private val parserRegistry: SubtitleParserRegistry,
     private val dispatchers: DispatcherProvider,
 ) {
@@ -66,21 +66,26 @@ class SubtitleRepository(
         // 可能已经被「去后缀」「未知标题兜底」改过。
         val mediaName = entry.displayName?.takeIf { it.isNotBlank() } ?: entry.title
 
-        // 两条来源问的是**两个不同的东西**，不能互相退化：MediaStore 条目问
-        // 「这个相对路径下有哪些字幕后缀的文件」，SAF 条目问「这个 document uri
-        // 的兄弟里有几个字幕后缀的文件」。后者拿不到 MediaStore 的索引——
-        // 用户授权 SAF 目录的典型动机恰恰是 MediaStore 看不见的地方。
-        // 详见 SafSubtitleLocator 的类注释。
-        val isSaf = entry.source == MediaSource.SAF_TREE
-        val where = if (isSaf) {
-            entry.uri
-        } else {
-            entry.relativePath?.takeIf { it.isNotBlank() }
-                ?: return@withContext SubtitleScan.NoDirectory
-        }
+        // 三条来源问的是**三个不同的地方**，一条都不能退化成另一条：
+        // 媒体库条目有索引（查 RELATIVE_PATH）、SAF 条目有授权（问 provider）、
+        // 文件浏览器打开的条目两样都没有（直接列目录）。判断本身是个纯函数，
+        // 见 SubtitleLookup 的注释——那里写了为什么它必须可测。
+        val lookup = subtitleLookupOf(entry)
+        val where = lookup.where
 
         val scan = try {
-            if (isSaf) safLocator.scan(where) else locator.scanDirectory(where)
+            when (lookup) {
+                is SubtitleLookup.SafDocument -> safLocator.scan(lookup.uri)
+
+                is SubtitleLookup.LocalDirectory -> fileSystemLocator.scanDirectory(lookup.path)
+
+                is SubtitleLookup.MediaStoreDirectory -> locator.scanDirectory(lookup.relativePath)
+
+                SubtitleLookup.Unavailable -> {
+                    MspLog.d(TAG) { "「$mediaName」拿不到所在目录，无法自动查找外挂字幕" }
+                    return@withContext SubtitleScan.NoDirectory
+                }
+            }
         } catch (error: Exception) {
             MspLog.w(TAG, error) { "查询目录「$where」失败" }
             return@withContext SubtitleScan.Failed(
@@ -90,7 +95,9 @@ class SubtitleRepository(
 
         when (scan) {
             DirectoryScan.Invisible -> {
-                MspLog.w(TAG) { "目录「$where」不可见：可能是缺权限，也可能是 SAF 授权已失效" }
+                MspLog.w(TAG) {
+                    "目录「$where」不可见：可能是没权限（未开启「所有文件访问」），也可能是 SAF 授权已失效"
+                }
                 return@withContext SubtitleScan.DirectoryInvisible
             }
 

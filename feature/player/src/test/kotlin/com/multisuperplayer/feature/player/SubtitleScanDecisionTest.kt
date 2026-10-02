@@ -18,8 +18,7 @@ import org.junit.Test
  * 会把加载整个吞掉——界面上只剩一句「目录不可用」。
  *
  * 这个组合不是边角情况，而是**手动指定字幕的主场**：需要手动挑的场景就是扫描
- * 最容易失败的地方（`Download/` 根、`.nomedia` 目录、媒体库不索引的路径，这些文件
- * 在 `BrowserEntry.toMediaEntry()` 里拿不到 `relativePath`，扫描必然回 `NoDirectory`）。
+ * 最容易失败的地方（`Download/` 根、`.nomedia` 目录、媒体库不索引的路径）。
  *
  * 真机上第一次跑就撞上了：代码写完了、编译过了、941 个测试全绿，字幕就是不出现。
  * 因为那段 `if` 夹在协程管线中间，只有跑真机才验得到——所以现在它是这个纯函数。
@@ -74,8 +73,9 @@ class SubtitleScanDecisionTest {
 
     @Test
     fun `目录拿不到时手选的字幕照样加载`() {
-        // 回归：FILE_SYSTEM 来源的媒体没有 relativePath ⇒ 扫描必然 NoDirectory。
-        // 这一条挂了就等于「文件浏览器里指定字幕」这个功能整体失效。
+        // 回归：这一条挂了就等于「扫描失败时手动指定字幕」这个功能整体失效。
+        // 状态是直接构造的——`NoDirectory` 今天只由 Android 9 及以下的媒体库条目
+        // 产生（浏览器条目已改走「直接列目录」），而这类状态本来就难在单测里真造出来。
         val step = decideScanStep(SubtitleScan.NoDirectory, manualSelection)
 
         assertEquals(emptyList<SubtitleSource>(), proceed(step).candidates)

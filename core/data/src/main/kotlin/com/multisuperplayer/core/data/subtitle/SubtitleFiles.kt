@@ -60,6 +60,10 @@ fun subtitleSourceOf(path: String, fileName: String, sizeBytes: Long = 0L): Subt
  *
  * 这不是「同一个 uri 两种写法」，而是两个消费者接受范围不同。转换放在这里，
  * 因为只有这个函数知道自己在为谁准备 uri。
+ *
+ * 调用方有两个，而且**必须共用这一处规则**：用户手选的那条（[subtitleSourceOf]）
+ * 与自动发现的同目录字幕（[FileSystemSubtitleLocator]）。`uri` 是解析缓存的键，
+ * 同一个文件按两条路拼出两个不同的 uri，就等于同一个文件被解析两次、缓存白建。
  */
-private fun readableUri(path: String): String =
+internal fun readableUri(path: String): String =
     if (path.contains("://")) path else "file://$path"

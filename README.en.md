@@ -36,8 +36,16 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - **Parsers**: SRT / WebVTT / ASS / SSA / LRC / Enhanced LRC (word-by-word) / TTML (DFXP, SMPTE-TT) /
   VobSub / PGS. Unsupported input is never guessed at silently — the registry reports readable
   diagnostics such as "detected as X but the content looks more like Y".
-- **Discovery and matching**: the media file's directory is scanned and candidates are scored by filename
-  similarity, language tag and `forced` flag; ties are broken by stable rules.
+- **Discovery and matching**: sibling subtitles are found by **source-specific** means and then scored
+  by filename similarity, language tag and `forced` flag; ties are broken by stable rules.
+  - library entries: through the relative path recorded by the system media library;
+  - entries inside a granted SAF tree: the siblings are enumerated by the SAF provider (so media the
+    media library cannot see at all is covered);
+  - entries opened through the built-in file browser: the directory is **listed straight off the disk**
+    (including `Download/` roots and `.lrc` files that are not in any index).
+
+  The route is chosen by the **source itself**, never by "which field happens to be populated" — keying
+  on a field would route browser entries down the media-library path and silently find nothing.
 - **Encoding fallback**: non-UTF-8 subtitles (GBK and friends) are tried against a list of candidate
   encodings, and the parse warnings state which one was used.
 - **Display modes**: hidden / original only / translation only / bilingual.
@@ -147,9 +155,12 @@ system picker.
 > `Movie.zh-CN.ass`), because the point of this list is finding one specific file, and the extension and
 > language tag are exactly the information you need for that.
 
-> Known trade-off: media opened through the built-in browser **does not automatically look for sibling
-> subtitles** (such entries have no relative path, and auto-discovery depends on it). That is deliberate;
-> see "Known limitations". Picking a subtitle from the same directory by hand does work.
+**Sibling subtitles are still discovered automatically**: media opened here has its own directory
+**listed straight off the disk** (never through the system media library — the whole reason this source
+exists is "places the media library cannot see"), so a `Download/` root, a `.nomedia` folder and media
+on the SD card all find their `.srt` / `.ass` / `.lrc` counterparts. This needs the "all files access"
+permission: **when the directory cannot be read the app says "cannot read this folder", never "this
+folder has no subtitles"** — the two need opposite fixes (grant a permission vs. rename a file).
 
 ### 1.8 Roadmap
 
@@ -162,7 +173,8 @@ system picker.
 | v0.5 | Playback: fullscreen/landscape, aspect modes, gestures, speed, A-B repeat, resume | Done |
 | v0.5.5 | Localization + documentation | Done |
 | v0.5.6 | Media library rework: five-tab navigation, mini player, SAF folder browsing, recent, playlists | Done |
-| **v0.5.7** | **Built-in file browser: own directory listing, optional all-files access, attach a tapped subtitle file** | **Current** |
+| **v0.5.7** | **Built-in file browser: own directory listing, optional all-files access, attach a tapped subtitle file** | Done |
+| **v0.5.8** | **Media opened from the browser discovers sibling subtitles (by listing the directory, not the media library)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
@@ -452,14 +464,13 @@ These are deliberate for this release, not oversights:
 8. **No artwork in lists, only type icons (audio / video).** Doing it properly means adding an image
    loading library and owning decode, caching and OOM; this release chooses not to, rather than shipping
    a version that OOMs.
-9. **Media opened through the built-in browser does not auto-discover sibling subtitles.** Auto-discovery
-   lists the parent directory by the media file's **relative path**, and entries that came in through the
-   browser have none (see `BrowserEntry.toMediaEntry()`), so that step necessarily has no directory to
-   work with. The UI **states the reason** ("cannot tell which folder this file is in, so same-name
+9. **Library entries on Android 9 and below do not auto-discover sibling subtitles.** `RELATIVE_PATH`
+   only exists from Android 10, and without it auto-discovery has no starting point for those entries.
+   The UI **states the reason** ("cannot tell which folder this file is in, so same-name
    subtitles cannot be found automatically") instead of pretending "this folder has no subtitles"; you
-   can still pick a sibling `.srt` / `.ass` by hand in the sheet, and that path works. Fixing it properly
-   needs a **direct directory listing**, not a trip through the system media library (a `.nomedia`
-   directory is invisible there).
+   can still pick a sibling `.srt` / `.ass` by hand in the sheet, and that path works.
+   (Media opened through the built-in browser is **not affected**: it takes the "list the directory"
+   route, see section 1.7.)
 10. **The built-in browser does not take part in multi-select**, and writes nothing to the media library.
     Its queue is **every playable entry in the current directory**.
 

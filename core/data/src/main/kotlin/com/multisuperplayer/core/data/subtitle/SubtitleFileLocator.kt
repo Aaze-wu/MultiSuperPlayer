@@ -17,14 +17,14 @@ data class SubtitleFileRow(
 )
 
 /**
- * 一次目录扫描的结果。
+ * 一次目录扫描的结果。三个来源实现共用它（MediaStore / SAF / 文件系统）。
  *
  * 之所以拆成三个分支而不是「一个列表 + 一个计数」，是因为**两种「字幕数为 0」
  * 给用户的建议完全相反**：
  *
- * - [NoSubtitles]：目录里能看到别的文件，只是没有字幕 → 「请把字幕文件放到同一目录」；
- * - [Invisible]：这个目录在 MediaStore 里**一条记录都看不到**（连媒体自己都没有）
- *   → 这次查询根本没通，多半是权限被拒 → 「请检查存储权限」。
+ * - [NoSubtitles]：目录看到了，只是里面没有字幕 → 「请把字幕文件放到同一目录」；
+ * - [Invisible]：这次查询/列目录**根本没通**（MediaStore 里一条记录都看不到、
+ *   文件系统拒绝列目录）→ 多半是权限被拒 → 「请检查存储权限」。
  *
  * 合并成一个空列表的话，用户会拿着「这个目录没有字幕」去反复检查文件名，
  * 而真正的原因在权限上。
@@ -33,10 +33,16 @@ sealed interface DirectoryScan {
     /** 目录里查到了这些字幕后缀的文件。 */
     data class Found(val subtitles: List<SubtitleFileRow>) : DirectoryScan
 
-    /** 目录可见，但没有字幕文件。[visibleFiles] 是该目录 MediaStore 可见的文件数。 */
+    /**
+     * 目录读到了，但没有字幕文件。
+     *
+     * [visibleFiles] 是该目录里能看到多少项，**用于日志**：MediaStore / SAF 只数文件
+     * （查询可能被过滤，0 个文件说明这次查询可疑），文件系统数目录项（列表本身已经
+     * 证明读到了，见 [FileSystemSubtitleLocator] 的类注释）。
+     */
     data class NoSubtitles(val visibleFiles: Int) : DirectoryScan
 
-    /** 目录在 MediaStore 里完全不可见：查询没通，而不是没有文件。 */
+    /** 这次查询 / 列目录没通：不是「没有文件」，而是「看不见」。 */
     data object Invisible : DirectoryScan
 }
 

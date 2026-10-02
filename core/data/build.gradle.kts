@@ -16,6 +16,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        // 文件系统的字幕发现（FileSystemSubtitleLocator）只依赖 `java.io.File`，
+        // 所以它能用真的目录树做单测——但它会写日志，而日志最终走到
+        // `android.util.Log`。默认情况下 JVM 单测里调它直接抛
+        // `Method println in android.util.Log not mocked`，于是一条
+        // 「读不到目录时返回 Invisible」的测试反而被日志本身搞崩了。
+        // 这里让 android.* 的方法返回默认值，和其余模块保持一致。
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         abortOnError = false
     }

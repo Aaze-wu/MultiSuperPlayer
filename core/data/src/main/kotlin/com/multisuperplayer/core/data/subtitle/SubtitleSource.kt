@@ -116,10 +116,16 @@ sealed interface SubtitleScan {
     /** 扫到了候选，可能一个都不匹配（那时 `sources.any { it.matchesMedia }` 为 false）。 */
     data class Found(val sources: List<SubtitleSource>) : SubtitleScan
 
-    /** 拿不到媒体所在目录（Android 9 及以下没有 `relativePath`），无法自动查找。 */
+    /**
+     * 拿不到媒体所在目录，无法自动查找。
+     *
+     * 两种来源：媒体库条目没有 `relativePath`（Android 9 及以下拿不到这个列），
+     * 或路径本身没有上一级目录。**文件浏览器打开的条目不再落进这一档**——
+     * 它的绝对路径能直接推出目录，见 [subtitleLookupOf]。
+     */
     data object NoDirectory : SubtitleScan
 
-    /** 目录在 MediaStore 里不可见：查询没通，多半是权限问题。 */
+    /** 目录读不到：查询没通 / 拒绝列目录，多半是权限问题。 */
     data object DirectoryInvisible : SubtitleScan
 
     /**

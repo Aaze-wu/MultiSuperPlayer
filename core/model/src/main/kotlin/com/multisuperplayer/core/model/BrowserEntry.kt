@@ -100,10 +100,16 @@ data class BrowserEntry(
      *
      * ## `relativePath` 故意留空
      *
-     * 它唯一的用途是媒体库的「按文件夹分组」和 `MediaStore.Files` 的字幕查找。
+     * 它唯一的用途是媒体库的「按文件夹分组」（`MediaStore.Files` 的字幕查找也用它，
+     * 但那条只适用于媒体库自己的条目）。
      * 文件浏览器的条目**不进媒体库**，而它的相对路径要靠「减去卷根」算出来
      * （`BrowserEntry` 自己不知道自己在哪个卷上），算错了反而会把分组带偏。
      * 需要目录时直接从 [ref] 上取最后一段——那才是它真实的样子。
+     *
+     * 外挂字幕也是照这个说法找的：`core:data` 的 `subtitleLookupOf` 按 [source]
+     * 决定去哪儿查，[MediaSource.FILE_SYSTEM] 一支直接把 [ref] 的上一级目录拿去列，
+     * **不经过 `relativePath`，也不经过 MediaStore**——这条来源存在的理由正是
+     * 「MediaStore 看不见的地方」。
      */
     fun toMediaEntry(): MediaEntry? {
         if (isDirectory) return null

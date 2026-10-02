@@ -16,6 +16,7 @@ import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.subtitle.FileSystemSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
@@ -99,6 +100,10 @@ val dataModule = module {
     // SAF 目录里的字幕走另一条路（列兄弟目录而不是查 MediaStore），见类注释。
     single { SafSubtitleLocator(context = androidContext()) }
 
+    // 文件浏览器打开的条目走第三条路（直接列目录）。零依赖：`java.io.File`
+    // 连 `Context` 都不需要，所以它也是这一层里唯一能真单测的。
+    single { FileSystemSubtitleLocator() }
+
     // 导出译文用。走 SAF，不申请存储权限。
     single { SubtitleExportWriter(context = androidContext(), dispatchers = get()) }
 
@@ -108,6 +113,7 @@ val dataModule = module {
             context = androidContext(),
             locator = get(),
             safLocator = get(),
+            fileSystemLocator = get(),
             parserRegistry = get(),
             dispatchers = get(),
         )
