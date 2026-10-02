@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.player.PlaybackPositionStore
+import com.multisuperplayer.core.player.PlaybackRecord
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -46,6 +47,19 @@ class PlaybackPositionRepository(
         ResumeCodec.decode(prefs[resumeKey(mediaId)])?.positionMs
     }
 
+    override suspend fun readAll(): List<PlaybackRecord> = withContext(dispatchers.io) {
+        val prefs = try {
+            store.data.first()
+        } catch (error: IOException) {
+            // 同 read()：读不出来按「什么都没有」处理，不让它穿透到界面。
+            MspLog.w(TAG, error) { "读取续播位置失败，按没有记录处理" }
+            return@withContext emptyList()
+        }
+        decodeAll(prefs.asMap())
+            .map { (mediaId, entry) -> PlaybackRecord(mediaId, entry.positionMs, entry.savedAtMs) }
+            .sortedWith(compareByDescending<PlaybackRecord> { it.savedAtMs }.thenBy { it.mediaId })
+    }
+
     override suspend fun write(mediaId: String, positionMs: Long) = withContext(dispatchers.io) {
         val entry = ResumeEntry(positionMs = positionMs, savedAtMs = System.currentTimeMillis())
         store.edit { prefs ->
@@ -71,18 +85,41 @@ class PlaybackPositionRepository(
      * 淘汰排序，而且永远不会自己消失。
      */
     private fun evictOverflow(prefs: MutablePreferences) {
-        val decoded = LinkedHashMap<String, ResumeEntry>()
-        val unreadable = mutableListOf<Preferences.Key<*>>()
+        val decoded = decodeAll(prefs.asMap())
+        ResumeEviction.expired(decoded).forEach { mediaId -> prefs.remove(resumeKey(mediaId)) }
+        unreadableKeys(prefs).forEach { key -> prefs.remove(key) }
+    }
 
-        for ((key, value) in prefs.asMap()) {
+    /**
+     * 能读懂的记录，保持插入顺序。
+     *
+     * 读 [evictOverflow] 和 [readAll] 都从这里走：两边对「什么算一条记录」的
+     * 判定必须**完全一致**，各写一遍的话「淘汰时认为读得出来、列给界面时又认为
+     * 读不出来」这种分歧迟早会出现，而它只会表现成「最近播放里少了一条」。
+     */
+    private fun decodeAll(values: Map<Preferences.Key<*>, Any>): Map<String, ResumeEntry> {
+        val decoded = LinkedHashMap<String, ResumeEntry>()
+        for ((key, value) in values) {
             if (!key.name.startsWith(RESUME_KEY_PREFIX)) continue
             val mediaId = key.name.substring(RESUME_KEY_PREFIX.length)
             val entry = (value as? String)?.let(ResumeCodec::decode)
-            if (mediaId.isEmpty() || entry == null) unreadable += key else decoded[mediaId] = entry
+            if (mediaId.isNotEmpty() && entry != null) decoded[mediaId] = entry
         }
+        return decoded
+    }
 
-        unreadable.forEach { key -> prefs.remove(key) }
-        ResumeEviction.expired(decoded).forEach { mediaId -> prefs.remove(resumeKey(mediaId)) }
+    /**
+     * 读不出来的记录对应的键。
+     *
+     * 它们对 [read] / [readAll] 来说不存在，却会占着名额参与淘汰排序，
+     * 而且永远不会自己消失——只能在这里顺手清掉。
+     */
+    private fun unreadableKeys(prefs: MutablePreferences): List<Preferences.Key<*>> {
+        val known = decodeAll(prefs.asMap()).keys
+        return prefs.asMap().keys.filter { key ->
+            key.name.startsWith(RESUME_KEY_PREFIX) &&
+                key.name.substring(RESUME_KEY_PREFIX.length) !in known
+        }
     }
 
     private fun resumeKey(mediaId: String): Preferences.Key<String> =

@@ -2,14 +2,21 @@ package com.multisuperplayer.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.model.Playlist
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 媒体库的界面状态。
@@ -22,10 +29,13 @@ data class LibraryUiState(
     val library: MediaLibraryState = MediaLibraryState.Loading,
     val filter: LibraryFilter = LibraryFilter.ALL,
     val query: String = "",
-    /** 已应用筛选与搜索的结果。 */
+    /** 已应用筛选与搜索的结果。**尚未排序**：排序/分组是展示方式，由 [LibraryArrangement] 在界面层算。 */
     val entries: List<MediaEntry> = emptyList(),
     /** 各筛选维度下**搜索命中**的条目数，用于在标签上显示「音乐 128」。 */
     val counts: Map<LibraryFilter, Int> = emptyMap(),
+    val sort: LibrarySort = LibrarySort.TITLE_ASC,
+    val groupMode: LibraryGroupMode = LibraryGroupMode.NONE,
+    val viewMode: LibraryViewMode = LibraryViewMode.LIST,
 ) {
     /** 当前搜索命中了多少条（尚未应用类型筛选）。**不是**库里一共有多少条。 */
     val allCount: Int get() = counts[LibraryFilter.ALL] ?: 0
@@ -51,6 +61,18 @@ data class LibraryUiState(
      * 把「没搜到」说成「本机没有文件」——而这两件事用户要做的事完全相反。
      */
     val filteredOut: Boolean get() = !libraryEmpty && entries.isEmpty()
+
+    /**
+     * 只拿到部分媒体权限。
+     *
+     * 和 [truncated] 分开：这两个提示要叫用户做的事完全不同（一个是去授权，
+     * 一个是「东西太多，分批看」），共用一个横幅就会出现「提示你去授权，
+     * 但权限早就给全了」。
+     */
+    val partial: Boolean get() = (library as? MediaLibraryState.Ready)?.partial == true
+
+    /** SAF 扫描被深度/条目上限截断了：列表是「少了」，不是「没有」。 */
+    val truncated: Boolean get() = (library as? MediaLibraryState.Ready)?.truncated == true
 }
 
 /**
@@ -64,6 +86,9 @@ internal fun buildLibraryUiState(
     library: MediaLibraryState,
     filter: LibraryFilter,
     query: String,
+    sort: LibrarySort = LibrarySort.TITLE_ASC,
+    groupMode: LibraryGroupMode = LibraryGroupMode.NONE,
+    viewMode: LibraryViewMode = LibraryViewMode.LIST,
 ): LibraryUiState {
     val all = (library as? MediaLibraryState.Ready)?.entries.orEmpty()
     val searched = all.filterByQuery(query)
@@ -71,6 +96,9 @@ internal fun buildLibraryUiState(
         library = library,
         filter = filter,
         query = query,
+        // 这里**不**排序：entries 同时被当「筛选结果」和「计数来源」用，
+        // 而排序只影响怎么画。两者混在一起时，将来加一种排序就要顺手确认
+        // 它不会把标签上的数字也改掉。
         entries = searched.filter(filter::accepts),
         // 计数按**搜索后**的集合算，而不是全库：搜索时标签上的数字跟着搜索走，
         // 否则会出现「显示『音乐 0』但点进去有 12 条」的诡异状态。
@@ -78,8 +106,28 @@ internal fun buildLibraryUiState(
         // 但这份计数**不**负责回答「库里有东西吗」——那是 libraryCount 的事。
         // 两者被混用过，代价是搜索一个匹配不到的词就把搜索框藏了起来。
         counts = LibraryFilter.entries.associateWith { f -> searched.count(f::accepts) },
+        sort = sort,
+        groupMode = groupMode,
+        viewMode = viewMode,
     )
 }
+
+/**
+ * 一条**一次性**的提示（Snackbar）。
+ *
+ * [nonce] 看起来多余，实际是必需的：只把文案放进状态时，用户连着两次「加入 N 项」
+ * 会得到两个**结构相等**的状态，Compose 的 `LaunchedEffect(text)` 认为 key 没变，
+ * 第二次的提示就再也不显示了。所以让每一次事件都带上一个只增不减的序号，
+ * 界面拿它当 key。
+ */
+data class LibraryMessage(val text: MspText, val nonce: Long)
+
+/** 排列相关的三个维度。单独打成一个包是为了配合 `combine` 的重载个数（最多 5 个）。 */
+private data class LibraryViewOptions(
+    val sort: LibrarySort,
+    val groupMode: LibraryGroupMode,
+    val viewMode: LibraryViewMode,
+)
 
 /**
  * 媒体库 ViewModel。
@@ -89,14 +137,48 @@ internal fun buildLibraryUiState(
  */
 class LibraryViewModel(
     private val repository: MediaLibraryRepository,
+    private val playlistStore: PlaylistStore,
 ) : ViewModel() {
 
     private val filter = MutableStateFlow(LibraryFilter.ALL)
     private val query = MutableStateFlow("")
+    private val sort = MutableStateFlow(LibrarySort.TITLE_ASC)
+    private val groupMode = MutableStateFlow(LibraryGroupMode.NONE)
+    private val viewMode = MutableStateFlow(LibraryViewMode.LIST)
+
+    private val options = combine(sort, groupMode, viewMode) { s, g, v ->
+        LibraryViewOptions(s, g, v)
+    }
+
+    private val _message = MutableStateFlow<LibraryMessage?>(null)
+
+    /** 一次性提示。界面用 [LibraryMessage.nonce] 当 key 显示，不需要「已消费」回调。 */
+    val message: StateFlow<LibraryMessage?> = _message.asStateFlow()
+
+    private val messageNonce = AtomicLong()
+
+    /**
+     * 可供「加入播放列表」选择的播放列表。
+     *
+     * `WhileSubscribed` + 5 秒超时：退出媒体库之后再回来不用重新读一遍 DataStore，
+     * 但真的离开之后订阅会被取消，不会为了一个看不见的对话框常驻一个 DataStore 观察者。
+     */
+    val playlists: StateFlow<List<Playlist>> = playlistStore.playlists.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptyList(),
+    )
 
     val uiState: StateFlow<LibraryUiState> =
-        combine(repository.state, filter, query) { library, currentFilter, currentQuery ->
-            buildLibraryUiState(library, currentFilter, currentQuery)
+        combine(repository.state, filter, query, options) { library, currentFilter, currentQuery, current ->
+            buildLibraryUiState(
+                library = library,
+                filter = currentFilter,
+                query = currentQuery,
+                sort = current.sort,
+                groupMode = current.groupMode,
+                viewMode = current.viewMode,
+            )
         }.stateIn(
             scope = viewModelScope,
             // 屏幕旋转/短暂失焦时不取消上游订阅：重建 ViewModel 会重新触发扫描，
@@ -116,6 +198,61 @@ class LibraryViewModel(
 
     fun setQuery(value: String) {
         query.value = value
+    }
+
+    fun setSort(value: LibrarySort) {
+        sort.value = value
+    }
+
+    fun setGroupMode(value: LibraryGroupMode) {
+        groupMode.value = value
+    }
+
+    fun setViewMode(value: LibraryViewMode) {
+        viewMode.value = value
+    }
+
+    /** 把 [entries] 追加到某个已有播放列表。 */
+    fun addToPlaylist(playlistId: String, entries: List<MediaEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch {
+            val added = playlistStore.addItems(playlistId, entries)
+            // 去重发生在存储层（PlaylistRules.withAdded），所以「几项被跳过」只有它能告诉我们。
+            // 这里如实报告，而不是一律说「已加入」——否则用户会以为点了两次就真的加了两遍。
+            publishAdded(added, entries.size)
+        }
+    }
+
+    /** 新建播放列表并把 [entries] 放进去。 */
+    fun createPlaylistWith(name: String, entries: List<MediaEntry>) {
+        viewModelScope.launch {
+            val id = playlistStore.create(name)
+            // create() 在数量达到上限时**不会写入**，但仍然返回一个 id。直接拿它去
+            // addItems 会静默地加进一个不存在的列表，用户看到的是「已加入 0 项」。
+            // 所以回读一次，确认它真的落盘了。
+            if (playlistStore.playlist(id) == null) {
+                MspLog.w(TAG) { "新建播放列表没有落盘（可能已达上限）" }
+                publish(MspText.Res(R.string.msp_library_playlist_create_failed))
+                return@launch
+            }
+            val added = playlistStore.addItems(id, entries)
+            publishAdded(added, entries.size)
+        }
+    }
+
+    private fun publishAdded(added: Int, requested: Int) {
+        val skipped = requested - added
+        publish(
+            if (skipped > 0) {
+                MspText.Res(R.string.msp_library_added_to_playlist_skipped, added, skipped)
+            } else {
+                MspText.Res(R.string.msp_library_added_to_playlist, added)
+            },
+        )
+    }
+
+    private fun publish(text: MspText) {
+        _message.value = LibraryMessage(text = text, nonce = messageNonce.incrementAndGet())
     }
 
     fun refresh() {
@@ -143,5 +280,6 @@ class LibraryViewModel(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+        const val TAG = "LibraryViewModel"
     }
 }

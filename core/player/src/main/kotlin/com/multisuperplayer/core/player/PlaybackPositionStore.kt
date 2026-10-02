@@ -1,6 +1,20 @@
 package com.multisuperplayer.core.player
 
 /**
+ * 一条续播记录的裸数据。
+ *
+ * 只有这三个字段——**没有标题、没有封面、没有时长**。这是存储层故意保持的最小形状：
+ * 写入方是内核（它只知道「播到哪」），把展示用元数据也塞进来会让内核不得不去读媒体库。
+ * 需要列表展示时由 `:core:data` 拿 [mediaId] 回媒体库连接元数据。
+ */
+data class PlaybackRecord(
+    val mediaId: String,
+    val positionMs: Long,
+    /** 最后一次写入的时间（不是文件的修改时间）。「最近播放」按它排序。 */
+    val savedAtMs: Long,
+)
+
+/**
  * 续播位置的存取。
  *
  * 定义在 `:core:player` 而不是 `:core:data`，是因为**内核是写入方**：只有它知道
@@ -13,13 +27,22 @@ package com.multisuperplayer.core.player
  *
  * ## 线程约定
  *
- * 两个方法都可能做磁盘 IO，因此都是 `suspend`，**不承诺在主线程返回**。
+ * 所有方法都可能做磁盘 IO，因此都是 `suspend`，**不承诺在主线程返回**。
  * 内核调用时只负责把结果用上去，不要假设自己还在主线程上。
  */
 interface PlaybackPositionStore {
 
     /** 读出上次播到的位置；没有记录、或记录已失效时返回 null。 */
     suspend fun read(mediaId: String): Long?
+
+    /**
+     * 读出全部记录，按**最后写入时间从新到旧**排序。
+     *
+     * 「最近播放」页要用它。放在接口上而不是让界面自己遍历：实现里本来就要在
+     * 每次写入后读全表做淘汰（见 [ResumeEviction]），所以这个能力是现成的，
+     * 另开一个接口/另存一份数据只会多一份需要保持同步的真相。
+     */
+    suspend fun readAll(): List<PlaybackRecord>
 
     /**
      * 记下位置。
@@ -42,6 +65,7 @@ interface PlaybackPositionStore {
          */
         val None: PlaybackPositionStore = object : PlaybackPositionStore {
             override suspend fun read(mediaId: String): Long? = null
+            override suspend fun readAll(): List<PlaybackRecord> = emptyList()
             override suspend fun write(mediaId: String, positionMs: Long) = Unit
             override suspend fun clear(mediaId: String) = Unit
         }

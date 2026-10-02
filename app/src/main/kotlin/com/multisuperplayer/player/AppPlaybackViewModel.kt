@@ -8,6 +8,8 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.player.PlaybackController
 import com.multisuperplayer.core.player.PlaybackPositionStore
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
+import com.multisuperplayer.core.player.MspPlaybackState
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -102,4 +104,25 @@ class AppPlaybackViewModel(
             controller.setQueue(entries, startIndex = start, resumePositionMs = resumeMs)
         }
     }
+
+    /**
+     * 迷你播放器要的三样东西。
+     *
+     * 它们是**转发**而不是把 `controller` 放开：一旦界面能拿到内核，就会有人
+     * 直接在 Composable 里调 `controller.stopAndClear()`——那时「谁改了播放状态」
+     * 就没有唯一答案了。只暴露只读的流和一个动作，比后面去查日志便宜得多。
+     */
+    val nowPlaying: StateFlow<MediaEntry?> get() = controller.currentEntry
+
+    val playbackState: StateFlow<MspPlaybackState> get() = controller.state
+
+    /**
+     * 播放位置。**只有迷你播放器里那条细进度线**该订阅它。
+     *
+     * 它每 200ms 变一次；谁把这次订阅写到外面（比如整条导航栏），
+     * 就等于让一整块 UI 每秒重组五次——而用户看到的只是那条线动了一下。
+     */
+    val positionMs: StateFlow<Long> get() = controller.positionMs
+
+    fun togglePlayPause() = controller.togglePlayPause()
 }

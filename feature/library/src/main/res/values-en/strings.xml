@@ -43,4 +43,86 @@
     <string name="msp_library_filter_audio">Music</string>
     <string name="msp_library_filter_video">Video</string>
 
+    <!-- ===== Sort ===== -->
+    <string name="msp_library_sort_label">Sort</string>
+    <string name="msp_library_sort_title_asc">Title (A-Z)</string>
+    <string name="msp_library_sort_title_desc">Title (Z-A)</string>
+    <string name="msp_library_sort_newest">Recently added</string>
+    <string name="msp_library_sort_oldest">Oldest first</string>
+    <string name="msp_library_sort_longest">Longest first</string>
+    <string name="msp_library_sort_largest">Largest first</string>
+
+    <!-- ===== Grouping ===== -->
+    <string name="msp_library_group_label">Group</string>
+    <string name="msp_library_group_none">No grouping</string>
+    <string name="msp_library_group_artist">By artist</string>
+    <string name="msp_library_group_album">By album</string>
+    <string name="msp_library_group_folder">By folder</string>
+    <string name="msp_library_group_unknown_artist">Unknown artist</string>
+    <string name="msp_library_group_unknown_album">Unknown album</string>
+    <string name="msp_library_group_unknown_folder">Unknown folder</string>
+    <!-- "item(s)" is deliberate: a group can mix audio and video. -->
+    <string name="msp_library_item_count">%1$d item(s)</string>
+
+    <!-- ===== View mode ===== -->
+    <string name="msp_library_view_list">List view</string>
+    <string name="msp_library_view_grid">Grid view</string>
+
+    <!-- ===== Incomplete scan ===== -->
+    <string name="msp_library_truncated">Too many folders or too deep a hierarchy - only part of it was scanned.</string>
+
+    <!-- ===== Multi-select ===== -->
+    <string name="msp_library_selection_count">%1$d selected</string>
+    <string name="msp_library_select_all">Select all</string>
+    <string name="msp_library_clear_selection">Deselect all</string>
+    <string name="msp_library_exit_selection">Exit selection</string>
+    <string name="msp_library_play_selection">Play</string>
+
+    <!-- ===== Playlists ===== -->
+    <string name="msp_library_add_to_playlist">Add to playlist</string>
+    <string name="msp_library_playlist_empty">No playlists yet - create one first.</string>
+    <string name="msp_library_playlist_new">New playlist</string>
+    <string name="msp_library_playlist_name_hint">Playlist name</string>
+    <string name="msp_library_playlist_create_failed">Could not create the playlist (limit reached).</string>
+    <string name="msp_library_added_to_playlist">Added %1$d item(s)</string>
+    <string name="msp_library_added_to_playlist_skipped">Added %1$d item(s); %2$d were already in the list</string>
+    <string name="msp_library_cancel">Cancel</string>
+    <string name="msp_library_confirm">OK</string>
+    <string name="msp_library_back">Back</string>
+
+    <!-- ===== Browse (SAF folders) ===== -->
+    <string name="msp_browse_title">Browse</string>
+    <string name="msp_browse_add">Add folder</string>
+    <string name="msp_browse_hint">Folders you grant here are merged with the system media library on the Library tab. Nothing in the system media library needs to be added here.</string>
+    <string name="msp_browse_empty_title">No folders granted yet</string>
+    <string name="msp_browse_empty_desc">Tap + in the top right to pick a folder. Useful for media the system library cannot see, such as music on an SD card.</string>
+    <string name="msp_browse_volume_root">Storage root</string>
+    <string name="msp_browse_tree_inaccessible">Permission revoked - remove it and add it again</string>
+    <string name="msp_browse_remove">Remove</string>
+
+    <!-- ===== Recently played ===== -->
+    <string name="msp_recent_title">Recently played</string>
+    <string name="msp_recent_refresh">Refresh</string>
+    <string name="msp_recent_supporting">Stopped at %1$s - %2$s</string>
+    <string name="msp_recent_empty_title">Nothing played yet</string>
+    <string name="msp_recent_empty_desc">What you play shows up here, remembering where you stopped.</string>
+    <string name="msp_recent_blocked_title">Media library unavailable</string>
+    <string name="msp_recent_blocked_desc">Recently played matches your history against the media library. Grant storage access on the Library tab first.</string>
+
+    <!-- ===== Playlists ===== -->
+    <string name="msp_playlists_title">Playlists</string>
+    <string name="msp_playlists_new">New playlist</string>
+    <string name="msp_playlists_empty_title">No playlists yet</string>
+    <string name="msp_playlists_empty_desc">Long-press items in the Library tab, then tap \"Add to playlist\".</string>
+    <string name="msp_playlists_empty_list_desc">This playlist is empty. Long-press items in the Library tab, then tap \"Add to playlist\".</string>
+    <string name="msp_playlists_rename">Rename</string>
+    <string name="msp_playlists_delete">Delete</string>
+    <string name="msp_playlists_delete_title">Delete this playlist?</string>
+    <string name="msp_playlists_delete_desc">Only the playlist is removed. No files are deleted.</string>
+    <string name="msp_playlists_more">More actions</string>
+    <string name="msp_playlists_play_all">Play all</string>
+    <string name="msp_playlists_item_missing">File is gone</string>
+    <string name="msp_playlists_missing_banner">%1$d item(s) point to files that are gone; playback may fail.</string>
+    <string name="msp_playlists_remove_item">Remove from playlist</string>
+
 </resources>

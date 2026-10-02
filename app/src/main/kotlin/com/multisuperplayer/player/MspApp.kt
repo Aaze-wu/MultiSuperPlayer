@@ -1,9 +1,12 @@
 package com.multisuperplayer.player
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -23,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.ui.chrome.AppChromeState
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
 import com.multisuperplayer.core.ui.chrome.LocalAppChromeState
@@ -33,7 +37,10 @@ import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
+import com.multisuperplayer.feature.library.BrowseRoute
 import com.multisuperplayer.feature.library.LibraryRoute
+import com.multisuperplayer.feature.library.PlaylistsRoute
+import com.multisuperplayer.feature.library.RecentRoute
 import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
@@ -92,7 +99,15 @@ private enum class MspDestination(
     val icon: ImageVector,
 ) {
     LIBRARY("library", MspText.Res(R.string.msp_nav_library), Icons.Outlined.LibraryMusic),
-    PLAYER("player", MspText.Res(R.string.msp_nav_now_playing), Icons.Outlined.PlayCircle),
+    BROWSE("browse", MspText.Res(R.string.msp_nav_browse), Icons.Outlined.FolderOpen),
+    RECENT("recent", MspText.Res(R.string.msp_nav_recent), Icons.Outlined.History),
+    // QueueMusic 有 auto-mirrored 版本：RTL 语言里这个图标是带方向的
+    // （音符后面跟一条线），直接写 Icons.Outlined.QueueMusic 在阿拉伯语下会画反。
+    PLAYLISTS(
+        "playlists",
+        MspText.Res(R.string.msp_nav_playlists),
+        Icons.AutoMirrored.Outlined.QueueMusic,
+    ),
     SETTINGS("settings", MspText.Res(R.string.msp_nav_settings), Icons.Outlined.Settings),
     ;
 
@@ -100,6 +115,14 @@ private enum class MspDestination(
         val START: MspDestination = LIBRARY
     }
 }
+
+/**
+ * 播放页不再是标签页：它从迷你播放器推上来（媒体库/最近播放/播放列表里点一条也直接进）。
+ *
+ * 它仍然是**真的导航目的地**（不是 `if (showPlayer)`），理由和其它子页面一样：
+ * 用户在播放页按返回键应该回到刚才那个列表，而不是退出应用。
+ */
+private const val PLAYER_ROUTE = "player"
 
 /**
  * 翻译设置不是标签页，而是从设置页（或播放页字幕面板）推上来的普通目的地。
@@ -135,16 +158,23 @@ private fun MspAppScaffold() {
     // 复制一份逻辑到播放页迟早会和这里分叉——一处改了另一处没改，
     // 症状是「从字幕面板去设置之后返回键失灵」。
     val navigateToTab: (MspDestination) -> Unit = { destination ->
-        navController.popBackStack(MspDestination.PLAYER.route, inclusive = true)
+        navController.popBackStack(PLAYER_ROUTE, inclusive = true)
         navController.navigate(destination.route) {
-            // 这里**不**写 saveState/restoreState：三个标签页各自都是单页，
-            // 真正需要留住的状态（列表滚动位置、筛选词）挂在**媒体库自己的**
+            // 这里**不**写 saveState/restoreState：每个标签页各自都是单页，
+            // 真正需要留住的状态（列表滚动位置、筛选词）挂在**那个标签自己的**
             // NavBackStackEntry 上，而它作为栈底永远不会被弹出，不必靠
-            // 「存取返回栈」来保。而一旦写上，播放页会被当成「媒体库标签的状态」
+            // 「存取返回栈」来保。而一旦写上，播放页会被当成「起始标签的状态」
             // 一起保存，于是「在播放页点媒体库」会立刻把它恢复回来——看起来就是没反应。
             popUpTo(navController.graph.findStartDestination().id)
             launchSingleTop = true
         }
+    }
+
+    // 三个页面都能「点一条就放」：走同一个入口，保证「队列 = 当前列表」
+    // 这条规则不会只在某一个页面上成立。
+    val playFrom: (List<MediaEntry>, Int) -> Unit = { entries, startIndex ->
+        playbackViewModel.startPlayback(entries, startIndex)
+        navController.navigate(PLAYER_ROUTE) { launchSingleTop = true }
     }
 
     Scaffold(
@@ -157,29 +187,52 @@ private fun MspAppScaffold() {
             // 于是 `innerPadding.bottom` 不为零，全屏画面底部会白留一条。
             // 而且这条留白只有在真机上才看得出来（预览里没有导航栏高度）。
             if (!chrome.bottomBarVisible) return@Scaffold
-            NavigationBar {
-                MspDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
+            // 迷你播放器叠在导航栏**上面**，而不是塞进某一页里：它属于应用骨架，
+            // 在哪个标签上都该在那儿；放进媒体库页的话，切到设置它就不见了。
+            //
+            // 唯一的例外是播放页自己：那个页面整屏就是它要指向的东西，
+            // 再叠一条同名的迷你播放器只是白占 130px，还把播放器自己的进度条
+            // 和底部的播放/暂停按钮挤在了一起。注意这里用的是「路由」而不是
+            // `chrome.bottomBarVisible`——底部栏的显示由全屏逻辑单独管，
+            // 两处都去写同一个开关会互相覆盖（谁后跑谁赢，看起来就是闪一下）。
+            val nowPlaying by playbackViewModel.nowPlaying.collectAsStateWithLifecycle()
+            val playbackState by playbackViewModel.playbackState.collectAsStateWithLifecycle()
+            Column {
+                nowPlaying?.takeIf { currentRoute != PLAYER_ROUTE }?.let { entry ->
+                    MiniPlayer(
+                        entry = entry,
+                        state = playbackState,
+                        position = playbackViewModel.positionMs,
                         onClick = {
-                            // 切标签前先把播放页**摘掉**（丢弃，不保存）。
-                            //
-                            // 播放页不是标签页，而是从媒体库推上来的普通目的地。
-                            // 如果把 "saveState + restoreState" 那套标准写法直接用在这里，
-                            // 存/取的 key 是「起始目的地」＝媒体库，于是**媒体库之上的一切**
-                            // 都会被打包成「媒体库标签的返回栈」，播放页也在里面；
-                            // 下一次点「媒体库」时 restoreState 会把它原样恢复回来。
-                            // 表现就是：在播放页点「媒体库」没反应，从设置页点「媒体库」
-                            // 反而莫名其妙跳回播放页。
-                            //
-                            // 直接丢弃没有任何代价：播放页显示什么完全由 PlayerViewModel
-                            // 从 PlaybackController（Koin 单例）读出来，不靠导航参数，
-                            // 也不在导航状态里存任何东西——底层播放也照旧继续。
-                            navigateToTab(destination)
+                            navController.navigate(PLAYER_ROUTE) { launchSingleTop = true }
                         },
-                        icon = { Icon(destination.icon, contentDescription = null) },
-                        label = { Text(destination.label.string()) },
+                        onTogglePlayPause = playbackViewModel::togglePlayPause,
                     )
+                }
+                NavigationBar {
+                    MspDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = currentRoute == destination.route,
+                            onClick = {
+                                // 切标签前先把播放页**摘掉**（丢弃，不保存）。
+                                //
+                                // 播放页不是标签页，而是从列表推上来的普通目的地。
+                                // 如果把 "saveState + restoreState" 那套标准写法直接用在这里，
+                                // 存/取的 key 是「起始标签」＝媒体库，于是**它之上的一切**
+                                // 都会被打包成「媒体库标签的返回栈」，播放页也在里面；
+                                // 下一次点「媒体库」时 restoreState 会把它原样恢复回来。
+                                // 表现就是：在播放页点「媒体库」没反应，从设置页点「媒体库」
+                                // 反而莫名其妙跳回播放页。
+                                //
+                                // 直接丢弃没有任何代价：播放页显示什么完全由 PlayerViewModel
+                                // 从 PlaybackController（Koin 单例）读出来，不靠导航参数，
+                                // 也不在导航状态里存任何东西——底层播放也照旧继续。
+                                navigateToTab(destination)
+                            },
+                            icon = { Icon(destination.icon, contentDescription = null) },
+                            label = { Text(destination.label.string()) },
+                        )
+                    }
                 }
             }
         },
@@ -191,23 +244,27 @@ private fun MspAppScaffold() {
         ) {
             composable(MspDestination.LIBRARY.route) {
                 LibraryRoute(
-                    onPlayRequest = { entries, startIndex ->
-                        playbackViewModel.startPlayback(entries, startIndex)
-                        // 同一个标签重复点不会压栈；从媒体库进播放页也不应该
-                        // 在返回栈里堆出十几个播放页。
-                        navController.navigate(MspDestination.PLAYER.route) {
-                            launchSingleTop = true
-                        }
-                    },
+                    // 重复点同一个列表项不应该在返回栈里堆出十几个播放页，
+                    // 所以这条导航统一走 playFrom 里的 launchSingleTop。
+                    onPlayRequest = playFrom,
                 )
             }
-            composable(MspDestination.PLAYER.route) {
+            composable(MspDestination.BROWSE.route) {
+                BrowseRoute()
+            }
+            composable(MspDestination.RECENT.route) {
+                RecentRoute(onPlayRequest = playFrom)
+            }
+            composable(MspDestination.PLAYLISTS.route) {
+                PlaylistsRoute(onPlayRequest = playFrom)
+            }
+            composable(PLAYER_ROUTE) {
                 PlayerRoute(
                     // 字幕面板里的「去设置」：没配置翻译服务时，用户要在同一个界面里
                     // 走到填密钥的地方。非要他先退出面板、再点底部设置，是没必要的绕路。
                     // 直接落到翻译设置页，而不是设置页的第一屏（那里全是主题）。
                     onOpenTranslationSettings = {
-                        navController.popBackStack(MspDestination.PLAYER.route, inclusive = true)
+                        navController.popBackStack(PLAYER_ROUTE, inclusive = true)
                         navController.navigate(MspDestination.SETTINGS.route) {
                             popUpTo(navController.graph.findStartDestination().id)
                             launchSingleTop = true

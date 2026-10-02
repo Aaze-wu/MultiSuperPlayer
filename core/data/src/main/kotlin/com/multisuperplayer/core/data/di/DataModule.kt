@@ -2,14 +2,19 @@ package com.multisuperplayer.core.data.di
 
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.history.PlaybackPositionRepository
+import com.multisuperplayer.core.data.history.RecentPlayRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
+import com.multisuperplayer.core.data.library.SafTreeScanner
+import com.multisuperplayer.core.data.library.SafTreeStore
+import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
@@ -20,10 +25,18 @@ import org.koin.dsl.module
 val dataModule = module {
     single { MediaStoreScanner(context = androidContext()) }
 
+    // SAF 目录扫描。与 MediaStore 两条来源在仓库里合并、去重，
+    // 详见 MediaLibraryRepository 与 LibraryMergeRules 的注释。
+    single { SafTreeScanner(context = androidContext()) }
+
+    single { SafTreeStore(context = androidContext(), dispatchers = get()) }
+
     single {
         MediaLibraryRepository(
             context = androidContext(),
             scanner = get(),
+            safScanner = get(),
+            safTreeStore = get(),
             dispatchers = get(),
         )
     }
@@ -43,6 +56,14 @@ val dataModule = module {
         PlaybackPositionRepository(context = androidContext(), dispatchers = get())
     }
 
+    // 「最近播放」= 续播记录 × 当前媒体库的投影。需要读媒体库当前状态，
+    // 所以只能排在上面两个注册之后。
+    single { RecentPlayRepository(positionStore = get(), library = get()) }
+
+    // 播放列表存在单独的 DataStore 文件（msp_playlists）里：写一次就是几 KB 自由文本，
+    // 混进 msp_settings 会拖慢用户设置的写入。
+    single { PlaylistStore(context = androidContext(), dispatchers = get()) }
+
     // API Key 加密存起来（AndroidKeyStore + AES/GCM），密文进 msp_settings 这个 DataStore。
     single { ApiKeyStore(context = androidContext(), dispatchers = get()) }
 
@@ -58,6 +79,9 @@ val dataModule = module {
 
     single { SubtitleFileLocator(context = androidContext()) }
 
+    // SAF 目录里的字幕走另一条路（列兄弟目录而不是查 MediaStore），见类注释。
+    single { SafSubtitleLocator(context = androidContext()) }
+
     // 导出译文用。走 SAF，不申请存储权限。
     single { SubtitleExportWriter(context = androidContext(), dispatchers = get()) }
 
@@ -66,6 +90,7 @@ val dataModule = module {
         SubtitleRepository(
             context = androidContext(),
             locator = get(),
+            safLocator = get(),
             parserRegistry = get(),
             dispatchers = get(),
         )

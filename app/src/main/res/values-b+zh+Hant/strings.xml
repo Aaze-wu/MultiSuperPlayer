@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="msp_nav_library">媒體庫</string>
-    <string name="msp_nav_now_playing">正在播放</string>
+    <string name="msp_nav_browse">瀏覽</string>
+    <string name="msp_nav_recent">最近</string>
+    <string name="msp_nav_playlists">播放清單</string>
     <string name="msp_nav_settings">設定</string>
+    <string name="msp_nav_now_playing">正在播放</string>
+    <string name="msp_mini_player_play">播放</string>
+    <string name="msp_mini_player_pause">暫停</string>
 </resources>

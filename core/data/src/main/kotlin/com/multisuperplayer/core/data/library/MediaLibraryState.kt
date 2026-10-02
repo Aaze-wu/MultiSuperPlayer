@@ -25,8 +25,16 @@ sealed interface MediaLibraryState {
      * @param partial 只有部分权限（例如允许了「音乐」但拒绝了「视频」，或
      *   Android 14 的「仅选择部分照片/视频」）。此时列表是**残缺的**，
      *   UI 需要提示「可能还有内容没显示」，否则用户会以为文件丢了。
+     * @param truncated SAF 授权目录里只收了一部分（嵌套太深、条数超过上限、
+     *   或者某个子目录读不出来）。和 [partial] **分开**：两者的原因不同、
+     *   用户该做的事也不同（一个是「去把权限给全」，一个是「换一个更小的目录」），
+     *   用同一句话描述等于两个都不对。
      */
-    data class Ready(val entries: List<MediaEntry>, val partial: Boolean = false) : MediaLibraryState
+    data class Ready(
+        val entries: List<MediaEntry>,
+        val partial: Boolean = false,
+        val truncated: Boolean = false,
+    ) : MediaLibraryState
 
     /** 一个权限都没有，列表无法扫描。 */
     data object NeedsPermission : MediaLibraryState

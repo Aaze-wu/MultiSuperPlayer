@@ -6,8 +6,19 @@
     -->
     <string name="app_name">MultiSuperPlayer</string>
 
-    <!-- 底部导航。这三个键只有 :app 自己用（别的模块引不到 :app 的 R）。 -->
+    <!-- 底部导航。这些键只有 :app 自己用（别的模块引不到 :app 的 R）。 -->
     <string name="msp_nav_library">媒体库</string>
-    <string name="msp_nav_now_playing">正在播放</string>
+    <string name="msp_nav_browse">浏览</string>
+    <string name="msp_nav_recent">最近</string>
+    <string name="msp_nav_playlists">播放列表</string>
     <string name="msp_nav_settings">设置</string>
+    <!--
+      还在用，但已经不是标签页了：播放页由迷你播放器推上来。
+      留着是因为无障碍/外接设备上仍需要一句话说明「这一页是正在播放」。
+    -->
+    <string name="msp_nav_now_playing">正在播放</string>
+
+    <!-- 迷你播放器。 -->
+    <string name="msp_mini_player_play">播放</string>
+    <string name="msp_mini_player_pause">暂停</string>
 </resources>

@@ -1,6 +1,9 @@
 package com.multisuperplayer.feature.library.di
 
+import com.multisuperplayer.feature.library.BrowseViewModel
 import com.multisuperplayer.feature.library.LibraryViewModel
+import com.multisuperplayer.feature.library.PlaylistsViewModel
+import com.multisuperplayer.feature.library.RecentViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -13,4 +16,10 @@ import org.koin.dsl.module
  */
 val libraryModule = module {
     viewModelOf(::LibraryViewModel)
+    // 「最近播放」与「播放列表」各自开一个 VM，而不是塞进 LibraryViewModel：
+    // 那两个页面是独立的目的地，要独立的作用域与生命周期；
+    // 共用一个 VM 的话，从媒体库切到最近播放会顺手把媒体库的选中态也带过去。
+    viewModelOf(::RecentViewModel)
+    viewModelOf(::PlaylistsViewModel)
+    viewModelOf(::BrowseViewModel)
 }

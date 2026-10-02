@@ -42,4 +42,86 @@
     <string name="msp_library_filter_audio">音樂</string>
     <string name="msp_library_filter_video">影片</string>
 
+    <!-- ===== 排序 ===== -->
+    <string name="msp_library_sort_label">排序</string>
+    <string name="msp_library_sort_title_asc">名稱（升冪）</string>
+    <string name="msp_library_sort_title_desc">名稱（降冪）</string>
+    <string name="msp_library_sort_newest">最新加入</string>
+    <string name="msp_library_sort_oldest">最早加入</string>
+    <string name="msp_library_sort_longest">時長（長→短）</string>
+    <string name="msp_library_sort_largest">體積（大→小）</string>
+
+    <!-- ===== 分組 ===== -->
+    <string name="msp_library_group_label">分組</string>
+    <string name="msp_library_group_none">不分組</string>
+    <string name="msp_library_group_artist">依演出者</string>
+    <string name="msp_library_group_album">依專輯</string>
+    <string name="msp_library_group_folder">依資料夾</string>
+    <string name="msp_library_group_unknown_artist">未知演出者</string>
+    <string name="msp_library_group_unknown_album">未知專輯</string>
+    <string name="msp_library_group_unknown_folder">未知資料夾</string>
+    <!-- 分組頭和播放清單共用的項目數，單位「項」而不是「首」：分組裡也可能有影片。 -->
+    <string name="msp_library_item_count">%1$d 項</string>
+
+    <!-- ===== 檢視切換 ===== -->
+    <string name="msp_library_view_list">清單檢視</string>
+    <string name="msp_library_view_grid">網格檢視</string>
+
+    <!-- ===== 掃描不完整提示 ===== -->
+    <string name="msp_library_truncated">目錄過多或層級過深，本次只掃描了其中一部分。</string>
+
+    <!-- ===== 多選 ===== -->
+    <string name="msp_library_selection_count">已選 %1$d 項</string>
+    <string name="msp_library_select_all">全選</string>
+    <string name="msp_library_clear_selection">取消選取</string>
+    <string name="msp_library_exit_selection">結束多選</string>
+    <string name="msp_library_play_selection">播放</string>
+
+    <!-- ===== 播放清單 ===== -->
+    <string name="msp_library_add_to_playlist">加入播放清單</string>
+    <string name="msp_library_playlist_empty">還沒有播放清單，先新增一個。</string>
+    <string name="msp_library_playlist_new">新增播放清單</string>
+    <string name="msp_library_playlist_name_hint">播放清單名稱</string>
+    <string name="msp_library_playlist_create_failed">新增播放清單失敗（數量已達上限）。</string>
+    <string name="msp_library_added_to_playlist">已加入 %1$d 項</string>
+    <string name="msp_library_added_to_playlist_skipped">已加入 %1$d 項，另有 %2$d 項已經在清單裡</string>
+    <string name="msp_library_cancel">取消</string>
+    <string name="msp_library_confirm">確定</string>
+    <string name="msp_library_back">返回</string>
+
+    <!-- ===== 瀏覽（SAF 授權目錄） ===== -->
+    <string name="msp_browse_title">瀏覽</string>
+    <string name="msp_browse_add">新增資料夾</string>
+    <string name="msp_browse_hint">授權的資料夾會和系統媒體庫的內容合併顯示在媒體庫頁。系統媒體庫裡的內容不需要在這裡授權。</string>
+    <string name="msp_browse_empty_title">還沒有授權任何資料夾</string>
+    <string name="msp_browse_empty_desc">點右上角的 + 選一個資料夾。適合放系統媒體庫看不到的內容（例如 SD 卡上的音樂）。</string>
+    <string name="msp_browse_volume_root">儲存根目錄</string>
+    <string name="msp_browse_tree_inaccessible">授權已失效，請移除後重新新增</string>
+    <string name="msp_browse_remove">移除</string>
+
+    <!-- ===== 最近播放 ===== -->
+    <string name="msp_recent_title">最近播放</string>
+    <string name="msp_recent_refresh">重新整理</string>
+    <string name="msp_recent_supporting">播放到 %1$s · %2$s</string>
+    <string name="msp_recent_empty_title">還沒有播放記錄</string>
+    <string name="msp_recent_empty_desc">播放過的內容會出現在這裡，並記住上次播到的位置。</string>
+    <string name="msp_recent_blocked_title">讀不到媒體庫</string>
+    <string name="msp_recent_blocked_desc">最近播放要靠媒體庫把記錄對上檔案。請先到媒體庫頁授權儲存權限。</string>
+
+    <!-- ===== 播放清單頁 ===== -->
+    <string name="msp_playlists_title">播放清單</string>
+    <string name="msp_playlists_new">新增播放清單</string>
+    <string name="msp_playlists_empty_title">還沒有播放清單</string>
+    <string name="msp_playlists_empty_desc">在媒體庫裡長按選取內容，再點右上角的「加入播放清單」。</string>
+    <string name="msp_playlists_empty_list_desc">這個清單還是空的。到媒體庫裡長按選取內容，再點「加入播放清單」。</string>
+    <string name="msp_playlists_rename">重新命名</string>
+    <string name="msp_playlists_delete">刪除</string>
+    <string name="msp_playlists_delete_title">刪除播放清單？</string>
+    <string name="msp_playlists_delete_desc">只刪除這個清單，不會刪除任何檔案。</string>
+    <string name="msp_playlists_more">更多操作</string>
+    <string name="msp_playlists_play_all">全部播放</string>
+    <string name="msp_playlists_item_missing">檔案已不在</string>
+    <string name="msp_playlists_missing_banner">其中 %1$d 條檔案已不在，播放時可能失敗。</string>
+    <string name="msp_playlists_remove_item">從播放清單移除</string>
+
 </resources>
