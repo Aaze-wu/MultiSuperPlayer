@@ -100,6 +100,18 @@ interface PlaybackController {
     /** 音量（0~1）。这是播放器内部音量，不是系统音量。 */
     fun setVolume(volume: Float)
 
+    /**
+     * 是否强制改用 FFmpeg 软件解码（默认 false）。
+     *
+     * 关着的时候内核已经是「系统解码器优先，解不了/解失败了自动换 FFmpeg」——
+     * 也就是说打开这个开关**不会让更多文件变得能放**，它解决的是另一类问题：
+     * 硬件解码器当场不报错，但画面花屏/变色/音画不同步。这时候只能靠人放弃硬件解码。
+     *
+     * 本安装包没有 FFmpeg（见 [SoftwareDecoderSupport.available]）时调用它是空操作，
+     * 不是错误：禁止用户使用一个不存在的功能，不该以崩溃的形式表达。
+     */
+    fun setForceSoftwareDecoding(enabled: Boolean)
+
     /** 停止并清空队列（用于「关闭播放器」）。 */
     fun stopAndClear()
 

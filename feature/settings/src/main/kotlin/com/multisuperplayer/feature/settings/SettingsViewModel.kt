@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.data.settings.PlaybackSettings
+import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.player.SoftwareDecoderSupport
 import com.multisuperplayer.core.translate.ConnectivityResult
 import com.multisuperplayer.core.translate.FailureText
 import com.multisuperplayer.core.translate.Glossary
@@ -60,6 +63,8 @@ data class ModelListState(
 class SettingsViewModel(
     private val themeSettings: ThemeSettingsRepository,
     private val translationSettings: TranslationSettingsRepository,
+    private val playbackSettingsRepository: PlaybackSettingsRepository,
+    private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
@@ -88,6 +93,31 @@ class SettingsViewModel(
 
     fun setColorFromArtwork(enabled: Boolean) = persist("封面取色=$enabled") {
         themeSettings.setColorFromArtwork(enabled)
+    }
+
+    // ------------------------------------------------------------------ 播放内核
+
+    /**
+     * 播放偏好的持久化值。
+     *
+     * `Eagerly` + 全空初值，理由同主题：首帧不能先闪一个「关」，
+     * 否则用户会看到开关自己弹一下。
+     */
+    val playback: StateFlow<PlaybackSettings> = playbackSettingsRepository.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PlaybackSettings())
+
+    /**
+     * 本安装包里到底有没有 FFmpeg。
+     *
+     * 界面**必须**用到它：[NextlibSoftwareDecoderSupport] 在 CPU 架构不受支持时
+     * 会如实报「不可用」，而那时 `setForceSoftwareDecoding` 是个空动作。
+     * 不把这件事说出来，用户拨开关只会得到一个「看起来生效了但什么都没发生」的界面
+     * ——正是这个 ViewModel 的类注释里点名要避免的东西。
+     */
+    val softwareDecodingAvailable: Boolean = softwareDecoders.available
+
+    fun setForceSoftwareDecoding(enabled: Boolean) = persist("强制软件解码=$enabled") {
+        playbackSettingsRepository.setForceSoftwareDecoding(enabled)
     }
 
     // ------------------------------------------------------------------ 字幕翻译

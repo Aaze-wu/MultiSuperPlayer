@@ -4,6 +4,7 @@ import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
 import com.multisuperplayer.core.data.settings.ApiKeyStore
+import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
@@ -27,6 +28,8 @@ val dataModule = module {
     single { ThemeSettingsRepository(context = androidContext(), dispatchers = get()) }
 
     single { SubtitleSettingsRepository(context = androidContext(), dispatchers = get()) }
+
+    single { PlaybackSettingsRepository(context = androidContext(), dispatchers = get()) }
 
     // API Key 加密存起来（AndroidKeyStore + AES/GCM），密文进 msp_settings 这个 DataStore。
     single { ApiKeyStore(context = androidContext(), dispatchers = get()) }

@@ -18,13 +18,11 @@ dependencyResolutionManagement {
         maven("https://maven.aliyun.com/repository/public")
         google()
         mavenCentral()
-        // 仅用于 Media3 的 FFmpeg 软件解码扩展（nextlib 只发布在 JitPack）。
-        maven("https://jitpack.io") {
-            content {
-                includeGroupByRegex("com\\.github\\..*")
-            }
-        }
     }
+    // 这里**不需要** jitpack.io：唯一需要外部仓库的依赖是 FFmpeg 软件解码扩展
+    // （`io.github.anilbeesetti:nextlib-media3ext`），而它发布在 Maven Central 上。
+    // 仓库列表越短，构建越不容易因为某个第三方仓库变慢/失效而失败——
+    // 所以别为了「以后可能用得上」提前加。
 }
 
 rootProject.name = "MultiSuperPlayer"

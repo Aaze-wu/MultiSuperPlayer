@@ -37,6 +37,11 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:data"))
     implementation(project(":core:ui"))
+    // 「强制软件解码」那一行要如实告诉用户「本安装包到底带没带 FFmpeg」：
+    // 不带的时候开关会被置灰并说明原因，而不是拨了没反应。
+    // 只用到 `SoftwareDecoderSupport` 这一个接口（Koin 在 playerModule 里绑定），
+    // 不会把 nextlib 暴露到设置模块。
+    implementation(project(":core:player"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

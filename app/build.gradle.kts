@@ -30,11 +30,23 @@ android {
         applicationId = "com.multisuperplayer.player"
         minSdk = 26
         targetSdk = 36
-        // 版本号跟着路线图走：0.1 = 骨架/媒体库/播放内核，0.2 = 字幕链路。
-        versionCode = 3
-        versionName = "0.3.0"
+        // 版本号跟着路线图走：0.1 = 骨架/媒体库/播放内核，0.2 = 字幕链路，
+        // 0.3 = 字幕翻译，0.4 = FFmpeg 软件解码（全格式）。
+        versionCode = 4
+        versionName = "0.4.0"
 
         vectorDrawables { useSupportLibrary = true }
+
+        // FFmpeg 软件解码扩展带四个 ABI 的原生库，全打进一个包会让 APK 无谓地大一倍：
+        // 实测 arm64-v8a 7.5MB + x86_64 11.1MB（未压缩），而 armeabi-v7a/x86 这两个
+        // 32 位架构在 2016 年之后就基本见不到了。只保留主流 64 位 + 模拟器架构。
+        //
+        // 少打两个 ABI 的**代价**是：32 位设备上装不上（不是装上了用不了，是安装器
+        // 直接拒绝）。若以后要覆盖老设备，正确做法是加 ABI split 或改发 AAB，
+        // 而不是把四个全塞回一个包里。
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     signingConfigs {

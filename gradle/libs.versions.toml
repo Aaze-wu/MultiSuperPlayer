@@ -36,6 +36,23 @@ palette = "1.0.0"
 # Media
 media3 = "1.11.1"
 
+# FFmpeg 软件解码扩展（NextLib）。发布在 **Maven Central**（不是 JitPack）。
+#
+# ⚠️ 版本号规则是「<它支持的 Media3 版本>-<自身版本>」，所以必须跟着上面的 media3 走：
+#    1.11.1-0.16.0 正好对应 media3 1.11.1。换成不匹配的组合会在运行时
+#    `NoSuchMethodError` / `AbstractMethodError`，编译期完全看不出来。
+#
+# ⚠️ 同样受上面那条 AAR 元数据约束。实测 `nextlib-media3ext-1.11.1-0.16.0.aar`：
+#    minCompileSdk=36（= 本项目上限，刚好够）、minAndroidGradlePluginVersion=1.0.0。
+#
+# ⚠️ 许可证是 **GPL-3.0**（它的 FFmpeg 构建启用了 GPL 组件）。链接进来意味着整个应用
+#    以 GPL-3.0 分发：必须附带完整源码、衍生作品也必须 GPL-3.0。
+#
+# ⚠️ 它提供的是**解码器**（音视频编码格式），不是**解封装器**（封装/容器格式）。
+#    因此「本机没有解码器」能被它救回来，「无法识别封装格式」不能——
+#    WMV/ASF、RealMedia(RM/RMVB) 至今仍放不了，别指望升级这个库能解决。
+nextlib = "1.11.1-0.16.0"
+
 # KotlinX
 coroutines = "1.11.0"
 serialization = "1.11.0"
@@ -80,6 +97,11 @@ media3-exoplayer-rtsp = { module = "androidx.media3:media3-exoplayer-rtsp", vers
 media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
 media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
+
+# --- FFmpeg 软件解码（GPL-3.0） ---
+# 只在 `:core:player` 里用 `implementation` 引入：它是实现细节，不该出现在
+# `PlaybackController` 的公开签名里（见 MspPlaybackState 里「不泄漏 Media3 类型」的说明）。
+nextlib-media3ext = { module = "io.github.anilbeesetti:nextlib-media3ext", version.ref = "nextlib" }
 
 # --- KotlinX ---
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -47,6 +48,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.ui.theme.MspAccent
@@ -67,15 +69,19 @@ fun SettingsRoute(
     val viewModel: SettingsViewModel = koinViewModel()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val translation by viewModel.translation.collectAsStateWithLifecycle()
+    val playback by viewModel.playback.collectAsStateWithLifecycle()
 
     SettingsScreen(
         theme = theme,
         translation = translation,
+        playback = playback,
+        softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
         modifier = modifier,
         onSelectBaseTheme = viewModel::selectBaseTheme,
         onSelectAccent = viewModel::selectAccent,
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
+        onSetForceSoftwareDecoding = viewModel::setForceSoftwareDecoding,
         onOpenTranslationSettings = onOpenTranslationSettings,
     )
 }
@@ -86,10 +92,13 @@ fun SettingsScreen(
     theme: ThemeSettings,
     modifier: Modifier = Modifier,
     translation: TranslationSettings = TranslationSettings(),
+    playback: PlaybackSettings = PlaybackSettings(),
+    softwareDecodingAvailable: Boolean = true,
     onSelectBaseTheme: (MspBaseTheme) -> Unit = {},
     onSelectAccent: (MspAccent) -> Unit = {},
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
+    onSetForceSoftwareDecoding: (Boolean) -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
@@ -179,6 +188,33 @@ fun SettingsScreen(
                         else ->
                             "强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。"
                     },
+                )
+            }
+
+            item { SectionHeader("播放") }
+            item {
+                // 这个开关**不当**「让更多文件能放」用：内核默认就是
+                // 「系统解码器优先，解不了/解失败自动换 FFmpeg」。它真正解决的是
+                // 另一类问题——硬件解码器不报错，但画面花屏、变色、音画不同步。
+                // 不说清楚的话，所有「放不了」的用户都会先来拨它，然后觉得没用。
+                val force = playback.forceSoftwareDecoding ?: false
+                SettingsSwitchRow(
+                    icon = { Icon(Icons.Outlined.Memory, contentDescription = null) },
+                    title = "强制软件解码",
+                    subtitle = when {
+                        !softwareDecodingAvailable ->
+                            "本安装包不含 FFmpeg（CPU 架构不受支持），打开也不会生效"
+
+                        force ->
+                            "已用 FFmpeg 解码。画面异常时用它排查；代价是耗电和发热明显变高。"
+
+                        else ->
+                            "默认不勾：系统解码器放不了或放错时，内核会自动改用内置的 FFmpeg。" +
+                                "只有当画面花屏/变色/音画不同步（硬件解码器出错）时才需要勾上。"
+                    },
+                    checked = force && softwareDecodingAvailable,
+                    enabled = softwareDecodingAvailable,
+                    onCheckedChange = onSetForceSoftwareDecoding,
                 )
             }
 

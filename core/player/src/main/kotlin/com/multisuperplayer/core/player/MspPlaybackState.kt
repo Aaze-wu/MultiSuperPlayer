@@ -35,6 +35,14 @@ data class MspPlaybackState(
     val repeatMode: MspRepeatMode = MspRepeatMode.OFF,
     val shuffleEnabled: Boolean = false,
     val volume: Float = 1f,
+    /**
+     * 当前**实际在用**的解码器类型，见 [MspDecoderKind]。
+     *
+     * 这不是一个装饰性字段。软件解码比硬件解码显著更耗电，
+     * 「这个文件一放就发烫/掉帧」是一个真实的用户疑问，而答案就在这个字段里——
+     * 没它的话，「是不是走了软解」只能靠猜。
+     */
+    val decoderKind: MspDecoderKind = MspDecoderKind.UNKNOWN,
     /** 最近一次错误的人类可读描述；成功播放后会被清空。 */
     val errorMessage: String? = null,
 ) {
@@ -49,6 +57,28 @@ enum class MspRepeatMode {
     OFF,
     ONE,
     ALL,
+}
+
+/**
+ * 实际在用的解码器类型。
+ *
+ * ⚠️ 这里刻意把软件解码拆成两个值，而不是一个笼统的 `SOFTWARE`：软件解码有两个来源
+ * ——系统自带的软件解码器（MediaCodec 里的非硬件实现）和内置 FFmpeg，两者的
+ * 兼容性与耗电都不一样。合并成一个值后，界面就无法回答「到底有没有走上 FFmpeg」
+ * 这个排查时最要紧的问题。
+ */
+enum class MspDecoderKind {
+    /** SoC 里的专用解码器。最省电，也最不兼容。 */
+    HARDWARE,
+
+    /** 系统自带的软件解码器（MediaCodec 的非硬件实现）。 */
+    SYSTEM_SOFTWARE,
+
+    /** 内置的 FFmpeg 软件解码器。能解的音视频编码最全，但费 CPU。 */
+    FFMPEG,
+
+    /** 还没开始解码，或者本安装包读不到解码器（例如缺对应 CPU 架构的原生库）。 */
+    UNKNOWN,
 }
 
 /**

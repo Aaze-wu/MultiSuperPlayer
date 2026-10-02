@@ -56,6 +56,7 @@ import androidx.media3.ui.PlayerView
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.player.MspDecoderKind
 import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
 import com.multisuperplayer.core.player.progressOf
@@ -235,7 +236,7 @@ fun PlayerScreen(
             }
         }
 
-        TrackInfo(entry = entry)
+        TrackInfo(entry = entry, decoderKind = state.decoderKind)
 
         SeekBar(
             // 时长未知时进度条没有意义（拖了也没目标），直接禁用。
@@ -359,7 +360,7 @@ private fun AudioArtwork(
 }
 
 @Composable
-private fun TrackInfo(entry: MediaEntry) {
+private fun TrackInfo(entry: MediaEntry, decoderKind: MspDecoderKind) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -371,10 +372,22 @@ private fun TrackInfo(entry: MediaEntry) {
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
-        val subtitle = entry.subtitle
-        if (subtitle.isNotBlank()) {
+        // 只有「软件解码真的介入了」才写出来。
+        //
+        // 这条信息存在的唯一意义是回答「FFmpeg 到底有没有生效」——用户排查
+        // 花屏/变色/放不了时最需要知道的一件事，而它恰好是界面完全看不出来的：
+        // 硬件解码和 FFmpeg 解出来的画面长一样，只有这时候不一样。
+        // 正常硬件解码时写「硬件解码」反而会把两行字的地方填满废话。
+        val decoderLabel = when (decoderKind) {
+            MspDecoderKind.FFMPEG -> "FFmpeg 软件解码"
+            MspDecoderKind.SYSTEM_SOFTWARE -> "系统软件解码"
+            MspDecoderKind.HARDWARE, MspDecoderKind.UNKNOWN -> null
+        }
+        val line = listOfNotNull(entry.subtitle.takeIf { it.isNotBlank() }, decoderLabel)
+            .joinToString("　·　")
+        if (line.isNotBlank()) {
             Text(
-                text = subtitle,
+                text = line,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

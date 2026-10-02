@@ -16,7 +16,17 @@ import androidx.media3.common.PlaybackException
 object PlaybackErrorMapper {
 
     /** 兜底文案里带上原始错误码，方便用户截图反馈时定位。 */
-    fun describe(errorCode: Int, causeName: String? = null): String {
+    fun describe(
+        errorCode: Int,
+        causeName: String? = null,
+        /**
+         * 出错时 FFmpeg 软件解码参与到了什么程度。见 [SoftwareDecodingAttempt]。
+         *
+         * 它必须是个三态而不是一个布尔值：这三种情况的**下一步动作**完全不同
+         * （换设备 / 只能换文件 / 再点一次重试），用 `Boolean` 就会有两态共用一个文案。
+         */
+        softwareDecoding: SoftwareDecodingAttempt = SoftwareDecodingAttempt.NOT_TRIED,
+    ): String {
         val base = when (errorCode) {
             PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
                 "找不到该文件，可能已被移动或删除"
@@ -39,14 +49,33 @@ object PlaybackErrorMapper {
             PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
             ->
-                "本机没有能解码该音视频格式的解码器（常见于 AC-3/DTS/TrueHD 音轨或特殊编码的 HEVC）。" +
-                    "可以在设置里启用 FFmpeg 软件解码后再试"
+                // ⚠️ 这里不能说「去设置里开 FFmpeg 软件解码」——那是 0.3 的旧文案，
+                // 当时根本没有那个设置项。现在软件解码默认就在，而且是**自动**回退的，
+                // 所以走到这里时它多半已经试过并失败了。
+                when (softwareDecoding) {
+                    SoftwareDecodingAttempt.UNAVAILABLE ->
+                        "本机没有能解码该音视频格式的解码器，而这个安装包不含 FFmpeg 软件解码" +
+                            "（可能是 CPU 架构不受支持）"
+
+                    SoftwareDecodingAttempt.FAILED ->
+                        "硬件解码和 FFmpeg 软件解码都解不开这个文件。常见于冷门编码，" +
+                            "或封装格式本身不被支持（例如 WMV、RealMedia）"
+
+                    SoftwareDecodingAttempt.NOT_TRIED ->
+                        "本机没有能解码该音视频格式的解码器（常见于 AC-3/DTS/TrueHD 音轨" +
+                            "或特殊编码的 HEVC）。再点一次播放会重试一次"
+                }
 
             PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
             PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
             PlaybackException.ERROR_CODE_DECODING_FAILED,
             ->
-                "解码器初始化失败。若反复出现，通常是这个文件的编码方式不被支持"
+                if (softwareDecoding == SoftwareDecodingAttempt.FAILED) {
+                    "解码失败：硬件解码和 FFmpeg 软件解码都试过并失败了。" +
+                        "这个文件的编码方式不被支持"
+                } else {
+                    "解码器初始化失败。若反复出现，通常是这个文件的编码方式不被支持"
+                }
 
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,

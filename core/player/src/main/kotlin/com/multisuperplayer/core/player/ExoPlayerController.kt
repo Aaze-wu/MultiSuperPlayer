@@ -7,10 +7,14 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.MediaEntry
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderManager
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -46,11 +50,78 @@ private const val TICK_INTERVAL_MS = 200L
 class ExoPlayerController(
     context: Context,
     private val dispatchers: DispatcherProvider,
+    /**
+     * 软件解码支持探测。默认值是「没有」而不是 null：拿不到原生库是一种
+     * **正常状态**（比如装到了未打包的 CPU 架构上），应该降级成「一台普通的
+     * Media3 播放器」，而不是启动就崩。
+     */
+    private val softwareDecoders: SoftwareDecoderSupport = SoftwareDecoderSupport.Unavailable,
 ) : PlaybackController {
 
     private val appContext: Context = context.applicationContext
 
+    /**
+     * 整个生命周期里**唯一**的解码器管理器；null 表示「本内核没有 FFmpeg 可用」。
+     *
+     * 这一个实例必须同时交给两个地方：渲染器工厂（`NextRenderersFactory
+     * .setDecoderManager`）和 [attachDecoderManager]。**必须是同一个对象**——
+     * `DecoderManager.attach(player)` 会校验「这个 player 就是用我建的」，
+     * 拿另一个实例去 attach 会抛
+     * `IllegalStateException: Set this DecoderManager on NextRenderersFactory before building the player`。
+     *
+     * 这个约束编译器看不见、单测也看不见（两个实例长得一模一样），只有真机启动才
+     * 暴露出来；而且症状很间接：一条 warn 日志 + 「强制软件解码」静默失效，
+     * 界面照常播放。所以这里刻意声明在 [player] **之前**：`player` 的初始化表达式
+     * 会读它，而属性初始化严格按声明顺序执行。
+     */
+    private val decoderManager: DecoderManager? = createDecoderManager()
+
+    /**
+     * 已经成功挂到内核上的那个管理器；null 表示没挂上。
+     *
+     * 和 [decoderManager] 分开，是因为「创建出来」和「挂上去」是两件事：attach 失败
+     * 的时候渲染器工厂**仍然**在用着那个管理器（工厂是在 build 之前就拿到手的），
+     * 所以把 [decoderManager] 置空只会反过来谎报「本包没有 FFmpeg」。这个字段因此
+     * 只代表一件事：**能不能运行期切换解码方式、能不能读到实际用的是哪种解码器**。
+     */
+    private var attachedDecoderManager: DecoderManager? = null
+
+    /**
+     * 用户设置的「强制软件解码」（持久化的那份在 `:core:data`）。
+     *
+     * 存在这里是为了让自动回退能够**退回**到它：[retryWithSoftwareDecoding] 会把
+     * 解码方式临时改成 FFmpeg，而那个临时状态不能一直留着——
+     * 否则一条 AC-3 音轨会把后续所有文件都拉成软解，耗电变化用户完全看不见原因。
+     */
+    private var forceSoftwareDecoding = false
+
+    /**
+     * 已经因解码失败自动回退过的那一条媒体。
+     *
+     * 用 media id 而不是布尔值：绑定成进程级会让「列表里第 3 条是 AC-3、
+     * 第 7 条是 DTS」这种情况下后面的文件白白放弃回退机会。
+     */
+    private var fellBackMediaId: String? = null
+
     override val player: ExoPlayer = ExoPlayer.Builder(appContext)
+        .apply {
+            // 永远装上带 FFmpeg 的渲染器工厂（只要这个安装包里有 FFmpeg），
+            // 而不是「开关打开时才装」：渲染器工厂只能在 Builder 阶段指定，
+            // 要按设置项重建 player 的话，开关一动就丢失当前播放位置。
+            //
+            // 用的是字段 `decoderManager`，不是再调一次 `createDecoderManager()`：
+            // 工厂持有的实例和 [attachDecoderManager] 挂上去的必须是同一个对象。
+            decoderManager?.let { manager ->
+                val factory = NextRenderersFactory(appContext).setDecoderManager(manager)
+                // 显式打开扩展渲染器。`setDecoderManager` 自己也会把优先级提到 ON，
+                // 但那是内部实现细节；不写下来的话，「哪天升级 nextlib 后 FFmpeg
+                // 悄悄不再被选中」只能靠人肉回放一个 AC-3 文件才发现。
+                factory.setExtensionRendererMode(
+                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
+                )
+                setRenderersFactory(factory)
+            }
+        }
         .setHandleAudioBecomingNoisy(true)
         .build()
         .apply {
@@ -103,6 +174,8 @@ class ExoPlayerController(
     private var serviceRunning = false
 
     init {
+        // 必须在 addListener 之后：`attach` 会立刻 apply 一次解码器选择，
+        // 那时若监听器已就位，随后的 publish 会把真实解码方式直接写上界面。
         player.addListener(
             object : Player.Listener {
                 /**
@@ -124,9 +197,14 @@ class ExoPlayerController(
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    // 先试自动回退。回退成功就逄回，不设错误文案——
+                    // 用户看到的是「黑一下接着放」，而不是一条错误提示。
+                    if (retryWithSoftwareDecoding(error)) return
+
                     pendingErrorMessage = PlaybackErrorMapper.describe(
                         errorCode = error.errorCode,
                         causeName = error.cause?.let { it::class.java.simpleName },
+                        softwareDecoding = softwareAttemptForCurrentMedia(),
                     )
                     MspLog.e(TAG, error) { "播放失败：$pendingErrorMessage" }
                     publish()
@@ -146,11 +224,15 @@ class ExoPlayerController(
                 delay(TICK_INTERVAL_MS)
             }
         }
+
+        attachDecoderManager()
     }
 
     // ---------------------------------------------------------------- 内部状态同步
 
-    /** 把内核当前状态抄进 Flow。只在主线程调用。 */
+    /**
+     * 把内核当前状态抄进 Flow。只在主线程调用。
+     */
     private fun publish() {
         _state.value = MspPlaybackState(
             mediaId = player.currentMediaItem?.mediaId,
@@ -164,6 +246,7 @@ class ExoPlayerController(
             repeatMode = player.repeatMode.toMsp(),
             shuffleEnabled = player.shuffleModeEnabled,
             volume = player.volume,
+            decoderKind = currentDecoderKind(),
             errorMessage = pendingErrorMessage,
         )
         syncCurrentEntry()
@@ -182,6 +265,24 @@ class ExoPlayerController(
         if (position != _positionMs.value) _positionMs.value = position
         val buffered = player.bufferedPosition.coerceAtLeast(0L)
         if (buffered != _bufferedPositionMs.value) _bufferedPositionMs.value = buffered
+    }
+
+    /**
+     * 从内核现读「实际在用哪种解码器」。
+     *
+     * 读 `activeVideoMode`/`activeAudioMode`（**已经在用**的那一个），而不是
+     * `videoMode`/`audioMode`（**要求用的**那一个）：自动回退刚发生的一瞬间两者
+     * 不同，而用户想知道的是「现在到底在用哪个」。
+     */
+    private fun currentDecoderKind(): MspDecoderKind {
+        val manager = attachedDecoderManager ?: return MspDecoderKind.UNKNOWN
+        val kinds = listOfNotNull(
+            manager.activeVideoMode?.toMspKind(),
+            manager.activeAudioMode?.toMspKind(),
+        )
+        // 报「最费 CPU 的那一路」：两路取其一的话，音频走的 FFmpeg 而视频是硬解时
+        // 报「硬件解码」会让人以为很省电，而整体耗电由最贵的那路决定。
+        return DECODER_KIND_SEVERITY.firstOrNull { it in kinds } ?: MspDecoderKind.UNKNOWN
     }
 
     /** 把所有命令统一切到主线程。 */
@@ -214,6 +315,147 @@ class ExoPlayerController(
         serviceRunning = false
     }
 
+    // -------------------------------------------------------------------- 解码方式
+
+    /** 构造解码器管理器；本安装包没有 FFmpeg 时返回 null。 */
+    private fun createDecoderManager(): DecoderManager? {
+        if (!softwareDecoders.available) return null
+        return runCatching { DecoderManager(DecoderMode.AUTO, DecoderMode.AUTO) }
+            .onFailure { error -> MspLog.w(TAG, error) { "解码器管理器无法创建，退回普通内核" } }
+            .getOrNull()
+    }
+
+    /**
+     * 把解码器管理器挂到内核上。
+     *
+     * 注意这里**不能**再调一次 [createDecoderManager]：管理器是 [player] 初始化时
+     * 交给渲染器工厂的那一个（见 [decoderManager]），attach 另一个实例会被 nextlib
+     * 的 `check` 拦下来，结果是「能播但开关静默失效」——真机试出来的坑，别改回去。
+     *
+     * 失败只记日志、不抛也不动 [decoderManager]：`attach` 要求 track selector 是
+     * `DefaultTrackSelector`（`ExoPlayer.Builder` 默认就给这个，我们也没换过），
+     * 所以只有在契约被破坏时才会失败；此时宁可退回「一台普通的 Media3 播放器」，
+     * 也不要让整个播放器起不来。
+     */
+    private fun attachDecoderManager() {
+        val manager = decoderManager ?: return
+        attachedDecoderManager = runCatching {
+            manager.attach(player)
+            manager
+        }.onFailure { error ->
+            MspLog.w(TAG, error) { "解码器管理器挂载失败，将无法运行期切换解码方式" }
+        }.getOrNull()
+
+        // 把持久化的偏好应用到内核。放在这里（而不是让上层在启动时调）是因为
+        // 上层要到播放页才拿得到控制器，而那时可能已经在播放了。
+        applyDecoderMode(baseDecoderMode())
+    }
+
+    /** 用户设置的解码方式（不含自动回退的临时状态）。 */
+    private fun baseDecoderMode(): DecoderMode =
+        if (forceSoftwareDecoding) DecoderMode.FFMPEG else DecoderMode.AUTO
+
+    /**
+     * 把两路解码器都设成 [mode]。
+     *
+     * 两路都要设：只改视频的话，纯音频文件（AC-3/DTS/TrueHD）根本没有视频轨，
+     * 回退永远不会发生——这是这类功能最常见的遗漏。
+     *
+     * 失败只记日志不抛：解码方式是一个「尽量让它生效」的偏好，不是播放的前置条件。
+     */
+    private fun applyDecoderMode(mode: DecoderMode) {
+        val manager = attachedDecoderManager ?: return
+        runCatching {
+            manager.selectVideoDecoder(mode)
+            manager.selectAudioDecoder(mode)
+        }.onFailure { error -> MspLog.w(TAG, error) { "切换解码方式失败：$mode" } }
+    }
+
+    /** 如果上一次播放曾自动回退，恢复到用户设置的解码方式。 */
+    private fun resetDecoderModeIfFellBack() {
+        if (fellBackMediaId == null) return
+        fellBackMediaId = null
+        applyDecoderMode(baseDecoderMode())
+    }
+
+    /**
+     * 出错的那一刻，FFmpeg 软件解码算什么情况。
+     *
+     * 四个分支的顺序不能变：先排「本包根本没带」（这是最确定的事实），
+     * 再看「已经明确切过去过」（手工强制 / 上一次自动回退），
+     * 最后才用「还有没有非 FFmpeg 的解码器在用」倒推。
+     * 倒推放最后是因为它是**间接证据**：切换失败时它也会返回「两路都是 FFmpeg」。
+     */
+    private fun softwareAttemptForCurrentMedia(): SoftwareDecodingAttempt = when {
+        !softwareDecoders.available -> SoftwareDecodingAttempt.UNAVAILABLE
+        fellBackMediaId == player.currentMediaItem?.mediaId -> SoftwareDecodingAttempt.FAILED
+        forceSoftwareDecoding -> SoftwareDecodingAttempt.FAILED
+        !holdsNonFfmpegDecoder() -> SoftwareDecodingAttempt.FAILED
+        else -> SoftwareDecodingAttempt.NOT_TRIED
+    }
+
+    /**
+     * 这一路是不是还有非 FFmpeg 解码器在用。
+     *
+     * 读的是 `videoMode`/`audioMode`（**要求用的**）而不是 active 系列：前者由
+     * `selectVideoDecoder` 同步写下，后者要等解码器真正被选中才有值，在错误回调
+     * 这一刻读它可能还是旧值，会把「已经切过了」误判成「还没切」然后无限重试。
+     */
+    private fun holdsNonFfmpegDecoder(): Boolean {
+        // 没挂上管理器 ⇒ 一律当作「没有可回退的空间」：切都切不了，
+        // 让策略判 REPORT 才是实话（否则会无限重试）。
+        val manager = attachedDecoderManager ?: return false
+        return manager.videoMode != DecoderMode.FFMPEG || manager.audioMode != DecoderMode.FFMPEG
+    }
+
+    /**
+     * 解码失败的自动回退。返回 true 表示已接手处理。
+     *
+     * 决定本身在 [DecoderFallbackPolicy] 里（纯函数、可穷举单测），这里只负责
+     * 「怎么把决定做出来」。
+     *
+     * 续播位置必须自己存下来再 seek 回去：失败后内核停在 idle，位置会归零，
+     * 不主动恢复的话用户会从头开始听——一个 20 分钟的进度白白丢掉。
+     */
+    private fun retryWithSoftwareDecoding(error: PlaybackException): Boolean {
+        val decision = DecoderFallbackPolicy.decide(
+            errorCode = error.errorCode,
+            alreadyRetried = fellBackMediaId == player.currentMediaItem?.mediaId,
+            ffmpegAvailable = softwareDecoders.available,
+            holdsNonFfmpegDecoder = holdsNonFfmpegDecoder(),
+        )
+        if (decision != DecoderFallbackDecision.RETRY_WITH_FFMPEG) return false
+        val manager = attachedDecoderManager ?: return false
+
+        val resumeAt = player.currentPosition.coerceAtLeast(0L)
+        val resumePlaying = player.playWhenReady
+        fellBackMediaId = player.currentMediaItem?.mediaId
+        MspLog.w(TAG, error) {
+            "解码失败（${error.errorCode}），改用 FFmpeg 软件解码，从 ${resumeAt}ms 续播"
+        }
+
+        val applied = runCatching {
+            manager.selectVideoDecoder(DecoderMode.FFMPEG)
+            manager.selectAudioDecoder(DecoderMode.FFMPEG)
+            // 库自己只会在「播放状态非 idle」时补一次 prepare（见它的
+            // requiresMediaCodecRestart），而解码失败后内核恰好停在 idle，
+            // 所以重新起播必须由我们做；否则表现为「黑一下就不动了」。
+            player.prepare()
+            player.seekTo(resumeAt)
+            player.playWhenReady = resumePlaying
+        }
+        if (applied.isFailure) {
+            // 回退本身失败（比渲染器已经释放）。当成普通错误报告，
+            // 不要再往上抛——回调里抛异常会直接干掉播放线程。
+            MspLog.w(TAG, applied.exceptionOrNull()) { "自动回退到 FFmpeg 失败" }
+            fellBackMediaId = null
+            return false
+        }
+        pendingErrorMessage = null
+        publish()
+        return true
+    }
+
     // ---------------------------------------------------------------------- 命令实现
 
     override fun setQueue(entries: List<MediaEntry>, startIndex: Int, playWhenReady: Boolean) {
@@ -226,6 +468,14 @@ class ExoPlayerController(
             _queue.value = entries
             _currentIndex.value = safeIndex
             pendingErrorMessage = null
+            // 上一次播放自动回退到 FFmpeg 的状态到这里就结束。
+            //
+            // 在这里恢复而不是在 `onMediaItemTransition` 里：切换条目时调用
+            // `selectVideoDecoder` 会（在需要重启 MediaCodec 的情况下）触发一次
+            // `player.prepare()`，那会把刚开始的新文件又重启一遍，表现为
+            // 「切歌时顿一下」甚至循环重启。而 setQueue 是「用户主动开一个新的播放会话」，
+            // 此时重启是预期行为。
+            resetDecoderModeIfFellBack()
             player.setMediaItems(
                 entries.map(MediaItemMapper::toMediaItem),
                 safeIndex,
@@ -325,6 +575,17 @@ class ExoPlayerController(
         }
     }
 
+    override fun setForceSoftwareDecoding(enabled: Boolean) {
+        onMain {
+            if (forceSoftwareDecoding == enabled) return@onMain
+            forceSoftwareDecoding = enabled
+            // 手动改了设置，之前的自动回退记录就作废了——用户刚刚明确表达了他想要什么。
+            fellBackMediaId = null
+            applyDecoderMode(baseDecoderMode())
+            publish()
+        }
+    }
+
     override fun stopAndClear() {
         onMain {
             player.stop()
@@ -367,3 +628,10 @@ private fun MspRepeatMode.toMedia3(): Int = when (this) {
     MspRepeatMode.ONE -> Player.REPEAT_MODE_ONE
     MspRepeatMode.ALL -> Player.REPEAT_MODE_ALL
 }
+
+/** 把两路解码器归并成一个结论时用的排序：从最费 CPU 到最省。 */
+private val DECODER_KIND_SEVERITY = listOf(
+    MspDecoderKind.FFMPEG,
+    MspDecoderKind.SYSTEM_SOFTWARE,
+    MspDecoderKind.HARDWARE,
+)
