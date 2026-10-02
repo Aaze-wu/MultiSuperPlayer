@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="msp_settings_title">設定</string>
+    <string name="msp_settings_back">返回</string>
+    <string name="msp_settings_cancel">取消</string>
+    <string name="msp_settings_read_failed">讀取設定失敗，請重試。</string>
+
+    <string name="msp_settings_appearance">外觀</string>
+    <string name="msp_settings_playback">播放</string>
+    <string name="msp_settings_translation">字幕翻譯</string>
+    <string name="msp_settings_about">關於</string>
+
+    <!-- 摘要片段之間的分隔符。 -->
+    <string name="msp_settings_summary_sep">" · "</string>
+
+    <string name="msp_settings_summary_tail_artwork">封面取色</string>
+    <string name="msp_settings_summary_tail_dynamic">系統取色</string>
+    <string name="msp_settings_summary_tail_dynamic_blocked">系統取色未生效</string>
+    <string name="msp_settings_summary_tail_force_software">強制軟解</string>
+    <string name="msp_settings_summary_tail_no_ffmpeg">本包無 FFmpeg</string>
+    <string name="msp_settings_summary_tail_no_position">不記位置</string>
+
+    <string name="msp_settings_summary_long_press">長按 %1$s</string>
+    <string name="msp_settings_summary_model_unset">未填模型名</string>
+    <string name="msp_settings_summary_translate_to">譯成%1$s</string>
+    <string name="msp_settings_summary_translation_incomplete">還不能翻譯（缺：%1$s）</string>
+
+    <string name="msp_settings_summary_no_logs">還沒有任何日誌檔案</string>
+    <!-- `%1$d` 是檔案數，`%2$s` 是總大小 -->
+    <string name="msp_settings_summary_log_usage">%1$d 個 · %2$s</string>
+    <string name="msp_settings_summary_no_range">—</string>
+
+    <string name="msp_settings_section_base_theme">主題基底</string>
+    <string name="msp_settings_section_color_source">取色來源</string>
+    <string name="msp_settings_section_about_theme">關於主題</string>
+    <string name="msp_settings_section_language">語言</string>
+
+    <string name="msp_settings_artwork_color">封面取色</string>
+    <string name="msp_settings_artwork_color_desc">用正在播放的封面產生主題色</string>
+
+    <string name="msp_settings_dynamic_color">跟隨系統取色</string>
+    <string name="msp_settings_dynamic_color_desc">使用系統桌布產生的主題色（選強調色時會自動關掉）</string>
+    <string name="msp_settings_dynamic_color_covered">已被封面取色覆蓋</string>
+    <string name="msp_settings_dynamic_color_needs_api31">需要 Android 12 及以上</string>
+    <string name="msp_settings_dynamic_color_blocked">純黑模式下不可用（系統取色會給出一堆深灰）</string>
+
+    <string name="msp_settings_theme_note_artwork">現在的主題色來自封面取色。它蓋住了強調色，但選一個強調色就可以切回來（那會自動關掉封面取色）；封面裡沒有可用顏色時（例如黑白封面）會回退到強調色，所以強調色仍然有用。</string>
+    <string name="msp_settings_theme_note_dynamic">現在的主題色來自系統取色。選一個強調色就會自動關掉系統取色，主題色立刻跟隨強調色。</string>
+    <string name="msp_settings_theme_note_accent">強調色會立即套用到整個應用程式：標題、按鈕、進度條和歌詞高亮都跟隨它。</string>
+
+    <string name="msp_settings_accent_label">強調色</string>
+
+    <string name="msp_settings_language_note_system">選中的語言由系統記錄。在系統的「設定 → 應用程式 → MultiSuperPlayer → 語言」裡改也同樣是這一項，兩邊始終一致。</string>
+    <string name="msp_settings_language_note_app_only">選中的語言只影響本應用程式。系統的日期、數字格式不跟著變；日期的顯示語言由系統設定決定。</string>
+    <string name="msp_settings_language_follow_system">跟隨系統</string>
+
+    <string name="msp_settings_section_decoding">解碼</string>
+    <string name="msp_settings_force_software">強制軟體解碼</string>
+    <string name="msp_settings_force_software_no_ffmpeg">本安裝包不含 FFmpeg（CPU 架構不受支援），打開也不會生效</string>
+    <string name="msp_settings_force_software_on">已用 FFmpeg 解碼。畫面異常時用它排查；代價是耗電和發熱明顯變高。</string>
+    <string name="msp_settings_force_software_off">預設不勾：系統解碼器放不了或放錯時，內核會自動改用內建的 FFmpeg。只有當畫面花屏/變色/音畫不同步（硬體解碼器出錯）時才需要勾上。</string>
+
+    <string name="msp_settings_section_picture_speed">畫面與速度</string>
+
+    <string name="msp_settings_default_aspect">預設畫面比例</string>
+    <string name="msp_settings_default_aspect_desc">只影響之後打開的檔案。在播放頁裡臨時改的比例不會寫到這裡。</string>
+
+    <string name="msp_settings_default_speed">預設倍速</string>
+    <string name="msp_settings_default_speed_desc">跨檔案保留：播放頁裡改了倍速，這裡也會跟著變。</string>
+
+    <string name="msp_settings_boost_speed">長按倍速</string>
+    <string name="msp_settings_boost_speed_desc">按住畫面時用這個速度，鬆手回到原來的速度。</string>
+
+    <string name="msp_settings_remember_position">記住播放位置</string>
+    <string name="msp_settings_remember_position_on">下次打開同一個檔案時接著上次的位置播</string>
+    <string name="msp_settings_remember_position_off">每次都從頭播。已經記住的位置不會被刪掉，重新打開這個開關就能繼續用。</string>
+
+    <string name="msp_settings_speed_normal">正常速度</string>
+    <string name="msp_settings_speed_default">預設值</string>
+
+    <string name="msp_settings_section_version">版本</string>
+    <string name="msp_settings_section_update">更新</string>
+    <string name="msp_settings_section_device">裝置</string>
+    <string name="msp_settings_section_license">開源授權</string>
+    <string name="msp_settings_section_logs">日誌</string>
+
+    <string name="msp_settings_check_update">檢查更新</string>
+    <string name="msp_settings_check">檢查</string>
+    <string name="msp_settings_view">檢視</string>
+
+    <string name="msp_settings_update_no_source">還沒有接入更新源：本版本沒有發布管道，這個包是本機自己構建的。</string>
+
+    <string name="msp_settings_update_dialog_text">還沒有接入更新源，所以無法檢查。\n\n目前版本 %1$s，構建來源 %2$s。\n\n以後接上發布管道後，這裡會顯示是否有新版本以及更新說明。</string>
+
+    <string name="msp_settings_device_unavailable">讀不到</string>
+
+    <string name="msp_settings_license_row_title">第三方組件與授權</string>
+    <string name="msp_settings_license_row_desc">本應用整體以 GPL-3.0 分發</string>
+
+    <string name="msp_settings_license_app_detail">本應用自身（倉庫根目錄的 LICENSE 檔案）</string>
+    <string name="msp_settings_license_nextlib_detail">內建 FFmpeg 軟體解碼；它的 FFmpeg 構建啟用了 GPL 組件</string>
+    <string name="msp_settings_license_media3_detail">播放內核與媒體工作階段</string>
+    <string name="msp_settings_license_toolchain_detail">語言、介面與依賴注入</string>
+
+    <string name="msp_settings_license_gpl_note">鏈入 NextLib 後，整個應用按 GPL-3.0 分發：對外發布安裝包時必須同時提供完整原始碼。</string>
+
+    <string name="msp_settings_log_files">日誌檔案</string>
+    <string name="msp_settings_log_range">涵蓋日期</string>
+    <string name="msp_settings_export_logs">匯出日誌</string>
+
+    <string name="msp_settings_export_hint_idle">匯出的是一個純文字檔案，包含本機保留的全部日誌和上方的版本/裝置資訊。出了問題把它發出來就能定位。</string>
+    <string name="msp_settings_export_running">正在寫入…</string>
+    <string name="msp_settings_export_saved">已儲存：%1$s（含 %2$d 個日誌檔案）</string>
+    <string name="msp_settings_export_skipped">有 %1$d 個檔案讀不出來，已跳過：%2$s</string>
+    <string name="msp_settings_export_failed">匯出失敗：%1$s</string>
+    <string name="msp_settings_about_export_open_failed">無法打開所選位置（可能已被刪除）</string>
+
+    <string name="msp_settings_list_separator">、</string>
+
+    <string name="msp_settings_got_it">知道了</string>
+    <string name="msp_settings_close">關閉</string>
+
+    <string name="msp_settings_section_provider">服務商</string>
+    <string name="msp_settings_section_api_key">金鑰</string>
+    <string name="msp_settings_section_translate">翻譯</string>
+    <string name="msp_settings_section_test">測試連線</string>
+
+    <string name="msp_settings_base_url">服務位址</string>
+    <string name="msp_settings_model_name">模型名稱</string>
+    <string name="msp_settings_fetch_models">拉取列表</string>
+    <string name="msp_settings_fetching">拉取中…</string>
+    <string name="msp_settings_fetch_failed_prefix">拉不到模型列表</string>
+
+    <string name="msp_settings_base_url_support">以 /v1 結尾的位址會自動補上 /chat/completions；改這裡可以指向你自己的中轉。</string>
+    <string name="msp_settings_model_support">必須和廠商文件裡的名字完全一致，別憑記憶寫。</string>
+
+    <string name="msp_settings_auto_translate">自動翻譯後續字幕</string>
+    <string name="msp_settings_auto_translate_desc">播放到哪就翻到哪，已經翻好的會留在字幕裡。關掉也可以隨時手動翻。</string>
+
+    <string name="msp_settings_test_desc">會真的翻一句樣板文本。它同時驗證位址、金鑰、模型名稱，以及這家廠商收不收我們的請求形狀。會消耗一次極少的 token。</string>
+    <string name="msp_settings_test_button">測試連線</string>
+    <string name="msp_settings_test_running">測試中…</string>
+    <string name="msp_settings_connection_failed_prefix">連線失敗</string>
+
+    <string name="msp_settings_missing_prefix">還差：%1$s</string>
+
+    <string name="msp_settings_failure_line">%1$s：%2$s</string>
+
+    <string name="msp_settings_switch">切換</string>
+
+    <string name="msp_settings_model_count">這家廠商報了 %1$d 個模型，點一下就用它：</string>
+
+    <string name="msp_settings_api_key_label">API 金鑰</string>
+    <string name="msp_settings_api_key_placeholder">貼上金鑰後點「儲存」</string>
+    <string name="msp_settings_save">儲存</string>
+    <string name="msp_settings_delete">刪除</string>
+
+    <string name="msp_settings_key_stored">已保存金鑰（%1$s）</string>
+    <string name="msp_settings_key_missing">還沒有保存金鑰</string>
+    <string name="msp_settings_key_not_required">這家服務不需要金鑰，留空即可。</string>
+
+    <string name="msp_settings_key_saved">已儲存。</string>
+    <string name="msp_settings_key_not_saved">沒有保存（金鑰是空的）。</string>
+    <string name="msp_settings_key_deleted">已刪除。</string>
+
+    <string name="msp_settings_key_storage_note">金鑰用系統金鑰庫加密後存在本機，不會寫進日誌，也不會隨設定匯出。</string>
+
+    <string name="msp_settings_delete_key">刪除金鑰</string>
+    <string name="msp_settings_delete_key_title">刪除金鑰？</string>
+    <string name="msp_settings_delete_key_confirm">刪除後這家服務就不能翻譯了，需要重新貼上一次金鑰。</string>
+
+    <string name="msp_settings_target_prefix">譯成：%1$s</string>
+
+    <string name="msp_settings_glossary">術語表</string>
+
+    <string name="msp_settings_glossary_desc">一行一條。`桐人` = 保持原樣，`Guild = 公會` = 固定譯法。# 開頭是註解。</string>
+
+    <string name="msp_settings_glossary_collapse">收合</string>
+    <string name="msp_settings_glossary_edit">編輯</string>
+    <string name="msp_settings_glossary_label">術語（每行一條）</string>
+    <string name="msp_settings_glossary_save">儲存術語表</string>
+    <string name="msp_settings_glossary_restore">還原</string>
+    <string name="msp_settings_glossary_count">目前 %1$d 條</string>
+
+    <string name="msp_settings_test_ok_title">連線正常。模型翻出來的是：</string>
+    <string name="msp_settings_test_ok_desc">看到這句話就說明位址、金鑰、模型名稱都是對的，播放頁裡應該也能翻出來。</string>
+
+    <string name="msp_settings_show_raw">看服務商返回的原文</string>
+    <string name="msp_settings_hide_raw">收起服務商返回的原文</string>
+
+</resources>

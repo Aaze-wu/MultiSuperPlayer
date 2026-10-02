@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  core:common 的繁體中文譯文。
+  位置參數（`%1$s`、`%2$d`）的數量與順序可以調整，但個數不能變。
+-->
+<resources>
+
+    <string name="msp_value_unknown">未知</string>
+
+    <string name="msp_row_device">裝置</string>
+    <string name="msp_row_system">系統</string>
+    <string name="msp_row_abi">CPU 架構</string>
+    <string name="msp_row_screen">螢幕</string>
+    <string name="msp_row_language">語言</string>
+
+    <string name="msp_row_version">版本</string>
+    <string name="msp_row_source">建置來源</string>
+    <string name="msp_row_build_time">建置時間</string>
+
+    <string name="msp_version_with_code">%1$s (%2$d)</string>
+
+    <string name="msp_wrapped_in_parens">%1$s（%2$s）</string>
+
+    <string name="msp_appended_with_comma">%1$s，%2$s</string>
+
+    <!-- 黏接模板：`%2$s` 是呼叫方傳進來的分隔符。 -->
+    <string name="msp_joined">%1$s%2$s%3$s</string>
+
+    <string name="msp_dirty_suffix">含未提交變更</string>
+
+    <string name="msp_device_brand_model">%1$s %2$s</string>
+
+    <string name="msp_android_with_api">Android %1$s（API %2$d）</string>
+
+    <string name="msp_api_only">API %1$d</string>
+
+    <string name="msp_screen_size">%1$d×%2$d @%3$ddpi</string>
+
+    <string name="msp_screen_size_plain">%1$d×%2$d</string>
+
+    <string name="msp_duration_hours">%1$d 小時</string>
+    <string name="msp_duration_minutes">%1$d 分</string>
+    <string name="msp_duration_seconds">%1$d 秒</string>
+
+    <string name="msp_duration_hours_minutes">%1$d 小時 %2$d 分</string>
+    <string name="msp_duration_hours_seconds">%1$d 小時 %2$d 秒</string>
+    <string name="msp_duration_minutes_seconds">%1$d 分 %2$d 秒</string>
+    <string name="msp_duration_full">%1$d 小時 %2$d 分 %3$d 秒</string>
+
+</resources>

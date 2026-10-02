@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  播放页的界面文案（基线：简体中文）。
+
+  ===== 命名 =====
+  前缀统一 `msp_player_`，因为本模块和 feature:settings 会同时出现在一个 App 里，
+  两边都叫 `msp_section_speed` 之类的话，资源合并时会静默取其中一个。
+
+  ===== 参数 =====
+  所有位置参数都写成 `%1$s` 这种带序号的形式：翻译时语序会变，不带序号的 `%s`
+  一旦被译者换位就会错位地取到另一个值。
+
+  ===== 品牌名不进资源 =====
+  「FFmpeg」「A-B」「WebVTT」这类专有名词只在需要翻译的语境里才做成资源，
+  单独的商标名由代码里的 `MspText.Plain` 提供。
+-->
+<resources>
+    <!-- ===== 字幕面板 ===== -->
+    <string name="msp_player_subtitles_title">字幕</string>
+    <string name="msp_player_rescan">重新扫描字幕</string>
+    <string name="msp_player_scanning">正在查找字幕…</string>
+    <string name="msp_player_reading">正在读取字幕…</string>
+    <string name="msp_player_cues">%1$s · %2$d 条</string>
+    <string name="msp_player_none_attached">当前没有挂上任何字幕。</string>
+    <string name="msp_player_translation_missing_shown_original">这份字幕没有译文，已按原文显示。</string>
+    <string name="msp_player_auto_select">自动选择</string>
+    <string name="msp_player_auto_selected">已自动选中「%1$s」</string>
+    <string name="msp_player_auto_pick_desc">按片名从候选里挑一条最吻合的</string>
+    <string name="msp_player_no_usable_subtitle">这个文件夹里没有找到可用的字幕文件。</string>
+    <!-- 引号不是内容：aapt2 会裁掉首尾空白，包上引号才能保住两侧的空格。 -->
+    <string name="msp_player_detail_sep">" · "</string>
+    <string name="msp_player_detail_language_unknown">未标语言</string>
+    <string name="msp_player_detail_forced">强制</string>
+    <string name="msp_player_detail_matches_title">与片名吻合</string>
+    <string name="msp_player_format_lrc">LRC 歌词</string>
+    <string name="msp_player_format_lrc_enhanced">增强型 LRC（逐字）</string>
+
+    <!-- ===== 显示模式 ===== -->
+    <string name="msp_player_mode_off">隐藏</string>
+    <string name="msp_player_mode_original_only">仅原文</string>
+    <string name="msp_player_mode_translation_only">仅译文</string>
+    <string name="msp_player_mode_bilingual">双语</string>
+
+    <!-- ===== 加载过程中的问题 ===== -->
+    <string name="msp_player_issue_no_directory">无法确定这个文件所在的文件夹，没法自动找同名字幕。</string>
+    <string name="msp_player_issue_directory_invisible">读不到这个文件所在的文件夹，可能是没有存储权限。</string>
+    <string name="msp_player_issue_scan_failed">查找字幕时出错：%1$s</string>
+    <string name="msp_player_issue_no_subtitles">这个文件夹里没有字幕文件。</string>
+    <string name="msp_player_issue_no_match">文件夹里有字幕，但文件名和这条片子对不上。可以在下面手动选一个。</string>
+    <string name="msp_player_issue_load_failed">「%1$s」读取失败：%2$s</string>
+
+    <!-- ===== 导出 ===== -->
+    <string name="msp_player_export_done">已导出 %1$s</string>
+    <string name="msp_player_export_failed">导出失败：%1$s 没能写入（文件可能已被删除，或者那个位置不允许写入）。</string>
+
+    <!-- ===== 翻译面板 ===== -->
+    <string name="msp_player_translation">翻译</string>
+    <string name="msp_player_target_prefix">目标语言：%1$s</string>
+    <string name="msp_player_with_model">模型：%1$s</string>
+    <string name="msp_player_wrapped_in_parens">%1$s（%2$s）</string>
+    <string name="msp_player_no_translatable">这份字幕里没有可翻译的文本（可能整篇都是注释或空行）。</string>
+    <string name="msp_player_failed_lines">有 %1$d 行没翻出来。</string>
+    <string name="msp_player_retry_only_failed">只重试这些行</string>
+    <string name="msp_player_got_it">知道了</string>
+    <string name="msp_player_not_configured">还没有配置翻译服务：还差 %1$s。</string>
+    <string name="msp_player_missing_url_fallback">完好的服务地址</string>
+    <string name="msp_player_open_settings">去设置</string>
+    <string name="msp_player_translated_count">已译 %1$d/%2$d</string>
+    <string name="msp_player_edited_suffix">（其中人工修正 %1$d 行）</string>
+    <string name="msp_player_run_progress">本次：%1$d/%2$d</string>
+    <string name="msp_player_with_cache">%1$s，缓存命中 %2$d</string>
+    <string name="msp_player_with_requests">%1$s，实际请求 %2$d 次</string>
+    <string name="msp_player_translating">正在翻译…可以随时停，已经翻好的会留下。</string>
+    <string name="msp_player_stop">停止</string>
+    <string name="msp_player_translate_all">翻译全文</string>
+    <string name="msp_player_translate_up_to">翻译到当前位置</string>
+    <string name="msp_player_retry_failed_n">重试失败的 %1$d 行</string>
+    <string name="msp_player_show_raw">看服务商返回的原文</string>
+    <string name="msp_player_hide_raw">收起服务商返回的原文</string>
+    <string name="msp_player_export">导出译文…</string>
+
+    <!-- ===== 播放控制 ===== -->
+    <string name="msp_player_decoder_ffmpeg">FFmpeg 软件解码</string>
+    <string name="msp_player_decoder_system">系统软件解码</string>
+    <string name="msp_player_shuffle_off">关闭随机播放</string>
+    <string name="msp_player_shuffle_on">开启随机播放</string>
+    <string name="msp_player_previous">上一首</string>
+    <string name="msp_player_play">播放</string>
+    <string name="msp_player_pause">暂停</string>
+    <string name="msp_player_next">下一首</string>
+    <string name="msp_player_repeat_off">循环已关闭</string>
+    <string name="msp_player_repeat_all">列表循环</string>
+    <string name="msp_player_repeat_one">单曲循环</string>
+    <string name="msp_player_subtitle_entry">字幕与歌词</string>
+    <string name="msp_player_enter_fullscreen">全屏播放</string>
+    <string name="msp_player_exit_fullscreen">退出全屏</string>
+    <string name="msp_player_speed">播放速度</string>
+    <string name="msp_player_ab_repeat">A-B 循环</string>
+    <string name="msp_player_aspect">画面比例</string>
+    <string name="msp_player_set_b">设 B</string>
+    <string name="msp_player_chip_active">%1$s，%2$s，已启用</string>
+    <string name="msp_player_chip_inactive">%1$s，%2$s</string>
+    <string name="msp_player_volume">音量</string>
+    <string name="msp_player_brightness">亮度</string>
+    <string name="msp_player_unlock">解除锁定</string>
+    <string name="msp_player_lock">锁定屏幕</string>
+    <!-- 首尾空白一律要用一对双引号保住，否则 aapt2 会裁掉（见 AppLanguageTest 的守卫用例）。
+         这份用的是全角空格，同样是「首尾空白」，不要因为它看着不像空格就省掉引号。 -->
+    <string name="msp_player_track_sep">"　·　"</string>
+
+    <!-- ===== 播放选项面板 ===== -->
+    <string name="msp_player_speed_note">倍速只影响播放，不会改变文件本身。音频会做音高补偿，人声不会变成快进声。</string>
+    <string name="msp_player_source_line">当前片源：%1$s</string>
+
+    <!-- ===== 播放页状态 ===== -->
+    <string name="msp_player_playing">播放中</string>
+    <string name="msp_player_paused">已暂停</string>
+    <string name="msp_player_boost">%1$s 加速中</string>
+    <string name="msp_player_offset_ahead">+%1$d 秒</string>
+    <string name="msp_player_offset_behind">-%1$d 秒</string>
+    <string name="msp_player_offset_zero">0 秒</string>
+    <string name="msp_player_nothing_playing">没有正在播放的内容</string>
+    <string name="msp_player_nothing_playing_desc">到「媒体库」里选一条音频或视频即可开始播放。</string>
+</resources>

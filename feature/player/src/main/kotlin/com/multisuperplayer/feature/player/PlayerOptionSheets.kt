@@ -17,10 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.player.MspVideoSize
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
+import com.multisuperplayer.core.ui.text.string
 
 /**
  * 倍速选择。
@@ -39,7 +42,7 @@ internal fun PlayerSpeedSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
             Text(
-                text = "播放速度",
+                text = stringResource(R.string.msp_player_speed),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
@@ -60,7 +63,7 @@ internal fun PlayerSpeedSheet(
                 }
             }
             Text(
-                text = "倍速只影响播放，不会改变文件本身。音频会做音高补偿，人声不会变成快进声。",
+                text = stringResource(R.string.msp_player_speed_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 12.dp),
@@ -90,12 +93,16 @@ internal fun PlayerAspectRatioSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
             Text(
-                text = "画面比例",
+                text = stringResource(R.string.msp_player_aspect),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Text(
-                text = "当前片源：" + (VideoFit.sourceLabel(videoSize) ?: "未知"),
+                // 分辨率（`1920×1080`）是数字，与语言无关；只有「未知」要走资源。
+                text = stringResource(
+                    R.string.msp_player_source_line,
+                    VideoFit.sourceLabel(videoSize) ?: MspText.unknown().string(),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -115,7 +122,7 @@ internal fun PlayerAspectRatioSheet(
                     RadioButton(selected = selected, onClick = null)
                     Column(modifier = Modifier.padding(start = 8.dp)) {
                         Text(
-                            text = mode.label,
+                            text = mode.label.string(),
                             style = MaterialTheme.typography.bodyLarge,
                             color = if (selected) {
                                 MaterialTheme.colorScheme.primary
@@ -124,7 +131,7 @@ internal fun PlayerAspectRatioSheet(
                             },
                         )
                         Text(
-                            text = mode.description,
+                            text = mode.description.string(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

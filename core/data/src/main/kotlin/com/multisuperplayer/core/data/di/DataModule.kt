@@ -5,6 +5,7 @@ import com.multisuperplayer.core.data.history.PlaybackPositionRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
 import com.multisuperplayer.core.data.settings.ApiKeyStore
+import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
@@ -32,6 +33,9 @@ val dataModule = module {
     single { SubtitleSettingsRepository(context = androidContext(), dispatchers = get()) }
 
     single { PlaybackSettingsRepository(context = androidContext(), dispatchers = get()) }
+
+    // 不加 dispatchers：这一个设置不用 DataStore、也不做异步读取，理由见 AppLocaleStore 的注释。
+    single { LocaleSettingsRepository(context = androidContext()) }
 
     // 续播位置存在单独的 DataStore 文件里（不是 msp_settings）——
     // 它无界增长、写入频繁，混进设置文件会拖累用户设置。见 mspPositionsStore。

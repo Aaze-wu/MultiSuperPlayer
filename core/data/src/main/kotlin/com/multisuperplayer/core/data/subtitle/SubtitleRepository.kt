@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.R
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
@@ -69,7 +71,9 @@ class SubtitleRepository(
             locator.scanDirectory(relativePath)
         } catch (error: Exception) {
             MspLog.w(TAG, error) { "查询目录「$relativePath」失败" }
-            return@withContext SubtitleScan.Failed(error.message ?: "无法读取字幕目录")
+            return@withContext SubtitleScan.Failed(
+                error.detailOr(MspText.Res(R.string.msp_subtitle_reason_directory_unreadable)),
+            )
         }
 
         when (scan) {
@@ -111,11 +115,14 @@ class SubtitleRepository(
         return withContext(dispatchers.io) {
             val bytes = try {
                 readBytes(source)
+            } catch (error: SubtitleReadException) {
+                MspLog.w(TAG, error) { "读取字幕失败：${source.fileName}" }
+                return@withContext SubtitleLoadResult.Failed(source.fileName, error.text)
             } catch (error: Exception) {
                 MspLog.w(TAG, error) { "读取字幕失败：${source.fileName}" }
                 return@withContext SubtitleLoadResult.Failed(
                     source.fileName,
-                    error.message ?: "无法读取文件",
+                    error.detailOr(MspText.Res(R.string.msp_subtitle_reason_file_unreadable)),
                 )
             }
 
@@ -130,7 +137,7 @@ class SubtitleRepository(
                 MspLog.w(TAG, error) { "解析字幕失败：${source.fileName}（编码 ${decoded.charset}）" }
                 return@withContext SubtitleLoadResult.Failed(
                     source.fileName,
-                    error.message ?: "无法解析这个字幕文件",
+                    error.detailOr(MspText.Res(R.string.msp_subtitle_reason_unparsable)),
                 )
             }
 
@@ -169,19 +176,40 @@ class SubtitleRepository(
 
     private fun readBytes(source: SubtitleSource): ByteArray {
         if (source.sizeBytes > MAX_SOURCE_BYTES) {
-            throw IOException("文件太大（${source.sizeBytes / 1024 / 1024} MB），可能不是字幕文件")
+            throw SubtitleReadException(tooLargeText(source.sizeBytes))
         }
         val stream = appContext.contentResolver.openInputStream(Uri.parse(source.uri))
-            ?: throw IOException("打不开这个文件，可能已被移动或删除")
+            ?: throw SubtitleReadException(MspText.Res(R.string.msp_subtitle_reason_file_unopenable))
         return stream.use { input ->
             val bytes = input.readBytes()
             // 再查一次：MediaStore 里的 SIZE 有可能过时（文件刚被换掉）。
             if (bytes.size > MAX_SOURCE_BYTES) {
-                throw IOException("文件太大（${bytes.size / 1024 / 1024} MB），可能不是字幕文件")
+                throw SubtitleReadException(tooLargeText(bytes.size.toLong()))
             }
             bytes
         }
     }
+
+    private fun tooLargeText(sizeBytes: Long): MspText =
+        MspText.Res(R.string.msp_subtitle_reason_file_too_large, sizeBytes / 1024 / 1024)
+
+    /**
+     * 读字幕时**我们自己**发现的失败。
+     *
+     * 为什么不直接用 `error.message`：那句话要显示给用户，必须能翻译，而 `message`
+     * 只能是一个已经定死的字符串。系统自己抛的异常仍然走 [detailOr]——系统原文
+     * 不翻译、原样透出去，否则真实原因会被一句中文盖掉。
+     */
+    private class SubtitleReadException(val text: MspText) : IOException(text.toString())
+
+    /**
+     * 那句给人看的说明。
+     *
+     * 系统异常的 `message` 可能是 null（而且通常已经是系统语言），那就退回
+     * 我们自己的 [fallback] 句子；有内容就原样透出。
+     */
+    private fun Throwable.detailOr(fallback: MspText): MspText =
+        message?.takeIf { it.isNotBlank() }?.let(MspText::Plain) ?: fallback
 
     private fun buildDocument(
         source: SubtitleSource,

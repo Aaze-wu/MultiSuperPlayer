@@ -4,6 +4,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.multisuperplayer.core.translate.Glossary
+import com.multisuperplayer.core.translate.MissingConfigItem
+import com.multisuperplayer.core.translate.TranslationEngine
 import com.multisuperplayer.core.translate.TranslationService
 import com.multisuperplayer.core.translate.TranslationServices
 import com.multisuperplayer.core.translate.TranslationTarget
@@ -52,26 +54,27 @@ data class TranslationSettings(
     /**
      * 还差哪几项才能开始翻译。空列表表示已经填够。
      *
-     * 这份清单要**跟着 [ready] 一起改**，所以直接由它派生，避免两处各写一遍条件。
+     * 判定直接交给 [TranslationEngine.missingConfigItems]——两处各写一遍条件，
+     * 迟早会出现「设置页说可以翻译、点下去引擎说不满足条件」这种互相打脸的状态。
+     * 这里只出**枚举**，不出句子：文案要跟着界面语言走（见 `describeMissingItem()`）。
+     *
      * 光有一个 `ready = false` 是不够的：三个界面（设置页汇总行、翻译设置页、
      * 播放页字幕面板）都需要具体说「还差 API 密钥」——一句「请检查设置」
      * 等于把找问题的事推回给用户。
      */
-    val missingItems: List<String>
-        get() = buildList {
-            if (baseUrl.isBlank()) {
-                add("服务地址")
-            } else if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
-                add("服务地址（需要以 http:// 或 https:// 开头）")
-            }
-            if (model.isBlank()) add("模型名")
-            if (apiKeyRequired && !apiKeyStored) add("API 密钥")
-        }
+    val missingItems: List<MissingConfigItem>
+        get() = TranslationEngine.missingConfigItems(
+            baseUrl = baseUrl,
+            model = model,
+            apiKeyRequired = apiKeyRequired,
+            apiKeyStored = apiKeyStored,
+            // 批大小还不是用户设置项（仓库里写死默认值），这里不报这个缺项。
+            batchSize = null,
+        )
 
     /**
      * 是否已经填够、可以开始翻译。
      *
-     * 判断条件和 [com.multisuperplayer.core.translate.TranslationEngine.validateConfig] 保持一致：
      * 界面上「能不能点」和引擎里「能不能跑」用同一套标准，否则会出现按钮亮着、
      * 点下去立刻失败的状态。这里只做「能不能点」的预判，真正的错误文案仍然由引擎给出。
      */

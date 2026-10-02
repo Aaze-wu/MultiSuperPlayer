@@ -75,7 +75,14 @@ class HttpFailureClassifierTest {
         assertEquals("w", extractProviderMessage("""{"detail":"w"}"""))
         // 非 JSON 也要有话说：一句「失败原因：」后面什么都没有，比塞满 JSON 还难用。
         assertEquals("Bad Gateway", extractProviderMessage("Bad Gateway"))
-        assertEquals("（响应体为空）", extractProviderMessage("   "))
+    }
+
+    @Test
+    fun `响应体是空的就返回空串而不是造一句中文`() {
+        // 这一层不知道界面语言，造占位句就等於在英文界面里招供出中文。
+        // 界面拿到空串就知道「厂商什么都没说」，不显示原文块。
+        assertEquals("", extractProviderMessage("   "))
+        assertEquals("", extractProviderMessage(""))
     }
 
     @Test
@@ -99,43 +106,47 @@ class HttpFailureClassifierTest {
     }
 
     @Test
-    fun `网络异常带上网址相关的提示`() {
-        // 三句话分别对应三个「重试一百次也不好」的场景，所以文案必须不一样：
+    fun `网络异常带上对应的处置档位`() {
+        // 三种情况分别对应三个「重试一百次也不好」的场景，所以档位必须不一样：
         // 超时是等，DNS 是地址填错，明文被拦是要 adb reverse。
+        // 断言档位而不是文案：文案在 TranslationFailureTextTest 里读资源文件验证。
         val timeout = assertIs<TranslationFailure.Network>(
             classifyNetworkException(SocketTimeoutException("Read timed out")),
         )
-        assertTrue(timeout.detail.contains("超时"))
+        assertEquals("SocketTimeoutException: Read timed out", timeout.detail)
+        assertEquals(NetworkNote.TIMEOUT, timeout.note)
         assertTrue(timeout.retryableAsIs)
 
         val dns = assertIs<TranslationFailure.Network>(
             classifyNetworkException(UnknownHostException("api.deepseek.com")),
         )
-        assertTrue(dns.detail.contains("域名"))
+        assertEquals(NetworkNote.UNRESOLVED_HOST, dns.note)
 
         // 明文被拦看起来像普通网络错误，但重试一百次也不好。
         val cleartext = assertIs<TranslationFailure.Network>(
             classifyNetworkException(IOException("CLEARTEXT communication to 192.168.1.5 not permitted")),
         )
-        assertTrue(cleartext.detail.contains("adb reverse"))
+        assertEquals(NetworkNote.CLEARTEXT_BLOCKED, cleartext.note)
 
+        // 普通网络错误只带系统原文，不要瞎猜原因。
         val plain = assertIs<TranslationFailure.Network>(
             classifyNetworkException(IOException("Connection reset")),
         )
         assertEquals("IOException: Connection reset", plain.detail)
+        assertEquals(NetworkNote.NONE, plain.note)
     }
 
     @Test
     fun `每种失败都有一句日志文案`() {
         // logLine() 是排查时唯一能看到的东西，空串会让日志出现「失败：」这种哑行。
         val all = listOf(
-            TranslationFailure.NotConfigured("服务地址"),
+            TranslationFailure.NotConfigured(MissingConfigItem.BASE_URL),
             TranslationFailure.Unauthorized(401, "x"),
             TranslationFailure.QuotaExceeded(429, "x"),
             TranslationFailure.RateLimited(429, 3L, "x"),
             TranslationFailure.Rejected(400, "x"),
             TranslationFailure.ServerError(500, "x"),
-            TranslationFailure.Network("x"),
+            TranslationFailure.Network("x", NetworkNote.TIMEOUT),
             TranslationFailure.BadResponse("x"),
             TranslationFailure.EmptyCompletion("length", 10, 10, "x"),
             TranslationFailure.Truncated("length", 100, 50, "x"),

@@ -1,11 +1,13 @@
 package com.multisuperplayer.player
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import com.multisuperplayer.core.common.di.commonModule
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.log.MspLogInitializer
 import com.multisuperplayer.core.data.di.dataModule
+import com.multisuperplayer.core.data.settings.wrapLocale
 import com.multisuperplayer.core.player.di.playerModule
 import com.multisuperplayer.core.subtitle.di.subtitleModule
 import com.multisuperplayer.core.translate.di.translateModule
@@ -32,6 +34,17 @@ private const val TAG = "MspApplication"
  * 真正的写盘在它自己的后台线程上，所以放在这里是有意为之，不是疏忽。
  */
 class MspApplication : Application() {
+
+    /**
+     * 把用户选的语言套到应用 Context 上。
+     *
+     * 必须在这里而不是 `onCreate`：`onCreate` 跑起来时 `Resources` 已经定型，
+     * 再改就是「换了一个没人用的 Context」。33 以上这个方法内部什么都不做，
+     * 交给系统的「每应用语言」（见 [wrapLocale] 的说明）。
+     */
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base.wrapLocale())
+    }
 
     override fun onCreate() {
         super.onCreate()

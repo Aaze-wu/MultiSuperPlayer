@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -43,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.common.format.TimeFormat
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.player.MspDecoderKind
@@ -51,6 +53,7 @@ import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
+import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
 import kotlin.math.abs
 import kotlinx.coroutines.delay
@@ -541,7 +544,7 @@ private fun PortraitLayout(
 
         PlayerActionChips(
             speed = state.playbackSpeed,
-            aspectRatioLabel = aspectRatio.label,
+            aspectRatioLabel = aspectRatio.label.string(),
             abRepeat = state.abRepeat,
             onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
             onOpenAspectRatio = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
@@ -635,7 +638,7 @@ private fun LandscapeLayout(
             positionMs = positionMs,
             bufferedMs = bufferedMs,
             speed = state.playbackSpeed,
-            aspectRatioLabel = aspectRatio.label,
+            aspectRatioLabel = aspectRatio.label.string(),
             subtitlesActive = subtitleState.isRendering,
             onExitFullscreen = { ui.applyFullscreen(false) },
             onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
@@ -707,7 +710,7 @@ private fun PlayerSeekIndicator(hint: PlayerSeekHint, modifier: Modifier = Modif
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = signedSeconds(hint.deltaMs),
+                    text = signedSeconds(hint.deltaMs).string(),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -742,7 +745,9 @@ private fun PlayerPlayPauseIndicator(playing: Boolean, modifier: Modifier = Modi
                 contentDescription = null,
             )
             Text(
-                text = if (playing) "播放中" else "已暂停",
+                text = stringResource(
+                    if (playing) R.string.msp_player_playing else R.string.msp_player_paused,
+                ),
                 style = MaterialTheme.typography.titleMedium,
             )
         }
@@ -768,20 +773,24 @@ private fun PlayerBoostIndicator(speed: Float, modifier: Modifier = Modifier) {
         modifier = modifier,
     ) {
         Text(
-            text = "${SpeedBoostOptions.format(speed)} 加速中",
+            text = stringResource(
+                R.string.msp_player_boost,
+                SpeedBoostOptions.format(speed),
+            ),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
     }
 }
 
-/** 「+12 秒」/「-8 秒」/「0 秒」。 */
-private fun signedSeconds(deltaMs: Long): String {
+/** 「+12 秒」/「-8 秒」/「0 秒」。正负号由各自的资源带，因为中文用「+/-」、
+ * 而「秒」字在不同语言里的位置也不一样。 */
+private fun signedSeconds(deltaMs: Long): MspText {
     val seconds = abs(deltaMs) / 1000
     return when {
-        deltaMs > 0L -> "+$seconds 秒"
-        deltaMs < 0L -> "-$seconds 秒"
-        else -> "0 秒"
+        deltaMs > 0L -> MspText.Res(R.string.msp_player_offset_ahead, seconds)
+        deltaMs < 0L -> MspText.Res(R.string.msp_player_offset_behind, seconds)
+        else -> MspText.Res(R.string.msp_player_offset_zero)
     }
 }
 
@@ -870,11 +879,13 @@ private fun TrackInfo(entry: MediaEntry, decoderKind: MspDecoderKind) {
         //
         // 只有「软件解码真的介入了」才会显示（见 decoderLabelOf）：硬件解码和
         // FFmpeg 解出来的画面长一样，这行字唯一的用处就是回答「FFmpeg 到底有没有生效」。
-        val line = listOfNotNull(entry.subtitle.takeIf { it.isNotBlank() }, decoderLabelOf(decoderKind))
-            .joinToString("　·　")
-        if (line.isNotBlank()) {
+        val details = buildList {
+            entry.subtitle.takeIf { it.isNotBlank() }?.let { add(MspText.Plain(it)) }
+            decoderLabelOf(decoderKind)?.let { add(it) }
+        }
+        if (details.isNotEmpty()) {
             Text(
-                text = line,
+                text = MspText.join(TRACK_SEPARATOR, details).string(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -884,6 +895,10 @@ private fun TrackInfo(entry: MediaEntry, decoderKind: MspDecoderKind) {
         }
     }
 }
+
+/** 标题行里片名和字幕信息之间的分隔符。用资源而不是代码里的字面量：
+ * 中文用全角间隔号（字宽紧凑），英文用半角加空格，否则会出现字挤在一起或空隙过大。 */
+private val TRACK_SEPARATOR: MspText = MspText.Res(R.string.msp_player_track_sep)
 
 @Composable
 private fun ErrorBanner(message: String) {
@@ -944,12 +959,12 @@ private fun NothingPlaying() {
             modifier = Modifier.size(48.dp),
         )
         Text(
-            text = "没有正在播放的内容",
+            text = stringResource(R.string.msp_player_nothing_playing),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 16.dp),
         )
         Text(
-            text = "到「媒体库」里选一条音频或视频即可开始播放。",
+            text = stringResource(R.string.msp_player_nothing_playing_desc),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

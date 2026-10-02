@@ -3,6 +3,10 @@ package com.multisuperplayer.core.data.settings
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.multisuperplayer.core.translate.MissingConfigItem
+import com.multisuperplayer.core.translate.TranslationConfig
+import com.multisuperplayer.core.translate.TranslationEngine
+import com.multisuperplayer.core.translate.TranslationFailure
 import com.multisuperplayer.core.translate.TranslationServices
 import com.multisuperplayer.core.translate.TranslationTarget
 import com.multisuperplayer.core.translate.encodeGlossary
@@ -10,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.test.assertIs
 
 /**
  * 翻译设置映射的单元测试。
@@ -200,7 +205,7 @@ class TranslationSettingsTest {
     fun `缺项清单说的是缺哪一项而不是泛泛的一句`() {
         val settings = preferencesOf(providerKey to "deepseek").toTranslationSettings()
 
-        assertTrue("预设已经有地址和模型，只该缺密钥", settings.missingItems.contains("API 密钥"))
+        assertTrue("预设已经有地址和模型，只该缺密钥", settings.missingItems.contains(MissingConfigItem.API_KEY))
         assertEquals(1, settings.missingItems.size)
     }
 
@@ -210,7 +215,7 @@ class TranslationSettingsTest {
             providerKey to TranslationServices.OLLAMA.id,
         ).toTranslationSettings()
 
-        assertFalse("Ollama 不需要密钥", settings.missingItems.contains("API 密钥"))
+        assertFalse("Ollama 不需要密钥", settings.missingItems.contains(MissingConfigItem.API_KEY))
     }
 
     @Test
@@ -222,7 +227,44 @@ class TranslationSettingsTest {
         ).toTranslationSettings()
 
         // 写「服务地址」不够——用户的地址明明填了东西。
-        assertEquals(listOf("服务地址（需要以 http:// 或 https:// 开头）"), settings.missingItems)
+        assertEquals(listOf(MissingConfigItem.BASE_URL_SCHEME), settings.missingItems)
+    }
+
+    @Test
+    fun `清单里不能出现用户改不了的项`() {
+        // 批大小目前不是用户设置项（仓库里写死默认值），报出这一项只会把人
+        // 指到一个不存在的开关上去。引擎自己会校验它，但那是它自己的事。
+        val settings = preferencesOf(providerKey to "deepseek").toTranslationSettings()
+
+        assertFalse(
+            "批大小还不是用户能改的东西",
+            settings.missingItems.contains(MissingConfigItem.BATCH_SIZE),
+        )
+    }
+
+    @Test
+    fun `缺项判定与引擎同源`() {
+        // 两处各写一遍条件，就会出现「设置页说可以翻译、点下去引擎说不满足条件」。
+        val settings = preferencesOf(
+            providerKey to "deepseek",
+            baseUrlKey to "api.deepseek.com",
+            apiKeyKey("deepseek") to "iv:aa",
+        ).toTranslationSettings()
+
+        val engine = TranslationEngine.validateConfig(
+            TranslationConfig(
+                baseUrl = settings.baseUrl,
+                apiKey = "k",
+                model = settings.model,
+                target = settings.target,
+            ),
+        )
+
+        assertEquals(
+            "引擎该说缺的是同一项",
+            MissingConfigItem.BASE_URL_SCHEME,
+            assertIs<TranslationFailure.NotConfigured>(engine).missing,
+        )
     }
 
     @Test

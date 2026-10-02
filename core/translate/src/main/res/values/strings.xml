@@ -1,0 +1,112 @@
+<resources>
+
+    <!--
+      ===== 翻译失败话术 =====
+
+      这里是**唯一**一处可以写翻译失败文案的地方。两条必须分开的路径：
+      形状不对（BadResponse ⇒ 换模型/缩小批次）和被截断（Truncated ⇒ 调大预算），
+      补救方向相反，文案绝不能合并。
+
+      `%1$s` / `%1$d` 都是参数：数字一律当参数传，不要拼进文案里——
+      拼接会把「哪个数字对应哪个含义」写死在代码里，换语言时容易错位。
+    -->
+    <string name="msp_translate_fail_not_configured">翻译设置还没填完：缺%1$s。</string>
+    <string name="msp_translate_fail_not_configured_hint">到「设置 → 字幕翻译」里补上再回来。</string>
+
+    <string name="msp_translate_fail_unauthorized">鉴权失败（HTTP %1$d）。</string>
+    <string name="msp_translate_fail_unauthorized_hint">密钥可能填错了、过期了，或者和所选地区不匹配（阿里云百炼的 key 与地域绑定，跨地域用会报 invalid_api_key）。</string>
+
+    <string name="msp_translate_fail_quota">账户余额或额度不足（HTTP %1$d）。</string>
+    <string name="msp_translate_fail_quota_hint">先去服务商后台充值；重试只会更快地把额度烧完。</string>
+
+    <string name="msp_translate_fail_rate_limited">请求太频繁（HTTP %1$d）。</string>
+    <string name="msp_translate_fail_rate_limited_wait">服务商要求等 %1$d 秒。稍后重试即可。</string>
+    <string name="msp_translate_fail_rate_limited_hint">等一会儿再重试即可；一直这样说明当前服务商正在拥堵。</string>
+
+    <string name="msp_translate_fail_rejected">服务商拒绝了这次请求（HTTP %1$d）。</string>
+    <string name="msp_translate_fail_rejected_hint">多半是模型名不存在、或者该模型不支持这种请求格式。</string>
+
+    <string name="msp_translate_fail_server">服务商内部错误（HTTP %1$d）。</string>
+    <string name="msp_translate_fail_server_hint">这不是你的设置问题，可以重试；连续出现就去服务商状态页看看。</string>
+
+    <string name="msp_translate_fail_network">连不上服务商。</string>
+
+    <string name="msp_translate_fail_bad_response">返回内容的结构不对（不是额度问题）。</string>
+    <string name="msp_translate_fail_bad_response_hint">重试会得到同样的结果：换一个更听指令的模型，或换一家服务商再试。</string>
+
+    <string name="msp_translate_fail_empty">模型这次一个字都没输出%1$s。</string>
+    <string name="msp_translate_fail_reason">（finish_reason=%1$s）</string>
+    <string name="msp_translate_fail_reasoning_tokens">（本次思考用了 %1$d tokens）</string>
+    <string name="msp_translate_fail_empty_hint">这类情况几乎都是推理模式把输出预算吃光了%1$s：换一个不做推理（思考）的模型就能正常翻译。</string>
+
+    <string name="msp_translate_fail_truncated">这一批太长，输出被截断了。%1$s</string>
+    <string name="msp_translate_fail_truncated_hint">本次上限 %1$d tokens，%2$s自动拆分后仍然装不下：换一个单次输出上限更高的模型再重试。</string>
+    <string name="msp_translate_fail_truncated_estimate">这一批估算需要约 %1$d tokens，</string>
+
+    <!-- 服务商没有给出任何说明时找不到原文，界面就不显示原文块。 -->
+
+    <!--
+      ===== 配置缺项 =====
+
+      这一组既给「设置页的清单」用，也给「引擎说还差什么」用——两处文案同源，
+      否则会出现「设置页说可以翻译、点下去引擎说不满足条件」这种互相打脸的状态。
+    -->
+    <string name="msp_translate_missing_base_url">服务地址</string>
+    <string name="msp_translate_missing_base_url_scheme">服务地址（需要以 http:// 或 https:// 开头）</string>
+    <string name="msp_translate_missing_model">模型名</string>
+    <string name="msp_translate_missing_api_key">API 密钥</string>
+    <string name="msp_translate_missing_batch_size">批次大小（至少 1 行）</string>
+
+    <!-- 目标语言名（跟着界面语言走，不是固定的中文名） -->
+    <string name="msp_translate_lang_zh_hans">简体中文</string>
+    <string name="msp_translate_lang_zh_hant">繁体中文</string>
+    <string name="msp_translate_lang_en">英语</string>
+    <string name="msp_translate_lang_ja">日语</string>
+    <string name="msp_translate_lang_ko">韩语</string>
+
+    <!-- 清单拼接。分隔符跟着语言走，所以不能用 joinToString。 -->
+    <string name="msp_translate_join_list">%1$s、%2$s</string>
+    <string name="msp_translate_join_comma">%1$s，%2$s</string>
+
+    <!-- 建议里点名「当前用的是什么」：换模型之前得先知道现在用的是哪个。 -->
+    <string name="msp_translate_current_provider">服务商：%1$s</string>
+    <string name="msp_translate_current_model">模型：%1$s</string>
+    <string name="msp_translate_current_of">%1$s（当前 %2$s）</string>
+
+    <!--
+      ===== 网络失败的补充说明 =====
+
+      这三句分别对应「重试一百次也不好」的三种情况：超时是等，DNS 是地址填错，
+      明文被拦是要 adb reverse。系统的原始异常信息照原样附在前面。
+    -->
+    <!-- 系统原始异常信息 + 我们的补充说明。拼接交给资源，是因为中英文之间要不要空格不一样。 -->
+    <string name="msp_translate_network_detail">%1$s%2$s</string>
+    <string name="msp_translate_network_timeout">（超时。长字幕请求很慢，可以在设置里调大读超时）</string>
+    <string name="msp_translate_network_unresolved">（域名解析不了：检查地址拼写与网络）</string>
+    <string name="msp_translate_network_cleartext">（明文 HTTP 被系统安全策略拦下了。只有 localhost / 10.0.2.2 在放行名单里；真机连局域网服务请用 adb reverse tcp:&lt;端口&gt; tcp:&lt;端口&gt; 再填 localhost）</string>
+
+    <!-- ===== 服务商预设 ===== -->
+
+    <string name="msp_translate_svc_dashscope_name">阿里云百炼（通义千问）</string>
+    <string name="msp_translate_svc_dashscope_note">百炼的 key 与地域绑定：跨地域用会报 401 invalid_api_key。开了工作空间的用户，地址要换成 https://&lt;WorkspaceId&gt;.cn-beijing.maas.aliyuncs.com/compatible-mode/v1。</string>
+    <string name="msp_translate_svc_deepseek_note">官方文档 api-docs.deepseek.com。base 只写域名即可，代码会补 /chat/completions。</string>
+    <string name="msp_translate_svc_zhipu_name">智谱 GLM</string>
+    <string name="msp_translate_svc_zhipu_note">base 末尾的 /v4 不能省。</string>
+    <string name="msp_translate_svc_moonshot_name">Kimi（月之暗面）</string>
+    <string name="msp_translate_svc_moonshot_note">官方文档写明 thinking **默认开启**，所以一定要带着关闭参数，否则长字幕会白花一大笔 token。</string>
+    <string name="msp_translate_svc_ollama_name">Ollama（本地）</string>
+    <string name="msp_translate_svc_ollama_note">模拟器用 10.0.2.2 指宿主机。真机推荐 `adb reverse tcp:11434 tcp:11434`，然后把地址填成 http://localhost:11434/v1——局域网明文 HTTP 会被系统安全策略拦掉，只有 localhost / 10.0.2.2 在放行名单里。</string>
+    <string name="msp_translate_svc_ollama_key_hint">本地服务随便填，留空也行</string>
+    <string name="msp_translate_svc_openai_note">国内网络通常需要自建代理，可以把 baseUrl 改成自己的中转地址。</string>
+    <string name="msp_translate_svc_custom_name">自定义（任何 OpenAI 兼容服务）</string>
+    <string name="msp_translate_svc_custom_note">只要支持 POST {baseUrl}/chat/completions 就能用：OpenAI、DeepSeek、通义、GLM、Kimi、Ollama、vLLM、LM Studio、one-api 中转都可以。</string>
+    <string name="msp_translate_svc_custom_key_hint">按服务商要求填</string>
+
+    <!-- ===== 导出选项 ===== -->
+
+    <string name="msp_translate_export_srt">SRT（通用）</string>
+    <string name="msp_translate_export_ass">ASS（带样式，可继续用 Aegisub 编辑）</string>
+    <string name="msp_translate_export_mode_translation_only">仅译文</string>
+    <string name="msp_translate_export_mode_bilingual">原文 + 译文</string>
+
+</resources>

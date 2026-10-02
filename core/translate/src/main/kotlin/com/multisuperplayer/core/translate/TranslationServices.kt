@@ -1,5 +1,6 @@
 package com.multisuperplayer.core.translate
 
+import com.multisuperplayer.core.common.text.MspText
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -12,17 +13,20 @@ import kotlinx.serialization.json.JsonObject
  *   推理模型（deepseek 的 thinking、qwen 的 enable_thinking、glm 的新版默认开启思考）**会把
  *   思考 token 算进 `max_tokens`**，结果是 HTTP 200 + 空 content + `finish_reason: length`。
  *   翻译这种任务不需要推理，所以每个预设都带上自己那套关掉它的参数；用户也能在界面上改。
+ * @param displayName 给用户看的名字。品牌名用 [MspText.Plain]（不该跟着语言变），
+ *   带括注的用 [MspText.Res]（「（本地）」「（月之暗面）」要翻译）。
+ * @param apiKeyHint 密钥输入框的占位提示。
  * @param note 给用户看的补充说明（地址怎么写、有哪些坑）。
  */
 data class TranslationService(
     val id: String,
-    val displayName: String,
+    val displayName: MspText,
     val baseUrl: String,
     val model: String,
     val requiresApiKey: Boolean,
-    val apiKeyHint: String,
+    val apiKeyHint: MspText,
     val disableThinkingBody: String = "",
-    val note: String = "",
+    val note: MspText,
 )
 
 /**
@@ -37,91 +41,94 @@ data class TranslationService(
  * ## 为什么默认是 DeepSeek
  *
  * 便宜、中文好、且 `deepseek-flash` 明确支持关闭思考。
+ *
+ * ## 为什么名字/说明是资源而不是字符串
+ *
+ * 这些字全都会显示在设置页上，写死中文等于「切到英文也还有一堆中文」。
  */
 object TranslationServices {
 
     const val CUSTOM_ID = "custom"
 
+    /** 常见密钥前缀，与语言无关，不需要翻译。 */
+    private val SK_HINT = MspText.Plain("sk-…")
+
     val DEEPSEEK = TranslationService(
         id = "deepseek",
-        displayName = "DeepSeek",
+        displayName = MspText.Plain("DeepSeek"),
         baseUrl = "https://api.deepseek.com",
         model = "deepseek-flash",
         requiresApiKey = true,
-        apiKeyHint = "sk-…",
+        apiKeyHint = SK_HINT,
         disableThinkingBody = """{"thinking":{"type":"disabled"}}""",
-        note = "官方文档 api-docs.deepseek.com。base 只写域名即可，代码会补 /chat/completions。",
+        note = MspText.Res(R.string.msp_translate_svc_deepseek_note),
     )
 
     val DASHSCOPE = TranslationService(
         id = "dashscope",
-        displayName = "阿里云百炼（通义千问）",
+        displayName = MspText.Res(R.string.msp_translate_svc_dashscope_name),
         baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
         model = "qwen-plus",
         requiresApiKey = true,
-        apiKeyHint = "sk-…",
+        apiKeyHint = SK_HINT,
         disableThinkingBody = """{"enable_thinking":false}""",
-        note = "百炼的 key 与地域绑定：跨地域用会报 401 invalid_api_key。" +
-            "开了工作空间的用户，地址要换成 https://<WorkspaceId>.cn-beijing.maas.aliyuncs.com/compatible-mode/v1。",
+        note = MspText.Res(R.string.msp_translate_svc_dashscope_note),
     )
 
     val ZHIPU = TranslationService(
         id = "zhipu",
-        displayName = "智谱 GLM",
+        displayName = MspText.Res(R.string.msp_translate_svc_zhipu_name),
         baseUrl = "https://open.bigmodel.cn/api/paas/v4",
         model = "glm-5.3",
         requiresApiKey = true,
-        apiKeyHint = "xxxxx.xxxxxxxx",
+        apiKeyHint = MspText.Plain("xxxxx.xxxxxxxx"),
         disableThinkingBody = """{"thinking":{"type":"disabled"}}""",
-        note = "base 末尾的 /v4 不能省。",
+        note = MspText.Res(R.string.msp_translate_svc_zhipu_note),
     )
 
     val MOONSHOT = TranslationService(
         id = "moonshot",
-        displayName = "Kimi（月之暗面）",
+        displayName = MspText.Res(R.string.msp_translate_svc_moonshot_name),
         baseUrl = "https://api.moonshot.cn/v1",
         model = "kimi-k2.6",
         requiresApiKey = true,
-        apiKeyHint = "sk-…",
+        apiKeyHint = SK_HINT,
         disableThinkingBody = """{"thinking":{"type":"disabled"}}""",
-        note = "官方文档写明 thinking **默认开启**，所以一定要带着关闭参数，否则长字幕会白花一大笔 token。",
+        note = MspText.Res(R.string.msp_translate_svc_moonshot_note),
     )
 
     val OLLAMA = TranslationService(
         id = "ollama",
-        displayName = "Ollama（本地）",
+        displayName = MspText.Res(R.string.msp_translate_svc_ollama_name),
         // 模拟器里 10.0.2.2 就是宿主机；真机请看下面 note。
         baseUrl = "http://10.0.2.2:11434/v1",
         model = "qwen3:8b",
         requiresApiKey = false,
-        apiKeyHint = "本地服务随便填，留空也行",
+        apiKeyHint = MspText.Res(R.string.msp_translate_svc_ollama_key_hint),
         disableThinkingBody = "",
-        note = "模拟器用 10.0.2.2 指宿主机。真机推荐 `adb reverse tcp:11434 tcp:11434`，" +
-            "然后把地址填成 http://localhost:11434/v1——局域网明文 HTTP 会被系统安全策略拦掉，" +
-            "只有 localhost / 10.0.2.2 在放行名单里。",
+        note = MspText.Res(R.string.msp_translate_svc_ollama_note),
     )
 
     val OPENAI = TranslationService(
         id = "openai",
-        displayName = "OpenAI",
+        displayName = MspText.Plain("OpenAI"),
         baseUrl = "https://api.openai.com/v1",
         model = "gpt-4o-mini",
         requiresApiKey = true,
-        apiKeyHint = "sk-…",
+        apiKeyHint = SK_HINT,
         disableThinkingBody = "",
-        note = "国内网络通常需要自建代理，可以把 baseUrl 改成自己的中转地址。",
+        note = MspText.Res(R.string.msp_translate_svc_openai_note),
     )
 
     val CUSTOM = TranslationService(
         id = CUSTOM_ID,
-        displayName = "自定义（任何 OpenAI 兼容服务）",
+        displayName = MspText.Res(R.string.msp_translate_svc_custom_name),
         baseUrl = "",
         model = "",
         requiresApiKey = false,
-        apiKeyHint = "按服务商要求填",
+        apiKeyHint = MspText.Res(R.string.msp_translate_svc_custom_key_hint),
         disableThinkingBody = "",
-        note = "只要支持 POST {baseUrl}/chat/completions 就能用：" +
-            "OpenAI、DeepSeek、通义、GLM、Kimi、Ollama、vLLM、LM Studio、one-api 中转都可以。",
+        note = MspText.Res(R.string.msp_translate_svc_custom_note),
     )
 
     /** 界面里的排列顺序。自定义放最后。 */

@@ -8,6 +8,8 @@ import android.os.Looper
 import android.provider.MediaStore
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.R
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -105,7 +107,11 @@ class MediaLibraryRepository(
                 .onFailure { error ->
                     MspLog.e(TAG, error) { "扫描媒体库失败" }
                     _state.value = MediaLibraryState.Error(
-                        error.message ?: "扫描媒体库失败（${error::class.java.simpleName}）",
+                        error.message?.takeIf { it.isNotBlank() }?.let(MspText::Plain)
+                            ?: MspText.Res(
+                                R.string.msp_library_scan_failed,
+                                error::class.java.simpleName,
+                            ),
                     )
                 }
         }

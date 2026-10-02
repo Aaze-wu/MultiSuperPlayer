@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="msp_nav_library">Library</string>
+    <string name="msp_nav_now_playing">Now Playing</string>
+    <string name="msp_nav_settings">Settings</string>
+</resources>

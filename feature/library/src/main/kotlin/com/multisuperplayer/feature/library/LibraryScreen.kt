@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,6 +49,8 @@ import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.ui.text.displayTitle
+import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -105,10 +108,13 @@ fun LibraryScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("媒体库") },
+                title = { Text(stringResource(R.string.msp_library_title)) },
                 actions = {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "重新扫描")
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            contentDescription = stringResource(R.string.msp_library_rescan),
+                        )
                     }
                 },
             )
@@ -142,9 +148,9 @@ fun LibraryScreen(
                     // 两个提示都恰好说反了，用户要做的下一步也正好相反。
                     LibraryPane.FilteredOut -> EmptyState(
                         icon = Icons.Outlined.SearchOff,
-                        title = "没有匹配的内容",
-                        description = "库里的媒体还在，只是当前搜索或筛选没匹配到。",
-                        actionLabel = "清空搜索与筛选",
+                        title = stringResource(R.string.msp_library_filtered_out_title),
+                        description = stringResource(R.string.msp_library_filtered_out_desc),
+                        actionLabel = stringResource(R.string.msp_library_clear_filters),
                         onAction = {
                             onQueryChange("")
                             onFilterChange(LibraryFilter.ALL)
@@ -153,17 +159,17 @@ fun LibraryScreen(
 
                     LibraryPane.NoMedia -> EmptyState(
                         icon = Icons.Outlined.FolderOff,
-                        title = "还没有扫描到媒体",
-                        description = "本机没有找到音频或视频文件。\n把文件放进手机存储后重新扫描即可。",
-                        actionLabel = "重新扫描",
+                        title = stringResource(R.string.msp_library_empty_title),
+                        description = stringResource(R.string.msp_library_empty_desc),
+                        actionLabel = stringResource(R.string.msp_library_rescan),
                         onAction = onRefresh,
                     )
 
                     is LibraryPane.Failure -> EmptyState(
                         icon = Icons.Outlined.WarningAmber,
-                        title = "扫描失败",
-                        description = pane.message,
-                        actionLabel = "重试",
+                        title = stringResource(R.string.msp_library_failure_title),
+                        description = pane.message.string(),
+                        actionLabel = stringResource(R.string.msp_library_retry),
                         onAction = onRefresh,
                     )
 
@@ -191,7 +197,7 @@ private fun LibraryToolbar(
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            placeholder = { Text("搜索标题、艺术家、专辑") },
+            placeholder = { Text(stringResource(R.string.msp_library_search_hint)) },
         )
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -201,7 +207,7 @@ private fun LibraryToolbar(
                 FilterChip(
                     selected = state.filter == filter,
                     onClick = { onFilterChange(filter) },
-                    label = { Text("${filter.label} ${state.counts[filter] ?: 0}") },
+                    label = { Text("${filter.label.string()} ${state.counts[filter] ?: 0}") },
                 )
             }
         }
@@ -228,7 +234,7 @@ private fun PartialAccessBanner() {
         ) {
             Icon(Icons.Outlined.Lock, contentDescription = null)
             Text(
-                text = "只授权了部分媒体访问，列表可能不完整。",
+                text = stringResource(R.string.msp_library_partial_access),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -263,16 +269,18 @@ private fun MediaEntryList(
 private fun MediaEntryRow(entry: MediaEntry, onClick: () -> Unit) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
-        headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = {
+            Text(entry.displayTitle().string(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
         supportingContent = {
             Text(
-                text = entry.subtitle.ifBlank { entry.kind.label },
+                text = entry.subtitle.ifBlank { entry.kind.label() },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         },
         leadingContent = {
-            Icon(imageVector = entry.kind.icon, contentDescription = entry.kind.label)
+            Icon(imageVector = entry.kind.icon, contentDescription = entry.kind.label())
         },
         trailingContent = {
             // 时长未知时**不显示** `00:00`。那会被读成「这条是空文件」，
@@ -299,10 +307,9 @@ private fun LoadingState() {
 private fun NeedsPermissionState(onRequestPermission: () -> Unit) {
     EmptyState(
         icon = Icons.Outlined.Lock,
-        title = "需要媒体访问权限",
-        description = "扫描本机音频和视频需要读取媒体的权限。\n" +
-            "应用只读取文件名、时长等元数据，不会修改或上传任何文件。",
-        actionLabel = "授予权限",
+        title = stringResource(R.string.msp_library_permission_title),
+        description = stringResource(R.string.msp_library_permission_desc),
+        actionLabel = stringResource(R.string.msp_library_grant_permission),
         onAction = onRequestPermission,
     )
 }
@@ -345,12 +352,17 @@ private fun EmptyState(
     }
 }
 
-private val MediaKind.label: String
-    get() = when (this) {
-        MediaKind.AUDIO -> "音频"
-        MediaKind.VIDEO -> "视频"
-        MediaKind.UNKNOWN -> "媒体"
-    }
+/**
+ * 类型名。写成 `@Composable` 函数而不是 `val`：文案在资源里，只能在组合期解析。
+ */
+@Composable
+private fun MediaKind.label(): String = stringResource(
+    when (this) {
+        MediaKind.AUDIO -> R.string.msp_library_kind_audio
+        MediaKind.VIDEO -> R.string.msp_library_kind_video
+        MediaKind.UNKNOWN -> R.string.msp_library_kind_media
+    },
+)
 
 private val MediaKind.icon: ImageVector
     get() = when (this) {

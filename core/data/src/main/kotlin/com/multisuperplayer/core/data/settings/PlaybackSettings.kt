@@ -1,5 +1,8 @@
 package com.multisuperplayer.core.data.settings
 
+import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.R
+
 import com.multisuperplayer.core.player.SpeedBoostOptions
 
 /**
@@ -84,18 +87,34 @@ data class PlaybackSettings(
  * @param label 短名，用在 chip、行尾的当前值上（地方小）。
  * @param description 一句话解释，用在选择列表里。
  */
-enum class AspectRatioMode(val id: String, val label: String, val description: String) {
+enum class AspectRatioMode(val id: String, val label: MspText, val description: MspText) {
     /** 保持比例，完整显示，多余的地方留黑边。 */
-    FIT("fit", "适应", "完整显示画面，多出来的地方留黑边"),
+    FIT(
+        "fit",
+        MspText.Res(R.string.msp_aspect_fit_label),
+        MspText.Res(R.string.msp_aspect_fit_desc),
+    ),
 
     /** 保持比例，铺满屏幕，超出部分裁掉（原「裁剪填满」）。 */
-    CROP("crop", "裁剪", "铺满屏幕，裁掉超出的部分"),
+    CROP(
+        "crop",
+        MspText.Res(R.string.msp_aspect_crop_label),
+        MspText.Res(R.string.msp_aspect_crop_desc),
+    ),
 
     /** 不保持比例，强行拉满整个屏幕。 */
-    STRETCH("stretch", "拉伸", "拉伸铺满，比例会变形"),
+    STRETCH(
+        "stretch",
+        MspText.Res(R.string.msp_aspect_stretch_label),
+        MspText.Res(R.string.msp_aspect_stretch_desc),
+    ),
 
     /** 按视频自己的宽高比显示（竖向视频不会被拉宽）。 */
-    ORIGINAL("original", "原始", "按片源像素显示，不放大也不缩小"),
+    ORIGINAL(
+        "original",
+        MspText.Res(R.string.msp_aspect_original_label),
+        MspText.Res(R.string.msp_aspect_original_desc),
+    ),
     ;
 
     companion object {

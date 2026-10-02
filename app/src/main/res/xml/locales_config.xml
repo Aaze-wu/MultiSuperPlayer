@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  声明本应用支持的语言，供 Android 13+ 的「设置 → 应用 → MultiSuperPlayer → 语言」
+  列表使用。不声明的话系统那边只会显示一个「系统默认」，用户就没法从系统设置里切。
+
+  这里的标签必须和 AppLanguage.resourceTags 对得上（有单测锁住），也不能少了
+  `zh-Hans`：它虽然放在 values/ 里当兜底，但对系统而言它仍是「支持的一种语言」，
+  漏掉它会让系统设置里缺一项「简体中文」。
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh-Hans" />
+    <locale android:name="zh-Hant" />
+    <locale android:name="en" />
+</locale-config>

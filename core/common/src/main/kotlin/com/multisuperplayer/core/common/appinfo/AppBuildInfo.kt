@@ -1,6 +1,8 @@
 package com.multisuperplayer.core.common.appinfo
 
+import com.multisuperplayer.core.common.R
 import com.multisuperplayer.core.common.info.InfoRow
+import com.multisuperplayer.core.common.text.MspText
 
 /**
  * 当前安装包的构建信息。
@@ -24,23 +26,31 @@ data class AppBuildInfo(
     val buildTimeText: String,
 ) {
 
-    /** 形如 `0.5.4 (504)`；拿不到版本号时返回 [UNKNOWN]。 */
-    fun versionText(): String {
+    /** 形如 `0.5.4 (50500)`；拿不到版本号时返回「未知」。 */
+    fun versionText(): MspText {
         val name = versionName.trim()
-        if (name.isEmpty()) return UNKNOWN
-        return if (versionCode > 0) "$name ($versionCode)" else name
+        if (name.isEmpty()) return MspText.unknown()
+        return if (versionCode > 0) {
+            MspText.Res(R.string.msp_version_with_code, name, versionCode)
+        } else {
+            MspText.Plain(name)
+        }
     }
 
     /**
-     * 提交说明：`09b06a6`、`09b06a6（含未提交改动）`、拿不到时 [UNKNOWN]。
+     * 提交说明：`09b06a6`、`09b06a6（含未提交改动）`、拿不到时「未知」。
      *
      * 「有未提交改动」必须说出来：否则一个在本地改过的包和一个干净的 tag 包
      * 会显示成同一个 commit，而它们的行为可能完全不同。
      */
-    fun commitText(): String {
+    fun commitText(): MspText {
         val commit = gitCommit.trim()
-        if (commit.isEmpty() || commit == UNKNOWN) return UNKNOWN
-        return if (gitDirty) "$commit（$DIRTY_SUFFIX）" else commit
+        if (commit.isEmpty()) return MspText.unknown()
+        return if (gitDirty) {
+            MspText.Res(R.string.msp_wrapped_in_parens, commit, dirtySuffix())
+        } else {
+            MspText.Plain(commit)
+        }
     }
 
     /**
@@ -54,48 +64,57 @@ data class AppBuildInfo(
      * 一个本地改过的包和干净的 tag 包会显示成同一行，而这正是当初把
      * versionCode/versionName 改成由构建脚本注入时想避免的事。
      */
-    fun sourceText(): String {
+    fun sourceText(): MspText {
         val commit = gitCommit.trim()
         val tag = gitTag.trim()
-        val hasCommit = commit.isNotEmpty() && commit != UNKNOWN
-        val hasTag = tag.isNotEmpty() && tag != UNKNOWN
-        val dirtySuffix = if (gitDirty) "，$DIRTY_SUFFIX" else ""
         return when {
-            hasTag && hasCommit -> "$tag（$commit$dirtySuffix）"
-            hasTag -> "$tag$dirtySuffix"
-            hasCommit -> "$commit$dirtySuffix"
-            else -> UNKNOWN
+            tag.isNotEmpty() && commit.isNotEmpty() ->
+                MspText.Res(R.string.msp_wrapped_in_parens, tag, commitText())
+
+            tag.isNotEmpty() -> if (gitDirty) appendedWithComma(tag) else MspText.Plain(tag)
+
+            // 只有 commit 时直接复用 commitText()
+            commit.isNotEmpty() -> commitText()
+
+            else -> MspText.unknown()
         }
     }
 
     /** 供设置首页那一行「关于」用的摘要。 */
-    fun summaryText(): String = versionText()
+    fun summaryText(): MspText = versionText()
 
-    /** 构建时间，拿不到时 [UNKNOWN]。 */
-    fun buildTimeLabel(): String = buildTimeText.trim().ifEmpty { UNKNOWN }
+    /** 构建时间，拿不到时「未知」。 */
+    fun buildTimeLabel(): MspText = MspText.plainOrUnknown(buildTimeText)
 
     /** 日志抬头用的若干行，和关于页同源。 */
     fun rows(): List<InfoRow> = listOf(
-        InfoRow("版本", versionText()),
-        InfoRow("构建来源", sourceText()),
-        InfoRow("构建时间", buildTimeLabel()),
+        InfoRow(MspText.Res(R.string.msp_row_version), versionText()),
+        InfoRow(MspText.Res(R.string.msp_row_source), sourceText()),
+        InfoRow(MspText.Res(R.string.msp_row_build_time), buildTimeLabel()),
     )
 
+    /** 「，含未提交改动」里的后半句，[commitText] 与 [sourceText] 共用同一句话。 */
+    private fun dirtySuffix(): MspText = MspText.Res(R.string.msp_dirty_suffix)
+
+    /** `v0.5.3，含未提交改动`。 */
+    private fun appendedWithComma(head: String): MspText =
+        MspText.Res(R.string.msp_appended_with_comma, head, dirtySuffix())
+
     companion object {
-        /** 取不到时的占位文本。**不要**留空串：空白行等于「这个字段不存在」，无法与「构建脚本坏了」区分。 */
-        const val UNKNOWN: String = "未知"
-
-        /** 「本地有未提交改动」的标记（不带括号与前导逗号），[commitText] 与 [sourceText] 共用同一句话。 */
-        const val DIRTY_SUFFIX: String = "含未提交改动"
-
-        /** 构建脚本没注入时的兜底值。 */
+        /**
+         * 构建脚本没注入时的兜底值。
+         *
+         * 六个字段全是空串/0，**不**把「未知」写进字段里：由 `MspText.unknown()` 在渲染时
+         * 兜底，于是「取到了什么」和「取不到时怎么显示」分开。好处是这两个词可以跟着
+         * 界面语言走，而不是把中文烙进构建数据。
+         */
         val Unknown = AppBuildInfo(
             versionName = "",
             versionCode = 0,
-            gitCommit = UNKNOWN,
-            gitTag = UNKNOWN,
+            gitCommit = "",
+            gitTag = "",
             gitDirty = false,
-            buildTimeText = UNKNOWN,
+            buildTimeText = "",
         )
     }
 }

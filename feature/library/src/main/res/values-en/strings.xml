@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Media library UI strings.
+
+    The key set must match values/ and values-b+zh+Hant/ exactly (guarded by
+    `AppLanguageTest`).
+-->
+<resources>
+
+    <!-- ===== Top bar ===== -->
+    <string name="msp_library_title">Media library</string>
+    <string name="msp_library_rescan">Rescan</string>
+
+    <!-- ===== Empty state: hidden by search/filter ===== -->
+    <string name="msp_library_filtered_out_title">No matches</string>
+    <string name="msp_library_filtered_out_desc">Your media is still here; the current search or filter just does not match it.</string>
+    <string name="msp_library_clear_filters">Clear search and filter</string>
+
+    <!-- ===== Empty state: the library itself is empty ===== -->
+    <string name="msp_library_empty_title">No media found yet</string>
+    <string name="msp_library_empty_desc">No audio or video files were found on this device.\nAdd files to your storage and rescan.</string>
+
+    <!-- ===== Empty state: the scan failed ===== -->
+    <string name="msp_library_failure_title">Scan failed</string>
+    <string name="msp_library_retry">Retry</string>
+
+    <!-- ===== Toolbar ===== -->
+    <string name="msp_library_search_hint">Search title, artist, album</string>
+    <string name="msp_library_partial_access">Only partial media access was granted, so this list may be incomplete.</string>
+
+    <!-- ===== Permission ===== -->
+    <string name="msp_library_permission_title">Media access needed</string>
+    <string name="msp_library_permission_desc">Scanning audio and video on this device needs media permission.\nThe app only reads metadata such as file names and durations; it never modifies or uploads your files.</string>
+    <string name="msp_library_grant_permission">Grant permission</string>
+
+    <!-- ===== Kind names (row subtitle, icon description) ===== -->
+    <string name="msp_library_kind_audio">Audio</string>
+    <string name="msp_library_kind_video">Video</string>
+    <string name="msp_library_kind_media">Media</string>
+
+    <!-- ===== Filter labels ===== -->
+    <string name="msp_library_filter_all">All</string>
+    <string name="msp_library_filter_audio">Music</string>
+    <string name="msp_library_filter_video">Video</string>
+
+</resources>

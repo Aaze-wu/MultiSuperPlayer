@@ -1,0 +1,96 @@
+<resources>
+
+    <!-- ===== Translation failure messages ===== -->
+
+    <!--
+      The two paths below must never share a sentence: a bad response shape is
+      fixed by changing model/batch size, a truncated response by raising the
+      budget. Merging them makes users apply the wrong remedy forever.
+    -->
+    <string name="msp_translate_fail_not_configured">Translation settings are incomplete: %1$s is missing.</string>
+    <string name="msp_translate_fail_not_configured_hint">Fill it in under Settings → Subtitle translation, then come back.</string>
+
+    <string name="msp_translate_fail_unauthorized">Authentication failed (HTTP %1$d).</string>
+    <string name="msp_translate_fail_unauthorized_hint">The key may be wrong, expired, or from another region (Alibaba Cloud Bailian keys are tied to a region; using one across regions returns invalid_api_key).</string>
+
+    <string name="msp_translate_fail_quota">Account balance or quota is used up (HTTP %1$d).</string>
+    <string name="msp_translate_fail_quota_hint">Top up in the provider console first; retrying only burns the remaining quota faster.</string>
+
+    <string name="msp_translate_fail_rate_limited">Too many requests (HTTP %1$d).</string>
+    <string name="msp_translate_fail_rate_limited_wait">The provider asks for a %1$d second wait. Just retry afterwards.</string>
+    <string name="msp_translate_fail_rate_limited_hint">Wait a moment and retry; if it keeps happening the provider is congested.</string>
+
+    <string name="msp_translate_fail_rejected">The provider rejected this request (HTTP %1$d).</string>
+    <string name="msp_translate_fail_rejected_hint">Usually the model name does not exist, or that model does not accept this request shape.</string>
+
+    <string name="msp_translate_fail_server">The provider hit an internal error (HTTP %1$d).</string>
+    <string name="msp_translate_fail_server_hint">This is not your configuration; retrying is fine. If it keeps happening, check the provider status page.</string>
+
+    <string name="msp_translate_fail_network">Cannot reach the provider.</string>
+
+    <string name="msp_translate_fail_bad_response">The response shape is wrong (this is not a quota problem).</string>
+    <string name="msp_translate_fail_bad_response_hint">Retrying returns the same thing. Switch to a model that follows instructions better, or try another provider.</string>
+
+    <string name="msp_translate_fail_empty">The model produced no output at all this time%1$s.</string>
+    <string name="msp_translate_fail_reason">" (finish_reason=%1$s)"</string>
+    <string name="msp_translate_fail_reasoning_tokens">" (%1$d tokens went to reasoning)"</string>
+    <string name="msp_translate_fail_empty_hint">This almost always means reasoning mode ate the whole output budget%1$s. Switching to a model without reasoning should translate normally.</string>
+
+    <string name="msp_translate_fail_truncated">This batch is too long; the output was cut off.%1$s</string>
+    <string name="msp_translate_fail_truncated_hint">The limit is %1$d tokens and %2$sthis batch still would not fit after being split automatically. Retry with a model that has a higher single-response limit.</string>
+    <string name="msp_translate_fail_truncated_estimate">"is estimated to need about %1$d tokens, so "</string>
+
+    <!-- ===== Missing configuration items ===== -->
+
+    <string name="msp_translate_missing_base_url">Base URL</string>
+    <string name="msp_translate_missing_base_url_scheme">Base URL (must start with http:// or https://)</string>
+    <string name="msp_translate_missing_model">Model name</string>
+    <string name="msp_translate_missing_api_key">API key</string>
+    <string name="msp_translate_missing_batch_size">Batch size (at least 1 line)</string>
+
+    <!-- Target language names (named in the UI language, not fixed to Chinese) -->
+    <string name="msp_translate_lang_zh_hans">Simplified Chinese</string>
+    <string name="msp_translate_lang_zh_hant">Traditional Chinese</string>
+    <string name="msp_translate_lang_en">English</string>
+    <string name="msp_translate_lang_ja">Japanese</string>
+    <string name="msp_translate_lang_ko">Korean</string>
+
+    <string name="msp_translate_join_list">%1$s, %2$s</string>
+    <string name="msp_translate_join_comma">%1$s, %2$s</string>
+
+    <string name="msp_translate_current_provider">Provider: %1$s</string>
+    <string name="msp_translate_current_model">Model: %1$s</string>
+    <string name="msp_translate_current_of">%1$s (currently %2$s)</string>
+
+    <!-- ===== Network failure notes ===== -->
+
+    <string name="msp_translate_network_detail">%1$s%2$s</string>
+    <string name="msp_translate_network_timeout">" (timed out. Long subtitles are slow; you can raise the read timeout in settings)"</string>
+    <string name="msp_translate_network_unresolved">" (DNS lookup failed: check the address spelling and your network)"</string>
+    <string name="msp_translate_network_cleartext">" (plain HTTP was blocked by the system security policy. Only localhost / 10.0.2.2 are allowed; to reach a LAN service from a real device run adb reverse tcp:&lt;port&gt; tcp:&lt;port&gt; and use localhost)"</string>
+
+    <!-- ===== Provider presets ===== -->
+
+    <string name="msp_translate_svc_dashscope_name">Alibaba Cloud Bailian (Qwen)</string>
+    <string name="msp_translate_svc_dashscope_note">Bailian keys are bound to a region: using one across regions returns 401 invalid_api_key. If you enabled a workspace, the address becomes https://&lt;WorkspaceId&gt;.cn-beijing.maas.aliyuncs.com/compatible-mode/v1.</string>
+    <string name="msp_translate_svc_deepseek_note">Official docs: api-docs.deepseek.com. The base URL is just the domain; /chat/completions is appended for you.</string>
+    <string name="msp_translate_svc_zhipu_name">Zhipu GLM</string>
+    <string name="msp_translate_svc_zhipu_note">The trailing /v4 in the base URL is required.</string>
+    <string name="msp_translate_svc_moonshot_name">Kimi (Moonshot AI)</string>
+    <string name="msp_translate_svc_moonshot_note">The official docs state thinking is **on by default**, so the disable parameter must always be sent, otherwise long subtitles burn a large amount of tokens for nothing.</string>
+    <string name="msp_translate_svc_ollama_name">Ollama (local)</string>
+    <string name="msp_translate_svc_ollama_note">On the emulator 10.0.2.2 points at the host machine. On a real device we recommend `adb reverse tcp:11434 tcp:11434` and then using http://localhost:11434/v1 — plain HTTP on the LAN is blocked by the system policy, only localhost / 10.0.2.2 are allowed.</string>
+    <string name="msp_translate_svc_ollama_key_hint">Any value works for a local service; it can be left empty</string>
+    <string name="msp_translate_svc_openai_note">Networks in mainland China usually need a proxy; you can point the base URL at your own relay.</string>
+    <string name="msp_translate_svc_custom_name">Custom (any OpenAI-compatible service)</string>
+    <string name="msp_translate_svc_custom_note">Anything that supports POST {baseUrl}/chat/completions works: OpenAI, DeepSeek, Qwen, GLM, Kimi, Ollama, vLLM, LM Studio, one-api relays, and more.</string>
+    <string name="msp_translate_svc_custom_key_hint">Fill in as your provider requires</string>
+
+    <!-- ===== Export options ===== -->
+
+    <string name="msp_translate_export_srt">SRT (universal)</string>
+    <string name="msp_translate_export_ass">ASS (styled, still editable in Aegisub)</string>
+    <string name="msp_translate_export_mode_translation_only">Translation only</string>
+    <string name="msp_translate_export_mode_bilingual">Original + translation</string>
+
+</resources>

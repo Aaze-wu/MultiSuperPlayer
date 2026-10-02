@@ -1,21 +1,22 @@
 package com.multisuperplayer.core.translate
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
 
 /** 导出格式。只做这两种——它们是实际有人用的；ASS 的样式导出见下。 */
-enum class SubtitleExportFormat(val extension: String, val label: String) {
-    SRT("srt", "SRT（通用）"),
-    ASS("ass", "ASS（带样式，可继续用 Aegisub 编辑）"),
+enum class SubtitleExportFormat(val extension: String, val label: MspText) {
+    SRT("srt", MspText.Res(R.string.msp_translate_export_srt)),
+    ASS("ass", MspText.Res(R.string.msp_translate_export_ass)),
 }
 
 /** 导出内容形态。 */
-enum class SubtitleExportMode(val label: String) {
+enum class SubtitleExportMode(val label: MspText) {
     /** 只有译文（没有译文的行回退原文，避免导出文件出现空洞）。 */
-    TRANSLATION_ONLY("仅译文"),
+    TRANSLATION_ONLY(MspText.Res(R.string.msp_translate_export_mode_translation_only)),
 
     /** 原文一行、译文一行。做双语字幕或拿去校对时用这个。 */
-    BILINGUAL("原文 + 译文"),
+    BILINGUAL(MspText.Res(R.string.msp_translate_export_mode_bilingual)),
 }
 
 /**

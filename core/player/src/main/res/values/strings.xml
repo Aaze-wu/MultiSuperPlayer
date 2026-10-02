@@ -1,5 +1,46 @@
 <resources>
+
     <!-- 通知渠道名。渠道一旦创建，名称就固定在该用户的系统里；
          改这里的文案只影响新安装的用户，不会修正已存在的渠道。 -->
     <string name="msp_playback_channel_name">播放控制</string>
+
+    <!-- ===== 播放失败文案 ===== -->
+
+    <!--
+      「为什么放不了」必须按原因分开说：权限 / 解码器 / 容器损坏对应完全不同的
+      处理方式，合并成一句「播放失败」等于什么都没说。
+
+      `%1$s` 是下面某一条，`%2$d` 是错误码，`%3$s` 是底层异常类名（可选）。
+      错误码留着是为了让截图能定位——用户复述不出 `ERROR_CODE_IO_NO_PERMISSION`。
+    -->
+    <string name="msp_playback_error_with_code">%1$s（错误码 %2$d）</string>
+    <string name="msp_playback_error_with_code_and_cause">%1$s（错误码 %2$d，%3$s）</string>
+
+    <string name="msp_playback_error_file_not_found">找不到该文件，可能已被移动或删除</string>
+    <string name="msp_playback_error_no_permission">没有读取该文件的权限。请重新选择这个文件或文件夹以授予访问权限</string>
+    <string name="msp_playback_error_cleartext">系统禁止明文 HTTP 播放。请在设置中允许该地址使用不加密连接</string>
+    <string name="msp_playback_error_network_failed">无法连接到服务器，请检查网络或播放地址</string>
+    <string name="msp_playback_error_network_timeout">连接服务器超时，请检查网络</string>
+    <string name="msp_playback_error_http_status">服务器返回了错误状态码，播放地址可能已失效</string>
+
+    <!--
+      下面三条是同一个错误码在「软件解码参与到了哪一步」下的三种说法。
+      它们**不能合并**：三种情况下一步该做的事完全不同
+      （换设备 / 只能换文件 / 再点一次重试）。
+    -->
+    <string name="msp_playback_error_decoder_unavailable">本机没有能解码该音视频格式的解码器，而这个安装包不含 FFmpeg 软件解码（可能是 CPU 架构不受支持）</string>
+    <string name="msp_playback_error_decoder_software_failed">硬件解码和 FFmpeg 软件解码都解不开这个文件。常见于冷门编码，或封装格式本身不被支持（例如 WMV、RealMedia）</string>
+    <string name="msp_playback_error_decoder_software_not_tried">本机没有能解码该音视频格式的解码器（常见于 AC-3/DTS/TrueHD 音轨或特殊编码的 HEVC）。再点一次播放会重试一次</string>
+
+    <string name="msp_playback_error_decoder_both_failed">解码失败：硬件解码和 FFmpeg 软件解码都试过并失败了。这个文件的编码方式不被支持</string>
+    <string name="msp_playback_error_decoder_init">解码器初始化失败。若反复出现，通常是这个文件的编码方式不被支持</string>
+
+    <string name="msp_playback_error_container_malformed">文件（或流清单）已损坏或下载不完整</string>
+    <string name="msp_playback_error_container_unsupported">无法识别这个文件/流的封装格式</string>
+
+    <string name="msp_playback_error_audio_output">音频输出初始化失败，可能是音频设备被其他应用占用</string>
+    <string name="msp_playback_error_live_window">直播进度落后过多，正在重新缓冲</string>
+    <string name="msp_playback_error_timeout">播放超时，请检查网络</string>
+    <string name="msp_playback_error_generic">播放失败</string>
+
 </resources>

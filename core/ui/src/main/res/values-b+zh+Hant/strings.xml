@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主題文案（繁體）。key 必須與 `values/strings.xml` 完全一致。
+-->
+<resources>
+
+    <!-- ===== 主題基底 ===== -->
+
+    <string name="msp_theme_system">跟隨系統</string>
+    <string name="msp_theme_light">淺色</string>
+    <string name="msp_theme_dark">深色</string>
+    <string name="msp_theme_black">純黑（OLED）</string>
+
+    <!-- ===== 強調色 ===== -->
+
+    <string name="msp_accent_indigo">靛藍</string>
+    <string name="msp_accent_violet">紫羅蘭</string>
+    <string name="msp_accent_teal">青碧</string>
+    <string name="msp_accent_green">森綠</string>
+    <string name="msp_accent_amber">琥珀</string>
+    <string name="msp_accent_rose">緋紅</string>
+
+    <!-- ===== 媒體標題兌底 ===== -->
+
+    <string name="msp_media_unknown_title">未知標題</string>
+
+</resources>

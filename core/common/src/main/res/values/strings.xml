@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  core:common 的文案。
+
+  这里放的是**跨模块共用**的词：设备信息、构建信息、时间/时长。
+  它们同时喂给「关于」页和日志抬头，所以只能有一份，不能让两个模块各写各的。
+
+  命名规则：`msp_<域>_<内容>`。带参数的字符串一律用**位置参数**（`%1$s`），
+  不用 `%s`：翻译时语序会变，位置参数才允许译者调换顺序。
+
+  注意：XML 注释里不能出现连续两个减号，所以下面用等号当分隔线。
+-->
+<resources>
+
+    <!-- ===== 通用 ===== -->
+
+    <!-- 「取不到这个值」。设备/构建信息里每个字段的兜底，绝不能显示成空白 -->
+    <string name="msp_value_unknown">未知</string>
+
+    <!-- ===== 关于页 / 日志的标签 ===== -->
+
+    <string name="msp_row_device">设备</string>
+    <string name="msp_row_system">系统</string>
+    <string name="msp_row_abi">CPU 架构</string>
+    <string name="msp_row_screen">屏幕</string>
+    <string name="msp_row_language">语言</string>
+
+    <string name="msp_row_version">版本</string>
+    <string name="msp_row_source">构建来源</string>
+    <string name="msp_row_build_time">构建时间</string>
+
+    <!-- ===== 构建信息 ===== -->
+
+    <!-- 例：`0.5.4 (50500)`。第一参数是版本名，第二参数是版本码 -->
+    <string name="msp_version_with_code">%1$s (%2$d)</string>
+
+    <!-- 通用包裹：`版本名（附加说明）`、`tag（commit）` 都走这一条 -->
+    <string name="msp_wrapped_in_parens">%1$s（%2$s）</string>
+
+    <!-- 通用并列：`tag，含未提交改动`。两个短片段之间的关系，译者可以换标点 -->
+    <string name="msp_appended_with_comma">%1$s，%2$s</string>
+
+    <!--
+      通用拼接：把若干段接成一句。分隔符（`%2$s`）由调用方传进来，所以「用 · 还是用、」
+      由文案决定，而「两两拼接」这件事不必每个模块各写一遍，也不用拼 `String`。
+    -->
+    <string name="msp_joined">%1$s%2$s%3$s</string>
+
+    <!-- 工作区有未提交改动时必须说出来，否则本地包和 tag 包长得一模一样 -->
+    <string name="msp_dirty_suffix">含未提交改动</string>
+
+    <!-- ===== 设备信息 ===== -->
+
+    <!-- 例：`Google Pixel 7`。机型已经自带品牌时不会拼这一条 -->
+    <string name="msp_device_brand_model">%1$s %2$s</string>
+
+    <!-- 例：`Android 14（API 34）` -->
+    <string name="msp_android_with_api">Android %1$s（API %2$d）</string>
+
+    <!-- 系统代号读不到时的降级：`API 34` -->
+    <string name="msp_api_only">API %1$d</string>
+
+    <!-- 例：`1080×2400 @420dpi`。「×」是全角乘号，不是字母 x -->
+    <string name="msp_screen_size">%1$d×%2$d @%3$ddpi</string>
+
+    <!-- 密度读不到时的降级：`1080×2400` -->
+    <string name="msp_screen_size_plain">%1$d×%2$d</string>
+
+    <!-- ===== 时长 ===== -->
+
+    <string name="msp_duration_hours">%1$d 小时</string>
+    <string name="msp_duration_minutes">%1$d 分</string>
+    <string name="msp_duration_seconds">%1$d 秒</string>
+
+    <string name="msp_duration_hours_minutes">%1$d 小时 %2$d 分</string>
+    <string name="msp_duration_hours_seconds">%1$d 小时 %2$d 秒</string>
+    <string name="msp_duration_minutes_seconds">%1$d 分 %2$d 秒</string>
+    <string name="msp_duration_full">%1$d 小时 %2$d 分 %3$d 秒</string>
+
+</resources>

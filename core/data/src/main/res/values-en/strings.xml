@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    UI strings of the data layer.
+
+    This module never writes user-facing prose in code: it hands out an MspText
+    (see core:common) so the UI resolves it in the language the user chose.
+-->
+<resources>
+
+    <!-- ==== Subtitles: why it could not be read ====
+         Messages that come from a system exception are passed through as-is (they
+         are already in the system language); only failures we detect ourselves
+         use these sentences. ==== -->
+    <string name="msp_subtitle_reason_directory_unreadable">Could not read the subtitle folder</string>
+    <string name="msp_subtitle_reason_file_unreadable">Could not read the file</string>
+    <string name="msp_subtitle_reason_file_unopenable">Cannot open this file; it may have been moved or deleted</string>
+    <string name="msp_subtitle_reason_unparsable">Could not parse this subtitle file</string>
+    <!-- %1$d: file size in MB -->
+    <string name="msp_subtitle_reason_file_too_large">File is too large (%1$d MB) and may not be a subtitle file</string>
+
+    <!-- ==== Media library ==== -->
+    <!-- %1$s: name of the system exception class -->
+    <string name="msp_library_scan_failed">Failed to scan the media library (%1$s)</string>
+
+    <!-- ==== Aspect ratio (label / description of AspectRatioMode) ==== -->
+    <string name="msp_aspect_fit_label">Fit</string>
+    <string name="msp_aspect_fit_desc">Shows the whole picture, with black bars where it does not fit</string>
+    <string name="msp_aspect_crop_label">Crop</string>
+    <string name="msp_aspect_crop_desc">Fills the screen, cutting off what overflows</string>
+    <string name="msp_aspect_stretch_label">Stretch</string>
+    <string name="msp_aspect_stretch_desc">Stretches to fill the screen, distorting the picture</string>
+    <string name="msp_aspect_original_label">Original</string>
+    <string name="msp_aspect_original_desc">Uses the source pixels, neither enlarged nor shrunk</string>
+
+</resources>

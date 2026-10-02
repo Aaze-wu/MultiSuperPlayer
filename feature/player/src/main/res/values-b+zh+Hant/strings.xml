@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  播放頁的介面文案（繁體中文）。
+
+  ===== 用詞對齊 =====
+  「檔案／設定／翻譯／權限／資料夾」與 feature:settings 的繁體檔一致，
+  同一個 App 裡不要一半寫「文件」一半寫「檔案」。
+
+  ===== 參數順序 =====
+  每個佔位符的編號都跟簡體基線相同，譯者可以調整語序而不必改程式碼。
+-->
+<resources>
+    <!-- ===== 字幕面板 ===== -->
+    <string name="msp_player_subtitles_title">字幕</string>
+    <string name="msp_player_rescan">重新掃描字幕</string>
+    <string name="msp_player_scanning">正在尋找字幕…</string>
+    <string name="msp_player_reading">正在讀取字幕…</string>
+    <string name="msp_player_cues">%1$s · %2$d 條</string>
+    <string name="msp_player_none_attached">目前沒有掛上任何字幕。</string>
+    <string name="msp_player_translation_missing_shown_original">這份字幕沒有譯文，已按原文顯示。</string>
+    <string name="msp_player_auto_select">自動選擇</string>
+    <string name="msp_player_auto_selected">已自動選中「%1$s」</string>
+    <string name="msp_player_auto_pick_desc">按片名從候選裡挑一條最吻合的</string>
+    <string name="msp_player_no_usable_subtitle">這個資料夾裡沒有找到可用的字幕檔案。</string>
+    <string name="msp_player_detail_sep">" · "</string>
+    <string name="msp_player_detail_language_unknown">未標語言</string>
+    <string name="msp_player_detail_forced">強制</string>
+    <string name="msp_player_detail_matches_title">與片名吻合</string>
+    <string name="msp_player_format_lrc">LRC 歌詞</string>
+    <string name="msp_player_format_lrc_enhanced">增強型 LRC（逐字）</string>
+
+    <!-- ===== 顯示模式 ===== -->
+    <string name="msp_player_mode_off">隱藏</string>
+    <string name="msp_player_mode_original_only">僅原文</string>
+    <string name="msp_player_mode_translation_only">僅譯文</string>
+    <string name="msp_player_mode_bilingual">雙語</string>
+
+    <!-- ===== 載入過程中的問題 ===== -->
+    <string name="msp_player_issue_no_directory">無法確定這個檔案所在的資料夾，沒辦法自動找同名字幕。</string>
+    <string name="msp_player_issue_directory_invisible">讀不到這個檔案所在的資料夾，可能是沒有儲存權限。</string>
+    <string name="msp_player_issue_scan_failed">尋找字幕時發生錯誤：%1$s</string>
+    <string name="msp_player_issue_no_subtitles">這個資料夾裡沒有字幕檔案。</string>
+    <string name="msp_player_issue_no_match">資料夾裡有字幕，但檔名和這部片對不上。可以在下面手動選一個。</string>
+    <string name="msp_player_issue_load_failed">「%1$s」讀取失敗：%2$s</string>
+
+    <!-- ===== 匯出 ===== -->
+    <string name="msp_player_export_done">已匯出 %1$s</string>
+    <string name="msp_player_export_failed">匯出失敗：%1$s 無法寫入（檔案可能已被刪除，或者那個位置不允許寫入）。</string>
+
+    <!-- ===== 翻譯面板 ===== -->
+    <string name="msp_player_translation">翻譯</string>
+    <string name="msp_player_target_prefix">目標語言：%1$s</string>
+    <string name="msp_player_with_model">模型：%1$s</string>
+    <string name="msp_player_wrapped_in_parens">%1$s（%2$s）</string>
+    <string name="msp_player_no_translatable">這份字幕裡沒有可翻譯的文字（可能整篇都是註解或空行）。</string>
+    <string name="msp_player_failed_lines">有 %1$d 行沒翻出來。</string>
+    <string name="msp_player_retry_only_failed">只重試這些行</string>
+    <string name="msp_player_got_it">知道了</string>
+    <string name="msp_player_not_configured">還沒有設定翻譯服務：還缺 %1$s。</string>
+    <string name="msp_player_missing_url_fallback">完好的服務位址</string>
+    <string name="msp_player_open_settings">去設定</string>
+    <string name="msp_player_translated_count">已譯 %1$d/%2$d</string>
+    <string name="msp_player_edited_suffix">（其中人工修正 %1$d 行）</string>
+    <string name="msp_player_run_progress">本次：%1$d/%2$d</string>
+    <string name="msp_player_with_cache">%1$s，快取命中 %2$d</string>
+    <string name="msp_player_with_requests">%1$s，實際請求 %2$d 次</string>
+    <string name="msp_player_translating">正在翻譯…可以隨時停止，已經翻好的會保留。</string>
+    <string name="msp_player_stop">停止</string>
+    <string name="msp_player_translate_all">翻譯全文</string>
+    <string name="msp_player_translate_up_to">翻譯到目前位置</string>
+    <string name="msp_player_retry_failed_n">重試失敗的 %1$d 行</string>
+    <string name="msp_player_show_raw">看服務商回傳的原文</string>
+    <string name="msp_player_hide_raw">收起服務商回傳的原文</string>
+    <string name="msp_player_export">匯出譯文…</string>
+
+    <!-- ===== 播放控制 ===== -->
+    <string name="msp_player_decoder_ffmpeg">FFmpeg 軟體解碼</string>
+    <string name="msp_player_decoder_system">系統軟體解碼</string>
+    <string name="msp_player_shuffle_off">關閉隨機播放</string>
+    <string name="msp_player_shuffle_on">開啟隨機播放</string>
+    <string name="msp_player_previous">上一首</string>
+    <string name="msp_player_play">播放</string>
+    <string name="msp_player_pause">暫停</string>
+    <string name="msp_player_next">下一首</string>
+    <string name="msp_player_repeat_off">循環已關閉</string>
+    <string name="msp_player_repeat_all">列表循環</string>
+    <string name="msp_player_repeat_one">單曲循環</string>
+    <string name="msp_player_subtitle_entry">字幕與歌詞</string>
+    <string name="msp_player_enter_fullscreen">全螢幕播放</string>
+    <string name="msp_player_exit_fullscreen">離開全螢幕</string>
+    <string name="msp_player_speed">播放速度</string>
+    <string name="msp_player_ab_repeat">A-B 循環</string>
+    <string name="msp_player_aspect">畫面比例</string>
+    <string name="msp_player_set_b">設 B</string>
+    <string name="msp_player_chip_active">%1$s，%2$s，已啟用</string>
+    <string name="msp_player_chip_inactive">%1$s，%2$s</string>
+    <string name="msp_player_volume">音量</string>
+    <string name="msp_player_brightness">亮度</string>
+    <string name="msp_player_unlock">解除鎖定</string>
+    <string name="msp_player_lock">鎖定螢幕</string>
+    <string name="msp_player_track_sep">"　·　"</string>
+
+    <!-- ===== 播放選項面板 ===== -->
+    <string name="msp_player_speed_note">倍速只影響播放，不會改變檔案本身。音訊會做音高補償，人聲不會變成快轉聲。</string>
+    <string name="msp_player_source_line">目前片源：%1$s</string>
+
+    <!-- ===== 播放頁狀態 ===== -->
+    <string name="msp_player_playing">播放中</string>
+    <string name="msp_player_paused">已暫停</string>
+    <string name="msp_player_boost">%1$s 加速中</string>
+    <string name="msp_player_offset_ahead">+%1$d 秒</string>
+    <string name="msp_player_offset_behind">-%1$d 秒</string>
+    <string name="msp_player_offset_zero">0 秒</string>
+    <string name="msp_player_nothing_playing">沒有正在播放的內容</string>
+    <string name="msp_player_nothing_playing_desc">到「媒體庫」裡選一條音訊或影片即可開始播放。</string>
+</resources>

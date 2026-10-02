@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主题相关的文案。
+
+  `values/` 是简体中文（源语言）；`values-en/` 与 `values-b+zh+Hant/` 是译文。
+  三份文件的 key 必须完全一致，`AppLanguageTest` 里的守卫会检查缺文件，
+  `MspStringsTest` 会检查 key 集合。
+-->
+<resources>
+
+    <!-- ===== 主题基底 ===== -->
+
+    <string name="msp_theme_system">跟随系统</string>
+    <string name="msp_theme_light">浅色</string>
+    <string name="msp_theme_dark">深色</string>
+    <string name="msp_theme_black">纯黑（OLED）</string>
+
+    <!-- ===== 强调色 ===== -->
+
+    <string name="msp_accent_indigo">靛蓝</string>
+    <string name="msp_accent_violet">紫罗兰</string>
+    <string name="msp_accent_teal">青碧</string>
+    <string name="msp_accent_green">森绿</string>
+    <string name="msp_accent_amber">琥珀</string>
+    <string name="msp_accent_rose">绯红</string>
+
+    <!-- ===== 媒体标题兑底 ===== -->
+
+    <string name="msp_media_unknown_title">未知标题</string>
+
+</resources>

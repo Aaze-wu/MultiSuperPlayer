@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.library
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 
@@ -10,10 +11,10 @@ import com.multisuperplayer.core.model.MediaKind
  * 与筛选是两个正交的东西，混在一个枚举里会让后面加分组时被迫再加一层。
  * 分组放到后续的 `groupBy` 里做。
  */
-enum class LibraryFilter(val label: String) {
-    ALL("全部"),
-    AUDIO("音乐"),
-    VIDEO("视频"),
+enum class LibraryFilter(val label: MspText) {
+    ALL(MspText.Res(R.string.msp_library_filter_all)),
+    AUDIO(MspText.Res(R.string.msp_library_filter_audio)),
+    VIDEO(MspText.Res(R.string.msp_library_filter_video)),
     ;
 
     fun accepts(entry: MediaEntry): Boolean = when (this) {

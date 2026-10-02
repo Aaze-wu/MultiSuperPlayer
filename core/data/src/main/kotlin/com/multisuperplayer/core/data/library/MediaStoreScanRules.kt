@@ -23,8 +23,14 @@ package com.multisuperplayer.core.data.library
  */
 internal object MediaStoreScanRules {
 
-    /** 标题、文件名都拿不到时的占位符。 */
-    const val UNKNOWN_TITLE = "(未知)"
+    /**
+     * 标题、文件名都拿不到时的**空**占位符。
+     *
+     * 曾经是 `"(未知)"`——但数据层不能放界面文案：这里的值只表示「没有标题」，
+     * 显示什么由界面决定（`core:ui` 的 `msp_media_unknown_title`），否则英文
+     * 界面里会冒出一句写死的中文。
+     */
+    const val UNKNOWN_TITLE = ""
 
     /**
      * MediaStore 在「这条记录没有艺术家/专辑信息」时**返回的字面字符串**。

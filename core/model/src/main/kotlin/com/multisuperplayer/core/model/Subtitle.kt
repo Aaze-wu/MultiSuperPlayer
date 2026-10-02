@@ -6,6 +6,11 @@ package com.multisuperplayer.core.model
  * 注意 LRC 与「增强型 LRC」共用 `.lrc` 后缀，所以**不能只靠后缀判断**：
  * 解析器要嗅探内容（是否含 `<mm:ss.xx>` 逐字标签 / `[ar:]` 标签），
  * 见 `core:subtitle` 的 `SubtitleFormatDetector`。
+ *
+ * [displayName] 刻意是**中立的 ASCII 名**（格式自己的名字），不是给用户看的文案：
+ * 本模块为了能被其它模块零成本依赖，不引用任何资源与工具类，
+ * 于是「LRC 歌词」这种要跟着语言走的说法只能放在界面层。
+ * 界面层用 `SubtitleFormat.label()`（`feature:player`）拿到本地化后的文本。
  */
 enum class SubtitleFormat(
     val displayName: String,
@@ -15,12 +20,12 @@ enum class SubtitleFormat(
     VTT("WebVTT", listOf("vtt", "webvtt")),
     ASS("Advanced SubStation Alpha", listOf("ass")),
     SSA("SubStation Alpha", listOf("ssa")),
-    LRC("LRC 歌词", listOf("lrc")),
-    ENHANCED_LRC("增强型 LRC（逐字）", listOf("lrc", "elrc")),
+    LRC("LRC", listOf("lrc")),
+    ENHANCED_LRC("Enhanced LRC", listOf("lrc", "elrc")),
     TTML("TTML / DFXP / SMPTE-TT", listOf("ttml", "dfxp", "xml")),
     VOBSUB("VobSub", listOf("idx", "sub")),
     PGS("PGS (Sup)", listOf("sup")),
-    UNKNOWN("未知", emptyList()),
+    UNKNOWN("Unknown", emptyList()),
     ;
 
     val isLyricStyle: Boolean

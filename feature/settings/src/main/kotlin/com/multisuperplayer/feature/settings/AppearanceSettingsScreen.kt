@@ -1,5 +1,8 @@
 package com.multisuperplayer.feature.settings
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,19 +42,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.ThemeSettings
+import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 外观设置：主题基底、强调色、两个取色来源。
+ * 外观设置：主题基底、强调色、两个取色来源、界面语言。
  *
  * 从设置入口页推上来，所以带返回键；返回时 [onBack] 只弹一层栈（见 `MspApp.kt` 的路由），
  * 不会回到「媒体库」。
@@ -62,16 +70,41 @@ fun AppearanceSettingsRoute(
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     AppearanceSettingsScreen(
         theme = theme,
+        language = language,
         onBack = onBack,
         onSelectBaseTheme = viewModel::selectBaseTheme,
         onSelectAccent = viewModel::selectAccent,
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
+        onSelectLanguage = { selected ->
+            viewModel.setLanguage(selected)
+            // 低于 Android 13 必须先写后重建：写进去的是 SharedPreferences，
+            // 而 `Resources` 只会在下一次 `attachBaseContext` 时重新读它。
+            // 33 以上不能重建——系统会自己重建，手动再来一次会闪两下。
+            if (viewModel.localeRequiresManualRecreate) {
+                context.findActivity()?.recreate()
+            }
+        },
         modifier = modifier,
     )
+}
+
+/**
+ * 从 Context 上找到真正的 Activity。
+ *
+ * Compose 给的 `LocalContext` 可能是包了好几层的 `ContextWrapper`（主题包装、
+ * `ContextThemeWrapper`、[androidx.activity.ComponentActivity] 自己的包装），
+ * 一层 `as? Activity` 会静默地拿到 null——症状就是「切了语言没反应」，但不报错。
+ */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,10 +113,12 @@ fun AppearanceSettingsScreen(
     theme: ThemeSettings,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    language: AppLanguage = AppLanguage.DEFAULT,
     onSelectBaseTheme: (MspBaseTheme) -> Unit = {},
     onSelectAccent: (MspAccent) -> Unit = {},
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
+    onSelectLanguage: (AppLanguage) -> Unit = {},
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
     val accent = MspAccent.fromId(theme.accentId)
@@ -107,10 +142,13 @@ fun AppearanceSettingsScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("外观") },
+                title = { Text(stringResource(R.string.msp_settings_appearance)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.msp_settings_back),
+                        )
                     }
                 },
             )
@@ -120,7 +158,7 @@ fun AppearanceSettingsScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { SectionHeader("主题基底") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_base_theme)) }
 
             items(MspBaseTheme.entries, key = { it.id }) { candidate ->
                 BaseThemeRow(
@@ -137,12 +175,12 @@ fun AppearanceSettingsScreen(
                 )
             }
 
-            item { SectionHeader("取色来源") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_color_source)) }
             item {
                 SettingsSwitchRow(
                     icon = { Icon(Icons.Outlined.Album, contentDescription = null) },
-                    title = "封面取色",
-                    subtitle = "用正在播放的封面生成主题色",
+                    title = stringResource(R.string.msp_settings_artwork_color),
+                    subtitle = stringResource(R.string.msp_settings_artwork_color_desc),
                     checked = artworkColorEnabled,
                     enabled = true,
                     onCheckedChange = onSetColorFromArtwork,
@@ -157,12 +195,12 @@ fun AppearanceSettingsScreen(
 
                 SettingsSwitchRow(
                     icon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
-                    title = "跟随系统取色",
+                    title = stringResource(R.string.msp_settings_dynamic_color),
                     subtitle = when {
-                        artworkColorEnabled -> "已被封面取色覆盖"
-                        !dynamicColorSupported -> "需要 Android 12 及以上"
-                        dynamicColorBlockedByOled -> "纯黑模式下不可用（系统取色会给出一堆深灰）"
-                        else -> "使用系统壁纸生成的主题色（选强调色时会自动关掉）"
+                        artworkColorEnabled -> stringResource(R.string.msp_settings_dynamic_color_covered)
+                        !dynamicColorSupported -> stringResource(R.string.msp_settings_dynamic_color_needs_api31)
+                        dynamicColorBlockedByOled -> stringResource(R.string.msp_settings_dynamic_color_blocked)
+                        else -> stringResource(R.string.msp_settings_dynamic_color_desc)
                     },
                     checked = checked,
                     enabled = enabled,
@@ -170,29 +208,69 @@ fun AppearanceSettingsScreen(
                 )
             }
 
-            item { SectionHeader("关于主题") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_about_theme)) }
             item {
                 // 说清楚「为什么我选的颜色没生效」——这是本页最容易让人困惑的一点。
                 // 但光描述现象没用：选强调色**会自动**关掉盖住它的那两个开关，
                 // 所以每条文案都要给出下一步动作。
                 InfoNote(
                     text = when {
-                        artworkColorEnabled ->
-                            "现在的配色来自封面取色。它盖住了强调色，但选一个强调色就可以" +
-                                "切回来（那会自动关掉封面取色）；封面里没有可用颜色时（比如黑白封面）" +
-                                "会回退到强调色，所以强调色仍然有用。"
+                        artworkColorEnabled -> stringResource(R.string.msp_settings_theme_note_artwork)
+                        dynamicColorActive -> stringResource(R.string.msp_settings_theme_note_dynamic)
+                        else -> stringResource(R.string.msp_settings_theme_note_accent)
+                    },
+                )
+            }
 
-                        dynamicColorActive ->
-                            "现在的配色来自系统取色。选一个强调色就会自动关掉系统取色，" +
-                                "配色立刻跟随强调色。"
-
-                        else ->
-                            "强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。"
+            item { SectionHeader(stringResource(R.string.msp_settings_section_language)) }
+            item {
+                // 用 RadioButton 而不是「点开一个对话框选」：只有四种语言，
+                // 摊开比藏起来少一次点击，而且当前选的是哪一项一眼就能看到。
+                Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
+                    AppLanguage.entries.forEach { candidate ->
+                        LanguageRow(
+                            language = candidate,
+                            selected = candidate == language,
+                            onSelect = { onSelectLanguage(candidate) },
+                        )
+                    }
+                }
+            }
+            item {
+                InfoNote(
+                    text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        stringResource(R.string.msp_settings_language_note_system)
+                    } else {
+                        stringResource(R.string.msp_settings_language_note_app_only)
                     },
                 )
             }
         }
     }
+}
+
+// --------------------------------------------------------------------- 语言
+
+@Composable
+private fun LanguageRow(
+    language: AppLanguage,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .fillMaxWidth(),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = { Icon(Icons.Outlined.Translate, contentDescription = null) },
+        headlineContent = {
+            // 「跟随系统」这一项没有自称（它是个相对概念），所以它是唯一跟着
+            // 界面语言翻译的一项；其余三项一律用自己的语言写自己的名字，
+            // 否则一个只会中文的用户在英文界面里就找不到自己的语言了。
+            Text(language.endonym ?: stringResource(R.string.msp_settings_language_follow_system))
+        },
+        trailingContent = { RadioButton(selected = selected, onClick = null) },
+    )
 }
 
 // --------------------------------------------------------------------- 主题基底
@@ -218,7 +296,7 @@ private fun BaseThemeRow(
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
-        headlineContent = { Text(candidate.displayName) },
+        headlineContent = { Text(candidate.label.string()) },
         trailingContent = {
             // 用 RadioButton 的 onClick = null：整行已经接收点击了，
             // 再挂一次会出现「点圆点触发两次」。
@@ -236,7 +314,7 @@ private fun AccentPicker(
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Text(
-            text = "强调色",
+            text = stringResource(R.string.msp_settings_accent_label),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(vertical = 8.dp),
         )
@@ -264,6 +342,8 @@ private fun AccentSwatch(
     // 色块用「亮色基底下的主色」：主题基底是深色时也能看清这是哪个颜色，
     // 因为真正需要辨认的是色相，不是它在当前主题下的具体取值。
     val swatch = accent.lightPrimary
+    // 先算好再进 semantics 的 lambda：那里面不是可组合上下文，拿不到 stringResource。
+    val accentLabel = accent.label.string()
 
     Box(
         modifier = Modifier
@@ -277,7 +357,7 @@ private fun AccentSwatch(
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             // 颜色本身对读屏用户不可见，必须给出名字，否则这一行是六个无名圆圈。
-            .semantics { contentDescription = accent.displayName },
+            .semantics { contentDescription = accentLabel },
         contentAlignment = Alignment.Center,
     ) {
         if (selected) {

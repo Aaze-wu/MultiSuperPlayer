@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="msp_nav_library">媒體庫</string>
+    <string name="msp_nav_now_playing">正在播放</string>
+    <string name="msp_nav_settings">設定</string>
+</resources>

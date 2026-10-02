@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    資料層的介面文案。
+
+    這個模組**自己不說人話**：所有要顯示的文字都按 MspText 交出去，由介面在
+    正確的語言下解析（見 core:common 的 MspText）。資料層只挑「該說哪一句」。
+-->
+<resources>
+
+    <!-- ============================================================
+         字幕：讀不了的原因
+         ============================================================
+         系統例外自帶的 message 原樣透出（通常已經是英文／系統語言），只有
+         「我們自己發現的失敗」才用這裡的句子——否則真實的系統原因會被一句
+         中文蓋掉（見 SubtitleRepository.detailOr）。
+         ============================================================ -->
+    <string name="msp_subtitle_reason_directory_unreadable">無法讀取字幕目錄</string>
+    <string name="msp_subtitle_reason_file_unreadable">無法讀取檔案</string>
+    <string name="msp_subtitle_reason_file_unopenable">打不開這個檔案，可能已被移動或刪除</string>
+    <string name="msp_subtitle_reason_unparsable">無法解析這個字幕檔</string>
+    <!-- %1$d：檔案大小（MB） -->
+    <string name="msp_subtitle_reason_file_too_large">檔案太大（%1$d MB），可能不是字幕檔</string>
+
+    <!-- ============================================================
+         媒體庫
+         ============================================================ -->
+    <!-- %1$s：系統例外的類別名 -->
+    <string name="msp_library_scan_failed">掃描媒體庫失敗（%1$s）</string>
+
+    <!-- ============================================================
+         畫面比例（AspectRatioMode 的 label / description）
+         ============================================================ -->
+    <string name="msp_aspect_fit_label">適應</string>
+    <string name="msp_aspect_fit_desc">完整顯示畫面，多出來的地方留黑邊</string>
+    <string name="msp_aspect_crop_label">裁剪</string>
+    <string name="msp_aspect_crop_desc">鋪滿螢幕，裁掉超出的部分</string>
+    <string name="msp_aspect_stretch_label">拉伸</string>
+    <string name="msp_aspect_stretch_desc">拉伸鋪滿，比例會變形</string>
+    <string name="msp_aspect_original_label">原始</string>
+    <string name="msp_aspect_original_desc">按片源像素顯示，不放大也不縮小</string>
+
+</resources>

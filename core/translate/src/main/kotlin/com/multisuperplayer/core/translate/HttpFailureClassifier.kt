@@ -47,7 +47,10 @@ internal fun classifyHttpFailure(
  */
 internal fun extractProviderMessage(body: String, maxChars: Int = 400): String {
     val trimmed = body.trim()
-    if (trimmed.isEmpty()) return "（响应体为空）"
+    // 响应体是空的就返回空串：**不要在这里造一句中文占位**。
+    // 这句话是要显示给用户看的，而这一层不知道界面语言；
+    // 界面拿到空串就知道「厂商什么都没说」，不显示原文块就行。
+    if (trimmed.isEmpty()) return ""
 
     val root = TranslationJson.parseObjectOrNull(trimmed)
     val message = root?.let { obj ->
@@ -61,7 +64,12 @@ internal fun extractProviderMessage(body: String, maxChars: Int = 400): String {
     return if (text.length <= maxChars) text else text.take(maxChars) + "…"
 }
 
-/** 响应体里出现这些词，就认为 429 是「额度/余额」而不是「打得太快」。 */
+/**
+ * 响应体里出现这些词，就认为 429 是「额度/余额」而不是「打得太快」。
+ *
+ * **这些词一个都不能翻译**：它们匹配的是**服务商返回的响应体**，不是我们的界面文案。
+ * 里面那几个中文词对应的是国内厂商（智谱/百炼等）返回的中文错误信息。
+ */
 private val QUOTA_MARKERS = listOf(
     "quota", "insufficient", "balance", "arrears", "billing", "credit",
     "欠费", "余额", "额度", "配额",
@@ -90,18 +98,18 @@ internal fun parseRetryAfterSeconds(header: String?): Long? {
  *
  * 特地识别「明文被拦」：`cleartext traffic not permitted` 在界面上看起来
  * 就是一句普通的网络错误，但它的解法是**换地址或加白名单**，跟重试毫无关系。
- * 所以这里把系统那句原文留下来，再补一句说明。
+ *
+ * 所以这里留下系统那句原文（[TranslationFailure.Network.detail]），
+ * 补的那一句则按档位记成枚举（[TranslationFailure.Network.note]）——
+ * 文案本身在 `TranslationFailureText.kt` 里取资源，这里写死中文就会在英文界面里混出来。
  */
 internal fun classifyNetworkException(error: IOException): TranslationFailure {
     val raw = "${error.javaClass.simpleName}: ${error.message.orEmpty()}"
-    val hint = when {
-        error is SocketTimeoutException -> "（超时。长字幕请求很慢，可以在设置里调大读超时）"
-        error is UnknownHostException -> "（域名解析不了：检查地址拼写与网络）"
-        raw.contains("CLEARTEXT", ignoreCase = true) ->
-            "（明文 HTTP 被系统安全策略拦下了。只有 localhost / 10.0.2.2 在放行名单里；" +
-                "真机连局域网服务请用 adb reverse tcp:<端口> tcp:<端口> 再填 localhost）"
-
-        else -> ""
+    val note = when {
+        error is SocketTimeoutException -> NetworkNote.TIMEOUT
+        error is UnknownHostException -> NetworkNote.UNRESOLVED_HOST
+        raw.contains("CLEARTEXT", ignoreCase = true) -> NetworkNote.CLEARTEXT_BLOCKED
+        else -> NetworkNote.NONE
     }
-    return TranslationFailure.Network(raw + hint)
+    return TranslationFailure.Network(raw, note)
 }

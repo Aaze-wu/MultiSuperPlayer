@@ -5,6 +5,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.ui.R
 
 /**
  * 主题基底。
@@ -12,12 +14,16 @@ import androidx.compose.ui.graphics.luminance
  * [BLACK] 不是 [DARK] 的换皮：AMOLED 屏上纯黑能让像素真正断电，
  * 省电且没有「灰蒙蒙的黑」；但它也让阴影和分割线失效，
  * 所以两套 surface 系列必须分别给值，不能共用。
+ *
+ * 界面上的名字是 [MspText]（延迟到 UI 边界才解析），而 [id] 是**与语言无关**的
+ * 存储键：[fromId] 表的是它，数据层只存它。两者用一个字段兼顾会在一改语言后
+ * 就把用户选过的主题认成「不认识的 id」而回退到默认值。
  */
-enum class MspBaseTheme(val id: String, val displayName: String) {
-    FOLLOW_SYSTEM("system", "跟随系统"),
-    LIGHT("light", "浅色"),
-    DARK("dark", "深色"),
-    BLACK("black", "纯黑（OLED）"),
+enum class MspBaseTheme(val id: String, val label: MspText) {
+    FOLLOW_SYSTEM("system", MspText.Res(R.string.msp_theme_system)),
+    LIGHT("light", MspText.Res(R.string.msp_theme_light)),
+    DARK("dark", MspText.Res(R.string.msp_theme_dark)),
+    BLACK("black", MspText.Res(R.string.msp_theme_black)),
     ;
 
     val isDark: Boolean get() = this != LIGHT
@@ -51,18 +57,42 @@ enum class MspBaseTheme(val id: String, val displayName: String) {
  */
 enum class MspAccent(
     val id: String,
-    val displayName: String,
+    val label: MspText,
     val lightPrimary: Color,
     val lightContainer: Color,
     val darkPrimary: Color,
     val darkContainer: Color,
 ) {
-    INDIGO("indigo", "靛蓝", Color(0xFF4A54C8), Color(0xFFE0E0FF), Color(0xFFB9C0FF), Color(0xFF303A8C)),
-    VIOLET("violet", "紫罗兰", Color(0xFF6A3FCB), Color(0xFFE9DDFF), Color(0xFFCDBDFF), Color(0xFF4B2A96)),
-    TEAL("teal", "青碧", Color(0xFF00695C), Color(0xFFA7F2E4), Color(0xFF64D8C4), Color(0xFF005044)),
-    GREEN("green", "森绿", Color(0xFF2E6B2F), Color(0xFFB2F2AC), Color(0xFF97D78F), Color(0xFF17501A)),
-    AMBER("amber", "琥珀", Color(0xFF8A5300), Color(0xFFFFDDB3), Color(0xFFFFB951), Color(0xFF663D00)),
-    ROSE("rose", "绯红", Color(0xFFB3245B), Color(0xFFFFD9E2), Color(0xFFFFB0C8), Color(0xFF8E0F45)),
+    INDIGO(
+        "indigo",
+        MspText.Res(R.string.msp_accent_indigo),
+        Color(0xFF4A54C8), Color(0xFFE0E0FF), Color(0xFFB9C0FF), Color(0xFF303A8C),
+    ),
+    VIOLET(
+        "violet",
+        MspText.Res(R.string.msp_accent_violet),
+        Color(0xFF6A3FCB), Color(0xFFE9DDFF), Color(0xFFCDBDFF), Color(0xFF4B2A96),
+    ),
+    TEAL(
+        "teal",
+        MspText.Res(R.string.msp_accent_teal),
+        Color(0xFF00695C), Color(0xFFA7F2E4), Color(0xFF64D8C4), Color(0xFF005044),
+    ),
+    GREEN(
+        "green",
+        MspText.Res(R.string.msp_accent_green),
+        Color(0xFF2E6B2F), Color(0xFFB2F2AC), Color(0xFF97D78F), Color(0xFF17501A),
+    ),
+    AMBER(
+        "amber",
+        MspText.Res(R.string.msp_accent_amber),
+        Color(0xFF8A5300), Color(0xFFFFDDB3), Color(0xFFFFB951), Color(0xFF663D00),
+    ),
+    ROSE(
+        "rose",
+        MspText.Res(R.string.msp_accent_rose),
+        Color(0xFFB3245B), Color(0xFFFFD9E2), Color(0xFFFFB0C8), Color(0xFF8E0F45),
+    ),
     ;
 
     companion object {

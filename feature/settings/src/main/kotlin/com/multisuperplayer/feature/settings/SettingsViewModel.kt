@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettings
@@ -68,6 +71,7 @@ class SettingsViewModel(
     private val themeSettings: ThemeSettingsRepository,
     private val translationSettings: TranslationSettingsRepository,
     private val playbackSettingsRepository: PlaybackSettingsRepository,
+    private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
     private val dispatchers: DispatcherProvider,
@@ -115,6 +119,41 @@ class SettingsViewModel(
     fun setColorFromArtwork(enabled: Boolean) = persist("封面取色=$enabled") {
         themeSettings.setColorFromArtwork(enabled)
     }
+
+    // ------------------------------------------------------------------ 语言
+
+    /**
+     * 当前语言。
+     *
+     * 初值用 [AppLanguage.DEFAULT] = 跟随系统，而不是去读盘等第一帧：
+     * 「跟随系统」恰好就是「用户没设置过」这个状态的名字，所以首帧不会跳。
+     *
+     * 真正生效时用的**不是**这个 Flow：界面文案靠 Context 上的 Configuration，
+     * 而这个 Flow 只负责把单选框勾在正确的那一项上。
+     *
+     * 它必须是一个会**继续发值**的 Flow，不能是「读一次就完」的快照。33 以上切语言
+     * 由系统重建 Activity，而 `ViewModel` 在重建中是存活的：快照型 Flow 只在
+     * `ViewModel` 第一次创建时读过一次，之后界面全变、单选框却还停在旧选择上。
+     * 由 `AppLocaleStore` 维护的进程内缓存把这个补给补上了（写入和
+     * `attachBaseContext` 都会推进新值）。
+     */
+    val language: StateFlow<AppLanguage> = localeSettings.language
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppLanguage.DEFAULT)
+
+    /**
+     * 切语言。
+     *
+     * 写入之后**界面要自己重建**（低于 Android 13），否则 `Resources` 已经换成新语言
+     * 而屏幕上那一屏还是旧的——症状是「点了没反应」，而重启之后又是对的。
+     * 重建由 UI 层做（`Activity.recreate()` 是 Activity 的事情），
+     * 需不需要重建读 [LocaleSettingsRepository.requiresManualRecreate]。
+     */
+    fun setLanguage(language: AppLanguage) = persist("语言=${language.tag}") {
+        localeSettings.setLanguage(language)
+    }
+
+    /** 33 以上由系统重建应用，界面不要再自己 `recreate()`（那会闪两下）。 */
+    val localeRequiresManualRecreate: Boolean get() = localeSettings.requiresManualRecreate
 
     // ------------------------------------------------------------------ 播放内核
 
@@ -261,7 +300,7 @@ class SettingsViewModel(
             val config = runCatching { translationSettings.currentConfig() }.getOrNull()
             if (config == null) {
                 mutableConnectionTest.value = ConnectionTestState(
-                    failure = FailureText(message = "读取设置失败，请重试。"),
+                    failure = FailureText(message = MspText.Res(R.string.msp_settings_read_failed)),
                 )
                 return@launch
             }

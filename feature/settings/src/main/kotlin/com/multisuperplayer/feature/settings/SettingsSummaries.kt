@@ -3,12 +3,14 @@ package com.multisuperplayer.feature.settings
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.log.LogSummary
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SpeedBoostOptions
+import com.multisuperplayer.core.translate.describeMissingItems
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
@@ -25,10 +27,24 @@ import com.multisuperplayer.core.ui.theme.MspThemeDefaults
  * 2. 它们是「当前状态 → 一句话」的映射，没有任何界面依赖，可以在 JVM 单测里
  *    直接喂各种脏数据（未设置、旧值不在档位表里、开关互相覆盖）检查输出。
  *
- * 全部返回单行文本。`ListItem` 的 supporting 文本会在需要时折行，但两行以上就说明
+ * 返回 [MspText] 而不是 `String`：这些句子里混着主题名、语言名和「缺哪一项」，
+ * 全都要跟着界面语言走；而取值（倍速、文件大小、日期范围）又和语言无关。
+ * 把「哪一句 + 什么参数」写下来，解析留给 UI 那一层，纯函数就能继续在 JVM 里测。
+ *
+ * 片段之间用 [MspText.join] 拼，分隔符是 [SEPARATOR] 这条资源——**不在代码里拼 `String`**：
+ * 那样测试就只能看到一整条拼好的句子，说不出「哪几段」。
+ *
+ * 全部是单行文本。`ListItem` 的 supporting 文本会在需要时折行，但两行以上就说明
  * 摘要写多了——入口页应该一眼扫完。
  */
 internal object SettingsSummaries {
+
+    /** 摘要片段之间的分隔符。译者可以换成「・」或者「, 」。 */
+    private val SEPARATOR: MspText = MspText.Res(R.string.msp_settings_summary_sep)
+
+    /** 拼一段摘要：`null` 的片段直接跳过（「没有这条尾巴」比「空字符串」更好读）。 */
+    private fun join(vararg parts: MspText?): MspText =
+        MspText.join(SEPARATOR, parts.filterNotNull())
 
     /**
      * 外观：`纯黑（OLED） · 青碧 · 封面取色`。
@@ -40,7 +56,7 @@ internal object SettingsSummaries {
      * 「系统取色未生效」这个尾巴是有意加的：开关开着但实际没生效时，用户看到的颜色
      * 是强调色，而他在这一行上完全无从知道为什么。说出来，再在「外观」页里解释原因。
      */
-    fun appearance(theme: ThemeSettings, systemColorSupported: Boolean): String {
+    fun appearance(theme: ThemeSettings, systemColorSupported: Boolean): MspText {
         val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
         val accent = MspAccent.fromId(theme.accentId)
         // 两个取色开关都是「有值才生效」的可空布尔，兜底值只从 MspThemeDefaults 来，
@@ -51,17 +67,14 @@ internal object SettingsSummaries {
         val dynamicBlockedByOled = baseTheme == MspBaseTheme.BLACK
         val dynamicActive = dynamicWanted && systemColorSupported && !dynamicBlockedByOled && !artworkColor
 
-        return buildString {
-            append(baseTheme.displayName)
-            append(" · ")
-            append(accent.displayName)
-            when {
-                artworkColor -> append(" · 封面取色")
-                // 覆盖优先级：封面取色 > 系统取色 > 强调色。
-                dynamicActive -> append(" · 系统取色")
-                dynamicWanted -> append(" · 系统取色未生效")
-            }
+        // 覆盖优先级：封面取色 > 系统取色 > 强调色。同时说两个是自相矛盾的：实际生效的只有一个。
+        val tail = when {
+            artworkColor -> MspText.Res(R.string.msp_settings_summary_tail_artwork)
+            dynamicActive -> MspText.Res(R.string.msp_settings_summary_tail_dynamic)
+            dynamicWanted -> MspText.Res(R.string.msp_settings_summary_tail_dynamic_blocked)
+            else -> null
         }
+        return join(baseTheme.label, accent.label, tail)
     }
 
     /**
@@ -71,23 +84,27 @@ internal object SettingsSummaries {
      * 同样的三件事；只把「非默认」的项显出来，会让这一行时有时无，看起来像坏了。
      * 后面的旗标相反——它们只在偏离默认时出现，因为「没有强制软解」不是一件需要提醒的事。
      */
-    fun playback(playback: PlaybackSettings, softwareDecodingAvailable: Boolean): String {
+    fun playback(playback: PlaybackSettings, softwareDecodingAvailable: Boolean): MspText {
         val speed = playback.speed ?: PlaybackSpeedOptions.DEFAULT
         val boost = SpeedBoostOptions.normalize(playback.boostSpeed)
         val aspect = playback.aspectRatioMode ?: AspectRatioMode.DEFAULT
         val forceSoftware = playback.forceSoftwareDecoding ?: false
         val rememberPosition = playback.rememberPosition ?: true
 
-        return buildString {
-            append(PlaybackSpeedOptions.format(speed))
-            append(" · 长按 ").append(SpeedBoostOptions.format(boost))
-            append(" · ").append(aspect.label)
+        return join(
+            MspText.Plain(PlaybackSpeedOptions.format(speed)),
+            MspText.Res(R.string.msp_settings_summary_long_press, SpeedBoostOptions.format(boost)),
+            aspect.label,
             // 「强制软解」只有在真的能生效时才说：本安装包不含 FFmpeg 时那个开关在
             // 「播放」页里是灰的，摘要却声称已开启，就是自相矛盾。
-            if (forceSoftware && softwareDecodingAvailable) append(" · 强制软解")
-            if (!softwareDecodingAvailable) append(" · 本包无 FFmpeg")
-            if (!rememberPosition) append(" · 不记位置")
-        }
+            if (forceSoftware && softwareDecodingAvailable) {
+                MspText.Res(R.string.msp_settings_summary_tail_force_software)
+            } else {
+                null
+            },
+            if (softwareDecodingAvailable) null else MspText.Res(R.string.msp_settings_summary_tail_no_ffmpeg),
+            if (rememberPosition) null else MspText.Res(R.string.msp_settings_summary_tail_no_position),
+        )
     }
 
     /**
@@ -95,20 +112,34 @@ internal object SettingsSummaries {
      *
      * 「缺什么」必须写出来。这一行是用户最常看的（从播放页的字幕面板翻不出来时，
      * 他只想确认这两件事），只写「未配置」等于让他点进三层页面自己找。
+     *
+     * 缺项清单来自 [TranslationSettings.missingItems]，和「测试连接」按钮同源——
+     * 在这里再判一次就会出现「这一行说缺密钥、点进去却说齐了」这种自相矛盾。
      */
-    fun translation(translation: TranslationSettings): String {
+    fun translation(translation: TranslationSettings): MspText {
         val provider = translation.provider.displayName
-        val model = translation.model.ifBlank { "未填模型名" }
-        val target = translation.target.label
-        return if (translation.ready) {
-            "$provider · $model · 译成$target"
-        } else {
-            "$provider · 还不能翻译（缺：${translation.missingItems.joinToString("、")}）"
+        if (!translation.ready) {
+            return join(
+                provider,
+                MspText.Res(
+                    R.string.msp_settings_summary_translation_incomplete,
+                    describeMissingItems(translation.missingItems),
+                ),
+            )
         }
+        // 模型名是用户自己填的（与语言无关），但「没填」这件事得说出来。
+        val model = translation.model.takeIf { it.isNotBlank() }
+            ?.let(MspText::Plain)
+            ?: MspText.Res(R.string.msp_settings_summary_model_unset)
+        return join(
+            provider,
+            model,
+            MspText.Res(R.string.msp_settings_summary_translate_to, translation.target.label),
+        )
     }
 
     /** 关于：只放版本号。检查更新、开源许可、导出日志都在这一页里，不必再挤进副标题。 */
-    fun about(buildInfo: AppBuildInfo): String = buildInfo.summaryText()
+    fun about(buildInfo: AppBuildInfo): MspText = buildInfo.summaryText()
 
     /**
      * 关于页的日志概览：`3 个 · 1.2 MB`。
@@ -116,9 +147,13 @@ internal object SettingsSummaries {
      * 没有文件时明说，不显示「0 个 · 0 B」——那读起来像是统计坏了，
      * 而事实是「这个安装包还没产生过日志」，「导出日志」按钮也就是点得出东西的（见 AboutScreen）。
      */
-    fun logFiles(summary: LogSummary): String {
-        if (summary.isEmpty) return "还没有任何日志文件"
-        return "${summary.fileCount} 个 · ${TimeFormat.fileSize(summary.totalBytes)}"
+    fun logFiles(summary: LogSummary): MspText {
+        if (summary.isEmpty) return MspText.Res(R.string.msp_settings_summary_no_logs)
+        return MspText.Res(
+            R.string.msp_settings_summary_log_usage,
+            summary.fileCount,
+            TimeFormat.fileSize(summary.totalBytes),
+        )
     }
 
     /**
@@ -126,10 +161,13 @@ internal object SettingsSummaries {
      *
      * 只剩一天时**只显示一天**：写成 `2026-10-02 ~ 2026-10-02` 会被读成「这中间有几天」，
      * 用户就会怀疑日志丢了几天。
+     *
+     * 日期用 [MspText.Plain]：ISO 日期和 `~` 与界面语言无关，做成待翻译的文案只会
+     * 让翻译者以为自己要动它。
      */
-    fun logRange(summary: LogSummary): String {
-        val oldest = summary.oldestDay ?: return "—"
-        val newest = summary.newestDay ?: return oldest
-        return if (oldest == newest) oldest else "$oldest ~ $newest"
+    fun logRange(summary: LogSummary): MspText {
+        val oldest = summary.oldestDay ?: return MspText.Res(R.string.msp_settings_summary_no_range)
+        val newest = summary.newestDay ?: return MspText.Plain(oldest)
+        return MspText.Plain(if (oldest == newest) oldest else "$oldest ~ $newest")
     }
 }

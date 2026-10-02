@@ -427,17 +427,45 @@ class TranslationEngine internal constructor(
          *
          * 公开的原因：设置页要在按钮上提前显示「还差什么」，如果那里自己写一套判断，
          * 就会出现「设置页说可以翻译、点下去引擎说不满足条件」这种互相打脸的状态。
+         *
+         * 返回的是枚举而不是句子：文案要跟着界面语言走，而这里拿不到 `Resources`
+         * （也拿不到用户选的语言）。渲染见 `describeMissingItem()`。
          */
-        fun validateConfig(config: TranslationConfig): TranslationFailure? = when {
-            config.baseUrl.isBlank() -> TranslationFailure.NotConfigured("服务地址")
-            !config.baseUrl.startsWith("http://") && !config.baseUrl.startsWith("https://") ->
-                TranslationFailure.NotConfigured("服务地址（需要以 http:// 或 https:// 开头）")
+        fun validateConfig(config: TranslationConfig): TranslationFailure? =
+            missingConfigItems(
+                baseUrl = config.baseUrl,
+                model = config.model,
+                batchSize = config.batchSize,
+            ).firstOrNull()?.let(TranslationFailure::NotConfigured)
 
-            config.model.isBlank() -> TranslationFailure.NotConfigured("模型名")
-            config.batchSize < TranslationBatching.MIN_BATCH_SIZE ->
-                TranslationFailure.NotConfigured("批次大小（至少 1 行）")
-
-            else -> null
+        /**
+         * 「还差哪几项」的**唯一**判定处：设置页的清单、引擎的报错、播放页的提示
+         * 都从这里取，免得出现「设置页说可以翻译、点下去引擎说不满足条件」这种互相打脸。
+         *
+         * 与 [validateConfig] 的差别只是**问的人不一样**：
+         * - [apiKeyRequired] / [apiKeyStored]：引擎拿到的是一个已经组装好的
+         *   [TranslationConfig]，密钥有没有由上层的 [ApiKeyStore] 说话；设置页在
+         *   这里才知道这家服务商要不要密钥。
+         * - [batchSize] 传 `null` 表示调用方根本没有这个概念（批大小目前还不是
+         *   用户设置项），那就别替它报一个它改不了的缺项。
+         */
+        fun missingConfigItems(
+            baseUrl: String,
+            model: String,
+            apiKeyRequired: Boolean = false,
+            apiKeyStored: Boolean = false,
+            batchSize: Int? = null,
+        ): List<MissingConfigItem> = buildList {
+            if (baseUrl.isBlank()) {
+                add(MissingConfigItem.BASE_URL)
+            } else if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
+                add(MissingConfigItem.BASE_URL_SCHEME)
+            }
+            if (model.isBlank()) add(MissingConfigItem.MODEL)
+            if (apiKeyRequired && !apiKeyStored) add(MissingConfigItem.API_KEY)
+            if (batchSize != null && batchSize < TranslationBatching.MIN_BATCH_SIZE) {
+                add(MissingConfigItem.BATCH_SIZE)
+            }
         }
     }
 }

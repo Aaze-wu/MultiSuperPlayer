@@ -35,7 +35,9 @@ dependencies {
     api(project(":core:model"))
     // HttpURLConnection 是 JDK/android.jar 自带的，所以这个模块**不引入任何 HTTP 依赖**：
     // 只多一个 kotlinx-serialization-json（版本目录里已经有）用来读写请求体与缓存。
-    implementation(project(":core:common"))
+    // api 而不是 implementation：TranslationService / FailureText / SubtitleExportFormat
+    // 的公开签名里都有 core:common 的 MspText，消费方得能看见它。
+    api(project(":core:common"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.koin.android)

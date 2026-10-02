@@ -1,0 +1,32 @@
+<resources>
+
+    <string name="msp_playback_channel_name">播放控制</string>
+
+    <!-- ===== 播放失敗文案 ===== -->
+
+    <string name="msp_playback_error_with_code">%1$s（錯誤碼 %2$d）</string>
+    <string name="msp_playback_error_with_code_and_cause">%1$s（錯誤碼 %2$d，%3$s）</string>
+
+    <string name="msp_playback_error_file_not_found">找不到該檔案，可能已被移動或刪除</string>
+    <string name="msp_playback_error_no_permission">沒有讀取該檔案的權限。請重新選擇這個檔案或資料夾以授予存取權限</string>
+    <string name="msp_playback_error_cleartext">系統禁止明文 HTTP 播放。請在設定中允許該位址使用未加密連線</string>
+    <string name="msp_playback_error_network_failed">無法連線到伺服器，請檢查網路或播放位址</string>
+    <string name="msp_playback_error_network_timeout">連線伺服器逾時，請檢查網路</string>
+    <string name="msp_playback_error_http_status">伺服器回傳了錯誤狀態碼，播放位址可能已失效</string>
+
+    <string name="msp_playback_error_decoder_unavailable">本機沒有能解碼該影音格式的解碼器，而這個安裝包不含 FFmpeg 軟體解碼（可能是 CPU 架構不受支援）</string>
+    <string name="msp_playback_error_decoder_software_failed">硬體解碼和 FFmpeg 軟體解碼都打不開這個檔案。常見於冷門編碼，或封裝格式本身不被支援（例如 WMV、RealMedia）</string>
+    <string name="msp_playback_error_decoder_software_not_tried">本機沒有能解碼該影音格式的解碼器（常見於 AC-3/DTS/TrueHD 音軌或特殊編碼的 HEVC）。再點一次播放會重試一次</string>
+
+    <string name="msp_playback_error_decoder_both_failed">解碼失敗：硬體解碼和 FFmpeg 軟體解碼都試過並失敗了。這個檔案的編碼方式不被支援</string>
+    <string name="msp_playback_error_decoder_init">解碼器初始化失敗。若反覆出現，通常是這個檔案的編碼方式不被支援</string>
+
+    <string name="msp_playback_error_container_malformed">檔案（或串流清單）已損毀或下載不完整</string>
+    <string name="msp_playback_error_container_unsupported">無法辨識這個檔案/串流的封裝格式</string>
+
+    <string name="msp_playback_error_audio_output">音訊輸出初始化失敗，可能是音訊裝置被其他應用程式佔用</string>
+    <string name="msp_playback_error_live_window">直播進度落後過多，正在重新緩衝</string>
+    <string name="msp_playback_error_timeout">播放逾時，請檢查網路</string>
+    <string name="msp_playback_error_generic">播放失敗</string>
+
+</resources>

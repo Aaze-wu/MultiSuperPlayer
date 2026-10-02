@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Player screen strings (English).
+
+  ===== Keep the parameter order =====
+  Every placeholder keeps the same number as the Simplified Chinese baseline, so a
+  translator can reorder the sentence without renumbering the code.
+-->
+<resources>
+    <!-- ===== Subtitle panel ===== -->
+    <string name="msp_player_subtitles_title">Subtitles</string>
+    <string name="msp_player_rescan">Rescan for subtitles</string>
+    <string name="msp_player_scanning">Looking for subtitles…</string>
+    <string name="msp_player_reading">Reading subtitles…</string>
+    <string name="msp_player_cues">%1$s · %2$d line(s)</string>
+    <string name="msp_player_none_attached">No subtitle is attached.</string>
+    <string name="msp_player_translation_missing_shown_original">This subtitle has no translation; showing the original text.</string>
+    <string name="msp_player_auto_select">Automatic</string>
+    <string name="msp_player_auto_selected">Auto-selected “%1$s”</string>
+    <string name="msp_player_auto_pick_desc">Picks the closest match by file name</string>
+    <string name="msp_player_no_usable_subtitle">No usable subtitle file was found in this folder.</string>
+    <string name="msp_player_detail_sep">" · "</string>
+    <string name="msp_player_detail_language_unknown">no language tag</string>
+    <string name="msp_player_detail_forced">forced</string>
+    <string name="msp_player_detail_matches_title">matches the title</string>
+    <string name="msp_player_format_lrc">LRC lyrics</string>
+    <string name="msp_player_format_lrc_enhanced">Enhanced LRC (per syllable)</string>
+
+    <!-- ===== Display modes ===== -->
+    <string name="msp_player_mode_off">Hidden</string>
+    <string name="msp_player_mode_original_only">Original only</string>
+    <string name="msp_player_mode_translation_only">Translation only</string>
+    <string name="msp_player_mode_bilingual">Bilingual</string>
+
+    <!-- ===== Problems while loading ===== -->
+    <string name="msp_player_issue_no_directory">Could not determine this file’s folder, so same-name subtitles cannot be found automatically.</string>
+    <string name="msp_player_issue_directory_invisible">This file’s folder cannot be read, most likely because storage permission is missing.</string>
+    <string name="msp_player_issue_scan_failed">Error while looking for subtitles: %1$s</string>
+    <string name="msp_player_issue_no_subtitles">There are no subtitle files in this folder.</string>
+    <string name="msp_player_issue_no_match">The folder has subtitles, but none of their names match this video. You can pick one below.</string>
+    <string name="msp_player_issue_load_failed">Could not read “%1$s”: %2$s</string>
+
+    <!-- ===== Export ===== -->
+    <string name="msp_player_export_done">Exported %1$s</string>
+    <string name="msp_player_export_failed">Export failed: %1$s could not be written (the file may have been deleted, or that location is read-only).</string>
+
+    <!-- ===== Translation panel ===== -->
+    <string name="msp_player_translation">Translation</string>
+    <string name="msp_player_target_prefix">Target language: %1$s</string>
+    <string name="msp_player_with_model">Model: %1$s</string>
+    <string name="msp_player_wrapped_in_parens">%1$s (%2$s)</string>
+    <string name="msp_player_no_translatable">This subtitle has no translatable text (it may be all comments or blank lines).</string>
+    <string name="msp_player_failed_lines">%1$d line(s) were not translated.</string>
+    <string name="msp_player_retry_only_failed">Retry only those lines</string>
+    <string name="msp_player_got_it">Got it</string>
+    <string name="msp_player_not_configured">The translation service is not set up yet: missing %1$s.</string>
+    <string name="msp_player_missing_url_fallback">a valid service URL</string>
+    <string name="msp_player_open_settings">Open settings</string>
+    <string name="msp_player_translated_count">Translated %1$d/%2$d</string>
+    <string name="msp_player_edited_suffix">" (%1$d hand-edited)"</string>
+    <string name="msp_player_run_progress">This run: %1$d/%2$d</string>
+    <string name="msp_player_with_cache">%1$s, %2$d from cache</string>
+    <string name="msp_player_with_requests">%1$s, %2$d request(s)</string>
+    <string name="msp_player_translating">Translating… you can stop at any time; finished lines are kept.</string>
+    <string name="msp_player_stop">Stop</string>
+    <string name="msp_player_translate_all">Translate all</string>
+    <string name="msp_player_translate_up_to">Translate up to here</string>
+    <string name="msp_player_retry_failed_n">Retry the %1$d failed line(s)</string>
+    <string name="msp_player_show_raw">Show the raw response</string>
+    <string name="msp_player_hide_raw">Hide the raw response</string>
+    <string name="msp_player_export">Export translation…</string>
+
+    <!-- ===== Playback controls ===== -->
+    <string name="msp_player_decoder_ffmpeg">FFmpeg software decoding</string>
+    <string name="msp_player_decoder_system">System software decoding</string>
+    <string name="msp_player_shuffle_off">Turn shuffle off</string>
+    <string name="msp_player_shuffle_on">Turn shuffle on</string>
+    <string name="msp_player_previous">Previous</string>
+    <string name="msp_player_play">Play</string>
+    <string name="msp_player_pause">Pause</string>
+    <string name="msp_player_next">Next</string>
+    <string name="msp_player_repeat_off">Repeat is off</string>
+    <string name="msp_player_repeat_all">Repeat all</string>
+    <string name="msp_player_repeat_one">Repeat one</string>
+    <string name="msp_player_subtitle_entry">Subtitles and lyrics</string>
+    <string name="msp_player_enter_fullscreen">Fullscreen</string>
+    <string name="msp_player_exit_fullscreen">Exit fullscreen</string>
+    <string name="msp_player_speed">Playback speed</string>
+    <string name="msp_player_ab_repeat">A-B repeat</string>
+    <string name="msp_player_aspect">Aspect ratio</string>
+    <string name="msp_player_set_b">Set B</string>
+    <string name="msp_player_chip_active">%1$s, %2$s, on</string>
+    <string name="msp_player_chip_inactive">%1$s, %2$s</string>
+    <string name="msp_player_volume">Volume</string>
+    <string name="msp_player_brightness">Brightness</string>
+    <string name="msp_player_unlock">Unlock</string>
+    <string name="msp_player_lock">Lock screen</string>
+    <string name="msp_player_track_sep">" · "</string>
+
+    <!-- ===== Playback option sheets ===== -->
+    <string name="msp_player_speed_note">Speed only affects playback, never the file itself. Audio is pitch-corrected, so voices do not turn into fast-forward chatter.</string>
+    <string name="msp_player_source_line">Source: %1$s</string>
+
+    <!-- ===== Player screen state ===== -->
+    <string name="msp_player_playing">Playing</string>
+    <string name="msp_player_paused">Paused</string>
+    <string name="msp_player_boost">%1$s sped up</string>
+    <string name="msp_player_offset_ahead">+%1$d s</string>
+    <string name="msp_player_offset_behind">-%1$d s</string>
+    <string name="msp_player_offset_zero">0 s</string>
+    <string name="msp_player_nothing_playing">Nothing is playing</string>
+    <string name="msp_player_nothing_playing_desc">Pick an audio or video file in Library to start playing.</string>
+</resources>

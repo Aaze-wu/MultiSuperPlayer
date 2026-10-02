@@ -22,9 +22,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.ui.chrome.AppChromeState
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
 import com.multisuperplayer.core.ui.chrome.LocalAppChromeState
+import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.ArtworkAccentState
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
 import com.multisuperplayer.core.ui.theme.MspAccent
@@ -86,12 +88,12 @@ fun MspApp() {
 
 private enum class MspDestination(
     val route: String,
-    val label: String,
+    val label: MspText,
     val icon: ImageVector,
 ) {
-    LIBRARY("library", "媒体库", Icons.Outlined.LibraryMusic),
-    PLAYER("player", "正在播放", Icons.Outlined.PlayCircle),
-    SETTINGS("settings", "设置", Icons.Outlined.Settings),
+    LIBRARY("library", MspText.Res(R.string.msp_nav_library), Icons.Outlined.LibraryMusic),
+    PLAYER("player", MspText.Res(R.string.msp_nav_now_playing), Icons.Outlined.PlayCircle),
+    SETTINGS("settings", MspText.Res(R.string.msp_nav_settings), Icons.Outlined.Settings),
     ;
 
     companion object {
@@ -176,7 +178,7 @@ private fun MspAppScaffold() {
                             navigateToTab(destination)
                         },
                         icon = { Icon(destination.icon, contentDescription = null) },
-                        label = { Text(destination.label) },
+                        label = { Text(destination.label.string()) },
                     )
                 }
             }

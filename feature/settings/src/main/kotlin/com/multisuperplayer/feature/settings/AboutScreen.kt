@@ -38,12 +38,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.device.DeviceSnapshot
 import com.multisuperplayer.core.common.info.InfoRow
 import com.multisuperplayer.core.common.log.LogSummary
+import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /** 导出日志的 MIME。`.txt` 最方便用户直接查看和粘贴。 */
@@ -104,10 +107,13 @@ fun AboutScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("关于") },
+                title = { Text(stringResource(R.string.msp_settings_about)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.msp_settings_back),
+                        )
                     }
                 },
             )
@@ -117,10 +123,10 @@ fun AboutScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { SectionHeader("版本") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_version)) }
             item { InfoRowList(buildInfo.rows()) }
 
-            item { SectionHeader("更新") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_update)) }
             item {
                 ListItem(
                     modifier = Modifier.fillMaxWidth(),
@@ -128,48 +134,65 @@ fun AboutScreen(
                     leadingContent = {
                         Icon(Icons.Outlined.SystemUpdate, contentDescription = null)
                     },
-                    headlineContent = { Text("检查更新") },
+                    headlineContent = { Text(stringResource(R.string.msp_settings_check_update)) },
                     supportingContent = {
-                        Text("还没有接入更新源：本版本没有发布渠道，这个包是本机自己构建的。")
+                        Text(stringResource(R.string.msp_settings_update_no_source))
                     },
                     trailingContent = {
-                        TextButton(onClick = { showUpdateDialog = true }) { Text("检查") }
+                        TextButton(onClick = { showUpdateDialog = true }) {
+                            Text(stringResource(R.string.msp_settings_check))
+                        }
                     },
                 )
             }
 
-            item { SectionHeader("设备") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_device)) }
             item {
                 val rows = device?.rows()
                 if (rows == null) {
                     // 读设备信息失败时不留一片空白：空白看起来像「这一节坏了」，而
                     // 说清楚「读不到」至少让人知道版本小节里的信息还是可信的。
-                    InfoRowList(listOf(InfoRow("设备", DeviceSnapshot.UNKNOWN)))
+                    InfoRowList(
+                        listOf(
+                            InfoRow(
+                                MspText.Res(R.string.msp_settings_section_device),
+                                MspText.Res(R.string.msp_settings_device_unavailable),
+                            ),
+                        ),
+                    )
                 } else {
                     InfoRowList(rows)
                 }
             }
 
-            item { SectionHeader("开源许可") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_license)) }
             item {
                 ListItem(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     leadingContent = { Icon(Icons.Outlined.Article, contentDescription = null) },
-                    headlineContent = { Text("第三方组件与许可证") },
-                    supportingContent = { Text("本应用整体以 GPL-3.0 分发") },
+                    headlineContent = { Text(stringResource(R.string.msp_settings_license_row_title)) },
+                    supportingContent = { Text(stringResource(R.string.msp_settings_license_row_desc)) },
                     trailingContent = {
-                        TextButton(onClick = { showLicenseDialog = true }) { Text("查看") }
+                        TextButton(onClick = { showLicenseDialog = true }) {
+                            Text(stringResource(R.string.msp_settings_view))
+                        }
                     },
                 )
             }
 
-            item { SectionHeader("日志") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_logs)) }
             item {
                 InfoRowList(
                     listOf(
-                        InfoRow("日志文件", SettingsSummaries.logFiles(logSummary)),
-                        InfoRow("覆盖日期", SettingsSummaries.logRange(logSummary)),
+                        InfoRow(
+                            MspText.Res(R.string.msp_settings_log_files),
+                            SettingsSummaries.logFiles(logSummary),
+                        ),
+                        InfoRow(
+                            MspText.Res(R.string.msp_settings_log_range),
+                            SettingsSummaries.logRange(logSummary),
+                        ),
                     ),
                 )
             }
@@ -184,7 +207,7 @@ fun AboutScreen(
                     ) {
                         Icon(Icons.Outlined.SaveAlt, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("导出日志")
+                        Text(stringResource(R.string.msp_settings_export_logs))
                     }
                     Spacer(Modifier.height(8.dp))
                     ExportStatus(export)
@@ -196,17 +219,20 @@ fun AboutScreen(
     if (showUpdateDialog) {
         AlertDialog(
             onDismissRequest = { showUpdateDialog = false },
-            title = { Text("检查更新") },
+            title = { Text(stringResource(R.string.msp_settings_check_update)) },
             text = {
                 Text(
-                    "还没有接入更新源，所以无法检查。\n\n" +
-                        "当前版本 ${buildInfo.versionText()}，" +
-                        "构建来源 ${buildInfo.sourceText()}。\n\n" +
-                        "以后接上发布渠道后，这里会显示是否有新版本以及更新说明。",
+                    stringResource(
+                        R.string.msp_settings_update_dialog_text,
+                        buildInfo.versionText().string(),
+                        buildInfo.sourceText().string(),
+                    ),
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showUpdateDialog = false }) { Text("知道了") }
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text(stringResource(R.string.msp_settings_got_it))
+                }
             },
         )
     }
@@ -214,7 +240,7 @@ fun AboutScreen(
     if (showLicenseDialog) {
         AlertDialog(
             onDismissRequest = { showLicenseDialog = false },
-            title = { Text("第三方组件与许可证") },
+            title = { Text(stringResource(R.string.msp_settings_license_row_title)) },
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -223,33 +249,34 @@ fun AboutScreen(
                     LicenseEntry(
                         name = "MultiSuperPlayer",
                         license = "GPL-3.0",
-                        detail = "本应用自身（仓库根目录的 LICENSE 文件）",
+                        detail = stringResource(R.string.msp_settings_license_app_detail),
                     )
                     LicenseEntry(
                         name = "NextLib（nextlib-media3ext）",
                         license = "GPL-3.0",
-                        detail = "内置 FFmpeg 软件解码；它的 FFmpeg 构建启用了 GPL 组件",
+                        detail = stringResource(R.string.msp_settings_license_nextlib_detail),
                     )
                     LicenseEntry(
                         name = "AndroidX Media3",
                         license = "Apache-2.0",
-                        detail = "播放内核与媒体会话",
+                        detail = stringResource(R.string.msp_settings_license_media3_detail),
                     )
                     LicenseEntry(
                         name = "Kotlin / Jetpack Compose / Koin",
                         license = "Apache-2.0",
-                        detail = "语言、界面与依赖注入",
+                        detail = stringResource(R.string.msp_settings_license_toolchain_detail),
                     )
                     Text(
-                        text = "链入 NextLib 后，整个应用按 GPL-3.0 分发：对外发布安装包时" +
-                            "必须同时提供完整源码。",
+                        text = stringResource(R.string.msp_settings_license_gpl_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showLicenseDialog = false }) { Text("关闭") }
+                TextButton(onClick = { showLicenseDialog = false }) {
+                    Text(stringResource(R.string.msp_settings_close))
+                }
             },
         )
     }
@@ -264,13 +291,13 @@ private fun InfoRowList(rows: List<InfoRow>) {
         rows.forEach { row ->
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
-                    text = row.label,
+                    text = row.label.string(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(88.dp),
                 )
                 Text(
-                    text = row.value,
+                    text = row.value.string(),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -294,15 +321,14 @@ private fun LicenseEntry(name: String, license: String, detail: String) {
 private fun ExportStatus(export: LogExportState) {
     when (export) {
         LogExportState.Idle -> InfoNote(
-            "导出的是一个纯文本文件，包含本机保留的全部日志和上方的版本/设备信息。" +
-                "出了问题把它发出来就能定位。",
+            stringResource(R.string.msp_settings_export_hint_idle),
         )
 
         LogExportState.Running -> {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "正在写入…",
+                text = stringResource(R.string.msp_settings_export_running),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -310,16 +336,24 @@ private fun ExportStatus(export: LogExportState) {
 
         is LogExportState.Saved -> {
             Text(
-                text = "已保存：${export.fileName}（含 ${export.includedFiles} 个日志文件）",
+                text = stringResource(
+                    R.string.msp_settings_export_saved,
+                    export.fileName,
+                    export.includedFiles,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
             if (export.failedFiles.isNotEmpty()) {
                 // 跳过的那几个必须点出来：报告看起来「完整」，缺的恰好可能是崩掉的那天。
                 Spacer(Modifier.height(4.dp))
+                val separator = stringResource(R.string.msp_settings_list_separator)
                 Text(
-                    text = "有 ${export.failedFiles.size} 个文件读不出来，已跳过：" +
-                        export.failedFiles.joinToString("、"),
+                    text = stringResource(
+                        R.string.msp_settings_export_skipped,
+                        export.failedFiles.size,
+                        export.failedFiles.joinToString(separator),
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -327,7 +361,7 @@ private fun ExportStatus(export: LogExportState) {
         }
 
         is LogExportState.Failed -> Text(
-            text = "导出失败：${export.message}",
+            text = stringResource(R.string.msp_settings_export_failed, export.message.string()),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )

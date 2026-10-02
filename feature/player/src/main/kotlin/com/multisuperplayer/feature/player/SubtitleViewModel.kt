@@ -3,6 +3,7 @@ package com.multisuperplayer.feature.player
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
@@ -286,8 +287,8 @@ class SubtitleViewModel(
     // ------------------------------------------------------------------ 导出
 
     /** 导出结果的一句话。写完不自动消失，要用户自己关——他需要时间看清是哪一步失败了。 */
-    private val mutableExportMessage = MutableStateFlow<String?>(null)
-    val exportMessage: StateFlow<String?> = mutableExportMessage.asStateFlow()
+    private val mutableExportMessage = MutableStateFlow<MspText?>(null)
+    val exportMessage: StateFlow<MspText?> = mutableExportMessage.asStateFlow()
 
     fun clearExportMessage() {
         mutableExportMessage.value = null
@@ -323,9 +324,9 @@ class SubtitleViewModel(
         viewModelScope.launch {
             val ok = exportWriter.write(uri, text)
             mutableExportMessage.value = if (ok) {
-                "已导出 $name"
+                MspText.Res(R.string.msp_player_export_done, name)
             } else {
-                "导出失败：$name 没能写入（文件可能已被删除，或者那个位置不允许写入）。"
+                MspText.Res(R.string.msp_player_export_failed, name)
             }
         }
     }
@@ -505,7 +506,7 @@ sealed interface SubtitleIssue {
     data object DirectoryInvisible : SubtitleIssue
 
     /** 查询本身失败。 */
-    data class ScanFailed(val message: String) : SubtitleIssue
+    data class ScanFailed(val message: MspText) : SubtitleIssue
 
     /** 目录里没有字幕文件。 */
     data object NoSubtitles : SubtitleIssue
@@ -514,7 +515,7 @@ sealed interface SubtitleIssue {
     data object NoMatch : SubtitleIssue
 
     /** 读/解析失败，[message] 是原始原因，原样透出。 */
-    data class LoadFailed(val fileName: String, val message: String) : SubtitleIssue
+    data class LoadFailed(val fileName: String, val message: MspText) : SubtitleIssue
 }
 
 /** 加载结果，不含用户偏好。 */

@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.library
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
@@ -57,8 +58,8 @@ class LibraryPaneTest {
     @Test
     fun `扫描失败把仓库给的原文透出去`() {
         assertEquals(
-            LibraryPane.Failure("读写被拒绝"),
-            state(library = MediaLibraryState.Error("读写被拒绝")).pane,
+            LibraryPane.Failure(MspText.Plain("读写被拒绝")),
+            state(library = MediaLibraryState.Error(MspText.Plain("读写被拒绝"))).pane,
         )
     }
 
@@ -120,7 +121,7 @@ class LibraryPaneTest {
             MediaLibraryState.Loading,
             MediaLibraryState.NeedsPermission,
             MediaLibraryState.Ready(emptyList()),
-            MediaLibraryState.Error("x"),
+            MediaLibraryState.Error(MspText.Plain("x")),
             library,
         )
         for (lib in libraries) {

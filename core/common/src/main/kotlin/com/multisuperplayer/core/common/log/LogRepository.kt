@@ -1,7 +1,6 @@
 package com.multisuperplayer.core.common.log
 
 import com.multisuperplayer.core.common.format.TimeFormat
-import com.multisuperplayer.core.common.info.InfoRow
 import java.io.File
 
 /** 日志目录的概览，给「关于」页显示「导出会得到什么」。 */
@@ -83,8 +82,15 @@ class LogRepository(
      * 是因为「忘了刷」的代价是静默的——导出一份看似完整的报告，谁都不会发现少了什么。
      *
      * 会做文件 IO，请**在 IO 线程上调用**。
+     *
+     * [header] 是**已经解析好的**一行行文本（由调用方用
+     * [com.multisuperplayer.core.common.info.InfoRow.render] 拼好）。这样做的原因有两个：
+     * 一是这里能保持不碰 `Resources`（报告拼接的单测因此不需要任何 Android 环境），
+     * 二是抬头要跟着界面语言走，而语言只有在 UI 边界才知道。
+     * 报告本身的骨架（`===== … =====`、`导出时间:` 那几行）**刻意不翻译**：
+     * 它是排查问题时给开发者看的，混进译文反而会让按关键字搜索失效。
      */
-    fun buildReport(header: List<InfoRow>, millis: Long = now()): LogReport {
+    fun buildReport(header: List<String>, millis: Long = now()): LogReport {
         runCatching { flush() }
 
         val files = files()
@@ -93,7 +99,7 @@ class LogRepository(
 
         builder.append("===== MultiSuperPlayer 日志报告 =====").append('\n')
         builder.append("导出时间: ").append(TimeFormat.dateTime(millis)).append('\n')
-        header.forEach { row -> builder.append(row.label).append(": ").append(row.value).append('\n') }
+        header.forEach { line -> builder.append(line).append('\n') }
         builder.append("日志文件: ").append(files.size).append(" 个，共 ")
             .append(TimeFormat.fileSize(files.sumOf { it.length() })).append('\n')
 

@@ -17,12 +17,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
+import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -92,7 +94,7 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("设置") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.msp_settings_title)) }) },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -103,16 +105,16 @@ fun SettingsScreen(
             item {
                 SettingActionRow(
                     icon = Icons.Outlined.Palette,
-                    title = "外观",
-                    subtitle = SettingsSummaries.appearance(theme, systemColorSupported),
+                    title = stringResource(R.string.msp_settings_appearance),
+                    subtitle = SettingsSummaries.appearance(theme, systemColorSupported).string(),
                     onClick = onOpenAppearance,
                 )
             }
             item {
                 SettingActionRow(
                     icon = Icons.Outlined.PlayCircle,
-                    title = "播放",
-                    subtitle = SettingsSummaries.playback(playback, softwareDecodingAvailable),
+                    title = stringResource(R.string.msp_settings_playback),
+                    subtitle = SettingsSummaries.playback(playback, softwareDecodingAvailable).string(),
                     onClick = onOpenPlayback,
                 )
             }
@@ -122,16 +124,16 @@ fun SettingsScreen(
                     // 标题和 [TranslationSettingsScreen] 的标题保持一致：「字幕与翻译」听起来
                     // 更完整，但那一页里目前只有翻译设置（字幕显示相关的项还没有消费者）。
                     // 页面标题和入口名不一样会让人怀疑自己点错了地方。
-                    title = "字幕翻译",
-                    subtitle = SettingsSummaries.translation(translation),
+                    title = stringResource(R.string.msp_settings_translation),
+                    subtitle = SettingsSummaries.translation(translation).string(),
                     onClick = onOpenTranslationSettings,
                 )
             }
             item {
                 SettingActionRow(
                     icon = Icons.Outlined.Info,
-                    title = "关于",
-                    subtitle = SettingsSummaries.about(buildInfo),
+                    title = stringResource(R.string.msp_settings_about),
+                    subtitle = SettingsSummaries.about(buildInfo).string(),
                     onClick = onOpenAbout,
                 )
             }

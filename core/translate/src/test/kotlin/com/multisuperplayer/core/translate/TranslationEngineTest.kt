@@ -78,7 +78,7 @@ class TranslationEngineTest {
 
         assertEquals(1, events.size)
         val aborted = assertIs<TranslationEvent.Aborted>(events.single())
-        assertEquals("服务地址", assertIs<TranslationFailure.NotConfigured>(aborted.failure).missing)
+        assertEquals(MissingConfigItem.BASE_URL, assertIs<TranslationFailure.NotConfigured>(aborted.failure).missing)
         assertEquals(0, aborted.total)
         assertTrue(client.requests.isEmpty())
     }
@@ -90,7 +90,7 @@ class TranslationEngineTest {
             .translate(doc(2), config = configOf(model = "  ")).toList()
 
         assertEquals(
-            "模型名",
+            MissingConfigItem.MODEL,
             assertIs<TranslationFailure.NotConfigured>(
                 assertIs<TranslationEvent.Aborted>(events.single()).failure,
             ).missing,
@@ -283,7 +283,7 @@ class TranslationEngineTest {
         with(TranslationLimits) {
             // 再跑下去一定是同一个错 ⇒ 中止
             assertEquals(FailureAction.Abort, act(TranslationFailure.Unauthorized(401, "x")))
-            assertEquals(FailureAction.Abort, act(TranslationFailure.NotConfigured("模型名")))
+            assertEquals(FailureAction.Abort, act(TranslationFailure.NotConfigured(MissingConfigItem.MODEL)))
             assertEquals(FailureAction.Abort, act(TranslationFailure.QuotaExceeded(429, "欠费")))
 
             // 预算问题 ⇒ 加大预算（降温度、拆批都修不好它）

@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.common.log
 
-import com.multisuperplayer.core.common.info.InfoRow
+import com.multisuperplayer.core.common.log.LogRepository
 import java.io.File
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -128,7 +128,9 @@ class LogRepositoryTest {
         val directory = temp.newFolder()
         writeLog(directory, "2026-01-01", "第一天的内容\n")
         writeLog(directory, "2026-01-02", "第二天的内容\n")
-        val header = listOf(InfoRow("版本", "0.5.4 (50400)"), InfoRow("设备", "Google Pixel 7"))
+        // 抬头现在是**已经渲染好的行**：`buildReport` 只负责拼字符串，不碰 `Resources`，
+        // 所以它既能在 JVM 单测里跑，也不会把报告的语言钉死在日志产生的那一刻。
+        val header = listOf("版本: 0.5.4 (50400)", "设备: Google Pixel 7")
 
         val report = repo(directory).buildReport(header = header)
 

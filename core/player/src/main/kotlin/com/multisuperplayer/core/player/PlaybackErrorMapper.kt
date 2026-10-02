@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.player
 
 import androidx.media3.common.PlaybackException
+import com.multisuperplayer.core.common.text.MspText
 
 /**
  * 把 Media3 的错误码翻译成「用户看得懂 + 能据此行动」的文案。
@@ -10,8 +11,10 @@ import androidx.media3.common.PlaybackException
  * 「这个文件放不了」，而放不了的原因完全不同（权限 / 解码器 / 容器损坏），
  * 对应完全不同的处理方式，所以这里按错误码分流。
  *
- * 刻意做成**纯函数**（`Int` + 原因名 → `String`）：这样它能进 JVM 单元测试，
- * 不需要起一个 Android 环境或真的造一个坏文件。
+ * 刻意做成**纯函数**（`Int` + 原因名 → [MspText]）：这样它能进 JVM 单元测试，
+ * 不需要起一个 Android 环境或真的造一个坏文件。返回 [MspText] 而不是 `String`
+ * 也是为了同一件事——取字符串需要 `Resources`，而单测里没有；解析交给
+ * UI 边界（见 `MspText` 的类注释）。
  */
 object PlaybackErrorMapper {
 
@@ -26,25 +29,25 @@ object PlaybackErrorMapper {
          * （换设备 / 只能换文件 / 再点一次重试），用 `Boolean` 就会有两态共用一个文案。
          */
         softwareDecoding: SoftwareDecodingAttempt = SoftwareDecodingAttempt.NOT_TRIED,
-    ): String {
-        val base = when (errorCode) {
+    ): MspText {
+        val base: MspText = when (errorCode) {
             PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
-                "找不到该文件，可能已被移动或删除"
+                MspText.Res(R.string.msp_playback_error_file_not_found)
 
             PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
-                "没有读取该文件的权限。请重新选择这个文件或文件夹以授予访问权限"
+                MspText.Res(R.string.msp_playback_error_no_permission)
 
             PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED ->
-                "系统禁止明文 HTTP 播放。请在设置中允许该地址使用不加密连接"
+                MspText.Res(R.string.msp_playback_error_cleartext)
 
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
-                "无法连接到服务器，请检查网络或播放地址"
+                MspText.Res(R.string.msp_playback_error_network_failed)
 
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
-                "连接服务器超时，请检查网络"
+                MspText.Res(R.string.msp_playback_error_network_timeout)
 
             PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-                "服务器返回了错误状态码，播放地址可能已失效"
+                MspText.Res(R.string.msp_playback_error_http_status)
 
             PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
@@ -54,16 +57,13 @@ object PlaybackErrorMapper {
                 // 所以走到这里时它多半已经试过并失败了。
                 when (softwareDecoding) {
                     SoftwareDecodingAttempt.UNAVAILABLE ->
-                        "本机没有能解码该音视频格式的解码器，而这个安装包不含 FFmpeg 软件解码" +
-                            "（可能是 CPU 架构不受支持）"
+                        MspText.Res(R.string.msp_playback_error_decoder_unavailable)
 
                     SoftwareDecodingAttempt.FAILED ->
-                        "硬件解码和 FFmpeg 软件解码都解不开这个文件。常见于冷门编码，" +
-                            "或封装格式本身不被支持（例如 WMV、RealMedia）"
+                        MspText.Res(R.string.msp_playback_error_decoder_software_failed)
 
                     SoftwareDecodingAttempt.NOT_TRIED ->
-                        "本机没有能解码该音视频格式的解码器（常见于 AC-3/DTS/TrueHD 音轨" +
-                            "或特殊编码的 HEVC）。再点一次播放会重试一次"
+                        MspText.Res(R.string.msp_playback_error_decoder_software_not_tried)
                 }
 
             PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
@@ -71,53 +71,49 @@ object PlaybackErrorMapper {
             PlaybackException.ERROR_CODE_DECODING_FAILED,
             ->
                 if (softwareDecoding == SoftwareDecodingAttempt.FAILED) {
-                    "解码失败：硬件解码和 FFmpeg 软件解码都试过并失败了。" +
-                        "这个文件的编码方式不被支持"
+                    MspText.Res(R.string.msp_playback_error_decoder_both_failed)
                 } else {
-                    "解码器初始化失败。若反复出现，通常是这个文件的编码方式不被支持"
+                    MspText.Res(R.string.msp_playback_error_decoder_init)
                 }
 
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
             ->
-                "文件（或流清单）已损坏或下载不完整"
+                MspText.Res(R.string.msp_playback_error_container_malformed)
 
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
             ->
-                "无法识别这个文件/流的封装格式"
+                MspText.Res(R.string.msp_playback_error_container_unsupported)
 
             PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
             PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED,
             ->
-                "音频输出初始化失败，可能是音频设备被其他应用占用"
+                MspText.Res(R.string.msp_playback_error_audio_output)
 
             PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ->
-                "直播进度落后过多，正在重新缓冲"
+                MspText.Res(R.string.msp_playback_error_live_window)
 
             PlaybackException.ERROR_CODE_TIMEOUT ->
-                "播放超时，请检查网络"
+                MspText.Res(R.string.msp_playback_error_timeout)
 
             else ->
-                "播放失败"
+                MspText.Res(R.string.msp_playback_error_generic)
         }
 
         // 原因名只在有信息量（不是 generic 的 PlaybackException）时才追加。
         //
         // 这里刻意用字符串字面量而不是 `PlaybackException::class.java.name`：
         // 后者会让本函数在运行时真的去加载那个类，从而把一个纯函数变成
-        // 「需要 Media3 类可加载」的东西，JVM 单元测试就得多一层依赖。
+        // 「需要 Media3 类可加载」的东西，JVM 单元测试就得多加一层依赖。
         // `when (errorCode)` 里的常量是 `const val`，编译期就内联了，没有这个问题。
         val cause = causeName?.takeIf { it.isNotBlank() && it != GENERIC_ERROR_CLASS }
-        return buildString {
-            append(base)
-            append("（错误码 ")
-            append(errorCode)
-            if (cause != null) {
-                append("，")
-                append(cause)
-            }
-            append("）")
+
+        // 括号和分隔符交给文案：中文是全角、英文是半角，而「错误码」三个字本身也要翻译。
+        return if (cause == null) {
+            MspText.Res(R.string.msp_playback_error_with_code, base, errorCode)
+        } else {
+            MspText.Res(R.string.msp_playback_error_with_code_and_cause, base, errorCode, cause)
         }
     }
 

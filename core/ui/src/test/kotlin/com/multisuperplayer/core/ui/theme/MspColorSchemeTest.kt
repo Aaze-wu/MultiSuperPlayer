@@ -129,7 +129,7 @@ class MspColorSchemeTest {
                     val b = composeColorScheme(accents[j], MspBaseTheme.LIGHT, isDark)
                     allAccentRoles.forEach { (name, get) ->
                         assertNotEquals(
-                            "$name 在「${accents[i].displayName}」和「${accents[j].displayName}」" +
+                            "$name 在「${accents[i].id}」和「${accents[j].id}」" +
                                 "下相同（isDark=$isDark），说明它没跟随强调色",
                             get(a),
                             get(b),
@@ -151,7 +151,7 @@ class MspColorSchemeTest {
                 val baseline = if (isDark) darkColorScheme() else lightColorScheme()
                 allAccentRoles.forEach { (name, get) ->
                     assertNotEquals(
-                        "$name 还是 M3 基线的值（${accent.displayName}, isDark=$isDark），" +
+                        "$name 还是 M3 基线的值（${accent.id}, isDark=$isDark），" +
                             "说明这个角色没有跟随强调色",
                         get(baseline),
                         get(scheme),
@@ -175,7 +175,7 @@ class MspColorSchemeTest {
                     val ratio = contrastRatio(pair.background(scheme), pair.foreground(scheme))
                     assertTrue(
                         "${pair.name} 的对比度 ${"%.2f".format(ratio)} 低于 ${pair.minRatio}" +
-                            "（${accent.displayName}, isDark=$isDark）",
+                            "（${accent.id}, isDark=$isDark）",
                         ratio >= pair.minRatio,
                     )
                 }
@@ -194,7 +194,7 @@ class MspColorSchemeTest {
                 val color = get(scheme)
                 val spread = maxOf(color.red, color.green, color.blue) -
                     minOf(color.red, color.green, color.blue)
-                assertEquals("$name 在 ${base.displayName} 下仍有色偏", 0f, spread, 0.0001f)
+                assertEquals("$name 在 ${base.id} 下仍有色偏", 0f, spread, 0.0001f)
             }
         }
     }

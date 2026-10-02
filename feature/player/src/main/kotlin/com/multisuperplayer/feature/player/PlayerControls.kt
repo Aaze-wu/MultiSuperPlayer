@@ -56,11 +56,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.multisuperplayer.core.common.format.TimeFormat
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.player.AbRepeatState
 import com.multisuperplayer.core.player.MspDecoderKind
@@ -68,6 +70,7 @@ import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.progressOf
+import com.multisuperplayer.core.ui.text.string
 
 /**
  * 解码方式的显示文字。
@@ -82,9 +85,9 @@ import com.multisuperplayer.core.player.progressOf
  * 定义在这里而不是放在某一个界面文件里：它同时出现在竖屏的标题区和横屏的顶栏，
  * 两处各写一份的话，迟早会出现「同一部片子，横屏说 FFmpeg、竖屏说系统软件解码」。
  */
-internal fun decoderLabelOf(decoderKind: MspDecoderKind): String? = when (decoderKind) {
-    MspDecoderKind.FFMPEG -> "FFmpeg 软件解码"
-    MspDecoderKind.SYSTEM_SOFTWARE -> "系统软件解码"
+internal fun decoderLabelOf(decoderKind: MspDecoderKind): MspText? = when (decoderKind) {
+    MspDecoderKind.FFMPEG -> MspText.Res(R.string.msp_player_decoder_ffmpeg)
+    MspDecoderKind.SYSTEM_SOFTWARE -> MspText.Res(R.string.msp_player_decoder_system)
     MspDecoderKind.HARDWARE, MspDecoderKind.UNKNOWN -> null
 }
 
@@ -211,7 +214,13 @@ internal fun PlayerTransportControls(
         IconButton(onClick = onToggleShuffle) {
             Icon(
                 imageVector = Icons.Filled.Shuffle,
-                contentDescription = if (state.shuffleEnabled) "关闭随机播放" else "开启随机播放",
+                contentDescription = stringResource(
+                    if (state.shuffleEnabled) {
+                        R.string.msp_player_shuffle_off
+                    } else {
+                        R.string.msp_player_shuffle_on
+                    },
+                ),
                 tint = if (state.shuffleEnabled) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -221,7 +230,10 @@ internal fun PlayerTransportControls(
         }
 
         FilledTonalIconButton(onClick = onSkipPrevious) {
-            Icon(Icons.Filled.SkipPrevious, contentDescription = "上一首")
+            Icon(
+                Icons.Filled.SkipPrevious,
+                contentDescription = stringResource(R.string.msp_player_previous),
+            )
         }
 
         FilledIconButton(
@@ -231,13 +243,18 @@ internal fun PlayerTransportControls(
         ) {
             Icon(
                 imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (state.isPlaying) "暂停" else "播放",
+                contentDescription = stringResource(
+                    if (state.isPlaying) R.string.msp_player_pause else R.string.msp_player_play,
+                ),
                 modifier = Modifier.size(32.dp),
             )
         }
 
         FilledTonalIconButton(onClick = onSkipNext) {
-            Icon(Icons.Filled.SkipNext, contentDescription = "下一首")
+            Icon(
+                Icons.Filled.SkipNext,
+                contentDescription = stringResource(R.string.msp_player_next),
+            )
         }
 
         IconButton(onClick = onCycleRepeat) {
@@ -247,11 +264,13 @@ internal fun PlayerTransportControls(
                 } else {
                     Icons.Filled.Repeat
                 },
-                contentDescription = when (state.repeatMode) {
-                    MspRepeatMode.OFF -> "循环已关闭"
-                    MspRepeatMode.ALL -> "列表循环"
-                    MspRepeatMode.ONE -> "单曲循环"
-                },
+                contentDescription = stringResource(
+                    when (state.repeatMode) {
+                        MspRepeatMode.OFF -> R.string.msp_player_repeat_off
+                        MspRepeatMode.ALL -> R.string.msp_player_repeat_all
+                        MspRepeatMode.ONE -> R.string.msp_player_repeat_one
+                    },
+                ),
                 tint = if (state.repeatMode == MspRepeatMode.OFF) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
@@ -265,7 +284,7 @@ internal fun PlayerTransportControls(
         IconButton(onClick = onOpenSubtitles) {
             Icon(
                 imageVector = Icons.Filled.Subtitles,
-                contentDescription = "字幕与歌词",
+                contentDescription = stringResource(R.string.msp_player_subtitle_entry),
                 tint = if (subtitlesActive) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -282,7 +301,13 @@ internal fun PlayerTransportControls(
                     } else {
                         Icons.Filled.Fullscreen
                     },
-                    contentDescription = if (fullscreen) "退出全屏" else "全屏播放",
+                    contentDescription = stringResource(
+                        if (fullscreen) {
+                            R.string.msp_player_exit_fullscreen
+                        } else {
+                            R.string.msp_player_enter_fullscreen
+                        },
+                    ),
                 )
             }
         }
@@ -319,19 +344,19 @@ internal fun PlayerActionChips(
             text = PlaybackSpeedOptions.format(speed),
             active = speed != PlaybackSpeedOptions.DEFAULT,
             onClick = onOpenSpeed,
-            description = "播放速度",
+            description = stringResource(R.string.msp_player_speed),
         )
         ChipButton(
-            text = abRepeat.chipLabel(),
+            text = abRepeat.chipLabel().string(),
             active = !abRepeat.isEmpty,
             onClick = onCycleAbRepeat,
-            description = "A-B 循环",
+            description = stringResource(R.string.msp_player_ab_repeat),
         )
         ChipButton(
             text = aspectRatioLabel,
             active = false,
             onClick = onOpenAspectRatio,
-            description = "画面比例",
+            description = stringResource(R.string.msp_player_aspect),
         )
     }
 }
@@ -343,10 +368,10 @@ internal fun PlayerActionChips(
  * 都写成「A-B」的话，用户按了第一下会以为没生效（画面上确实什么都没变，
  * 循环要等到 B 才成立）。
  */
-private fun AbRepeatState.chipLabel(): String = when {
-    isEmpty -> "A-B"
-    isWaitingForEnd -> "设 B"
-    else -> "A-B"
+private fun AbRepeatState.chipLabel(): MspText = when {
+    isEmpty -> MspText.Plain("A-B")
+    isWaitingForEnd -> MspText.Res(R.string.msp_player_set_b)
+    else -> MspText.Plain("A-B")
 }
 
 @Composable
@@ -356,6 +381,13 @@ private fun ChipButton(
     onClick: () -> Unit,
     description: String,
 ) {
+    // 无障碍描述要先把资源取出来再进 `semantics`：那里的 lambda 不是 `@Composable`，
+    // 里面调不了 `stringResource`。
+    val chipDescription = stringResource(
+        if (active) R.string.msp_player_chip_active else R.string.msp_player_chip_inactive,
+        description,
+        text,
+    )
     TextButton(
         onClick = onClick,
         colors = ButtonDefaults.textButtonColors(
@@ -367,9 +399,7 @@ private fun ChipButton(
         ),
         // 无障碍文案把状态读出来：TalkBack 读「播放速度，1.5×，已启用」比只读一个
         // 「1.5×」有用得多——后者在语音里完全看不出它是当前速度还是可选项。
-        modifier = Modifier.semantics {
-            contentDescription = if (active) "$description，$text，已启用" else "$description，$text"
-        },
+        modifier = Modifier.semantics { contentDescription = chipDescription },
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge)
     }
@@ -396,7 +426,9 @@ internal fun PlayerLevelIndicator(hint: PlayerLevelHint, modifier: Modifier = Mo
         ) {
             Icon(
                 imageVector = if (hint.isVolume) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Brightness6,
-                contentDescription = if (hint.isVolume) "音量" else "亮度",
+                contentDescription = stringResource(
+                    if (hint.isVolume) R.string.msp_player_volume else R.string.msp_player_brightness,
+                ),
             )
             Text(
                 text = "${hint.percent}%",
@@ -490,7 +522,10 @@ internal fun PlayerControlsOverlay(
                         onClick = onToggleLock,
                         modifier = Modifier.padding(8.dp),
                     ) {
-                        Icon(Icons.Filled.LockOpen, contentDescription = "解除锁定")
+                        Icon(
+                            Icons.Filled.LockOpen,
+                            contentDescription = stringResource(R.string.msp_player_unlock),
+                        )
                     }
                 }
             }
@@ -512,7 +547,10 @@ internal fun PlayerControlsOverlay(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onExitFullscreen) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出全屏")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.msp_player_exit_fullscreen),
+                        )
                     }
                     Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
                         Text(
@@ -523,7 +561,7 @@ internal fun PlayerControlsOverlay(
                         )
                         decoderLabelOf(state.decoderKind)?.let { label ->
                             Text(
-                                text = label,
+                                text = label.string(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -540,7 +578,10 @@ internal fun PlayerControlsOverlay(
                         onCycleAbRepeat = onCycleAbRepeat,
                     )
                     IconButton(onClick = onToggleLock) {
-                        Icon(Icons.Filled.Lock, contentDescription = "锁定屏幕")
+                        Icon(
+                            Icons.Filled.Lock,
+                            contentDescription = stringResource(R.string.msp_player_lock),
+                        )
                     }
                 }
             }

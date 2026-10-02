@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.player
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.SubtitleCue
@@ -95,7 +96,7 @@ class SubtitleStateResolutionTest {
         val state = resolveSubtitleState(
             load = SubtitleLoadState(
                 phase = SubtitlePhase.READY,
-                issue = SubtitleIssue.LoadFailed("movie.srt", "无法读取文件"),
+                issue = SubtitleIssue.LoadFailed("movie.srt", MspText.Plain("无法读取文件")),
             ),
             displayMode = SubtitleDisplayMode.TRANSLATION_ONLY,
         )

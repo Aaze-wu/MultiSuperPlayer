@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.common.log
 
 import android.content.Context
+import android.content.res.Resources
 import android.os.Process
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import java.io.File
@@ -60,7 +61,7 @@ object MspLogInitializer {
             MspLog.minLevel = if (release) MspLogLevel.INFO else MspLogLevel.DEBUG
             installCrashHandler(sink)
 
-            logSessionHeader(buildInfo, directory)
+            logSessionHeader(context.resources, buildInfo, directory)
             return sink
         }
     }
@@ -89,15 +90,24 @@ object MspLogInitializer {
      * 这条路基本不存在，用户拿到的必然是应用内导出的那份 `msp-log-*.txt`。
      * 反过来，给原始文件加设备行就是为一个不会发生的场景在冷启动上多花一次 IPC。
      */
-    private fun logSessionHeader(buildInfo: AppBuildInfo, directory: File) {
+    private fun logSessionHeader(
+        resources: Resources,
+        buildInfo: AppBuildInfo,
+        directory: File,
+    ) {
         MspLog.i(TAG) {
             buildString {
                 append("===== 会话开始 =====")
                 append("\n进程 PID: ").append(Process.myPid())
                 append("\n等级门槛: ").append(MspLog.minLevel.name)
                 append("\n日志目录: ").append(directory.absolutePath)
-                buildInfo.rows().forEach { row -> append("\n").append(row.label).append(": ").append(row.value) }
-                append("\n提交: ").append(buildInfo.commitText())
+                // 标签/值是本地化的（跟着当前界面语言），而这一行的骨架不是——
+                // 后者是排查时按 `设备:` 搜的锚点，不能随语言变。
+                buildInfo.rows().forEach { row ->
+                    append("\n").append(row.label.resolve(resources))
+                        .append(": ").append(row.value.resolve(resources))
+                }
+                append("\n提交: ").append(buildInfo.commitText().resolve(resources))
             }
         }
     }

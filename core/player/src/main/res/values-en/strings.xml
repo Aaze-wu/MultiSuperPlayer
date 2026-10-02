@@ -1,0 +1,39 @@
+<resources>
+
+    <string name="msp_playback_channel_name">Playback controls</string>
+
+    <!-- ===== Playback failure messages ===== -->
+
+    <!--
+      The reason a file will not play decides what the user can do about it,
+      so the branches below must stay separate.
+
+      Note the escaped apostrophes: a bare `'` in a string resource is an
+      aapt2 error, not a typo.
+    -->
+    <string name="msp_playback_error_with_code">%1$s (error code %2$d)</string>
+    <string name="msp_playback_error_with_code_and_cause">%1$s (error code %2$d, %3$s)</string>
+
+    <string name="msp_playback_error_file_not_found">File not found. It may have been moved or deleted</string>
+    <string name="msp_playback_error_no_permission">No permission to read this file. Pick the file or folder again to grant access</string>
+    <string name="msp_playback_error_cleartext">The system blocks plain HTTP playback. Allow this address to use an unencrypted connection in settings</string>
+    <string name="msp_playback_error_network_failed">Cannot reach the server. Check your network or the playback address</string>
+    <string name="msp_playback_error_network_timeout">Timed out connecting to the server. Check your network</string>
+    <string name="msp_playback_error_http_status">The server returned an error status. The playback address may no longer be valid</string>
+
+    <string name="msp_playback_error_decoder_unavailable">No decoder on this device handles this format, and this build ships without FFmpeg software decoding (possibly an unsupported CPU architecture)</string>
+    <string name="msp_playback_error_decoder_software_failed">Neither hardware decoding nor FFmpeg software decoding could open this file. Common with obscure codecs, or containers that are simply not supported (for example WMV, RealMedia)</string>
+    <string name="msp_playback_error_decoder_software_not_tried">No decoder on this device handles this format (common with AC-3/DTS/TrueHD audio or unusually encoded HEVC). Tapping play again retries once</string>
+
+    <string name="msp_playback_error_decoder_both_failed">Decoding failed: hardware decoding and FFmpeg software decoding were both tried and both failed. This file\'s codec is not supported</string>
+    <string name="msp_playback_error_decoder_init">The decoder failed to initialize. If it keeps happening, this file\'s codec is usually the reason</string>
+
+    <string name="msp_playback_error_container_malformed">The file (or stream manifest) is corrupted or was not fully downloaded</string>
+    <string name="msp_playback_error_container_unsupported">The container format of this file/stream is not recognised</string>
+
+    <string name="msp_playback_error_audio_output">Audio output failed to initialize. Another app may be holding the audio device</string>
+    <string name="msp_playback_error_live_window">Too far behind the live edge, rebuffering</string>
+    <string name="msp_playback_error_timeout">Playback timed out. Check your network</string>
+    <string name="msp_playback_error_generic">Playback failed</string>
+
+</resources>

@@ -237,15 +237,20 @@ class ExoPlayerController(
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    // 先试自动回退。回退成功就逄回，不设错误文案——
+                    // 先试自动回退。回退成功就直接返回，不设错误文案——
                     // 用户看到的是「黑一下接着放」，而不是一条错误提示。
                     if (retryWithSoftwareDecoding(error)) return
 
+                    // `describe` 返回的是「哪一条 + 什么参数」，在这里解析成字符串：
+                    // UI 状态里放一个已经取过语言的 `String`，是因为它在会话中途
+                    // 换语言的场景下没必要跟着变（错误提示本身就活不过几秒）。
+                    // 用 `appContext` 而不是 `context` 是为了避免把 Activity 泄漏进
+                    // 播放器的长生命周期回调里。
                     pendingErrorMessage = PlaybackErrorMapper.describe(
                         errorCode = error.errorCode,
                         causeName = error.cause?.let { it::class.java.simpleName },
                         softwareDecoding = softwareAttemptForCurrentMedia(),
-                    )
+                    ).resolve(appContext.resources)
                     MspLog.e(TAG, error) { "播放失败：$pendingErrorMessage" }
                     publish()
                 }

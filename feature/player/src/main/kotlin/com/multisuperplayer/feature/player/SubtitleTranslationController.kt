@@ -1,10 +1,12 @@
 package com.multisuperplayer.feature.player
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.translate.CueFailure
 import com.multisuperplayer.core.translate.FailureText
+import com.multisuperplayer.core.translate.MissingConfigItem
 import com.multisuperplayer.core.translate.TranslationCacheStore
 import com.multisuperplayer.core.translate.TranslationEditsCodec
 import com.multisuperplayer.core.translate.TranslationEditsStore
@@ -321,7 +323,7 @@ internal data class TranslationProgress(
 data class TranslationUiState(
     /** 设置是否已经填够（地址/模型/密钥）。没填够时按钮要禁掉并说明缺什么。 */
     val configured: Boolean = false,
-    val providerName: String = "",
+    val providerName: MspText = MspText.Plain(""),
     val model: String = "",
     val target: TranslationTarget = TranslationTarget.DEFAULT,
     val autoTranslate: Boolean = false,
@@ -333,7 +335,7 @@ data class TranslationUiState(
      * 而本地 Ollama 不需要密钥、预设好的厂商只剩密钥没填，
      * 于是这句「三选三」的清单反而把人指到了错的地方。
      */
-    val missing: List<String> = emptyList(),
+    val missing: List<MissingConfigItem> = emptyList(),
     val running: Boolean = false,
     val done: Int = 0,
     val total: Int = 0,

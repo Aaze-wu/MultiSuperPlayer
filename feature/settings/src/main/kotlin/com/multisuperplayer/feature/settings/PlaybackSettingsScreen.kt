@@ -23,12 +23,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SpeedBoostOptions
+import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -82,10 +84,13 @@ fun PlaybackSettingsScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("播放") },
+                title = { Text(stringResource(R.string.msp_settings_playback)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.msp_settings_back),
+                        )
                     }
                 },
             )
@@ -95,7 +100,7 @@ fun PlaybackSettingsScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { SectionHeader("解码") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_decoding)) }
             item {
                 // 这个开关**不当**「让更多文件能放」用：内核默认就是
                 // 「系统解码器优先，解不了/解失败自动换 FFmpeg」。它真正解决的是
@@ -104,17 +109,16 @@ fun PlaybackSettingsScreen(
                 val force = playback.forceSoftwareDecoding ?: false
                 SettingsSwitchRow(
                     icon = { Icon(Icons.Outlined.Memory, contentDescription = null) },
-                    title = "强制软件解码",
+                    title = stringResource(R.string.msp_settings_force_software),
                     subtitle = when {
                         !softwareDecodingAvailable ->
-                            "本安装包不含 FFmpeg（CPU 架构不受支持），打开也不会生效"
+                            stringResource(R.string.msp_settings_force_software_no_ffmpeg)
 
                         force ->
-                            "已用 FFmpeg 解码。画面异常时用它排查；代价是耗电和发热明显变高。"
+                            stringResource(R.string.msp_settings_force_software_on)
 
                         else ->
-                            "默认不勾：系统解码器放不了或放错时，内核会自动改用内置的 FFmpeg。" +
-                                "只有当画面花屏/变色/音画不同步（硬件解码器出错）时才需要勾上。"
+                            stringResource(R.string.msp_settings_force_software_off)
                     },
                     checked = force && softwareDecodingAvailable,
                     enabled = softwareDecodingAvailable,
@@ -122,16 +126,16 @@ fun PlaybackSettingsScreen(
                 )
             }
 
-            item { SectionHeader("画面与速度") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_picture_speed)) }
             item {
                 // 画面比例的**默认值**。不是「当前值」：播放页里临时切到「裁剪」
                 // 看完一部片子，不应该让下一部也默认被裁掉两边。
                 val aspect = playback.aspectRatioMode ?: AspectRatioMode.DEFAULT
                 SettingChoiceRow(
                     icon = Icons.Outlined.AspectRatio,
-                    title = "默认画面比例",
-                    value = aspect.label,
-                    subtitle = "只影响之后打开的文件。在播放页里临时改的比例不会写到这里。",
+                    title = stringResource(R.string.msp_settings_default_aspect),
+                    value = aspect.label.string(),
+                    subtitle = stringResource(R.string.msp_settings_default_aspect_desc),
                     onClick = { openDialog = PlaybackDialog.ASPECT_RATIO },
                 )
             }
@@ -142,9 +146,9 @@ fun PlaybackSettingsScreen(
                 val speed = playback.speed ?: PlaybackSpeedOptions.DEFAULT
                 SettingChoiceRow(
                     icon = Icons.Outlined.Speed,
-                    title = "默认倍速",
+                    title = stringResource(R.string.msp_settings_default_speed),
                     value = PlaybackSpeedOptions.format(speed),
-                    subtitle = "跨文件保留：播放页里改了倍速，这里也会跟着变。",
+                    subtitle = stringResource(R.string.msp_settings_default_speed_desc),
                     onClick = { openDialog = PlaybackDialog.SPEED },
                 )
             }
@@ -155,9 +159,9 @@ fun PlaybackSettingsScreen(
                 // 没有 0.5×/0.75× 这种「比原速慢」的值，最小值就是 1.5×。
                 SettingChoiceRow(
                     icon = Icons.Outlined.FastForward,
-                    title = "长按倍速",
+                    title = stringResource(R.string.msp_settings_boost_speed),
                     value = SpeedBoostOptions.format(playback.boostSpeed),
-                    subtitle = "按住画面时用这个速度，松手回到原来的速度。",
+                    subtitle = stringResource(R.string.msp_settings_boost_speed_desc),
                     onClick = { openDialog = PlaybackDialog.BOOST_SPEED },
                 )
             }
@@ -166,11 +170,11 @@ fun PlaybackSettingsScreen(
                 val remember = playback.rememberPosition ?: true
                 SettingsSwitchRow(
                     icon = { Icon(Icons.Outlined.History, contentDescription = null) },
-                    title = "记住播放位置",
+                    title = stringResource(R.string.msp_settings_remember_position),
                     subtitle = if (remember) {
-                        "下次打开同一个文件时接着上次的位置播"
+                        stringResource(R.string.msp_settings_remember_position_on)
                     } else {
-                        "每次都从头播。已经记住的位置不会被删掉，重新打开这个开关就能继续用。"
+                        stringResource(R.string.msp_settings_remember_position_off)
                     },
                     checked = remember,
                     enabled = true,
@@ -184,11 +188,11 @@ fun PlaybackSettingsScreen(
     // 放进 item 的话它会随列表滚走，而对话框是浮层，本就不该有自己的滚动位置。
     when (openDialog) {
         PlaybackDialog.ASPECT_RATIO -> ChoiceDialog(
-            title = "默认画面比例",
+            title = stringResource(R.string.msp_settings_default_aspect),
             options = AspectRatioMode.entries,
             selected = playback.aspectRatioMode ?: AspectRatioMode.DEFAULT,
-            label = { it.label },
-            description = { it.description },
+            label = { it.label.string() },
+            description = { it.description.string() },
             // 选完就关：只有一个选项要选，让用户再去按一次「确定」是多余的一步。
             onSelect = { mode ->
                 onSetAspectRatioMode(mode)
@@ -198,7 +202,7 @@ fun PlaybackSettingsScreen(
         )
 
         PlaybackDialog.SPEED -> ChoiceDialog(
-            title = "默认倍速",
+            title = stringResource(R.string.msp_settings_default_speed),
             options = PlaybackSpeedOptions.PRESETS,
             // 存的值可能不在档位表里（改了档位表、或被别的入口写进来的旧值）：
             // 用最近档位高亮，不能一个都不亮——那看起来像「没设置过」。
@@ -206,7 +210,9 @@ fun PlaybackSettingsScreen(
                 playback.speed ?: PlaybackSpeedOptions.DEFAULT,
             ),
             label = { PlaybackSpeedOptions.format(it) },
-            description = { if (it == PlaybackSpeedOptions.DEFAULT) "正常速度" else null },
+            description = {
+                if (it == PlaybackSpeedOptions.DEFAULT) stringResource(R.string.msp_settings_speed_normal) else null
+            },
             onSelect = { speed ->
                 onSetSpeed(speed)
                 openDialog = null
@@ -215,14 +221,16 @@ fun PlaybackSettingsScreen(
         )
 
         PlaybackDialog.BOOST_SPEED -> ChoiceDialog(
-            title = "长按倍速",
+            title = stringResource(R.string.msp_settings_boost_speed),
             // 注意这里**不能**用 `PlaybackSpeedOptions.PRESETS`：那张表有 10 档，
             // 包含 0.5×/0.75×，而「按住反而变慢」既不是这个功能的意图，也会让
             // 用户以为按住是在出问题。
             options = SpeedBoostOptions.PRESETS,
             selected = SpeedBoostOptions.normalize(playback.boostSpeed),
             label = { SpeedBoostOptions.format(it) },
-            description = { if (it == SpeedBoostOptions.DEFAULT) "默认值" else null },
+            description = {
+                if (it == SpeedBoostOptions.DEFAULT) stringResource(R.string.msp_settings_speed_default) else null
+            },
             onSelect = { speed ->
                 onSetBoostSpeed(speed)
                 openDialog = null

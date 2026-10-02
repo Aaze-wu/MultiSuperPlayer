@@ -1,9 +1,11 @@
 package com.multisuperplayer.player
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.multisuperplayer.core.data.settings.wrapLocale
 
 /**
  * 唯一的 Activity。
@@ -13,6 +15,17 @@ import androidx.activity.enableEdgeToEdge
  * 单 Activity 下这些只是导航状态，好推理得多。
  */
 class MainActivity : ComponentActivity() {
+
+    /**
+     * 语言要在主题和 Compose 内容之前定下来，所以套在 base 上。
+     *
+     * [MspApplication] 已经套过一次了，这里还要再来一次，是因为 Activity 拿到的
+     * base 不保证是那个已套过的 Context（通知、画中画、系统重建都走不同的路径）。
+     * 重复套是幂等的：读到的还是同一个标签，套出来的还是同一个 Configuration。
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.wrapLocale())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

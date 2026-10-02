@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    媒体库界面的文案。
+
+    key 必须与 values-en/ 和 values-b+zh+Hant/ 完全一致（`AppLanguageTest` 的守卫）。
+-->
+<resources>
+
+    <!-- ===== 标题栏 ===== -->
+    <string name="msp_library_title">媒体库</string>
+    <string name="msp_library_rescan">重新扫描</string>
+
+    <!-- ===== 空状态：被搜索/筛选挡光了 ===== -->
+    <string name="msp_library_filtered_out_title">没有匹配的内容</string>
+    <string name="msp_library_filtered_out_desc">库里的媒体还在，只是当前搜索或筛选没匹配到。</string>
+    <string name="msp_library_clear_filters">清空搜索与筛选</string>
+
+    <!-- ===== 空状态：库本身是空的 ===== -->
+    <string name="msp_library_empty_title">还没有扫描到媒体</string>
+    <string name="msp_library_empty_desc">本机没有找到音频或视频文件。\n把文件放进手机存储后重新扫描即可。</string>
+
+    <!-- ===== 空状态：扫描失败 ===== -->
+    <string name="msp_library_failure_title">扫描失败</string>
+    <string name="msp_library_retry">重试</string>
+
+    <!-- ===== 工具栏 ===== -->
+    <string name="msp_library_search_hint">搜索标题、艺术家、专辑</string>
+    <string name="msp_library_partial_access">只授权了部分媒体访问，列表可能不完整。</string>
+
+    <!-- ===== 权限 ===== -->
+    <string name="msp_library_permission_title">需要媒体访问权限</string>
+    <string name="msp_library_permission_desc">扫描本机音频和视频需要读取媒体的权限。\n应用只读取文件名、时长等元数据，不会修改或上传任何文件。</string>
+    <string name="msp_library_grant_permission">授予权限</string>
+
+    <!-- ===== 类型名（列表行的副标题、图标描述） ===== -->
+    <string name="msp_library_kind_audio">音频</string>
+    <string name="msp_library_kind_video">视频</string>
+    <string name="msp_library_kind_media">媒体</string>
+
+    <!-- ===== 筛选标签 ===== -->
+    <string name="msp_library_filter_all">全部</string>
+    <string name="msp_library_filter_audio">音乐</string>
+    <string name="msp_library_filter_video">视频</string>
+
+</resources>

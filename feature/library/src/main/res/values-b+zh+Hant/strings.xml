@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    媒體庫介面的文案。
+
+    key 必須與 values/ 和 values-en/ 完全一致（`AppLanguageTest` 的守衛）。
+-->
+<resources>
+
+    <!-- ===== 標題列 ===== -->
+    <string name="msp_library_title">媒體庫</string>
+    <string name="msp_library_rescan">重新掃描</string>
+
+    <!-- ===== 空狀態：被搜尋／篩選擋光了 ===== -->
+    <string name="msp_library_filtered_out_title">沒有符合的內容</string>
+    <string name="msp_library_filtered_out_desc">庫裡的媒體還在，只是目前搜尋或篩選沒對上。</string>
+    <string name="msp_library_clear_filters">清空搜尋與篩選</string>
+
+    <!-- ===== 空狀態：庫本身是空的 ===== -->
+    <string name="msp_library_empty_title">還沒有掃描到媒體</string>
+    <string name="msp_library_empty_desc">本機沒有找到音訊或視訊檔案。\n把檔案放進手機儲存空間後重新掃描即可。</string>
+
+    <!-- ===== 空狀態：掃描失敗 ===== -->
+    <string name="msp_library_failure_title">掃描失敗</string>
+    <string name="msp_library_retry">重試</string>
+
+    <!-- ===== 工具列 ===== -->
+    <string name="msp_library_search_hint">搜尋標題、演出者、專輯</string>
+    <string name="msp_library_partial_access">只授權了部分媒體存取，清單可能不完整。</string>
+
+    <!-- ===== 權限 ===== -->
+    <string name="msp_library_permission_title">需要媒體存取權限</string>
+    <string name="msp_library_permission_desc">掃描本機音訊和視訊需要讀取媒體的權限。\n應用只讀取檔案名稱、時長等中繼資料，不會修改或上傳任何檔案。</string>
+    <string name="msp_library_grant_permission">授予權限</string>
+
+    <!-- ===== 類型名（列表列的副標題、圖示描述） ===== -->
+    <string name="msp_library_kind_audio">音訊</string>
+    <string name="msp_library_kind_video">視訊</string>
+    <string name="msp_library_kind_media">媒體</string>
+
+    <!-- ===== 篩選標籤 ===== -->
+    <string name="msp_library_filter_all">全部</string>
+    <string name="msp_library_filter_audio">音樂</string>
+    <string name="msp_library_filter_video">影片</string>
+
+</resources>

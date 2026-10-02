@@ -4,7 +4,9 @@ import android.content.Context
 import android.os.Build
 import android.util.DisplayMetrics
 import android.view.WindowManager
+import com.multisuperplayer.core.common.R
 import com.multisuperplayer.core.common.info.InfoRow
+import com.multisuperplayer.core.common.text.MspText
 import java.util.Locale
 
 /**
@@ -27,34 +29,40 @@ data class DeviceSnapshot(
 ) {
 
     /** 机型文本。很多机型的 `MODEL` 里已经带了品牌（如 `Pixel 7`、`M2101K9C`），避免出现「小米 小米 14」。 */
-    fun deviceText(): String {
+    fun deviceText(): MspText {
         val brand = manufacturer.trim()
         val name = model.trim()
         return when {
-            name.isEmpty() -> brand.ifEmpty { UNKNOWN }
-            brand.isEmpty() -> name
-            name.lowercase(Locale.ROOT).startsWith(brand.lowercase(Locale.ROOT)) -> name
-            else -> "$brand $name"
+            name.isEmpty() -> if (brand.isEmpty()) MspText.unknown() else MspText.Plain(brand)
+            brand.isEmpty() -> MspText.Plain(name)
+            name.lowercase(Locale.ROOT).startsWith(brand.lowercase(Locale.ROOT)) -> MspText.Plain(name)
+            else -> MspText.Res(R.string.msp_device_brand_model, brand, name)
         }
     }
 
-    fun androidText(): String =
-        if (androidRelease.isBlank()) "API $sdkInt" else "Android $androidRelease（API $sdkInt）"
+    fun androidText(): MspText =
+        if (androidRelease.isBlank()) {
+            MspText.Res(R.string.msp_api_only, sdkInt)
+        } else {
+            MspText.Res(R.string.msp_android_with_api, androidRelease.trim(), sdkInt)
+        }
 
-    fun abiText(): String = if (abis.isEmpty()) UNKNOWN else abis.joinToString(", ")
+    fun abiText(): MspText =
+        if (abis.isEmpty()) MspText.unknown() else MspText.Plain(abis.joinToString(", "))
 
     /**
      * 屏幕文本 `1080×2400 @420dpi`。
      *
      * 用全角乘号 `×` 而不是 `x`：等宽字体下 `x` 会和数字糊在一起，
-     * 而且项目其它地方（日志、中文文案）都是全角。
+     * 而且项目其它地方（日志、中文文案）都是全角。乘号本身也在资源里了，
+     * 万一某种语言想写成 `1080 × 2400`，改文案即可。
      */
-    fun screenText(): String {
-        if (screenWidthPx <= 0 || screenHeightPx <= 0) return UNKNOWN
+    fun screenText(): MspText {
+        if (screenWidthPx <= 0 || screenHeightPx <= 0) return MspText.unknown()
         return if (densityDpi > 0) {
-            "${screenWidthPx}×${screenHeightPx} @${densityDpi}dpi"
+            MspText.Res(R.string.msp_screen_size, screenWidthPx, screenHeightPx, densityDpi)
         } else {
-            "${screenWidthPx}×${screenHeightPx}"
+            MspText.Res(R.string.msp_screen_size_plain, screenWidthPx, screenHeightPx)
         }
     }
 
@@ -65,16 +73,12 @@ data class DeviceSnapshot(
      * 前三个是真正用来定位问题的，屏幕和语言属于「顺手记一下」。
      */
     fun rows(): List<InfoRow> = listOf(
-        InfoRow("设备", deviceText()),
-        InfoRow("系统", androidText()),
-        InfoRow("CPU 架构", abiText()),
-        InfoRow("屏幕", screenText()),
-        InfoRow("语言", languageTag.ifBlank { UNKNOWN }),
+        InfoRow(MspText.Res(R.string.msp_row_device), deviceText()),
+        InfoRow(MspText.Res(R.string.msp_row_system), androidText()),
+        InfoRow(MspText.Res(R.string.msp_row_abi), abiText()),
+        InfoRow(MspText.Res(R.string.msp_row_screen), screenText()),
+        InfoRow(MspText.Res(R.string.msp_row_language), MspText.plainOrUnknown(languageTag)),
     )
-
-    companion object {
-        const val UNKNOWN: String = "未知"
-    }
 }
 
 /** 从系统里读一次设备信息。**只在需要时调用**（启动路径上不要调，见 [DeviceInfo.snapshot] 的注释）。 */

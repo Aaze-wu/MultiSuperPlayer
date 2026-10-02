@@ -3,6 +3,7 @@ package com.multisuperplayer.feature.player
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,12 +22,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
+import com.multisuperplayer.core.ui.text.string
 
 /**
  * 字幕选择面板。
@@ -43,7 +47,7 @@ import com.multisuperplayer.core.translate.SubtitleExportMode
 internal fun SubtitleTrackPicker(
     state: SubtitleUiState,
     translation: TranslationUiState,
-    exportMessage: String?,
+    exportMessage: MspText?,
     onDismiss: () -> Unit,
     onSelectMode: (SubtitleDisplayMode) -> Unit,
     onSelectSource: (SubtitleSource) -> Unit,
@@ -66,7 +70,10 @@ internal fun SubtitleTrackPicker(
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(text = "字幕", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = stringResource(R.string.msp_player_subtitles_title),
+                style = MaterialTheme.typography.titleLarge,
+            )
 
             ModeChips(current = state.displayMode, onSelect = onSelectMode)
 
@@ -81,7 +88,7 @@ internal fun SubtitleTrackPicker(
             )
 
             TextButton(onClick = onRescan, enabled = !state.isLoading) {
-                Text("重新扫描字幕")
+                Text(stringResource(R.string.msp_player_rescan))
             }
             
             TranslationSection(
@@ -105,9 +112,19 @@ private fun ModeChips(
     current: SubtitleDisplayMode,
     onSelect: (SubtitleDisplayMode) -> Unit,
 ) {
-    Row(
+    // 用 FlowRow（宽度随文案、装不下就换行）而不是等分宽度的 Row。
+    //
+    // 中文档位名都是两个字，等分之后四个芯片正好摆平；英文是
+    // Hidden / Original / Translation / Bilingual，同样等分就装不下了，
+    // FilterChip 会把文字直接裁成「Translati」——一个只在英文/繁体下出现、
+    // 看中文截图永远发现不了的缺陷。换行比缩小字号、截断或缩写都更稳妥。
+    //
+    // 等分原本是为了「选中项左右不跳动」，但每个芯片的文案是固定的，
+    // 宽度本来就不会随选中状态变化，所以去掉 weight 并不会跳。
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         SubtitleDisplayMode.entries.forEach { mode ->
             FilterChip(
@@ -115,13 +132,11 @@ private fun ModeChips(
                 onClick = { onSelect(mode) },
                 label = {
                     Text(
-                        text = mode.label(),
+                        text = mode.label().string(),
                         maxLines = 1,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 },
-                // 等分宽度：四档模式的名字长度不一样，不等分的话选中项左右跳动。
-                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -138,7 +153,13 @@ private fun StatusBlock(state: SubtitleUiState) {
         ) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp))
             Text(
-                text = if (state.phase == SubtitlePhase.SCANNING) "正在查找字幕…" else "正在读取字幕…",
+                text = stringResource(
+                    if (state.phase == SubtitlePhase.SCANNING) {
+                        R.string.msp_player_scanning
+                    } else {
+                        R.string.msp_player_reading
+                    },
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -154,14 +175,18 @@ private fun StatusBlock(state: SubtitleUiState) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "${attached.describeAttached()} · ${state.cueCount} 条",
+                        text = stringResource(
+                            R.string.msp_player_cues,
+                            attached.describeAttached().string(),
+                            state.cueCount,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                     )
                 }
             } else {
                 Text(
-                    text = "当前没有挂上任何字幕。",
+                    text = stringResource(R.string.msp_player_none_attached),
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                 )
@@ -173,7 +198,7 @@ private fun StatusBlock(state: SubtitleUiState) {
     // 会认为「切了没反应」，然后去反复点那几个按钮。
     if (state.translationUnavailable) {
         Text(
-            text = "这份字幕没有译文，已按原文显示。",
+            text = stringResource(R.string.msp_player_translation_missing_shown_original),
             style = MaterialTheme.typography.bodySmall,
             color = scheme.tertiary,
         )
@@ -181,7 +206,7 @@ private fun StatusBlock(state: SubtitleUiState) {
 
     state.issue?.let { issue ->
         Text(
-            text = issue.describe(),
+            text = issue.describe().string(),
             style = MaterialTheme.typography.bodySmall,
             color = scheme.onSurfaceVariant,
         )
@@ -208,11 +233,13 @@ private fun CandidateList(
 ) {
     Column {
         SourceRow(
-            title = "自动选择",
-            details = state.attached
-                ?.takeIf { state.autoSelected }
-                ?.let { "已自动选中「${it.fileName}」" }
-                ?: "按片名从候选里挑一条最吻合的",
+            title = stringResource(R.string.msp_player_auto_select),
+            details = (
+                state.attached
+                    ?.takeIf { state.autoSelected }
+                    ?.let { MspText.Res(R.string.msp_player_auto_selected, it.fileName) }
+                    ?: MspText.Res(R.string.msp_player_auto_pick_desc)
+                ).string(),
             selected = state.autoSelected,
             onClick = onUseAuto,
         )
@@ -220,7 +247,7 @@ private fun CandidateList(
         state.candidates.forEach { source ->
             SourceRow(
                 title = source.fileName,
-                details = source.describeDetails(),
+                details = source.describeDetails().string(),
                 // 只有「手动选中」才算选上：自动选中时这一行的选中态由上面那行表达，
                 // 两行同时打勾会让人以为是两个不同的设置。
                 selected = !state.autoSelected && state.attached?.uri == source.uri,
@@ -230,7 +257,7 @@ private fun CandidateList(
 
         if (state.candidates.isEmpty() && !state.isLoading) {
             Text(
-                text = "这个文件夹里没有找到可用的字幕文件。",
+                text = stringResource(R.string.msp_player_no_usable_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),

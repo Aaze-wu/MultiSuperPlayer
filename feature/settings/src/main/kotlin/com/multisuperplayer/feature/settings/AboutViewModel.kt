@@ -8,10 +8,10 @@ import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.device.DeviceInfo
 import com.multisuperplayer.core.common.device.DeviceSnapshot
-import com.multisuperplayer.core.common.info.InfoRow
 import com.multisuperplayer.core.common.log.LogRepository
 import com.multisuperplayer.core.common.log.LogSummary
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.common.text.MspText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,7 +31,7 @@ sealed interface LogExportState {
         val failedFiles: List<String>,
     ) : LogExportState
 
-    data class Failed(val message: String) : LogExportState
+    data class Failed(val message: MspText) : LogExportState
 }
 
 /**
@@ -113,20 +113,30 @@ class AboutViewModel(
             }
             _export.value = outcome.getOrElse { error ->
                 MspLog.w(TAG, error) { "导出日志失败" }
-                LogExportState.Failed(error.message ?: error::class.java.simpleName)
+                // IO 异常自带的话是技术细节，翻不了也不应该翻；
+                // 但它至少比空串有用，空串用 [MspText.plainOrUnknown] 兑成「未知」。
+                LogExportState.Failed(MspText.plainOrUnknown(error.message ?: error::class.java.simpleName))
             }
             refreshLogs()
         }
     }
 
-    /** 报告里带上的抬头：构建信息 + 设备信息。和关于页上显示的是同一批数据。 */
-    private fun reportHeader(): List<InfoRow> = buildInfo.rows() + device?.rows().orEmpty()
+    /**
+     * 报告里带上的抬头：构建信息 + 设备信息。和关于页上显示的是同一批数据。
+     *
+     * 顺带在这里渲染成 `String`：[LogRepository.buildReport] 要的是已经拼好的行，
+     * 而日志文件是写给「发给别人看」的，不应该带资源 id。
+     */
+    private fun reportHeader(): List<String> =
+        (buildInfo.rows() + device?.rows().orEmpty()).map { it.render(appContext.resources) }
 
     /** 在 IO 线程上执行。 */
     private fun writeReport(uri: Uri): LogExportState {
         val report = logs.buildReport(header = reportHeader())
         val stream = appContext.contentResolver.openOutputStream(uri)
-            ?: return LogExportState.Failed("无法打开所选位置（可能已被删除）")
+            ?: return LogExportState.Failed(
+                MspText.Res(R.string.msp_settings_about_export_open_failed),
+            )
         stream.use { it.write(report.text.toByteArray(Charsets.UTF_8)) }
         MspLog.i(TAG) {
             "已导出日志：${report.fileName}（${report.includedFiles} 个文件，" +

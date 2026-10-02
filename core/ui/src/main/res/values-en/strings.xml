@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Theme labels. Keys must match `values/strings.xml` exactly.
+
+  Accent names are colour words, so they are translated rather than kept as
+  identifiers: a user looking for 「靛蓝」 in a Chinese UI has no reason to
+  know the word "Indigo".
+-->
+<resources>
+
+    <!-- ===== Base theme ===== -->
+
+    <string name="msp_theme_system">Follow system</string>
+    <string name="msp_theme_light">Light</string>
+    <string name="msp_theme_dark">Dark</string>
+    <string name="msp_theme_black">Black (OLED)</string>
+
+    <!-- ===== Accent ===== -->
+
+    <string name="msp_accent_indigo">Indigo</string>
+    <string name="msp_accent_violet">Violet</string>
+    <string name="msp_accent_teal">Teal</string>
+    <string name="msp_accent_green">Green</string>
+    <string name="msp_accent_amber">Amber</string>
+    <string name="msp_accent_rose">Rose</string>
+
+    <!-- ===== Fallback for a missing media title ===== -->
+
+    <string name="msp_media_unknown_title">Unknown title</string>
+
+</resources>

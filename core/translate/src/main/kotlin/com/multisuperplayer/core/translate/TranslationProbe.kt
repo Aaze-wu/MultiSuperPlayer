@@ -86,7 +86,10 @@ class TranslationProbe internal constructor(
             !text.isNullOrBlank() -> ConnectivityResult.Ok(translated = text, sample = SAMPLE_TEXT)
             failure != null -> ConnectivityResult.Failed(failure!!)
             else -> ConnectivityResult.Failed(
-                TranslationFailure.BadResponse("模型没有返回可用的译文。"),
+                // detail 会当「厂商原文」显示给用户。这一档是我们自己判出来的，
+                // 没有厂商原文可说——写一句中文进去只会在英文界面上露馅。
+                // 界面看到空就从下一层的 message/hint 里说清楚。
+                TranslationFailure.BadResponse(""),
             )
         }
     }

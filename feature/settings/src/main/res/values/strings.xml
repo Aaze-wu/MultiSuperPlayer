@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置模块（入口页 + 外观 / 播放 / 字幕翻译 / 关于）的文案。
+
+  这个文件里**不该**出现别处已有的句子：主题名和强调色名在 `core:ui`，
+  播放错误在 `core:player`，翻译失败在 `core:translate`。这里只放本模块自己说的
+  「设置」语言——尤其是四行摘要，它们是用户判断「现在是什么状态」的唯一入口。
+-->
+<resources>
+
+    <!-- ===== 通用 ===== -->
+
+    <string name="msp_settings_title">设置</string>
+
+    <!-- 四个子页的返回键都会念这一句 -->
+    <string name="msp_settings_back">返回</string>
+
+    <string name="msp_settings_cancel">取消</string>
+
+    <!-- 设置读盘失败。不要写异常文本：用户能做的只有「重试」 -->
+    <string name="msp_settings_read_failed">读取设置失败，请重试。</string>
+
+    <!-- 入口页四行 -->
+    <string name="msp_settings_appearance">外观</string>
+    <string name="msp_settings_playback">播放</string>
+    <string name="msp_settings_translation">字幕翻译</string>
+    <string name="msp_settings_about">关于</string>
+
+    <!-- ===== 入口页摘要 ===== -->
+
+    <!--
+      `%1$s`/`%2$s` 等是摘要里的各个片段，拼接本身走 `MspText.join`，
+      分隔符就是下面这一条——换个语言想用「・」或者「, 」都可以。
+    -->
+    <!-- 引号不是内容：aapt2 会裁掉首尾空白，包上引号才能保住两侧的空格。 -->
+    <string name="msp_settings_summary_sep">" · "</string>
+
+    <!-- 三类尾巴：只有真的生效的那个才出现 -->
+    <string name="msp_settings_summary_tail_artwork">封面取色</string>
+    <string name="msp_settings_summary_tail_dynamic">系统取色</string>
+
+    <!-- 开关开着但没生效（系统不支持 / 纯黑模式自动关掉）。不说出来的话用户只能怀疑开关坏了 -->
+    <string name="msp_settings_summary_tail_dynamic_blocked">系统取色未生效</string>
+
+    <!-- 播放摘要的两条尾巴 -->
+    <string name="msp_settings_summary_tail_force_software">强制软解</string>
+
+    <!-- 「没有 FFmpeg」是安装包的事实，和开关无关，所以它单独说 -->
+    <string name="msp_settings_summary_tail_no_ffmpeg">本包无 FFmpeg</string>
+    <string name="msp_settings_summary_tail_no_position">不记位置</string>
+
+    <!-- 例：`长按 2×`。`%1$s` 是档位（1.5× / 2× …） -->
+    <string name="msp_settings_summary_long_press">长按 %1$s</string>
+
+    <string name="msp_settings_summary_model_unset">未填模型名</string>
+
+    <!-- 例：`译成中文`。`%1$s` 是目标语言名 -->
+    <string name="msp_settings_summary_translate_to">译成%1$s</string>
+
+    <!-- 还没配好。`%1$s` 是缺项清单（逗号分隔）。写清缺什么比「请检查设置」有用 -->
+    <string name="msp_settings_summary_translation_incomplete">还不能翻译（缺：%1$s）</string>
+
+    <string name="msp_settings_summary_no_logs">还没有任何日志文件</string>
+
+    <!-- 例：`12 个 · 1.4 MB`。第一参数是文件数，第二参数是总量 -->
+    <string name="msp_settings_summary_log_usage">%1$d 个 · %2$s</string>
+
+    <!-- 日志覆盖日期取不到时的占位（Windows 上曾出现过空字符串） -->
+    <string name="msp_settings_summary_no_range">—</string>
+
+    <!-- ===== 外观 ===== -->
+
+    <string name="msp_settings_section_base_theme">主题基底</string>
+    <string name="msp_settings_section_color_source">取色来源</string>
+    <string name="msp_settings_section_about_theme">关于主题</string>
+    <string name="msp_settings_section_language">语言</string>
+
+    <string name="msp_settings_artwork_color">封面取色</string>
+    <string name="msp_settings_artwork_color_desc">用正在播放的封面生成主题色</string>
+
+    <string name="msp_settings_dynamic_color">跟随系统取色</string>
+    <string name="msp_settings_dynamic_color_desc">使用系统壁纸生成的主题色（选强调色时会自动关掉）</string>
+
+    <!-- 被另一个开关盖住时必须说清是「被盖住」而不是「被系统关了」 -->
+    <string name="msp_settings_dynamic_color_covered">已被封面取色覆盖</string>
+    <string name="msp_settings_dynamic_color_needs_api31">需要 Android 12 及以上</string>
+
+    <!-- 纯黑基底 + 系统取色会给出一堆深灰，正好毁掉「省像素」，所以那条路是自己关掉的 -->
+    <string name="msp_settings_dynamic_color_blocked">纯黑模式下不可用（系统取色会给出一堆深灰）</string>
+
+    <string name="msp_settings_theme_note_artwork">现在的配色来自封面取色。它盖住了强调色，但选一个强调色就可以切回来（那会自动关掉封面取色）；封面里没有可用颜色时（比如黑白封面）会回退到强调色，所以强调色仍然有用。</string>
+    <string name="msp_settings_theme_note_dynamic">现在的配色来自系统取色。选一个强调色就会自动关掉系统取色，配色立刻跟随强调色。</string>
+    <string name="msp_settings_theme_note_accent">强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。</string>
+
+    <string name="msp_settings_accent_label">强调色</string>
+
+    <!--
+      Android 13 起语言由系统记录（系统的「应用语言」就是这一项），
+      13 以下只影响本应用。两句话必须分开写，否则用户会以为两边不一致。
+    -->
+    <string name="msp_settings_language_note_system">选中的语言由系统记录。在系统的「设置 → 应用 → MultiSuperPlayer → 语言」里改也同样是这一项，两边始终一致。</string>
+    <string name="msp_settings_language_note_app_only">选中的语言只影响本应用。系统的日期、数字格式不跟着变；日期的显示语言由系统设置决定。</string>
+
+    <!-- 「跟随系统」自己没有自称，所以它是这一列里唯一会被翻译的一项 -->
+    <string name="msp_settings_language_follow_system">跟随系统</string>
+
+    <!-- ===== 播放 ===== -->
+
+    <string name="msp_settings_section_decoding">解码</string>
+    <string name="msp_settings_force_software">强制软件解码</string>
+
+    <!-- 三个分支的说明：这是一个「开关在但不管用」的开关，三个状态必须说清 -->
+    <string name="msp_settings_force_software_no_ffmpeg">本安装包不含 FFmpeg（CPU 架构不受支持），打开也不会生效</string>
+    <string name="msp_settings_force_software_on">已用 FFmpeg 解码。画面异常时用它排查；代价是耗电和发热明显变高。</string>
+    <string name="msp_settings_force_software_off">默认不勾：系统解码器放不了或放错时，内核会自动改用内置的 FFmpeg。只有当画面花屏/变色/音画不同步（硬件解码器出错）时才需要勾上。</string>
+
+    <string name="msp_settings_section_picture_speed">画面与速度</string>
+
+    <string name="msp_settings_default_aspect">默认画面比例</string>
+    <string name="msp_settings_default_aspect_desc">只影响之后打开的文件。在播放页里临时改的比例不会写到这里。</string>
+
+    <string name="msp_settings_default_speed">默认倍速</string>
+    <string name="msp_settings_default_speed_desc">跨文件保留：播放页里改了倍速，这里也会跟着变。</string>
+
+    <string name="msp_settings_boost_speed">长按倍速</string>
+    <string name="msp_settings_boost_speed_desc">按住画面时用这个速度，松手回到原来的速度。</string>
+
+    <string name="msp_settings_remember_position">记住播放位置</string>
+    <string name="msp_settings_remember_position_on">下次打开同一个文件时接着上次的位置播</string>
+    <string name="msp_settings_remember_position_off">每次都从头播。已经记住的位置不会被删掉，重新打开这个开关就能继续用。</string>
+
+    <!-- 选择对话框里的档位说明，两处都是「等同于默认」的意思 -->
+    <string name="msp_settings_speed_normal">正常速度</string>
+    <string name="msp_settings_speed_default">默认值</string>
+
+    <!-- ===== 关于 ===== -->
+
+    <string name="msp_settings_section_version">版本</string>
+    <string name="msp_settings_section_update">更新</string>
+    <string name="msp_settings_section_device">设备</string>
+    <string name="msp_settings_section_license">开源许可</string>
+    <string name="msp_settings_section_logs">日志</string>
+
+    <string name="msp_settings_check_update">检查更新</string>
+    <string name="msp_settings_check">检查</string>
+    <string name="msp_settings_view">查看</string>
+
+    <!-- 还没接更新源就说清楚「不是坏了，是没这个渠道」 -->
+    <string name="msp_settings_update_no_source">还没有接入更新源：本版本没有发布渠道，这个包是本机自己构建的。</string>
+
+    <!-- 更新说明。`%1$s` 是版本号，`%2$s` 是构建来源 -->
+    <string name="msp_settings_update_dialog_text">还没有接入更新源，所以无法检查。\n\n当前版本 %1$s，构建来源 %2$s。\n\n以后接上发布渠道后，这里会显示是否有新版本以及更新说明。</string>
+
+    <!-- 设备信息读不到时的值。左边标签就是上面的「设备」 -->
+    <string name="msp_settings_device_unavailable">读不到</string>
+
+    <string name="msp_settings_license_row_title">第三方组件与许可证</string>
+    <string name="msp_settings_license_row_desc">本应用整体以 GPL-3.0 分发</string>
+
+    <string name="msp_settings_license_app_detail">本应用自身（仓库根目录的 LICENSE 文件）</string>
+    <string name="msp_settings_license_nextlib_detail">内置 FFmpeg 软件解码；它的 FFmpeg 构建启用了 GPL 组件</string>
+    <string name="msp_settings_license_media3_detail">播放内核与媒体会话</string>
+    <string name="msp_settings_license_toolchain_detail">语言、界面与依赖注入</string>
+
+    <string name="msp_settings_license_gpl_note">链入 NextLib 后，整个应用按 GPL-3.0 分发：对外发布安装包时必须同时提供完整源码。</string>
+
+    <string name="msp_settings_log_files">日志文件</string>
+    <string name="msp_settings_log_range">覆盖日期</string>
+    <string name="msp_settings_export_logs">导出日志</string>
+
+    <string name="msp_settings_export_hint_idle">导出的是一个纯文本文件，包含本机保留的全部日志和上方的版本/设备信息。出了问题把它发出来就能定位。</string>
+    <string name="msp_settings_export_running">正在写入…</string>
+
+    <!-- 例：`已保存：msp-20260101.log（含 12 个日志文件）` -->
+    <string name="msp_settings_export_saved">已保存：%1$s（含 %2$d 个日志文件）</string>
+
+    <!-- 跳过的那几个必须点出来：报告看起来「完整」，缺的恰好可能是崩掉的那天 -->
+    <string name="msp_settings_export_skipped">有 %1$d 个文件读不出来，已跳过：%2$s</string>
+
+    <string name="msp_settings_export_failed">导出失败：%1$s</string>
+
+    <!-- SAF 选择器返回的 uri 打不开（比如用户刚把那个位置删了） -->
+    <string name="msp_settings_about_export_open_failed">无法打开所选位置（可能已被删除）</string>
+
+    <!-- 列表分隔符。中文用顿号，英文逗号 + 空格，所以不能写在代码里 -->
+    <string name="msp_settings_list_separator">、</string>
+
+    <string name="msp_settings_got_it">知道了</string>
+    <string name="msp_settings_close">关闭</string>
+
+    <!-- ===== 字幕翻译 ===== -->
+
+    <string name="msp_settings_section_provider">服务商</string>
+    <string name="msp_settings_section_api_key">密钥</string>
+    <string name="msp_settings_section_translate">翻译</string>
+    <string name="msp_settings_section_test">测试连接</string>
+
+    <string name="msp_settings_base_url">服务地址</string>
+    <string name="msp_settings_model_name">模型名</string>
+    <string name="msp_settings_fetch_models">拉取列表</string>
+    <string name="msp_settings_fetching">拉取中…</string>
+    <string name="msp_settings_fetch_failed_prefix">拉不到模型列表</string>
+
+    <!-- 地址、模型名、密钥三类的补充说明 -->
+    <string name="msp_settings_base_url_support">以 /v1 结尾的地址会被自动补上 /chat/completions；改这里可以指向你自己的中转。</string>
+    <string name="msp_settings_model_support">必须和厂商文档里的名字完全一致，别凭记忆写。</string>
+
+    <string name="msp_settings_auto_translate">自动翻译后续字幕</string>
+    <string name="msp_settings_auto_translate_desc">播放到哪就翻到哪，已经翻好的会留在字幕里。关掉也可以随时手动翻。</string>
+
+    <string name="msp_settings_test_desc">会真的翻一句样板文本。它同时验证地址、密钥、模型名，以及这家厂商收不收我们的请求形状。会消耗一次极少的 token。</string>
+    <string name="msp_settings_test_button">测试连接</string>
+    <string name="msp_settings_test_running">测试中…</string>
+    <string name="msp_settings_connection_failed_prefix">连接失败</string>
+
+    <!-- 例：`还差：服务地址、模型名` -->
+    <string name="msp_settings_missing_prefix">还差：%1$s</string>
+
+    <!-- 失败块的一行。`%1$s` 是场景前缀，`%2$s` 是具体的失败说明 -->
+    <string name="msp_settings_failure_line">%1$s：%2$s</string>
+
+    <string name="msp_settings_switch">切换</string>
+
+    <string name="msp_settings_model_count">这家厂商报了 %1$d 个模型，点一下就用它：</string>
+
+    <string name="msp_settings_api_key_label">API 密钥</string>
+    <string name="msp_settings_api_key_placeholder">粘贴密钥后点「保存」</string>
+    <string name="msp_settings_save">保存</string>
+    <string name="msp_settings_delete">删除</string>
+
+    <string name="msp_settings_key_stored">已保存密钥（%1$s）</string>
+    <string name="msp_settings_key_missing">还没有保存密钥</string>
+    <string name="msp_settings_key_not_required">这家服务不需要密钥，留空即可。</string>
+
+    <!-- 保存密钥的三个结果。空输入不算是「保存成功」，必须说清 -->
+    <string name="msp_settings_key_saved">已保存。</string>
+    <string name="msp_settings_key_not_saved">没有保存（密钥是空的）。</string>
+    <string name="msp_settings_key_deleted">已删除。</string>
+
+    <string name="msp_settings_key_storage_note">密钥用系统密钥库加密后存在本机，不会写进日志，也不会随设置导出。</string>
+
+    <string name="msp_settings_delete_key">删除密钥</string>
+    <string name="msp_settings_delete_key_title">删除密钥？</string>
+    <string name="msp_settings_delete_key_confirm">删除后这家服务就不能翻译了，需要重新粘贴一次密钥。</string>
+
+    <string name="msp_settings_target_prefix">译成：%1$s</string>
+
+    <string name="msp_settings_glossary">术语表</string>
+
+    <!--
+      术语表语法说明。例子里的反引号是故意写的：它们就是用户该输入的符号，
+      所以不能换成引号。
+    -->
+    <string name="msp_settings_glossary_desc">一行一条。`桐人` = 保持原样，`Guild = 公会` = 固定译法。# 开头是注释。</string>
+
+    <string name="msp_settings_glossary_collapse">收起</string>
+    <string name="msp_settings_glossary_edit">编辑</string>
+    <string name="msp_settings_glossary_label">术语（每行一条）</string>
+    <string name="msp_settings_glossary_save">保存术语表</string>
+    <string name="msp_settings_glossary_restore">还原</string>
+    <string name="msp_settings_glossary_count">当前 %1$d 条</string>
+
+    <string name="msp_settings_test_ok_title">连通。模型翻出来的是：</string>
+    <string name="msp_settings_test_ok_desc">看到这句话就说明地址、密钥、模型名都是对的，播放页里应该也能翻出来。</string>
+
+    <string name="msp_settings_show_raw">看服务商返回的原文</string>
+    <string name="msp_settings_hide_raw">收起服务商返回的原文</string>
+
+</resources>

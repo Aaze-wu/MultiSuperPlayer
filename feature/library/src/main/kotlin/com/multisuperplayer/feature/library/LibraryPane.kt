@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.library
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.library.MediaLibraryState
 
 /**
@@ -31,8 +32,8 @@ internal sealed interface LibraryPane {
     /** 库里有内容，只是被当前搜索或筛选挡光了。 */
     data object FilteredOut : LibraryPane
 
-    /** 扫描失败，[message] 是给用户看的原因。 */
-    data class Failure(val message: String) : LibraryPane
+    /** 扫描失败，[message] 是给用户看的原因（已跟随仓库层的类型变成可翻译的文本）。 */
+    data class Failure(val message: MspText) : LibraryPane
 
     /** 正常渲染列表。 */
     data object Content : LibraryPane

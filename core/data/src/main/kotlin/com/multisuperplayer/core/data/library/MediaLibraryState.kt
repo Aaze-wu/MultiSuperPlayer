@@ -1,5 +1,7 @@
 package com.multisuperplayer.core.data.library
 
+import com.multisuperplayer.core.common.text.MspText
+
 import com.multisuperplayer.core.model.MediaEntry
 
 /**
@@ -30,5 +32,9 @@ sealed interface MediaLibraryState {
     data object NeedsPermission : MediaLibraryState
 
     /** 扫描本身失败（数据库异常等）。 */
-    data class Error(val message: String) : MediaLibraryState
+    /**
+     * 扫描彻底失败。[message] 是给人看的说明，由界面按当前语言解析
+     * （系统异常的原文包成 [MspText.Plain]，不翻译）。
+     */
+    data class Error(val message: MspText) : MediaLibraryState
 }

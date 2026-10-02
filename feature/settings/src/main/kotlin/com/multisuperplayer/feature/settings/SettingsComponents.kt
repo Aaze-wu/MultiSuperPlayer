@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
@@ -198,14 +199,18 @@ internal fun SettingsSwitchRow(
  *
  * 列表套 `verticalScroll` + `heightIn`：倍速有 10 个档位，小屏横屏时
  * 全铺开会把对话框顶出屏幕外，而 `AlertDialog` 的内容区**不会**自己滚。
+ *
+ * [label] / [description] 是**可组合**的回调而不是 `String` 参数：文案在资源里，
+ * 只能在这一层解析；传 `String` 的话调用方就得先拿 `String`，
+ * 而那些值恰恰是「哪一条文案」的语义（见 `MspText` 的说明）。
  */
 @Composable
 internal fun <T> ChoiceDialog(
     title: String,
     options: List<T>,
     selected: T,
-    label: (T) -> String,
-    description: (T) -> String?,
+    label: @Composable (T) -> String,
+    description: @Composable (T) -> String?,
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -256,7 +261,7 @@ internal fun <T> ChoiceDialog(
         },
         // 只有「取消」：选择本身即生效，再放一个「确定」等于让人确认两次。
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.msp_settings_cancel)) }
         },
     )
 }

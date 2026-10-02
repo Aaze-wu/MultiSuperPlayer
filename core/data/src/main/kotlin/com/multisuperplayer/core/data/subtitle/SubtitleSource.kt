@@ -1,5 +1,6 @@
 package com.multisuperplayer.core.data.subtitle
 
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
 
@@ -121,13 +122,21 @@ sealed interface SubtitleScan {
     /** 目录在 MediaStore 里不可见：查询没通，多半是权限问题。 */
     data object DirectoryInvisible : SubtitleScan
 
-    data class Failed(val message: String) : SubtitleScan
+    /**
+     * 查询本身失败。[message] 是给人看的说明：系统抛出来的原文包成 [MspText.Plain]，
+     * 我们自己造的句子用 [MspText.Res]，界面才能按当前语言显示。
+     */
+    data class Failed(val message: MspText) : SubtitleScan
 }
 
 /** 加载并解析一条字幕的结果。 */
 sealed interface SubtitleLoadResult {
     data class Loaded(val document: SubtitleDocument) : SubtitleLoadResult
 
-    /** [message] 是给用户看的原文，不做替换——真实原因必须原样透出去。 */
-    data class Failed(val fileName: String, val message: String) : SubtitleLoadResult
+    /**
+     * [message] 是给人看的说明。系统抛出来的原文包成 [MspText.Plain]（不翻译），
+     * 只有我们自己发现的失败才换成 [MspText.Res] 这样可翻译的句子——
+     * 真实原因不能被一句翻译盖掉。
+     */
+    data class Failed(val fileName: String, val message: MspText) : SubtitleLoadResult
 }

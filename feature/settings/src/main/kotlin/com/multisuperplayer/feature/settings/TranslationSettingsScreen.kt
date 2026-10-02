@@ -34,18 +34,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.translate.FailureText
 import com.multisuperplayer.core.translate.Glossary
 import com.multisuperplayer.core.translate.TranslationServices
 import com.multisuperplayer.core.translate.TranslationTarget
+import com.multisuperplayer.core.translate.describeMissingItems
 import com.multisuperplayer.core.translate.formatGlossary
 import com.multisuperplayer.core.translate.parseGlossary
+import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -114,10 +118,13 @@ fun TranslationSettingsScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("字幕翻译") },
+                title = { Text(stringResource(R.string.msp_settings_translation)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.msp_settings_back),
+                        )
                     }
                 },
             )
@@ -129,17 +136,17 @@ fun TranslationSettingsScreen(
                 .padding(innerPadding),
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
-            item { SectionHeader("服务商") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_provider)) }
             item { ProviderPicker(settings, onSelectProvider) }
             item {
                 DraftTextField(
                     key = settings.providerId,
                     stored = settings.baseUrl,
                     onCommit = onSetBaseUrl,
-                    label = "服务地址",
+                    label = stringResource(R.string.msp_settings_base_url),
                     placeholder = "https://api.deepseek.com",
                     keyboardType = KeyboardType.Uri,
-                    supportingText = "以 /v1 结尾的地址会被自动补上 /chat/completions；改这里可以指向你自己的中转。",
+                    supportingText = stringResource(R.string.msp_settings_base_url_support),
                 )
             }
             item {
@@ -147,20 +154,28 @@ fun TranslationSettingsScreen(
                     key = settings.providerId,
                     stored = settings.model,
                     onCommit = onSetModel,
-                    label = "模型名",
+                    label = stringResource(R.string.msp_settings_model_name),
                     placeholder = "deepseek-flash",
                     // 模型名写错是最常见的一类：地址对、密钥对、HTTP 200，
                     // 但返回的是「模型不存在」，或者更糟——静默返回别的东西。
-                    supportingText = "必须和厂商文档里的名字完全一致，别凭记忆写。",
+                    supportingText = stringResource(R.string.msp_settings_model_support),
                     trailing = {
                         TextButton(onClick = onFetchModels, enabled = !modelList.loading) {
-                            Text(if (modelList.loading) "拉取中…" else "拉取列表")
+                            Text(
+                                if (modelList.loading) stringResource(R.string.msp_settings_fetching)
+                                else stringResource(R.string.msp_settings_fetch_models),
+                            )
                         }
                     },
                 )
             }
             if (modelList.failure != null) {
-                item { FailureBlock(modelList.failure, prefix = "拉不到模型列表") }
+                item {
+                    FailureBlock(
+                        failure = modelList.failure,
+                        prefix = stringResource(R.string.msp_settings_fetch_failed_prefix),
+                    )
+                }
             } else if (modelList.models.isNotEmpty()) {
                 item {
                     ModelListBlock(models = modelList.models, current = settings.model) { model ->
@@ -169,22 +184,22 @@ fun TranslationSettingsScreen(
                 }
             }
 
-            item { SectionHeader("密钥") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_api_key)) }
             item { ApiKeyBlock(settings, onSaveApiKey, onClearApiKey) }
 
-            item { SectionHeader("翻译") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_translate)) }
             item { TargetPicker(settings.target, onSetTarget) }
             item {
                 SettingsSwitchRow(
-                    title = "自动翻译后续字幕",
-                    subtitle = "播放到哪就翻到哪，已经翻好的会留在字幕里。关掉也可以随时手动翻。",
+                    title = stringResource(R.string.msp_settings_auto_translate),
+                    subtitle = stringResource(R.string.msp_settings_auto_translate_desc),
                     checked = settings.autoTranslate,
                     onCheckedChange = onSetAutoTranslate,
                 )
             }
             item { GlossaryBlock(settings.glossary, onSetGlossary) }
 
-            item { SectionHeader("测试连接") }
+            item { SectionHeader(stringResource(R.string.msp_settings_section_test)) }
             item {
                 Column(
                     modifier = Modifier
@@ -193,8 +208,7 @@ fun TranslationSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = "会真的翻一句样板文本。它同时验证地址、密钥、模型名，以及" +
-                            "这家厂商收不收我们的请求形状。会消耗一次极少的 token。",
+                        text = stringResource(R.string.msp_settings_test_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -207,11 +221,17 @@ fun TranslationSettingsScreen(
                             // 没配齐就不给点：点了必然拿到「还差 XX」，不如提前说。
                             enabled = settings.ready && !connectionTest.running,
                         ) {
-                            Text(if (connectionTest.running) "测试中…" else "测试连接")
+                            Text(
+                                if (connectionTest.running) stringResource(R.string.msp_settings_test_running)
+                                else stringResource(R.string.msp_settings_test_button),
+                            )
                         }
                         if (!settings.ready) {
                             Text(
-                                text = "还差：${missingConfigNotice(settings)}",
+                                text = stringResource(
+                                    R.string.msp_settings_missing_prefix,
+                                    missingConfigNotice(settings).string(),
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -223,7 +243,12 @@ fun TranslationSettingsScreen(
                     connectionTest.translated?.let { translated ->
                         ConnectionOkBlock(sample = connectionTest.sample.orEmpty(), translated = translated)
                     }
-                    connectionTest.failure?.let { FailureBlock(it, prefix = "连接失败") }
+                    connectionTest.failure?.let {
+                        FailureBlock(
+                            failure = it,
+                            prefix = stringResource(R.string.msp_settings_connection_failed_prefix),
+                        )
+                    }
                 }
             }
         }
@@ -236,8 +261,8 @@ fun TranslationSettingsScreen(
  * 清单本身在 [TranslationSettings.missingItems] 里，和 [TranslationSettings.ready] 同源；
  * 这里只负责拼成一句话，不在本地再写一遍判断条件（写两遍就会写漏一遍）。
  */
-private fun missingConfigNotice(settings: TranslationSettings): String =
-    settings.missingItems.joinToString("、")
+private fun missingConfigNotice(settings: TranslationSettings): MspText =
+    describeMissingItems(settings.missingItems)
 
 @Composable
 private fun ProviderPicker(settings: TranslationSettings, onSelect: (String) -> Unit) {
@@ -251,18 +276,19 @@ private fun ProviderPicker(settings: TranslationSettings, onSelect: (String) -> 
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
         ) {
-            Text(current.displayName, modifier = Modifier.weight(1f))
-            Text("切换", style = MaterialTheme.typography.labelLarge)
+            Text(current.displayName.string(), modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.msp_settings_switch), style = MaterialTheme.typography.labelLarge)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             TranslationServices.all.forEach { service ->
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(service.displayName)
-                            if (service.note.isNotBlank()) {
+                            Text(service.displayName.string())
+                            val note = service.note.string()
+                            if (note.isNotBlank()) {
                                 Text(
-                                    text = service.note,
+                                    text = note,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -276,9 +302,10 @@ private fun ProviderPicker(settings: TranslationSettings, onSelect: (String) -> 
                 )
             }
         }
-        if (current.note.isNotBlank()) {
+        val currentNote = current.note.string()
+        if (currentNote.isNotBlank()) {
             Text(
-                text = current.note,
+                text = currentNote,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
@@ -337,7 +364,7 @@ private fun ModelListBlock(models: List<String>, current: String, onPick: (Strin
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "这家厂商报了 ${models.size} 个模型，点一下就用它：",
+            text = stringResource(R.string.msp_settings_model_count, models.size),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -370,7 +397,7 @@ private fun ApiKeyBlock(
     onClear: () -> Unit,
 ) {
     var input by remember(settings.providerId) { mutableStateOf("") }
-    var message by remember(settings.providerId) { mutableStateOf<String?>(null) }
+    var message by remember(settings.providerId) { mutableStateOf<MspText?>(null) }
     var confirmClear by remember(settings.providerId) { mutableStateOf(false) }
 
     Column(
@@ -380,12 +407,16 @@ private fun ApiKeyBlock(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = if (settings.apiKeyStored) "已保存密钥（${settings.provider.displayName}）" else "还没有保存密钥",
+            text = if (settings.apiKeyStored) {
+                stringResource(R.string.msp_settings_key_stored, settings.provider.displayName.string())
+            } else {
+                stringResource(R.string.msp_settings_key_missing)
+            },
             style = MaterialTheme.typography.bodyMedium,
         )
         if (!settings.apiKeyRequired) {
             Text(
-                text = "这家服务不需要密钥，留空即可。",
+                text = stringResource(R.string.msp_settings_key_not_required),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -396,8 +427,8 @@ private fun ApiKeyBlock(
                 input = it
                 message = null
             },
-            label = { Text("API 密钥") },
-            placeholder = { Text("粘贴密钥后点「保存」") },
+            label = { Text(stringResource(R.string.msp_settings_api_key_label)) },
+            placeholder = { Text(stringResource(R.string.msp_settings_api_key_placeholder)) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
             singleLine = true,
@@ -409,23 +440,32 @@ private fun ApiKeyBlock(
                 // 只会让人以为保存成功了。
                 onClick = {
                     onSave(input) { stored ->
-                        message = if (stored) "已保存。" else "没有保存（密钥是空的）。"
+                        message = MspText.Res(
+                            if (stored) R.string.msp_settings_key_saved
+                            else R.string.msp_settings_key_not_saved,
+                        )
                         if (stored) input = ""
                     }
                 },
                 enabled = input.isNotBlank(),
             ) {
-                Text("保存")
+                Text(stringResource(R.string.msp_settings_save))
             }
             if (settings.apiKeyStored) {
-                OutlinedButton(onClick = { confirmClear = true }) { Text("删除密钥") }
+                OutlinedButton(onClick = { confirmClear = true }) {
+                    Text(stringResource(R.string.msp_settings_delete_key))
+                }
             }
         }
         message?.let {
-            Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = it.string(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
         Text(
-            text = "密钥用系统密钥库加密后存在本机，不会写进日志，也不会随设置导出。",
+            text = stringResource(R.string.msp_settings_key_storage_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -434,17 +474,19 @@ private fun ApiKeyBlock(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("删除密钥？") },
-            text = { Text("删除后这家服务就不能翻译了，需要重新粘贴一次密钥。") },
+            title = { Text(stringResource(R.string.msp_settings_delete_key_title)) },
+            text = { Text(stringResource(R.string.msp_settings_delete_key_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClear = false
                     onClear()
-                    message = "已删除。"
-                }) { Text("删除") }
+                    message = MspText.Res(R.string.msp_settings_key_deleted)
+                }) { Text(stringResource(R.string.msp_settings_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消") }
+                TextButton(onClick = { confirmClear = false }) {
+                    Text(stringResource(R.string.msp_settings_cancel))
+                }
             },
         )
     }
@@ -461,13 +503,16 @@ private fun TargetPicker(target: TranslationTarget, onSelect: (TranslationTarget
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
         ) {
-            Text("译成：${target.label}", modifier = Modifier.weight(1f))
-            Text("切换", style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = stringResource(R.string.msp_settings_target_prefix, target.label.string()),
+                modifier = Modifier.weight(1f),
+            )
+            Text(stringResource(R.string.msp_settings_switch), style = MaterialTheme.typography.labelLarge)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             TranslationTarget.entries.forEach { candidate ->
                 DropdownMenuItem(
-                    text = { Text(candidate.label) },
+                    text = { Text(candidate.label.string()) },
                     onClick = {
                         expanded = false
                         onSelect(candidate)
@@ -502,15 +547,20 @@ private fun GlossaryBlock(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("术语表", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.msp_settings_glossary), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = "一行一条。`桐人` = 保持原样，`Guild = 公会` = 固定译法。# 开头是注释。",
+                    text = stringResource(R.string.msp_settings_glossary_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(onClick = { expanded = !expanded }) {
-                Text(if (expanded) "收起" else "编辑")
+                Text(
+                    stringResource(
+                        if (expanded) R.string.msp_settings_glossary_collapse
+                        else R.string.msp_settings_glossary_edit,
+                    ),
+                )
             }
         }
         if (expanded) {
@@ -518,7 +568,7 @@ private fun GlossaryBlock(
                 value = text,
                 onValueChange = { text = it },
                 minLines = 6,
-                label = { Text("术语（每行一条）") },
+                label = { Text(stringResource(R.string.msp_settings_glossary_label)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(
@@ -531,13 +581,13 @@ private fun GlossaryBlock(
                         parsed = parsedGlossary.size
                         onSetGlossary(parsedGlossary)
                     },
-                ) { Text("保存术语表") }
+                ) { Text(stringResource(R.string.msp_settings_glossary_save)) }
                 TextButton(onClick = {
                     text = formatGlossary(glossary)
                     parsed = glossary.size
-                }) { Text("还原") }
+                }) { Text(stringResource(R.string.msp_settings_glossary_restore)) }
                 Text(
-                    text = if (parsed == 0) "当前 0 条" else "当前 $parsed 条",
+                    text = stringResource(R.string.msp_settings_glossary_count, parsed),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -553,7 +603,7 @@ private fun ConnectionOkBlock(sample: String, translated: String) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "连通。模型翻出来的是：",
+            text = stringResource(R.string.msp_settings_test_ok_title),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -562,7 +612,7 @@ private fun ConnectionOkBlock(sample: String, translated: String) {
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
-            text = "看到这句话就说明地址、密钥、模型名都是对的，播放页里应该也能翻出来。",
+            text = stringResource(R.string.msp_settings_test_ok_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -586,20 +636,25 @@ private fun FailureBlock(failure: FailureText, prefix: String) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "$prefix：${failure.message}",
+            text = stringResource(R.string.msp_settings_failure_line, prefix, failure.message.string()),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.error,
         )
         failure.hint?.let {
             Text(
-                text = it,
+                text = it.string(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         failure.raw?.let { raw ->
             TextButton(onClick = { showRaw = !showRaw }) {
-                Text(if (showRaw) "收起服务商返回的原文" else "看服务商返回的原文")
+                Text(
+                    stringResource(
+                        if (showRaw) R.string.msp_settings_hide_raw
+                        else R.string.msp_settings_show_raw,
+                    ),
+                )
             }
             if (showRaw) {
                 HorizontalDivider()
