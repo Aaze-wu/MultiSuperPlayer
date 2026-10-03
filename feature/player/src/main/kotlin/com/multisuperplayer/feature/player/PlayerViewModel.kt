@@ -12,9 +12,13 @@ import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
+import com.multisuperplayer.core.player.MspTrackInfo
+import com.multisuperplayer.core.player.MspTrackKind
 import com.multisuperplayer.core.player.PlaybackController
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SpeedBoostOptions
+import com.multisuperplayer.core.player.TrackSelectionController
+import com.multisuperplayer.core.player.audioTracks
 import com.multisuperplayer.core.player.clampPlaybackSpeed
 import com.multisuperplayer.core.ui.theme.ArtworkAccent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +44,8 @@ import kotlinx.coroutines.launch
  */
 class PlayerViewModel(
     private val controller: PlaybackController,
+    /** 片源里的可选轨道。只用到音频那一维（字幕那维归 [SubtitleViewModel]）。 */
+    private val tracks: TrackSelectionController,
     artworkPalette: ArtworkPaletteRepository,
     private val playbackSettings: PlaybackSettingsRepository,
 ) : ViewModel() {
@@ -64,6 +70,16 @@ class PlayerViewModel(
     val bufferedPositionMs: StateFlow<Long> = controller.bufferedPositionMs
     val queue: StateFlow<List<MediaEntry>> = controller.queue
     val currentIndex: StateFlow<Int> = controller.currentIndex
+
+    /**
+     * 当前片源里的音频轨。没有媒体（或者只有一条）时界面不画音轨入口。
+     *
+     * 不过滤语言、不过滤默认标记：面板要把**全部**音轨列出来给用户选，
+     * 做筛选（比如藏掉评论轨）就是替用户做决定。
+     */
+    val audioTracks: StateFlow<List<MspTrackInfo>> = tracks.tracks
+        .map { list -> list.audioTracks() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), emptyList())
 
     /**
      * 当前封面的取色结果。null 同时表示「没有封面」、「取不出来」和「算出来没有
@@ -188,6 +204,16 @@ class PlayerViewModel(
     }
 
     fun toggleShuffle() = controller.setShuffleEnabled(!controller.state.value.shuffleEnabled)
+
+    /** 手选一条音频轨。只对**当前这条媒体**有效（切条目时内核会清掉覆盖）。 */
+    fun selectAudioTrack(track: MspTrackInfo) {
+        tracks.selectTrack(MspTrackKind.AUDIO, track.id)
+    }
+
+    /** 音频轨回到自动挑选。字幕轨不受影响。 */
+    fun useAutomaticAudioTrack() {
+        tracks.useAutomaticAudioTrack()
+    }
 
     private companion object {
         const val TAG = "PlayerViewModel"

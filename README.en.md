@@ -53,6 +53,11 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   an exit you can see, instead of having to guess the system back gesture (landscape keeps its
   own *Exit fullscreen* arrow and gets no second button). Collapsing pops the player page only:
   playback continues and the mini player takes over the bottom bar.
+- **Audio track selection**: when a file carries more than one audio track, an extra *Audio track* chip
+  shows up under the controls (labelled with the current track's name/language) and its panel lets you
+  switch track by track or go back to *Auto*. The choice applies to **this file only** — another file goes
+  back to automatic, otherwise the previous file's pick would follow the next one with nothing on screen
+  saying it had been changed by hand (the same reason manual subtitle picks are not remembered).
 - **Also**: shuffle / repeat all / repeat one, previous / next, volume and brightness indicators,
   a playback service and notification controls.
 
@@ -85,6 +90,17 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   found. A manual pick is deliberately **not remembered**: switching media goes back to auto-selection,
   because otherwise last item's pick would follow the next one, which looks exactly like subtitles being
   attached to the wrong media — and nothing on screen would say a manual pick was ever in effect.
+- **Subtitles that ship inside the file**: **subtitle tracks muxed into the container** are fed into **our
+  own subtitle layer** (not Media3's `SubtitleView`), so display modes, bilingual mode, translation and the
+  timeline offset treat them exactly like sibling files. They are listed in the same panel as the file
+  candidates, with language, format and default/forced flags. The format is read from `Format.codecs`, not
+  from `sampleMimeType`: Media3 reports every text track it extracts from a container as
+  `application/x-media3-cues` and keeps the real format (`application/x-subrip` and friends) in `codecs`.
+  Judging by `sampleMimeType` classifies them as unknown and the whole track then **vanishes** from the
+  panel — while the top line still says `Auto-selected "zh"`, i.e. the two halves contradict each other.
+- **Subtitle timeline offset**: ±0.1 s and ±0.5 s steps that accumulate, plus a *Reset* button. A positive
+  value means the subtitle appears **later** (if it shows up before the sound, tune positive). The offset
+  only shifts the timeline as a whole; it never changes how long a line stays on screen.
 
 ### 1.3 Subtitle translation
 
@@ -246,7 +262,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.11** | **Recent page: delete one entry (undoable) and clear all (confirmed)** | Done |
 | **v0.5.12** | **Portrait player gets a *Collapse* button top-left (a visible exit that keeps playing)** | Done |
 | **v0.5.13** | **Landscape layout dedicated to audio: cover left, lyrics right, permanent control strip (also fixes controls that could not be brought back)** | Done |
-| **v0.5.14** | **"Choose subtitle file…" in the subtitle panel; previous / next buttons on the bottom bar; fixes playback controls never appearing in the notification (the Media3 session was never registered)** | **Current** |
+| **v0.5.14** | **"Choose subtitle file…" in the subtitle panel; previous / next buttons on the bottom bar; fixes playback controls never appearing in the notification (the Media3 session was never registered)** | Done |
+| **v0.5.15** | **Subtitle tracks muxed into the container are fed into our own subtitle layer (including the fix that reads the format from `codecs`); audio / embedded-subtitle track pickers; subtitle timeline offset ±** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
@@ -553,6 +570,14 @@ These are deliberate for this release, not oversights:
     discovery log line**: it writes "looking for subtitles for xxx", and for an entry restored from a
     playlist that one field is missing (everything else is there). Fixing it means changing the storage
     format and writing a migration, which is disproportionate for one name in one log line.
+12. **Bitmap subtitles inside the file (PGS / VobSub / DVB) never show up in the panel.** Our own subtitle
+    layer draws text; bitmap subtitles need a different rendering path (the one Media3 ships, which this
+    project deliberately does not use as the main path — using it would make embedded subtitles bypass
+    display modes, bilingual mode, translation and the offset). The panel therefore lists **text** embedded
+    tracks only: a bitmap track neither appears nor can be selected, and the panel does not explain why
+    (it simply looks like "this file has no embedded subtitles"). Supporting it for real means handing
+    bitmap tracks to Media3's `SubtitleView` as a second layer, at the cost of two subtitle layers having
+    to agree on "who drew text at which instant". Left for a later version.
 
 ---
 

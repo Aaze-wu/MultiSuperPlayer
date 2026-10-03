@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -398,7 +399,8 @@ internal fun PlayerActionChips(
     onOpenSpeed: () -> Unit,
     onCycleAbRepeat: () -> Unit,
     modifier: Modifier = Modifier,
-    aspectRatio: AspectRatioChip? = null,
+    aspectRatio: PlayerBarChip? = null,
+    audioTrack: PlayerBarChip? = null,
 ) {
     Row(
         modifier = modifier,
@@ -423,24 +425,57 @@ internal fun PlayerActionChips(
         aspectRatio?.let { chip ->
             ChipButton(
                 text = chip.label,
-                active = false,
+                active = chip.active,
                 onClick = chip.onClick,
                 description = stringResource(R.string.msp_player_aspect),
+            )
+        }
+        // 音轨按钮上的字就是**当前这条轨的名字**，所以它同时回答了「现在听的是哪条」
+        // 和「去哪儿换」两个问题。单轨片源下调用方会传 null（永远只有一个选项的
+        // 按钮只会占地方）。
+        //
+        // 名字来自容器自己的标签，长度完全不受我们控制（`Commentary by director`
+        // 是真实存在的值）。一行四个芯片的横屏里，一个长标签会把旁边两个挤出屏幕——
+        // 所以这里限宽并省略：宁可显示「国语（…」，也不要把「倍速」挤没。
+        audioTrack?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_audio_track),
+                modifier = Modifier.widthIn(max = CHIP_MAX_WIDTH),
             )
         }
     }
 }
 
 /**
- * 「画面比例」按钮的配置。
+ * 控制条上「一个可选值」的按钮配置（画面比例、音轨）。
  *
- * `null`（不给）表示这一处没有「画面比例」这件事——音频页就是这种情况：
+ * `null`（不给）表示这一处没有这件事——音频页就是「没有画面比例」那种情况：
  * 声音没有画面比例可调，把它画出来只会让用户点开一个永远无效的面板。
+ * 音轨也同理，只是判断依据不同：只有**多条**音轨时才给。
+ *
+ * [active] 表示「现在不是默认状态」：[PlayerActionChips] 里的倍速、A-B 靠它高亮，
+ * 而画面比例和音轨目前都传 `false`——它们的标签本身已经把状态写全了
+ * （「裁剪」/「国语」），再点亮一次不增加任何信息。
+ *
+ * 公开（而不是 `internal`）是因为它出现在 `PlayerScreen` 的参数表上，而那个组合
+ * 函数是公开的——公开函数不能暴露 internal 类型。
  */
-internal data class AspectRatioChip(
+data class PlayerBarChip(
     val label: String,
+    val active: Boolean = false,
     val onClick: () -> Unit,
 )
+
+/**
+ * 芯片上文字的最大宽度。
+ *
+ * 只有标签完全由容器决定的那个芯片（音轨）用得上：倍速是 `1.5×`、A-B 是
+ * `A-B`、画面比例是三个两字词，都是我们自己写的。
+ */
+private val CHIP_MAX_WIDTH = 96.dp
 
 /**
  * A-B 按钮上的文字。
@@ -461,6 +496,7 @@ private fun ChipButton(
     active: Boolean,
     onClick: () -> Unit,
     description: String,
+    modifier: Modifier = Modifier,
 ) {
     // 无障碍描述要先把资源取出来再进 `semantics`：那里的 lambda 不是 `@Composable`，
     // 里面调不了 `stringResource`。
@@ -480,9 +516,16 @@ private fun ChipButton(
         ),
         // 无障碍文案把状态读出来：TalkBack 读「播放速度，1.5×，已启用」比只读一个
         // 「1.5×」有用得多——后者在语音里完全看不出它是当前速度还是可选项。
-        modifier = Modifier.semantics { contentDescription = chipDescription },
+        modifier = modifier.semantics { contentDescription = chipDescription },
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
+        // 单行 + 省略：芯片是一排里的格位，换行会把整排推高、把控件区挤变形。
+        // TalkBack 读的还是完整文案（在 [semantics] 里），所以截断只影响视觉。
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -571,6 +614,8 @@ internal fun PlayerControlsOverlay(
     onToggleShuffle: () -> Unit,
     onOpenSubtitles: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 音轨入口的配置。`null` = 这个片源只有一条音轨（或还没有轨道信息）。 */
+    audioTrackChip: PlayerBarChip? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
 
@@ -655,10 +700,11 @@ internal fun PlayerControlsOverlay(
                         abRepeat = state.abRepeat,
                         onOpenSpeed = onOpenSpeed,
                         onCycleAbRepeat = onCycleAbRepeat,
-                        aspectRatio = AspectRatioChip(
+                        aspectRatio = PlayerBarChip(
                             label = aspectRatioLabel,
                             onClick = onOpenAspectRatio,
                         ),
+                        audioTrack = audioTrackChip,
                     )
                     IconButton(onClick = onToggleLock) {
                         Icon(

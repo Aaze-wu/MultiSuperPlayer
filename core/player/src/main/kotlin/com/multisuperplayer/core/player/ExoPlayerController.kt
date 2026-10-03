@@ -9,6 +9,11 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
+import androidx.media3.common.text.Cue
+import androidx.media3.common.text.CueGroup
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
@@ -147,6 +152,53 @@ class ExoPlayerController(
     /** 上一轮回调时是不是在播；用于识别「刚停下来」这个瞬间。 */
     private var wasPlaying = false
 
+    /** 轨道清单（音频 + 字幕）。没有媒体时是空列表。 */
+    private val _tracks = MutableStateFlow<List<MspTrackInfo>>(emptyList())
+    override val tracks: StateFlow<List<MspTrackInfo>> = _tracks.asStateFlow()
+
+    /**
+     * 轨道 id → Media3 的 `TrackGroup`。
+     *
+     * 选轨必须拿 `TrackGroup` 实例去构造覆盖（Media3 没有「按 id 选」的入口），
+     * 而 id 是我们自己编的。每次 `onTracksChanged` 重建这份映射：
+     * 切到另一条媒体后，旧的 `TrackGroup` 已经不属于当前播放列表，拿它构造的
+     * 覆盖什么也不会发生（用户点了没反应，而且不报错）。
+     */
+    private val trackGroups = mutableMapOf<String, TrackGroup>()
+
+    /**
+     * 用户手选的字幕轨 id；null = 还没选过（那时走自动挑）。
+     *
+     * 只对**当前这条媒体**有效，切条目时清空（见 `onMediaItemTransition`）：
+     * 手选留在下一条上，就成了「我明明没选过却是这条」。
+     */
+    private var textTrackChoice: String? = null
+
+    /** 内嵌字幕行。切换条目时清空。 */
+    private val _embeddedSubtitle = MutableStateFlow(EmbeddedSubtitleState())
+    override val embeddedSubtitle: StateFlow<EmbeddedSubtitleState> = _embeddedSubtitle.asStateFlow()
+
+    /**
+     * 字幕偏好的语言，取自**应用界面语言**。
+     *
+     * 还没有「字幕偏好语言」这个设置项（那是语言/翻译那一版的事），所以先用界面语言
+     * 当成弱推测：用户把界面调成中文，多半也想看中文字幕。它只参与自动选轨，
+     * 选错了用户在面板里换一下就行。
+     */
+    private val preferredTextLanguages: List<String> by lazy {
+        val configuration = appContext.resources.configuration
+        @Suppress("DEPRECATION")
+        val locales = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            configuration.locales
+        } else {
+            // 单个 locale 的兼容分支：这里**必须**用 `configuration.locale`，
+            // 不能用 `Locale.getDefault()`——后者是进程级的，和用户给本应用单独指定的
+            // 语言可能不一致，自动选轨就会挑到另一种语言的轨。
+            android.os.LocaleList(configuration.locale)
+        }
+        (0 until locales.size()).mapNotNull { normalizeLanguageTag(locales.get(it).toLanguageTag()) }
+    }
+
     override val player: ExoPlayer = ExoPlayer.Builder(appContext)
         .apply {
             // 永远装上带 FFmpeg 的渲染器工厂（只要这个安装包里有 FFmpeg），
@@ -218,6 +270,19 @@ class ExoPlayerController(
     private var serviceRunning = false
 
     init {
+        // 必须在 addListener 之前：这两条参数决定了「第一条媒体加载完时选哪条字幕轨」，
+        // 而选择结果是通过 onTracksChanged 递过来的。晚一步设，第一次选择就已经
+        // 按 Media3 的默认值（= 什么都不选）做完了。
+        //
+        // Media3 的默认轨道参数**不选**任何文本轨：内嵌字幕「存在但不显示」的根因就在这。
+        // `setPreferredTextLanguages` 按界面语言挑；`setSelectUndeterminedTextLanguage`
+        // 兜住「轨道没标语言」的片源（否则它一条都不会选，而用户在面板里能看到它，
+        // 就会以为「点不动」）。
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setPreferredTextLanguages(*preferredTextLanguages.toTypedArray())
+            .setSelectUndeterminedTextLanguage(true)
+            .build()
+
         // 必须在 addListener 之后：`attach` 会立刻 apply 一次解码器选择，
         // 那时若监听器已就位，随后的 publish 会把真实解码方式直接写上界面。
         player.addListener(
@@ -273,7 +338,52 @@ class ExoPlayerController(
                     // 上一首的 A/B 毫无意义，而且很可能落在新文件外面（然后就是
                     // 每个节拍都 seek 的死循环）。直接清掉。
                     if (abRepeat != AbRepeatState.None) abRepeat = AbRepeatState.None
+                    // 手选的字幕轨、已经读到的内嵌字幕行都属于**上一条**媒体：
+                    // 台词留着会跟着新片子的时间轴显示（内容和位置都不对），
+                    // 而用户完全看不出是「没收走」造成的。
+                    textTrackChoice = null
+                    // 音轨同理，而且更隐蔽：`TrackGroup.id` 在不同片源里**可能一模一样**
+                    // （容器里的轨道编号），所以留着手选的覆盖，下一部片子会静默地用上
+                    //「第 0 条音轨」这个选择——比如下一部片子里那是导演评论音轨。
+                    // 字幕那边靠 `textTrackChoice = null` 之后重跑自动挑选覆盖了旧覆盖，
+                    // 音频没有自动挑选那一步，只能显式清。
+                    clearAudioOverride()
+                    _embeddedSubtitle.value = EmbeddedSubtitleState()
                     publish()
+                }
+
+                /**
+                 * 轨道清单变了（换条目、片源信息解析完成、自适应档位变化）。
+                 *
+                 * 只在 `onEvents` 里刷新是不够的：那个回调不会因为轨道清单变化而触发，
+                 * 而「多音轨片源」正是靠这里才第一次出现在界面上。
+                 */
+                override fun onTracksChanged(tracks: Tracks) {
+                    syncTracks(tracks)
+                }
+
+                /**
+                 * 该显示哪些字幕行。
+                 *
+                 * 这就是内嵌字幕的**唯一**来源：我们没挂 Media3 的 `SubtitleView`，
+                 * 所以这些 cue 不会自己出现在画面上，而是被收进 `embeddedSubtitle`，
+                 * 由我们自己的字幕层（和外挂字幕同一套）渲染、翻译、导出。
+                 *
+                 * 位图字幕（PGS / VobSub）的 `Cue.text` 是空的，这里会自然丢掉它们
+                 * （它们本来也只能由渲染器直接画）。
+                 */
+                override fun onCues(cueGroup: CueGroup) {
+                    val texts = cueGroup.cues.mapNotNull { cue: Cue ->
+                        cue.text?.toString()?.takeIf { it.isNotBlank() }
+                    }
+                    val next = _embeddedSubtitle.value.receive(
+                        atMs = cueGroup.presentationTimeUs / 1_000L,
+                        texts = texts,
+                    )
+                    if (next.cues.size != _embeddedSubtitle.value.cues.size) {
+                        MspLog.d(TAG) { "内嵌字幕读到 ${next.cues.size} 行" }
+                    }
+                    _embeddedSubtitle.value = next
                 }
             },
         )
@@ -294,6 +404,135 @@ class ExoPlayerController(
         }
 
         attachDecoderManager()
+    }
+
+    // ------------------------------------------------------------------ 轨道选择
+
+    /**
+     * 把内核的轨道清单抄进 Flow，并在用户还没手选时自动挑一条字幕轨。
+     *
+     * ## 为什么要自动挑
+     *
+     * Media3 的默认轨道选择参数**不会选任何文本轨**（实测：一个带内嵌中文字幕的
+     * MKV 播到有台词的地方屏幕上一个字都没有，日志里连 TrackSelector 的行都没有）。
+     * 所以「容器里明明有字幕却不显示」不是渲染器的问题，而是没人选它。
+     */
+    private fun syncTracks(tracks: Tracks) {
+        trackGroups.clear()
+        val list = ArrayList<MspTrackInfo>()
+        var groupIndex = 0
+        for (group in tracks.groups) {
+            val kind = when (group.type) {
+                C.TRACK_TYPE_AUDIO -> MspTrackKind.AUDIO
+                C.TRACK_TYPE_TEXT -> MspTrackKind.TEXT
+                else -> null
+            }
+            // 不支持的轨（没有解码器）不列出来：点了也不会有声音/字幕，
+            // 而用户会以为是播放器坏了。`isSupported` 已经把这一点问清楚了。
+            if (kind == null || !group.isSupported) {
+                groupIndex++
+                continue
+            }
+            val mediaTrackGroup = group.mediaTrackGroup
+            for (i in 0 until group.length) {
+                val format = group.getTrackFormat(i)
+                val id = trackId(kind, mediaTrackGroup, i)
+                trackGroups[id] = mediaTrackGroup
+                list += MspTrackInfo(
+                    id = id,
+                    kind = kind,
+                    label = format.label?.takeIf { it.isNotBlank() },
+                    language = normalizeLanguageTag(format.language),
+                    mimeType = format.sampleMimeType.orEmpty(),
+                    codec = format.codecs?.takeIf { it.isNotBlank() },
+                    channelCount = format.channelCount.takeIf { kind == MspTrackKind.AUDIO && it > 0 },
+                    indexInGroup = i,
+                    isSelected = group.isTrackSelected(i),
+                    isDefault = format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0,
+                    isForced = format.selectionFlags and C.SELECTION_FLAG_FORCED != 0,
+                )
+            }
+            groupIndex++
+        }
+        _tracks.value = list
+
+        // 用户今天手选过就别自动改了——那会把用户的明确选择反复推翻。
+        if (textTrackChoice != null) return
+        val auto = list.bestEmbeddedTextTrack(preferredTextLanguages) ?: return
+        if (list.any { it.kind == MspTrackKind.TEXT && it.isSelected }) return
+        selectTrack(MspTrackKind.TEXT, auto.id)
+        MspLog.d(TAG) {
+            "自动选中内嵌字幕轨「${auto.displayLabel(auto.id)}」（语言 ${auto.language ?: "未标"}）"
+        }
+    }
+
+    /**
+     * 轨道 id：同一条媒体内稳定，跨条目不承诺。
+     *
+     * 用 `TrackGroup.id`（容器里那份，稳定）而不是「第几个组」：自适应音轨的不同
+     * 档位会共享一个组，而组顺序在片源重新解析后并不保证不变。
+     */
+    private fun trackId(kind: MspTrackKind, group: TrackGroup, indexInGroup: Int): String =
+        "${kind.name}:${group.id}:$indexInGroup"
+
+    override fun selectTrack(kind: MspTrackKind, id: String) {
+        val group = trackGroups[id] ?: run {
+            MspLog.d(TAG) { "选轨：$id 不在当前片源里，忽略" }
+            return
+        }
+        val index = trackIndexOf(id, group) ?: 0
+        MspLog.d(TAG) { "选轨 $id" }
+        if (kind == MspTrackKind.TEXT) textTrackChoice = id
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setOverrideForType(TrackSelectionOverride(group, listOf(index)))
+            .setTrackTypeDisabled(trackTypeOf(kind), false)
+            .build()
+        // 覆盖生效后内核会重新回调 `onTracksChanged`，清单里的 isSelected 随之更新；
+        // 但那条路径依赖内核的调度，这里先按已选好算一遍，界面才不会有一下「没勾上」的帧。
+        _tracks.value = _tracks.value.map { if (it.id == id) it.copy(isSelected = true) else it }
+    }
+
+    override fun useAutomaticTracks() {
+        textTrackChoice = null
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .build()
+        // 清掉覆盖后内核不一定回调 `onTracksChanged`（参数值变了但清单没变），
+        // 所以自己再算一遍：自动挑选那一步就在 [syncTracks] 里。
+        syncTracks(player.currentTracks)
+    }
+
+    /**
+     * 音频轨回到内核自动挑选。**不动**字幕轨的选择。
+     *
+     * 没有 `audioTrackChoice` 那种字段：字幕需要一个字段去压住 `syncTracks` 里的
+     * 自动挑选，而音频的自动挑选本来就是内核自己在做（我们只负责盖覆盖）。
+     */
+    override fun useAutomaticAudioTrack() {
+        MspLog.d(TAG) { "音轨回到自动挑选" }
+        clearAudioOverride()
+        // 同 [useAutomaticTracks]：清掉覆盖不保证有回调，自己重算一次清单，
+        // 面板上的单选才会立刻落到内核真正选中的那条上。
+        syncTracks(player.currentTracks)
+    }
+
+    /** 清掉音频类型的轨道覆盖，把选版权交回内核。 */
+    private fun clearAudioOverride() {
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+            .build()
+    }
+
+    private fun trackTypeOf(kind: MspTrackKind): Int = when (kind) {
+        MspTrackKind.AUDIO -> C.TRACK_TYPE_AUDIO
+        MspTrackKind.TEXT -> C.TRACK_TYPE_TEXT
+    }
+
+    /** 从 id 里取回组内下标（id 的最后一段）。 */
+    private fun trackIndexOf(id: String, group: TrackGroup): Int? {
+        val raw = id.substringAfterLast(':').toIntOrNull()
+        return raw?.takeIf { it in 0 until group.length }
     }
 
     // ---------------------------------------------------------------- 内部状态同步

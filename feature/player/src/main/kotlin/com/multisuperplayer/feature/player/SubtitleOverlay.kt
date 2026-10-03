@@ -38,7 +38,10 @@ internal fun SubtitleOverlay(
     if (!state.isRendering) return
 
     val document = state.document ?: return
-    val cue = document.cueAt(positionMs) ?: return
+    // 查 cue 和逐字高亮必须用**同一个**时刻：两者用不同的时刻会让逐字高亮
+    // 跑到下一句上去（唱到一半整行换掉）。所以这里只算一次。
+    val cuePositionMs = subtitleCuePosition(positionMs, state.timelineOffsetMs)
+    val cue = document.cueAt(cuePositionMs) ?: return
 
     val lines = cueLinesFor(cue, state.effectiveMode)
     if (lines.isEmpty) return
@@ -46,7 +49,7 @@ internal fun SubtitleOverlay(
     CueTextBlock(
         lines = lines,
         cue = cue,
-        positionMs = positionMs,
+        positionMs = cuePositionMs,
         // 盖在视频上，所以配色不看主题：白字 + 黑描边在任意画面上都可读，
         // 而跟随主题的 onSurface 在深色画面上会直接消失。可自定义的字幕样式是
         // 后面的事，现在先保证「任何时候都看得清」。

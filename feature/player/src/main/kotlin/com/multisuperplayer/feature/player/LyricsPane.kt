@@ -48,9 +48,12 @@ internal fun LyricsPane(
     mode: SubtitleDisplayMode,
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    timelineOffsetMs: Long = 0L,
 ) {
     val listState = rememberLazyListState()
-    val activeIndex = document.cueFocusIndexAt(positionMs)
+    // 高亮行和逐字高亮用同一个「微调后」的时刻，否则条子和高亮会差半秒。
+    val cuePositionMs = subtitleCuePosition(positionMs, timelineOffsetMs)
+    val activeIndex = document.cueFocusIndexAt(cuePositionMs)
 
     LaunchedEffect(activeIndex) {
         if (activeIndex < 0) return@LaunchedEffect
@@ -71,7 +74,7 @@ internal fun LyricsPane(
             LyricLine(
                 cue = cue,
                 isActive = index == activeIndex,
-                positionMs = positionMs,
+                positionMs = cuePositionMs,
                 mode = mode,
                 onClick = { onSeekTo(cue.startMs) },
             )

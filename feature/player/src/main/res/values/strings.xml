@@ -28,10 +28,24 @@
     <string name="msp_player_auto_selected">已自动选中「%1$s」</string>
     <string name="msp_player_auto_pick_desc">按片名从候选里挑一条最吻合的</string>
     <string name="msp_player_no_usable_subtitle">这个文件夹里没有找到可用的字幕文件。</string>
+    <string name="msp_player_embedded_section">片源自带的字幕</string>
+    <string name="msp_player_embedded_track">内嵌字幕 %1$d</string>
+    <!-- 时间轴微调：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
+    <string name="msp_player_subtitle_sync">字幕时间轴</string>
+    <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
+    <string name="msp_player_subtitle_sync_reset">归零</string>
+    <string name="msp_player_subtitle_sync_hint">字幕比声音早出现就往正数调，晚了就往负数调。</string>
+    <!-- 音轨选择。只在片源里真的有多条音轨时才会出现入口。 -->
+    <string name="msp_player_audio_track">音轨</string>
+    <string name="msp_player_audio_track_n">音轨 %1$d</string>
+    <string name="msp_player_channels">%1$d 声道</string>
+    <string name="msp_player_audio_auto">自动</string>
+    <string name="msp_player_audio_track_hint">只对当前这个文件有效，换一个文件会回到自动。</string>
     <!-- 引号不是内容：aapt2 会裁掉首尾空白，包上引号才能保住两侧的空格。 -->
     <string name="msp_player_detail_sep">" · "</string>
     <string name="msp_player_detail_language_unknown">未标语言</string>
     <string name="msp_player_detail_forced">强制</string>
+    <string name="msp_player_detail_default_track">默认</string>
     <string name="msp_player_detail_matches_title">与片名吻合</string>
     <string name="msp_player_format_lrc">LRC 歌词</string>
     <string name="msp_player_format_lrc_enhanced">增强型 LRC（逐字）</string>

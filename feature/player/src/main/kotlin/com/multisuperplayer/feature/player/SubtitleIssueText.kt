@@ -5,6 +5,8 @@ import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.isAutoMatchable
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.player.MspTrackInfo
+
 
 /**
  * 字幕相关的界面文案。
@@ -60,7 +62,11 @@ internal fun SubtitleIssue.describe(): MspText = when (this) {
         MspText.Res(R.string.msp_player_issue_load_failed, fileName, message)
 }
 
-/** 列表项之间的分隔符。语言不同密度也不同（中文用半角点，英文用半角点加空格）。 */
+/** 列表项之间的分隔符。语言不同密度也不同（中文用半角点，英文用半角点加空格）。
+ *
+ * 字幕候选行、内嵌字幕轨的副标题、音轨副标题都用它：三处的信息结构一样
+ *（「几个短字段并排」），用同一个分隔符才看起来是一套东西。
+ */
 internal val SUBTITLE_DETAIL_SEPARATOR: MspText = MspText.Res(R.string.msp_player_detail_sep)
 
 /** 候选行的副标题：格式、语言、以及「是不是和片名吻合」。 */
@@ -87,5 +93,29 @@ internal fun SubtitleSource.describeAttached(): MspText = MspText.join(
     buildList {
         add(format.label())
         languageTag?.let { add(MspText.Plain(it)) }
+    },
+)
+
+/**
+ * 内嵌字幕轨的副标题：格式、语言、「默认/强制」。
+ *
+ * 不复用 [describeDetails]：那个是给文件用的，会顺带报「与片名吻合」——内嵌轨
+ * 没有文件名，这句话在这里是无意义的（它当然属于这部片子）。
+ *
+ * 也不需要「内嵌」这个词：它就在「片源自带的字幕」标题下面。
+ */
+internal fun MspTrackInfo.describeDetails(): MspText = MspText.join(
+    SUBTITLE_DETAIL_SEPARATOR,
+    buildList {
+        // 用 subtitleFormat() 而不是 subtitleFormatOf(mimeType)：Media3 给内嵌文本轨
+        // 的 mime 是它自己的 cue 包（`application/x-media3-cues`），格式在 `codecs` 里。
+        // 直接看 mimeType 的话这一格会永远显示「未知」。
+        add(subtitleFormat().label())
+        add(
+            language?.let { MspText.Plain(it) }
+                ?: MspText.Res(R.string.msp_player_detail_language_unknown),
+        )
+        if (isDefault) add(MspText.Res(R.string.msp_player_detail_default_track))
+        if (isForced) add(MspText.Res(R.string.msp_player_detail_forced))
     },
 )

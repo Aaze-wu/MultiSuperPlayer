@@ -128,6 +128,7 @@ fun PlayerRoute(
     val bufferedMs by viewModel.bufferedPositionMs.collectAsStateWithLifecycle()
     val artworkAccent by viewModel.artworkAccent.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val audioTracks by viewModel.audioTracks.collectAsStateWithLifecycle()
 
     val subtitleViewModel: SubtitleViewModel = koinViewModel()
     val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
@@ -296,6 +297,30 @@ fun PlayerRoute(
     // 同一个函数，就能保证「提示泡写 2×」和「真的下给内核的 2×」是同一个数。
     val boostSpeed = SpeedBoostOptions.normalize(settings.boostSpeed)
 
+    // 音轨入口只在**多于一条**音轨时出现：单轨片源上那个按钮永远只有一个选项，
+    // 点开也做不了任何事，却白占一格（竖屏那排芯片一共才三个位置）。
+    //
+    // 按钮上的字是**当前这条轨的名字**，所以它同时回答了「现在听的是谁」和
+    // 「去哪儿换」；选不中单独一条时（多码率自适应、或还没解析出轨道）写「自动」。
+    val audioTrackChip = if (audioTracks.size < 2) {
+        null
+    } else {
+        PlayerBarChip(
+            label = audioTrackChipLabel(
+                tracks = audioTracks,
+                autoLabel = stringResource(R.string.msp_player_audio_auto),
+                // 用 `context.getString` 而不是 `stringResource`：这个 lambda 不是
+                // composable，而「音轨 3」必须走 `_n` 那个键（带占位符），
+                // 不能让两种语言各自拼一遍。
+                fallbackOf = { track ->
+                    context.getString(R.string.msp_player_audio_track_n, track.indexInGroup + 1)
+                },
+            ),
+            // 不点亮：字已经把状态写全了（和画面比例芯片同一条理由）。
+            onClick = { ui.openSheet(PlayerSheet.AUDIO_TRACK) },
+        )
+    }
+
     // 离开播放页时把加速收掉。
     //
     // 手势层里的 `finally` 已经覆盖了绝大多数情况（协程被取消时会跑），但那是
@@ -319,6 +344,7 @@ fun PlayerRoute(
         boostSpeed = boostSpeed,
         onSpeedBoost = viewModel::setSpeedBoost,
         subtitleState = subtitleState,
+        audioTrackChip = audioTrackChip,
         modifier = modifier,
         onTogglePlayPause = viewModel::togglePlayPause,
         onSkipNext = viewModel::skipToNext,
@@ -342,6 +368,9 @@ fun PlayerRoute(
             onDismiss = { showSubtitleSheet = false },
             onSelectMode = subtitleViewModel::setDisplayMode,
             onSelectSource = subtitleViewModel::selectSource,
+            onSelectEmbedded = subtitleViewModel::selectEmbeddedTrack,
+            onNudgeTimeline = subtitleViewModel::nudgeTimelineOffset,
+            onResetTimeline = subtitleViewModel::resetTimelineOffset,
             onUseAuto = subtitleViewModel::useAutoSelection,
             onRescan = subtitleViewModel::rescan,
             onPickFile = { manualSubtitleLauncher.launch(arrayOf("*/*")) },
@@ -378,6 +407,15 @@ fun PlayerRoute(
                 ui.setAspectRatio(mode)
                 ui.closeSheet()
             },
+            onDismiss = ui::closeSheet,
+        )
+
+        PlayerSheet.AUDIO_TRACK -> PlayerAudioTrackSheet(
+            tracks = audioTracks,
+            // 面板**不**自己关：用户要在这里听效果（配音对不对、5.1 是不是真的在响），
+            // 切完就关掉的话他每试一条都要重新点开一次。
+            onSelect = viewModel::selectAudioTrack,
+            onUseAuto = viewModel::useAutomaticAudioTrack,
             onDismiss = ui::closeSheet,
         )
 
@@ -418,6 +456,8 @@ fun PlayerScreen(
     windowController: PlayerWindowController? = null,
     boostSpeed: Float = SpeedBoostOptions.DEFAULT,
     subtitleState: SubtitleUiState = SubtitleUiState(),
+    /** 音轨入口的芯片配置，`null` = 这个片源没有多条音轨。 */
+    audioTrackChip: PlayerBarChip? = null,
     onTogglePlayPause: () -> Unit = {},
     onSkipNext: () -> Unit = {},
     onSkipPrevious: () -> Unit = {},
@@ -493,6 +533,7 @@ fun PlayerScreen(
             ui = ui,
             aspectRatio = aspectRatio,
             subtitleState = subtitleState,
+            audioTrackChip = audioTrackChip,
             videoLayer = videoLayer,
             modifier = modifier,
             onTogglePlayPause = onTogglePlayPause,
@@ -513,6 +554,7 @@ fun PlayerScreen(
             ui = ui,
             aspectRatio = aspectRatio,
             subtitleState = subtitleState,
+            audioTrackChip = audioTrackChip,
             videoLayer = videoLayer,
             modifier = modifier,
             onTogglePlayPause = onTogglePlayPause,
@@ -546,6 +588,7 @@ private fun PortraitLayout(
     ui: PlayerUiState,
     aspectRatio: AspectRatioMode,
     subtitleState: SubtitleUiState,
+    audioTrackChip: PlayerBarChip?,
     videoLayer: @Composable (Modifier) -> Unit,
     modifier: Modifier,
     onTogglePlayPause: () -> Unit,
@@ -618,10 +661,11 @@ private fun PortraitLayout(
             abRepeat = state.abRepeat,
             onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
             onCycleAbRepeat = onCycleAbRepeat,
-            aspectRatio = AspectRatioChip(
+            aspectRatio = PlayerBarChip(
                 label = aspectRatio.label.string(),
                 onClick = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
             ),
+            audioTrack = audioTrackChip,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -660,6 +704,7 @@ private fun LandscapeLayout(
     ui: PlayerUiState,
     aspectRatio: AspectRatioMode,
     subtitleState: SubtitleUiState,
+    audioTrackChip: PlayerBarChip?,
     videoLayer: @Composable (Modifier) -> Unit,
     modifier: Modifier,
     onTogglePlayPause: () -> Unit,
@@ -687,6 +732,7 @@ private fun LandscapeLayout(
                 bufferedMs = bufferedMs,
                 ui = ui,
                 subtitleState = subtitleState,
+                audioTrackChip = audioTrackChip,
                 onTogglePlayPause = onTogglePlayPause,
                 onSkipNext = onSkipNext,
                 onSkipPrevious = onSkipPrevious,
@@ -735,6 +781,7 @@ private fun LandscapeLayout(
                 speed = state.playbackSpeed,
                 aspectRatioLabel = aspectRatio.label.string(),
                 subtitlesActive = subtitleState.isRendering,
+                audioTrackChip = audioTrackChip,
                 onExitFullscreen = { ui.applyFullscreen(false) },
                 onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
                 onOpenAspectRatio = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
@@ -784,6 +831,7 @@ private fun AudioLandscapeLayout(
     bufferedMs: Long,
     ui: PlayerUiState,
     subtitleState: SubtitleUiState,
+    audioTrackChip: PlayerBarChip?,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -845,6 +893,7 @@ private fun AudioLandscapeLayout(
                         mode = subtitleState.effectiveMode,
                         onSeekTo = onSeekTo,
                         modifier = Modifier.fillMaxSize(),
+                        timelineOffsetMs = subtitleState.timelineOffsetMs,
                     )
 
                     is LyricsSlot.Notice -> LyricsNotice(
@@ -866,6 +915,7 @@ private fun AudioLandscapeLayout(
                 state = state,
                 ui = ui,
                 subtitleState = subtitleState,
+                audioTrackChip = audioTrackChip,
                 positionMs = positionMs,
                 bufferedMs = bufferedMs,
                 onTogglePlayPause = onTogglePlayPause,
@@ -923,6 +973,7 @@ private fun AudioLandscapeControls(
     state: MspPlaybackState,
     ui: PlayerUiState,
     subtitleState: SubtitleUiState,
+    audioTrackChip: PlayerBarChip?,
     positionMs: Long,
     bufferedMs: Long,
     onTogglePlayPause: () -> Unit,
@@ -949,6 +1000,9 @@ private fun AudioLandscapeControls(
                 abRepeat = state.abRepeat,
                 onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
                 onCycleAbRepeat = onCycleAbRepeat,
+                // 音频横屏不摆画面比例（没画面可调），但音轨照摆：
+                // 多音轨的音频文件（不同语言的配音、不同音质）正是最需要切的地方。
+                audioTrack = audioTrackChip,
                 modifier = Modifier.fillMaxWidth(),
             )
             PlayerTransportControls(

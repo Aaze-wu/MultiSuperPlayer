@@ -145,9 +145,12 @@ private fun headerText(translation: TranslationUiState): MspText {
         ),
     )
     // `（DeepSeek）`：括号的形状本身也跟着语言走（中文全角、英文半角）。
-    return translation.providerName
-        ?.let { MspText.Res(R.string.msp_player_wrapped_in_parens, head, it) }
-        ?: head
+    //
+    // `providerName` 是**非空**的（`TranslationUiState.providerName: MspText`），而且
+    // 内置的 7 个服务商都给得出名字（认不出的 id 也会回退到默认服务商），所以这里
+    // 不再判空——原来那个 `?.` 是它还是可空类型时的残留，编译器会警告它多余，
+    // 而留着它反而会让人以为「服务商名可能缺」这件事真的会发生。
+    return MspText.Res(R.string.msp_player_wrapped_in_parens, head, translation.providerName)
 }
 
 @Composable

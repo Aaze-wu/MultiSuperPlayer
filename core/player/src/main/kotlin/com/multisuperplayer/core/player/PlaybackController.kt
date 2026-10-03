@@ -68,7 +68,7 @@ fun clampPlaybackSpeed(speed: Float): Float {
  * 分开是因为进度条和歌词高亮需要高频位置，而它们只是播放页的一小块。
  * 若把位置塞进 [state]，每次 tick 都会让订阅 [state] 的所有组件重组。
  */
-interface PlaybackController {
+interface PlaybackController : TrackSelectionController {
 
     /** 离散播放状态。**不含播放位置**，理由见类注释。 */
     val state: StateFlow<MspPlaybackState>

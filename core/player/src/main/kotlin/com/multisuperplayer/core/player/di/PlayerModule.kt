@@ -4,6 +4,7 @@ import com.multisuperplayer.core.player.ExoPlayerController
 import com.multisuperplayer.core.player.NextlibSoftwareDecoderSupport
 import com.multisuperplayer.core.player.PlaybackController
 import com.multisuperplayer.core.player.SoftwareDecoderSupport
+import com.multisuperplayer.core.player.TrackSelectionController
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -35,4 +36,10 @@ val playerModule = module {
             positionStore = get(),
         )
     }
+
+    // 字幕那一层只有「有哪些轨 / 选哪条 / 读到哪些行」这几件事要做，
+    // 不该拿到整个 [PlaybackController]（暂停、倍速、队列它一样也不需要）。
+    // 绑定到**同一个**单例：轨道清单必须是同一个内核在维护，两个实例会变成
+    // 两份真相，而且多出来的那个内核还会白白占着解码器。
+    single<TrackSelectionController> { get<PlaybackController>() }
 }

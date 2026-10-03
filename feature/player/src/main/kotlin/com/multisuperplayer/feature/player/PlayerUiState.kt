@@ -42,8 +42,15 @@ data class PlayerSeekHint(
     val durationMs: Long,
 )
 
-/** 播放页上会弹出的两种选择面板。 */
-enum class PlayerSheet { SPEED, ASPECT_RATIO }
+/**
+ * 播放页上会弹出的选择面板。
+ *
+ * 一个面板只改一个维度：`SPEED` 改倍速、`ASPECT_RATIO` 改画面比例、`AUDIO_TRACK`
+ * 改音轨。字幕不在这张表里——它是单独一个 `ModalBottomSheet`（见 `PlayerRoute` 里
+ * 的 `showSubtitleSheet`），因为它下面挂着一整棵状态机（扫描、翻译、导出），
+ * 和这三个「选一个值就关掉」的面板不是一类东西。
+ */
+enum class PlayerSheet { SPEED, ASPECT_RATIO, AUDIO_TRACK }
 
 /**
  * 播放页的**界面**状态：全屏、锁定、控制条显隐、提示泡、当前面板。
