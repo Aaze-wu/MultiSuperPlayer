@@ -23,7 +23,7 @@
     <!-- 入口页五行 -->
     <string name="msp_settings_appearance">外观</string>
     <string name="msp_settings_playback">播放</string>
-    <string name="msp_settings_translation">字幕翻译</string>
+    <string name="msp_settings_translation">字幕与翻译</string>
     <string name="msp_settings_file_access">文件访问</string>
     <string name="msp_settings_about">关于</string>
 
@@ -284,5 +284,28 @@
 
     <string name="msp_settings_show_raw">看服务商返回的原文</string>
     <string name="msp_settings_hide_raw">收起服务商返回的原文</string>
+
+    <!--
+      字幕样式小节。
+
+      档位名（小/标准/大、无/细/粗…）不在这里：它们绑在 `SubtitleStyle` 的枚举上，
+      在 core:data，播放页的字幕面板和这一页共用同一套话。
+
+      为什么放在「字幕与翻译」这一页的**最后**：这一页的入口有两个，一个是从设置页
+      进来的「我想配字幕」，另一个是播放页字幕面板里翻译没配时点「去设置」——
+      后者是带着「我要填密钥」进来的，把外观摆到他第一眼看到的位置会让他多绕一步。
+    -->
+    <string name="msp_settings_section_subtitle_style">字幕样式</string>
+    <string name="msp_settings_subtitle_size">字号</string>
+    <string name="msp_settings_subtitle_size_desc">字幕本身的大小，不影响画面</string>
+    <string name="msp_settings_subtitle_line_spacing">行距</string>
+    <string name="msp_settings_subtitle_line_spacing_desc">同时显示原文与译文时，两行之间的距离</string>
+    <string name="msp_settings_subtitle_outline">描边</string>
+    <string name="msp_settings_subtitle_outline_desc">给字加一圈深色边，浅色画面上更容易看清</string>
+    <string name="msp_settings_subtitle_margin">底部距离</string>
+    <string name="msp_settings_subtitle_margin_desc">字幕离画面底边的距离</string>
+    <string name="msp_settings_subtitle_reset">恢复默认样式</string>
+    <string name="msp_settings_subtitle_reset_desc">字号、行距、描边、底部距离一起恢复</string>
+    <string name="msp_settings_subtitle_reset_already">当前就是默认样式</string>
 
 </resources>

@@ -52,4 +52,27 @@
     <!-- 兜底文案：用户授权的是某个卷的根，但树里没带名字，我们也不知道是哪一张卡。 -->
     <string name="msp_browser_volume_root">存储根目录</string>
 
+    <!--
+      字幕样式的**档位名**。
+
+      放在 core:data 而不是播放页里，是因为它们绑在 `SubtitleStyle` 的枚举上：
+      那个枚举是持久化契约（存的是枚举名），档位文案和枚举必须在同一个模块里，
+      否则会出现「加了一个档位但没有人给它写文案」——而 `entries` 的 `label`
+      是必填参数，漏了就编译不过，这正是想要的。
+
+      小节标题与行内标签不在这里：它们属于画它们的那个页面（播放页字幕面板 / 设置页）。
+    -->
+    <string name="msp_subtitle_style_normal">标准</string>
+    <string name="msp_subtitle_style_size_small">小</string>
+    <string name="msp_subtitle_style_size_large">大</string>
+    <string name="msp_subtitle_style_size_huge">特大</string>
+    <string name="msp_subtitle_style_line_tight">紧凑</string>
+    <string name="msp_subtitle_style_line_loose">宽松</string>
+    <string name="msp_subtitle_style_outline_none">无</string>
+    <string name="msp_subtitle_style_outline_thin">细</string>
+    <string name="msp_subtitle_style_outline_thick">粗</string>
+    <string name="msp_subtitle_style_margin_edge">贴边</string>
+    <string name="msp_subtitle_style_margin_raised">抬高</string>
+    <string name="msp_subtitle_style_margin_high">很高</string>
+
 </resources>

@@ -60,4 +60,15 @@ enum class SubtitleDisplayMode {
  */
 data class SubtitleSettings(
     val displayMode: SubtitleDisplayMode = SubtitleDisplayMode.DEFAULT,
+    /**
+     * 字幕外观（字号 / 行距 / 描边 / 底部距离）。
+     *
+     * 做成**一个**字段而不是四个平铺字段：[SubtitleStyle] 是一组必须一起取默认值的
+     * 参数，分开摆会让「恢复默认样式」变成四处写入，而其中最容易被漏掉的那一处
+     * 只在用户重启应用后才看得出来。
+     *
+     * 它是**全局**的、跨文件保留的：字号小是「我看不清」这件事的属性，不是某一部片子的。
+     * 与「字幕时间轴微调」（`SubtitleUiState.timelineOffsetMs`）那种「本次播放」状态刻意相反。
+     */
+    val style: SubtitleStyle = SubtitleStyle.DEFAULT,
 )

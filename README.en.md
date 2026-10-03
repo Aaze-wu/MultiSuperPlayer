@@ -101,6 +101,17 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - **Subtitle timeline offset**: ±0.1 s and ±0.5 s steps that accumulate, plus a *Reset* button. A positive
   value means the subtitle appears **later** (if it shows up before the sound, tune positive). The offset
   only shifts the timeline as a whole; it never changes how long a line stays on screen.
+- **Subtitle style**: presets for text size (Small / Normal / Large / Huge), line spacing (Tight / Normal /
+  Loose), outline (None / Thin / Normal / Thick) and bottom margin (Edge / Normal / Raised / High). Both the
+  **subtitle panel on the player** and the **"Subtitles & translation" settings page** can edit them; the
+  two entry points share one setting, changes apply immediately and are remembered globally, and *Reset
+  subtitle style* puts all four back at once. The reset runs in a single transaction rather than four
+  consecutive writes: if one of those failed you would be left half default and half custom with nothing on
+  screen saying which half did not make it. Presets rather than continuous sliders, because no tick on a
+  slider has any claim to being "the default", nobody dares to drag one arbitrarily, and afterwards a stored
+  number ("1.37× text size") cannot be explained. **The default presets resolve to exactly the numbers
+  v0.5.15 hard-coded** (16sp text size / 24sp line height / no outline / 12dp bottom margin), so nobody sees
+  their subtitles suddenly change after upgrading — a unit test guards this.
 
 ### 1.3 Subtitle translation
 
@@ -263,7 +274,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.12** | **Portrait player gets a *Collapse* button top-left (a visible exit that keeps playing)** | Done |
 | **v0.5.13** | **Landscape layout dedicated to audio: cover left, lyrics right, permanent control strip (also fixes controls that could not be brought back)** | Done |
 | **v0.5.14** | **"Choose subtitle file…" in the subtitle panel; previous / next buttons on the bottom bar; fixes playback controls never appearing in the notification (the Media3 session was never registered)** | Done |
-| **v0.5.15** | **Subtitle tracks muxed into the container are fed into our own subtitle layer (including the fix that reads the format from `codecs`); audio / embedded-subtitle track pickers; subtitle timeline offset ±** | **Current** |
+| **v0.5.15** | **Subtitle tracks muxed into the container are fed into our own subtitle layer (including the fix that reads the format from `codecs`); audio / embedded-subtitle track pickers; subtitle timeline offset ±** | Done |
+| **v0.5.16** | **Subtitle style: presets for text size / line spacing / outline / bottom margin, edited from either the player or the settings page (one shared setting, applied immediately), with a one-tap reset (the default presets match v0.5.15's rendering parameters exactly)** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 

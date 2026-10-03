@@ -371,6 +371,11 @@ fun PlayerRoute(
             onSelectEmbedded = subtitleViewModel::selectEmbeddedTrack,
             onNudgeTimeline = subtitleViewModel::nudgeTimelineOffset,
             onResetTimeline = subtitleViewModel::resetTimelineOffset,
+            onSetTextSize = subtitleViewModel::setTextSize,
+            onSetLineSpacing = subtitleViewModel::setLineSpacing,
+            onSetOutline = subtitleViewModel::setOutline,
+            onSetBottomMargin = subtitleViewModel::setBottomMargin,
+            onResetStyle = subtitleViewModel::resetStyle,
             onUseAuto = subtitleViewModel::useAutoSelection,
             onRescan = subtitleViewModel::rescan,
             onPickFile = { manualSubtitleLauncher.launch(arrayOf("*/*")) },
@@ -513,13 +518,18 @@ fun PlayerScreen(
         ) {
             // 字幕层叠在画面矩形**里面**（见 PlayerVideoSurface 的 overlay 参数），
             // 所以它跟着画面的实际高度走，而不会跑到黑边里。
+            //
+            // 这里只留「左右各 16dp」这种与用户设置无关的边距：**离底边多远由字幕样式
+            // 决定**，而样式是全局设置、和这里的布局常量不是一回事。两边都写一份的话，
+            // 用户把「底部距离」调到最大时，实际位置会是「设置值 + 12dp」——多出来的
+            // 那一截没有任何地方能解释。
             SubtitleOverlay(
                 state = subtitleState,
                 positionMs = positionMs,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp),
             )
         }
     }

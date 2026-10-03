@@ -13,6 +13,12 @@ import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
+import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
+import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
+import com.multisuperplayer.core.data.settings.SubtitleOutline
+import com.multisuperplayer.core.data.settings.SubtitleSettings
+import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
+import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -65,13 +71,16 @@ data class ModelListState(
 /**
  * 设置页的状态。
  *
- * 这里**只装载当前内核已经会读的设置项**。像「字幕字号」这类还没有消费者的项，
- * 等对应的内核做实了再加——写一个没人读的开关，用户拨它只会得到一个
- * 「看起来生效了但什么都没发生」的界面。
+ * 这里**只装载当前内核已经会读的设置项**。一个没人读的开关，用户拨它只会得到
+ * 一个「看起来生效了但什么都没发生」的界面，比没有这个开关更糟。
+ *
+ * v0.5.15 之前这类注释里举的例子是「字幕字号」——它在 v0.5.16 有了消费者
+ * （渲染层按 [SubtitleSettings.style] 排版字幕），所以现在长在这里。
  */
 class SettingsViewModel(
     private val themeSettings: ThemeSettingsRepository,
     private val translationSettings: TranslationSettingsRepository,
+    private val subtitleStyleSettings: SubtitleSettingsRepository,
     private val playbackSettingsRepository: PlaybackSettingsRepository,
     private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
@@ -292,6 +301,51 @@ class SettingsViewModel(
 
     fun setGlossary(glossary: Glossary) = persist("术语表（${glossary.size} 条）") {
         translationSettings.setGlossary(glossary)
+    }
+
+    // ------------------------------------------------------------------ 字幕样式
+
+    /**
+     * 字幕外观。和翻译设置同属「字幕与翻译」那一页。
+     *
+     * `Eagerly` + 全默认初值，理由同主题/播放：首帧不能先闪一个错的档位，
+     * 否则用户会看到「标准」跳成自己选的那个。
+     *
+     * 这里改的和播放页字幕面板里改的是**同一个值**（同一个仓库、同一份全局设置）。
+     * 两边都只是入口：面板是「一边看一边改」，这里是「先把偏好配好」。
+     */
+    val subtitle: StateFlow<SubtitleSettings> = subtitleStyleSettings.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SubtitleSettings())
+
+    /**
+     * 四个档位。默认值用枚举自己的 `DEFAULT` 时不要在这里写死字符串——
+     * 写进日志的是枚举名，跟杆位对不上的话日志会误导人。
+     */
+    fun setSubtitleTextSize(size: SubtitleTextSize) = persist("字幕字号=${size.name}") {
+        subtitleStyleSettings.setTextSize(size)
+    }
+
+    fun setSubtitleLineSpacing(spacing: SubtitleLineSpacing) = persist("字幕行距=${spacing.name}") {
+        subtitleStyleSettings.setLineSpacing(spacing)
+    }
+
+    fun setSubtitleOutline(outline: SubtitleOutline) = persist("字幕描边=${outline.name}") {
+        subtitleStyleSettings.setOutline(outline)
+    }
+
+    fun setSubtitleBottomMargin(margin: SubtitleBottomMargin) = persist("字幕底部距离=${margin.name}") {
+        subtitleStyleSettings.setBottomMargin(margin)
+    }
+
+    /**
+     * 恢复默认样式。
+     *
+     * 四个键必须**一次事务**写完（[SubtitleSettingsRepository.resetStyle]），
+     * 不能在这里连调四个 setter：中途失败会留下「一半默认一半自定义」的样式，
+     * 而那个组合在界面上没有任何对应的档位显示。
+     */
+    fun resetSubtitleStyle() = persist("恢复默认字幕样式") {
+        subtitleStyleSettings.resetStyle()
     }
 
     /**

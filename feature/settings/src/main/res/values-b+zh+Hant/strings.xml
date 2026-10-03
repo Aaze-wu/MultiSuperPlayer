@@ -8,7 +8,7 @@
 
     <string name="msp_settings_appearance">外觀</string>
     <string name="msp_settings_playback">播放</string>
-    <string name="msp_settings_translation">字幕翻譯</string>
+    <string name="msp_settings_translation">字幕與翻譯</string>
     <string name="msp_settings_file_access">檔案存取</string>
     <string name="msp_settings_about">關於</string>
 
@@ -207,5 +207,19 @@
 
     <string name="msp_settings_show_raw">看服務商返回的原文</string>
     <string name="msp_settings_hide_raw">收起服務商返回的原文</string>
+
+    <!-- 字幕樣式小節（見 values/strings.xml 的同一段說明）。 -->
+    <string name="msp_settings_section_subtitle_style">字幕樣式</string>
+    <string name="msp_settings_subtitle_size">字號</string>
+    <string name="msp_settings_subtitle_size_desc">字幕本身的大小，不影響畫面</string>
+    <string name="msp_settings_subtitle_line_spacing">行距</string>
+    <string name="msp_settings_subtitle_line_spacing_desc">同時顯示原文與譯文時，兩行之間的距離</string>
+    <string name="msp_settings_subtitle_outline">描邊</string>
+    <string name="msp_settings_subtitle_outline_desc">給字加一圈深色邊，淺色畫面上更容易看清</string>
+    <string name="msp_settings_subtitle_margin">底部距離</string>
+    <string name="msp_settings_subtitle_margin_desc">字幕離畫面底邊的距離</string>
+    <string name="msp_settings_subtitle_reset">恢復預設樣式</string>
+    <string name="msp_settings_subtitle_reset_desc">字號、行距、描邊、底部距離一起恢復</string>
+    <string name="msp_settings_subtitle_reset_already">目前就是預設樣式</string>
 
 </resources>

@@ -5,7 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
+import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
+import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
+import com.multisuperplayer.core.data.settings.SubtitleOutline
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
+import com.multisuperplayer.core.data.settings.SubtitleStyle
+import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleLoadResult
@@ -218,6 +223,7 @@ class SubtitleViewModel(
             displayMode = settings.displayMode,
             embeddedTracks = trackList.embeddedTextTracks(),
             timelineOffsetMs = offsetMs,
+            style = settings.style,
         )
     }.stateIn(
         viewModelScope,
@@ -432,6 +438,37 @@ class SubtitleViewModel(
 
     /** 关掉字幕 = 切到 [SubtitleDisplayMode.OFF]，不是「卸载这条字幕」。 */
     fun disableSubtitles() = setDisplayMode(SubtitleDisplayMode.OFF)
+
+    // ---------------------------------------------------------------- 字幕样式
+    //
+    // 四个 setter 都直接写仓库并**不**回读任何东西：样式的唯一真相源是 DataStore，
+    // 而 `state` 那条管线本来就订阅着它（见上面的 `combine`）。在这里再存一份
+    // 「当前字号」就会出现两个真相源，其中一个只在改完之后才跟上。
+    //
+    // 这四个值和 `setDisplayMode` 一样是**全局**的：改字号影响的是之后每一部片子，
+    // 而不是「这一部」。想成「字幕层的缩放」会让人以为下标（cue 时间轴）也得跟着变，
+    // 那是不需要的。
+
+    fun setTextSize(size: SubtitleTextSize) {
+        viewModelScope.launch { settingsRepository.setTextSize(size) }
+    }
+
+    fun setLineSpacing(spacing: SubtitleLineSpacing) {
+        viewModelScope.launch { settingsRepository.setLineSpacing(spacing) }
+    }
+
+    fun setOutline(outline: SubtitleOutline) {
+        viewModelScope.launch { settingsRepository.setOutline(outline) }
+    }
+
+    fun setBottomMargin(margin: SubtitleBottomMargin) {
+        viewModelScope.launch { settingsRepository.setBottomMargin(margin) }
+    }
+
+    /** 四个样式键在仓库里是**一次事务**写完的，所以不会出现「只恢复了三个」的中间态。 */
+    fun resetStyle() {
+        viewModelScope.launch { settingsRepository.resetStyle() }
+    }
 
     /**
      * 加载管线：扫目录 → 挑一条 → 读+解析。
@@ -729,6 +766,14 @@ data class SubtitleUiState(
      * 没有任何东西提示「你以前调过」。换条目时归零（见 `SubtitleViewModel.bindEntry`）。
      */
     val timelineOffsetMs: Long = 0L,
+    /**
+     * 字幕外观（字号 / 行距 / 描边 / 底部距离）。
+     *
+     * 放在**状态**里而不是让渲染层自己去订阅设置，是因为 `SubtitleOverlay` 拿到的
+     * 就是这一个对象。让它再依赖一个仓库就会出现两个数据源各自重组：一帧里可能
+     * 一半用新字号、一半用旧字号，而屏幕上只表现为「改完字号那一下闪了一下」。
+     */
+    val style: SubtitleStyle = SubtitleStyle.DEFAULT,
 ) {
     val isLoading: Boolean get() = phase == SubtitlePhase.SCANNING || phase == SubtitlePhase.LOADING
     /** 屏幕上有东西可画吗。 */
@@ -750,6 +795,7 @@ internal fun resolveSubtitleState(
     displayMode: SubtitleDisplayMode,
     embeddedTracks: List<MspTrackInfo> = emptyList(),
     timelineOffsetMs: Long = 0L,
+    style: SubtitleStyle = SubtitleStyle.DEFAULT,
 ): SubtitleUiState {
     val document = load.document
     val fallbackNeeded = displayMode == SubtitleDisplayMode.TRANSLATION_ONLY &&
@@ -772,6 +818,7 @@ internal fun resolveSubtitleState(
         embeddedTracks = embeddedTracks,
         embeddedTrack = load.embeddedTrack,
         timelineOffsetMs = timelineOffsetMs,
+        style = style,
     )
 }
 

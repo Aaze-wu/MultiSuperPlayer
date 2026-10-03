@@ -43,4 +43,18 @@
     <!-- 兜底文案：用户授权的是某个卷的根，但树里没带名字，我们也不知道是哪一张卡。 -->
     <string name="msp_browser_volume_root">Storage root</string>
 
+    <!-- 字幕样式的档位名（见 values/strings.xml 的同一段说明）。 -->
+    <string name="msp_subtitle_style_normal">Normal</string>
+    <string name="msp_subtitle_style_size_small">Small</string>
+    <string name="msp_subtitle_style_size_large">Large</string>
+    <string name="msp_subtitle_style_size_huge">Huge</string>
+    <string name="msp_subtitle_style_line_tight">Tight</string>
+    <string name="msp_subtitle_style_line_loose">Loose</string>
+    <string name="msp_subtitle_style_outline_none">Off</string>
+    <string name="msp_subtitle_style_outline_thin">Thin</string>
+    <string name="msp_subtitle_style_outline_thick">Thick</string>
+    <string name="msp_subtitle_style_margin_edge">Edge</string>
+    <string name="msp_subtitle_style_margin_raised">Raised</string>
+    <string name="msp_subtitle_style_margin_high">Very high</string>
+
 </resources>

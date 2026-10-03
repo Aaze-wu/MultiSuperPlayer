@@ -10,6 +10,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.FormatColorText
+import androidx.compose.material.icons.outlined.FormatLineSpacing
+import androidx.compose.material.icons.outlined.FormatSize
+import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -41,6 +46,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
+import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
+import com.multisuperplayer.core.data.settings.SubtitleOutline
+import com.multisuperplayer.core.data.settings.SubtitleStyle
+import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.translate.FailureText
 import com.multisuperplayer.core.translate.Glossary
@@ -75,6 +85,7 @@ fun TranslationSettingsRoute(
     val settings by viewModel.translation.collectAsStateWithLifecycle()
     val connectionTest by viewModel.connectionTest.collectAsStateWithLifecycle()
     val modelList by viewModel.modelList.collectAsStateWithLifecycle()
+    val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
 
     TranslationSettingsScreen(
         settings = settings,
@@ -91,6 +102,14 @@ fun TranslationSettingsRoute(
         onClearApiKey = viewModel::clearApiKey,
         onTestConnection = viewModel::testConnection,
         onFetchModels = viewModel::fetchModels,
+        // 外观和翻译在同一个仓库的两个键上，所以两段共用这一个 ViewModel，
+        // 不需要为「字幕长什么样」再造一个。
+        subtitleStyle = subtitle.style,
+        onSetSubtitleTextSize = viewModel::setSubtitleTextSize,
+        onSetSubtitleLineSpacing = viewModel::setSubtitleLineSpacing,
+        onSetSubtitleOutline = viewModel::setSubtitleOutline,
+        onSetSubtitleBottomMargin = viewModel::setSubtitleBottomMargin,
+        onResetSubtitleStyle = viewModel::resetSubtitleStyle,
         modifier = modifier,
     )
 }
@@ -113,7 +132,21 @@ fun TranslationSettingsScreen(
     onTestConnection: () -> Unit,
     onFetchModels: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitleStyle: SubtitleStyle = SubtitleStyle.DEFAULT,
+    onSetSubtitleTextSize: (SubtitleTextSize) -> Unit = {},
+    onSetSubtitleLineSpacing: (SubtitleLineSpacing) -> Unit = {},
+    onSetSubtitleOutline: (SubtitleOutline) -> Unit = {},
+    onSetSubtitleBottomMargin: (SubtitleBottomMargin) -> Unit = {},
+    onResetSubtitleStyle: () -> Unit = {},
 ) {
+    // 当前打开的字幕样式对话框（null = 没开）。
+    //
+    // 用「当前值 + 点开选」而不是像播放页的字幕面板那样把档位排成芯片：那边是
+    // 「一边看画面一边连点着试」，所以每多一次点击都是代价；这里是「先把偏好配好」，
+    // 一屏能看完四项比少点一下更重要——四排芯片摆开之后，反而要事先弄清楚
+    // 「这一排是字号还是行距」。
+    var openStyleDialog: SubtitleStyleDialog? by remember { mutableStateOf(null) }
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -251,9 +284,131 @@ fun TranslationSettingsScreen(
                     }
                 }
             }
+
+            // 字幕外观放在**最后**：这一页的两个入口里，一个是设置页的「字幕与翻译」，
+            // 另一个是播放页字幕面板里翻译没配好时的「去设置」——后者带着
+            // 「我要填密钥」进来，把外观摆到他第一眼看到的地方等于让他多绕一步。
+            // 而上面服务商 → 密钥 → 翻译 → 测试连接是一条完整的诊断链，也不该被切断。
+            item { SectionHeader(stringResource(R.string.msp_settings_section_subtitle_style)) }
+            item {
+                SettingChoiceRow(
+                    icon = Icons.Outlined.FormatSize,
+                    title = stringResource(R.string.msp_settings_subtitle_size),
+                    value = subtitleStyle.textSize.label.string(),
+                    subtitle = stringResource(R.string.msp_settings_subtitle_size_desc),
+                    onClick = { openStyleDialog = SubtitleStyleDialog.TEXT_SIZE },
+                )
+            }
+            item {
+                SettingChoiceRow(
+                    icon = Icons.Outlined.FormatLineSpacing,
+                    title = stringResource(R.string.msp_settings_subtitle_line_spacing),
+                    value = subtitleStyle.lineSpacing.label.string(),
+                    subtitle = stringResource(R.string.msp_settings_subtitle_line_spacing_desc),
+                    onClick = { openStyleDialog = SubtitleStyleDialog.LINE_SPACING },
+                )
+            }
+            item {
+                SettingChoiceRow(
+                    icon = Icons.Outlined.FormatColorText,
+                    title = stringResource(R.string.msp_settings_subtitle_outline),
+                    value = subtitleStyle.outline.label.string(),
+                    subtitle = stringResource(R.string.msp_settings_subtitle_outline_desc),
+                    onClick = { openStyleDialog = SubtitleStyleDialog.OUTLINE },
+                )
+            }
+            item {
+                SettingChoiceRow(
+                    icon = Icons.Outlined.VerticalAlignBottom,
+                    title = stringResource(R.string.msp_settings_subtitle_margin),
+                    value = subtitleStyle.bottomMargin.label.string(),
+                    subtitle = stringResource(R.string.msp_settings_subtitle_margin_desc),
+                    onClick = { openStyleDialog = SubtitleStyleDialog.BOTTOM_MARGIN },
+                )
+            }
+            item {
+                // 四个档位的默认值**不是**同一类值（字号默认「标准」、描边默认「无」），
+                // 所以「恢复默认」不能让用户自己去猜是哪几项。已经全是默认值时置灰：
+                // 按下去不会有任何变化的按钮，按下去只会让人怀疑「是不是没生效」。
+                val isDefault = subtitleStyle == SubtitleStyle.DEFAULT
+                SettingActionRow(
+                    icon = Icons.Outlined.Restore,
+                    title = stringResource(R.string.msp_settings_subtitle_reset),
+                    subtitle = stringResource(
+                        if (isDefault) R.string.msp_settings_subtitle_reset_already
+                        else R.string.msp_settings_subtitle_reset_desc,
+                    ),
+                    onClick = onResetSubtitleStyle,
+                    enabled = !isDefault,
+                )
+            }
         }
     }
+
+    // 对话框画在 `Scaffold` 外面，而不是塞进 `LazyColumn` 的 item 里：
+    // 放进 item 的话它会随列表滚走，而对话框是浮层，本就不该有自己的滚动位置。
+    //
+    // 四组都没有 `description`：档位名（小/标准/大/特大、无/细/标准/粗）就是全部
+    // 需要知道的信息，再写一句「比标准小一点」只是把同一件事说两遍。
+    when (openStyleDialog) {
+        SubtitleStyleDialog.TEXT_SIZE -> ChoiceDialog(
+            title = stringResource(R.string.msp_settings_subtitle_size),
+            options = SubtitleTextSize.entries,
+            selected = subtitleStyle.textSize,
+            label = { it.label.string() },
+            description = { null },
+            onSelect = { size ->
+                onSetSubtitleTextSize(size)
+                openStyleDialog = null
+            },
+            onDismiss = { openStyleDialog = null },
+        )
+
+        SubtitleStyleDialog.LINE_SPACING -> ChoiceDialog(
+            title = stringResource(R.string.msp_settings_subtitle_line_spacing),
+            options = SubtitleLineSpacing.entries,
+            selected = subtitleStyle.lineSpacing,
+            label = { it.label.string() },
+            description = { null },
+            onSelect = { spacing ->
+                onSetSubtitleLineSpacing(spacing)
+                openStyleDialog = null
+            },
+            onDismiss = { openStyleDialog = null },
+        )
+
+        SubtitleStyleDialog.OUTLINE -> ChoiceDialog(
+            title = stringResource(R.string.msp_settings_subtitle_outline),
+            options = SubtitleOutline.entries,
+            selected = subtitleStyle.outline,
+            label = { it.label.string() },
+            description = { null },
+            onSelect = { outline ->
+                onSetSubtitleOutline(outline)
+                openStyleDialog = null
+            },
+            onDismiss = { openStyleDialog = null },
+        )
+
+        SubtitleStyleDialog.BOTTOM_MARGIN -> ChoiceDialog(
+            title = stringResource(R.string.msp_settings_subtitle_margin),
+            options = SubtitleBottomMargin.entries,
+            selected = subtitleStyle.bottomMargin,
+            label = { it.label.string() },
+            description = { null },
+            onSelect = { margin ->
+                onSetSubtitleBottomMargin(margin)
+                openStyleDialog = null
+            },
+            onDismiss = { openStyleDialog = null },
+        )
+
+        null -> Unit
+    }
 }
+
+/** 字幕样式页上会弹出的选择对话框。 */
+private enum class SubtitleStyleDialog { TEXT_SIZE, LINE_SPACING, OUTLINE, BOTTOM_MARGIN }
 
 /**
  * 还差哪一项，逐项列出来——「请检查设置」等于什么都没说。

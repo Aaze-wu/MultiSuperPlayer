@@ -132,4 +132,12 @@
     <string name="msp_player_offset_zero">0 秒</string>
     <string name="msp_player_nothing_playing">沒有正在播放的內容</string>
     <string name="msp_player_nothing_playing_desc">到「媒體庫」裡選一條音訊或影片即可開始播放。</string>
+
+    <!-- 字幕樣式小節（見 values/strings.xml 的同一段說明）。 -->
+    <string name="msp_player_subtitle_style">字幕樣式</string>
+    <string name="msp_player_subtitle_style_size">字號</string>
+    <string name="msp_player_subtitle_style_line_spacing">行距</string>
+    <string name="msp_player_subtitle_style_outline">描邊</string>
+    <string name="msp_player_subtitle_style_bottom_margin">底部距離</string>
+    <string name="msp_player_subtitle_style_reset">恢復預設樣式</string>
 </resources>

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,7 +27,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
+import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
+import com.multisuperplayer.core.data.settings.SubtitleOutline
+import com.multisuperplayer.core.data.settings.SubtitleStyle
+import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.translate.SubtitleExportFormat
@@ -55,6 +61,11 @@ internal fun SubtitleTrackPicker(
     onSelectEmbedded: (MspTrackInfo) -> Unit,
     onNudgeTimeline: (Long) -> Unit,
     onResetTimeline: () -> Unit,
+    onSetTextSize: (SubtitleTextSize) -> Unit,
+    onSetLineSpacing: (SubtitleLineSpacing) -> Unit,
+    onSetOutline: (SubtitleOutline) -> Unit,
+    onSetBottomMargin: (SubtitleBottomMargin) -> Unit,
+    onResetStyle: () -> Unit,
     onUseAuto: () -> Unit,
     onRescan: () -> Unit,
     onPickFile: () -> Unit,
@@ -113,6 +124,15 @@ internal fun SubtitleTrackPicker(
                 state = state,
                 onNudge = onNudgeTimeline,
                 onReset = onResetTimeline,
+            )
+
+            SubtitleStyleSection(
+                state = state,
+                onSetTextSize = onSetTextSize,
+                onSetLineSpacing = onSetLineSpacing,
+                onSetOutline = onSetOutline,
+                onSetBottomMargin = onSetBottomMargin,
+                onReset = onResetStyle,
             )
 
             TranslationSection(
@@ -366,6 +386,142 @@ private fun SubtitleSyncSection(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * 字幕外观：字号 / 行距 / 描边 / 底部距离。
+ *
+ * ## 为什么和「时间轴微调」一样放在面板里
+ *
+ * 这两件事的用法完全一样：一边看画面一边改。字号太小、字幕压进画面的黑边里、
+ * 深色背景下白字没边看不清——都是**当场**才发现的，而改的时候必须能同时看到画面
+ * （面板是浮层，画面还在后面放着）。摆到控制栏里则是每一条正常播放都要多挨
+ * 一排按钮。
+ *
+ * ## 为什么不管「当前有没有挂上字幕」
+ *
+ * 时间轴微调必须挂着字幕才有意义（没字幕时调它没有任何可观察的结果）；而样式是
+ * **全局设置**，影响的是以后每一个文件。因为「当前这条没字幕」就把设置藏起来，
+ * 等于把「设置」和「当前文件」混成一件事——用户想先把字号调大再去放片子，
+ * 会发现根本找不到入口。
+ *
+ * 唯一真的不显示的情况是**模式 = 隐藏**：那时屏幕上永远不会有字幕，
+ * 摆四个只改外观的档位（旁边没有任何东西会变）只会让人以为没生效。
+ */
+@Composable
+private fun SubtitleStyleSection(
+    state: SubtitleUiState,
+    onSetTextSize: (SubtitleTextSize) -> Unit,
+    onSetLineSpacing: (SubtitleLineSpacing) -> Unit,
+    onSetOutline: (SubtitleOutline) -> Unit,
+    onSetBottomMargin: (SubtitleBottomMargin) -> Unit,
+    onReset: () -> Unit,
+) {
+    if (state.displayMode == SubtitleDisplayMode.OFF) return
+    val style = state.style
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(R.string.msp_player_subtitle_style),
+            style = MaterialTheme.typography.labelLarge,
+        )
+
+        StyleChipGroup(
+            title = stringResource(R.string.msp_player_subtitle_style_size),
+            options = SubtitleTextSize.entries,
+            selected = style.textSize,
+            label = { it.label.string() },
+            onSelect = onSetTextSize,
+        )
+
+        StyleChipGroup(
+            title = stringResource(R.string.msp_player_subtitle_style_line_spacing),
+            options = SubtitleLineSpacing.entries,
+            selected = style.lineSpacing,
+            label = { it.label.string() },
+            onSelect = onSetLineSpacing,
+        )
+
+        StyleChipGroup(
+            title = stringResource(R.string.msp_player_subtitle_style_outline),
+            options = SubtitleOutline.entries,
+            selected = style.outline,
+            label = { it.label.string() },
+            onSelect = onSetOutline,
+        )
+
+        StyleChipGroup(
+            title = stringResource(R.string.msp_player_subtitle_style_bottom_margin),
+            options = SubtitleBottomMargin.entries,
+            selected = style.bottomMargin,
+            label = { it.label.string() },
+            onSelect = onSetBottomMargin,
+        )
+
+        // 「恢复默认样式」而不是让用户自己点回四个档位：四个档位的默认值并不都是
+        // 各组的第一项，也不都是中间那项（字号/行距/底部距离的默认是「标准」，
+        // 而默认**不开**描边）。让用户自己猜「出厂是哪个」是没必要的一道题。
+        //
+        // 已经全是默认值时禁用：按下去不会有任何变化的按钮，按下去只会让人怀疑
+        // 「是不是没生效」。这四个键在仓库里是一次事务写完的，所以不会出现
+        // 「恢复了三个」的中间态。
+        TextButton(onClick = onReset, enabled = style != SubtitleStyle.DEFAULT) {
+            Text(stringResource(R.string.msp_player_subtitle_style_reset))
+        }
+    }
+}
+
+/**
+ * 一行「标题 + 一排档位芯片」。
+ *
+ * 做成泛型而不是复制四遍：四组选项的唯一区别就是类型，而复制四遍的结果一定是
+ * 「加了一组新的、但漏了其中一份的某个细节」（比如忘了 `maxLines = 1`，
+ * 于是英文档位名被裁成 `Translati` —— 一个看中文截图永远发现不了的缺陷）。
+ *
+ * 用 [FlowRow] 而不是等分的 `Row`：档位文案长度不等（中英文都不同），
+ * 等分装不下时 `FilterChip` 会把文字裁掉。换行比缩小字号或截断都稳妥。
+ */
+@Composable
+private fun <T> StyleChipGroup(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // 固定一个标题栏最小宽度：四行的芯片就从同一列开始，而不是被
+            // 「字号」和「底部距离」的宽度差推来推去（那样看起来像两组不同的东西）。
+            // 76dp 放得下中文四字；英文（Bottom margin）放不下会在标题栏内部换行，
+            // 不会裁字。
+            modifier = Modifier
+                .widthIn(min = 76.dp)
+                .padding(top = 8.dp, end = 8.dp),
+        )
+        FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            options.forEach { option ->
+                FilterChip(
+                    selected = option == selected,
+                    onClick = { onSelect(option) },
+                    label = {
+                        Text(
+                            text = label(option),
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 

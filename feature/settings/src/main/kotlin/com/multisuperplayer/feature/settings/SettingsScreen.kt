@@ -150,8 +150,8 @@ fun SettingsScreen(
             item {
                 SettingActionRow(
                     icon = Icons.Outlined.Translate,
-                    // 标题和 [TranslationSettingsScreen] 的标题保持一致：「字幕与翻译」听起来
-                    // 更完整，但那一页里目前只有翻译设置（字幕显示相关的项还没有消费者）。
+                    // 标题和 [TranslationSettingsScreen] 的标题保持一致：那一页现在装的是
+                    // 「字幕外观 + 翻译设置」两段，所以叫「字幕与翻译」而不是「字幕翻译」。
                     // 页面标题和入口名不一样会让人怀疑自己点错了地方。
                     title = stringResource(R.string.msp_settings_translation),
                     subtitle = SettingsSummaries.translation(translation).string(),

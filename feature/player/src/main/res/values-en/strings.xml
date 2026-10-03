@@ -127,4 +127,12 @@
     <string name="msp_player_offset_zero">0 s</string>
     <string name="msp_player_nothing_playing">Nothing is playing</string>
     <string name="msp_player_nothing_playing_desc">Pick an audio or video file in Library to start playing.</string>
+
+    <!-- 字幕样式小节（见 values/strings.xml 的同一段说明）。 -->
+    <string name="msp_player_subtitle_style">Subtitle style</string>
+    <string name="msp_player_subtitle_style_size">Text size</string>
+    <string name="msp_player_subtitle_style_line_spacing">Line spacing</string>
+    <string name="msp_player_subtitle_style_outline">Outline</string>
+    <string name="msp_player_subtitle_style_bottom_margin">Bottom margin</string>
+    <string name="msp_player_subtitle_style_reset">Reset subtitle style</string>
 </resources>

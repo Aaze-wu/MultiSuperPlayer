@@ -87,4 +87,150 @@ class SubtitleSettingsTest {
         assertEquals("black", both.toThemeSettings().baseThemeId)
         assertEquals(SubtitleDisplayMode.BILINGUAL, both.toSubtitleSettings().displayMode)
     }
+
+    // ---------------------------------------------------------------- 字幕样式
+
+    @Test
+    fun `全新安装时用默认字幕样式`() {
+        val settings = preferencesOf().toSubtitleSettings()
+
+        assertEquals(SubtitleStyle.DEFAULT, settings.style)
+        // 默认值必须和 v0.5.15 写死的渲染参数一致，否则升级之后所有人的字幕
+        // 会自己变样。这里只钉**档位**，具体数字由 feature:player 的
+        // SubtitleStyleRulesTest 钉（两处都需要：一个是「存什么」，一个是「画成什么」）。
+        assertEquals(SubtitleTextSize.NORMAL, settings.style.textSize)
+        assertEquals(SubtitleLineSpacing.NORMAL, settings.style.lineSpacing)
+        assertEquals(SubtitleOutline.NONE, settings.style.outline)
+        assertEquals(SubtitleBottomMargin.NEAR, settings.style.bottomMargin)
+    }
+
+    @Test
+    fun `四组样式档位都能原样存取`() {
+        // 用字面量键名读写：这是写入用户设备的**契约**，改成 Keys.X.name
+        // 就只能证明「我读得出来我自己写的东西」。
+        SubtitleTextSize.entries.forEach { size ->
+            val stored = preferencesOf(stringPreferencesKey("subtitle.text_size") to size.name)
+                .toSubtitleSettings()
+            assertEquals(size, stored.style.textSize)
+        }
+        SubtitleLineSpacing.entries.forEach { spacing ->
+            val stored = preferencesOf(stringPreferencesKey("subtitle.line_spacing") to spacing.name)
+                .toSubtitleSettings()
+            assertEquals(spacing, stored.style.lineSpacing)
+        }
+        SubtitleOutline.entries.forEach { outline ->
+            val stored = preferencesOf(stringPreferencesKey("subtitle.outline") to outline.name)
+                .toSubtitleSettings()
+            assertEquals(outline, stored.style.outline)
+        }
+        SubtitleBottomMargin.entries.forEach { margin ->
+            val stored = preferencesOf(stringPreferencesKey("subtitle.bottom_margin") to margin.name)
+                .toSubtitleSettings()
+            assertEquals(margin, stored.style.bottomMargin)
+        }
+    }
+
+    @Test
+    fun `四个样式键同时存进去也互不干扰`() {
+        val stored = preferencesOf(
+            stringPreferencesKey("subtitle.text_size") to SubtitleTextSize.HUGE.name,
+            stringPreferencesKey("subtitle.line_spacing") to SubtitleLineSpacing.TIGHT.name,
+            stringPreferencesKey("subtitle.outline") to SubtitleOutline.THICK.name,
+            stringPreferencesKey("subtitle.bottom_margin") to SubtitleBottomMargin.HIGH.name,
+            stringPreferencesKey("subtitle.display_mode") to SubtitleDisplayMode.OFF.name,
+        ).toSubtitleSettings()
+
+        assertEquals(SubtitleDisplayMode.OFF, stored.displayMode)
+        assertEquals(SubtitleTextSize.HUGE, stored.style.textSize)
+        assertEquals(SubtitleLineSpacing.TIGHT, stored.style.lineSpacing)
+        assertEquals(SubtitleOutline.THICK, stored.style.outline)
+        assertEquals(SubtitleBottomMargin.HIGH, stored.style.bottomMargin)
+    }
+
+    @Test
+    fun `只存了一个样式键时另外三个用各自的默认值`() {
+        // 恢复出厂、或者从没有样式字段的旧版本升上来，都可能只看到一部分键。
+        // 缺键必须回退到**该档位的**默认，不能整块 style 都不要（那会让另外三个
+        // 已经存好的值也一起变回默认）。
+        val stored = preferencesOf(
+            stringPreferencesKey("subtitle.text_size") to SubtitleTextSize.LARGE.name,
+        ).toSubtitleSettings()
+
+        assertEquals(SubtitleTextSize.LARGE, stored.style.textSize)
+        assertEquals(SubtitleLineSpacing.DEFAULT, stored.style.lineSpacing)
+        assertEquals(SubtitleOutline.DEFAULT, stored.style.outline)
+        assertEquals(SubtitleBottomMargin.DEFAULT, stored.style.bottomMargin)
+    }
+
+    @Test
+    fun `认不出来的样式值回退到默认而不是抛异常`() {
+        listOf("", "SOMETHING_ELSE", "1.25", "small").forEach { garbage ->
+            val stored = preferencesOf(
+                stringPreferencesKey("subtitle.text_size") to garbage,
+                stringPreferencesKey("subtitle.line_spacing") to garbage,
+                stringPreferencesKey("subtitle.outline") to garbage,
+                stringPreferencesKey("subtitle.bottom_margin") to garbage,
+            ).toSubtitleSettings()
+
+            assertEquals("垃圾值 = $garbage", SubtitleStyle.DEFAULT, stored.style)
+        }
+    }
+
+    @Test
+    fun `样式键名按字面量锁住`() {
+        // 改名 = 所有用户的字幕样式被静默重置。这一条是防止「顺手重命名」。
+        assertEquals("subtitle.text_size", SubtitleSettingsRepository.Keys.TEXT_SIZE.name)
+        assertEquals("subtitle.line_spacing", SubtitleSettingsRepository.Keys.LINE_SPACING.name)
+        assertEquals("subtitle.outline", SubtitleSettingsRepository.Keys.OUTLINE.name)
+        assertEquals("subtitle.bottom_margin", SubtitleSettingsRepository.Keys.BOTTOM_MARGIN.name)
+    }
+
+    @Test
+    fun `样式枚举名按字面量锁住`() {
+        // 存的是枚举名而不是序号：往档位表中间插一档时，存序号会让所有人的字号
+        // 跳一格，而屏幕上只表现为「字幕好像变大了」，没人会联想到版本升级。
+        assertEquals("SMALL", SubtitleTextSize.SMALL.name)
+        assertEquals("NORMAL", SubtitleTextSize.NORMAL.name)
+        assertEquals("LARGE", SubtitleTextSize.LARGE.name)
+        assertEquals("HUGE", SubtitleTextSize.HUGE.name)
+        assertEquals("TIGHT", SubtitleLineSpacing.TIGHT.name)
+        assertEquals("NORMAL", SubtitleLineSpacing.NORMAL.name)
+        assertEquals("LOOSE", SubtitleLineSpacing.LOOSE.name)
+        assertEquals("NONE", SubtitleOutline.NONE.name)
+        assertEquals("THIN", SubtitleOutline.THIN.name)
+        assertEquals("NORMAL", SubtitleOutline.NORMAL.name)
+        assertEquals("THICK", SubtitleOutline.THICK.name)
+        assertEquals("EDGE", SubtitleBottomMargin.EDGE.name)
+        assertEquals("NEAR", SubtitleBottomMargin.NEAR.name)
+        assertEquals("RAISED", SubtitleBottomMargin.RAISED.name)
+        assertEquals("HIGH", SubtitleBottomMargin.HIGH.name)
+    }
+
+    @Test
+    fun `每个样式枚举的默认档位都是文档写的那一个`() {
+        // 「恢复默认样式」写下去的就是这四个 DEFAULT，所以它们也属于持久化契约。
+        assertEquals(SubtitleTextSize.NORMAL, SubtitleTextSize.DEFAULT)
+        assertEquals(SubtitleLineSpacing.NORMAL, SubtitleLineSpacing.DEFAULT)
+        // 默认不开描边：老用户已有一层柔和阴影，默认加一圈硬边等于换了一副样子。
+        assertEquals(SubtitleOutline.NONE, SubtitleOutline.DEFAULT)
+        // 12dp = v0.5.15 的位置。
+        assertEquals(SubtitleBottomMargin.NEAR, SubtitleBottomMargin.DEFAULT)
+        assertEquals(12, SubtitleBottomMargin.NEAR.dp)
+    }
+
+    @Test
+    fun `样式键与主题键不冲突`() {
+        // 同一个文件里前缀都是 subtitle.，主题是 theme.，这里再钉一次「不是靠前缀
+        // 猜出来的」——而是逐个键名比对。
+        val subtitleKeys = listOf(
+            SubtitleSettingsRepository.Keys.DISPLAY_MODE,
+            SubtitleSettingsRepository.Keys.TEXT_SIZE,
+            SubtitleSettingsRepository.Keys.LINE_SPACING,
+            SubtitleSettingsRepository.Keys.OUTLINE,
+            SubtitleSettingsRepository.Keys.BOTTOM_MARGIN,
+        ).map { it.name }
+
+        assertEquals(subtitleKeys.size, subtitleKeys.toSet().size)
+        assertEquals(subtitleKeys.size, subtitleKeys.count { it.startsWith("subtitle.") })
+    }
 }

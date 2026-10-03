@@ -8,7 +8,7 @@
 
     <string name="msp_settings_appearance">Appearance</string>
     <string name="msp_settings_playback">Playback</string>
-    <string name="msp_settings_translation">Subtitle translation</string>
+    <string name="msp_settings_translation">Subtitles &amp; translation</string>
     <string name="msp_settings_file_access">File access</string>
     <string name="msp_settings_about">About</string>
 
@@ -209,5 +209,19 @@
 
     <string name="msp_settings_show_raw">Show the raw vendor response</string>
     <string name="msp_settings_hide_raw">Hide the raw vendor response</string>
+
+    <!-- Subtitle appearance (see values/strings.xml for the full note). -->
+    <string name="msp_settings_section_subtitle_style">Subtitle style</string>
+    <string name="msp_settings_subtitle_size">Text size</string>
+    <string name="msp_settings_subtitle_size_desc">Size of the subtitles only, the picture is not affected</string>
+    <string name="msp_settings_subtitle_line_spacing">Line spacing</string>
+    <string name="msp_settings_subtitle_line_spacing_desc">Distance between the two lines when the original and the translation are shown together</string>
+    <string name="msp_settings_subtitle_outline">Outline</string>
+    <string name="msp_settings_subtitle_outline_desc">Adds a dark edge around the letters so they stay readable on bright scenes</string>
+    <string name="msp_settings_subtitle_margin">Bottom margin</string>
+    <string name="msp_settings_subtitle_margin_desc">How far the subtitles sit above the bottom of the picture</string>
+    <string name="msp_settings_subtitle_reset">Reset subtitle style</string>
+    <string name="msp_settings_subtitle_reset_desc">Restores text size, line spacing, outline and bottom margin together</string>
+    <string name="msp_settings_subtitle_reset_already">Already using the default style</string>
 
 </resources>

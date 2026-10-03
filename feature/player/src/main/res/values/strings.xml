@@ -142,4 +142,16 @@
     <string name="msp_player_offset_zero">0 秒</string>
     <string name="msp_player_nothing_playing">没有正在播放的内容</string>
     <string name="msp_player_nothing_playing_desc">到「媒体库」里选一条音频或视频即可开始播放。</string>
+
+    <!--
+      字幕样式小节。
+
+      档位名（小/标准/大…）不在这里：它们绑在 `SubtitleStyle` 的枚举上，在 core:data。
+    -->
+    <string name="msp_player_subtitle_style">字幕样式</string>
+    <string name="msp_player_subtitle_style_size">字号</string>
+    <string name="msp_player_subtitle_style_line_spacing">行距</string>
+    <string name="msp_player_subtitle_style_outline">描边</string>
+    <string name="msp_player_subtitle_style_bottom_margin">底部距离</string>
+    <string name="msp_player_subtitle_style_reset">恢复默认样式</string>
 </resources>
