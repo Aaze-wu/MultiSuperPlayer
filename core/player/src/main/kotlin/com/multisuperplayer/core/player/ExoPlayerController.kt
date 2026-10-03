@@ -230,6 +230,17 @@ class ExoPlayerController(
             )
             // 后台播放网络流时，熄屏后不能因为 CPU 休眠而断流。
             setWakeMode(C.WAKE_MODE_NETWORK)
+            // 「上一首」永远切上一条：内核的 `seekToPrevious()` 会先看
+            // 「当前播到第几毫秒」，只要超过了这个阈值就退化成「回到本条目开头」
+            // （默认 3000 ms，于是用户要按两下才切得走）。
+            // 设成 `Long.MAX_VALUE` 就是「永远不超过阈值」⇒ 那个位置判断永远走
+            // 「切上一条」那一支，没有上一条时仍然是回到开头。
+            //
+            // 这一句和 [skipToPrevious] 是同一个决定的**两个入口**，不能只改一处：
+            // 通知栏 / 锁屏 / 耳机线上那个「上一首」是 Media3 的 `MediaSession`
+            // 直接调内核的 `seekToPrevious()`（那条路上根本没有我们的代码），
+            // 它只认这个阈值。规则与理由见 [PreviousTrackRules]。
+            setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
         }
 
     /**
@@ -1190,7 +1201,13 @@ class ExoPlayerController(
 
     override fun skipToPrevious() {
         onMain {
-            player.seekToPrevious()
+            // 不用 `player.seekToPrevious()`：那一条命令在「已播过 3 秒」时会走成
+            // 「回到本条目开头」（`getMaxSeekToPreviousPosition()` 默认 3000 ms），
+            // 于是用户要按两下才切得走上一条。规则与取舍见 PreviousTrackRules。
+            when (PreviousTrackRules.actionFor(player.hasPreviousMediaItem())) {
+                PreviousTrackRules.Action.PREVIOUS_ITEM -> player.seekToPreviousMediaItem()
+                PreviousTrackRules.Action.RESTART_CURRENT -> player.seekTo(0L)
+            }
             publish()
         }
     }
