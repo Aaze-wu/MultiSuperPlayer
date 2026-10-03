@@ -39,6 +39,15 @@
     <string name="msp_settings_summary_asr_partial">%1$d%% downloaded</string>
     <string name="msp_settings_summary_asr_ready">Downloaded</string>
 
+    <!--
+      The three on-device translation model states. Unlike the ASR one, this download
+      cannot be resumed, so the unfinished state must not say "resume".
+    -->
+    <string name="msp_settings_summary_local_model_absent">Not downloaded</string>
+    <!-- `%1$d` is a whole percentage already received, rounded down -->
+    <string name="msp_settings_summary_local_model_partial">Unfinished (%1$d%% received)</string>
+    <string name="msp_settings_summary_local_model_ready">Downloaded</string>
+
     <string name="msp_settings_summary_no_logs">No log files yet</string>
     <!-- `%1$d` files, `%2$s` total size -->
     <string name="msp_settings_summary_log_usage">%1$d file(s) · %2$s</string>
@@ -281,6 +290,40 @@
     <string name="msp_settings_asr_source_invalid">Must start with http:// or https://</string>
 
     <string name="msp_settings_asr_dismiss">Got it</string>
+
+    <!-- ===== On-device translation model ===== -->
+
+    <string name="msp_settings_local_model">On-device model</string>
+    <string name="msp_settings_section_local_model">Translation model</string>
+    <!-- No network is the selling point, and the first thing users doubt, so it comes first. -->
+    <string name="msp_settings_local_model_hint">Translation runs entirely on this device: no network, no account, and subtitle text never leaves the phone. The model file has to be downloaded once.</string>
+
+    <!-- The size goes on the button: it is the one number worth knowing before tapping (about 329 MB). -->
+    <string name="msp_settings_local_model_download">Download model (%1$s)</string>
+    <!-- Shown when a download was interrupted. There is no resume support, so it restarts from zero. -->
+    <string name="msp_settings_local_model_redownload">Download again (%1$s)</string>
+    <string name="msp_settings_local_model_partial_hint">The last download did not finish; %1$s arrived. Resuming is not supported, so it starts over.</string>
+    <string name="msp_settings_local_model_stop">Stop</string>
+    <string name="msp_settings_local_model_downloading">Downloading model…</string>
+    <string name="msp_settings_local_model_download_bytes">%1$s / %2$s downloaded</string>
+    <!-- Verification reads the whole 345 MB file (about one second). The bar deliberately stays indeterminate. -->
+    <string name="msp_settings_local_model_verifying">Verifying the file…</string>
+    <string name="msp_settings_local_model_installed">%1$s is ready.</string>
+    <string name="msp_settings_local_model_ready_hint">Ready. Pick On-device as the provider under Subtitles and translation to use it.</string>
+
+    <string name="msp_settings_local_model_remove">Delete model (frees %1$s)</string>
+    <string name="msp_settings_local_model_remove_confirm_title">Delete this model?</string>
+    <string name="msp_settings_local_model_remove_confirm_body">%1$s would have to be downloaded again (%2$s) before on-device translation works. Subtitles you already translated are not affected.</string>
+    <string name="msp_settings_local_model_removed">Deleted %1$s.</string>
+    <string name="msp_settings_local_model_remove_missing">The files for this model are no longer on this phone.</string>
+
+    <string name="msp_settings_section_local_model_source">Download source</string>
+    <string name="msp_settings_local_model_source">Model download URL</string>
+    <string name="msp_settings_local_model_source_support">Uses the hf-mirror.com mirror by default</string>
+    <string name="msp_settings_local_model_source_invalid">Must start with http:// or https://</string>
+    <string name="msp_settings_local_model_source_help">hf-mirror.com is used by default. A different mirror only affects downloads started after the change.</string>
+
+    <string name="msp_settings_local_model_dismiss">Got it</string>
 
     <!-- ===== Per-setting help ===== -->
 

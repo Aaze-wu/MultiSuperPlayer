@@ -28,6 +28,10 @@ import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettings
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.llm.LlmModelCatalog
+import com.multisuperplayer.core.llm.LlmModelInfo
+import com.multisuperplayer.core.llm.LlmModelLocator
+import com.multisuperplayer.core.llm.LlmModelStatus
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SoftwareDecoderSupport
 import com.multisuperplayer.core.player.SpeedBoostOptions
@@ -88,6 +92,23 @@ data class AsrEntryState(
 }
 
 /**
+ * 「字幕与翻译」页上本地模型那一行要的两个数。与 [AsrEntryState] 同构，理由也一样：
+ * 「用哪条模型」与「它在不在磁盘上」总是一起显示（`Qwen3 0.6B（本地） · 未下载`），
+ * 分成两个 Flow 会在换完模型的那几帧里拼出「新模型名 + 上一条的状态」。
+ */
+data class LocalModelEntryState(
+    val settings: TranslationSettings = TranslationSettings(),
+    val status: LlmModelStatus = LlmModelStatus.Absent,
+) {
+
+    /**
+     * 设置里存的是模型 id（它同时是目录名），显示出来是错的。
+     * 认不出的 id 由 [LlmModelCatalog.byId] 兜底成默认模型。
+     */
+    val model: LlmModelInfo get() = LlmModelCatalog.byId(settings.model)
+}
+
+/**
  * 设置页的状态。
  *
  * 这里**只装载当前内核已经会读的设置项**。一个没人读的开关，用户拨它只会得到
@@ -115,6 +136,17 @@ class SettingsViewModel(
      */
     private val asrSettingsRepository: AsrSettingsRepository,
     private val asrModelLocator: AsrModelLocator,
+    /**
+     * 本地翻译模型的位置。
+     *
+     * 「字幕与翻译」页要显示「模型下了没有」（以后入口页那一行的摘要也会用到）。
+     * **不需要** `LlmModelInstaller`：下载只发生在「本地模型」子页里
+     * （`LocalModelSettingsViewModel`），这一页不碰网络、不写文件，只 stat 一下长度。
+     *
+     * 构造零成本（里面就一个 `File`），所以放在这个**应用启动时就会被创建**的
+     * ViewModel 里没有代价。
+     */
+    private val localModelLocator: LlmModelLocator,
     /**
      * 构建信息。设置入口页的「关于」那一行要显示版本号。
      *
@@ -495,6 +527,46 @@ class SettingsViewModel(
      */
     private suspend fun readAsrStatus(model: AsrModelInfo): AsrModelStatus =
         withContext(dispatchers.io) { asrModelLocator.statusOf(model) }
+
+    // ------------------------------------------------------------------ 本地翻译模型
+
+    private val localModelEntryState = MutableStateFlow(LocalModelEntryState())
+
+    /** 「字幕与翻译」页本地模型那一行要的两个数。见 [LocalModelEntryState]。 */
+    val localModelEntry: StateFlow<LocalModelEntryState> = localModelEntryState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            translationSettings.settings.collect { settings ->
+                localModelEntryState.value = LocalModelEntryState(
+                    settings = settings,
+                    status = readLocalModelStatus(settings.model),
+                )
+            }
+        }
+    }
+
+    /**
+     * 重新读一次模型文件的磁盘状态。
+     *
+     * 与 [refreshAsrStatus] 同一个理由：模型是在「本地模型」子页里下载/删除的，
+     * 那一页有自己的 ViewModel，回到这一页时没有任何回调会通知这里。
+     * 界面在外层 `ON_RESUME` 时调一次。
+     */
+    fun refreshLocalModelStatus() {
+        viewModelScope.launch {
+            localModelEntryState.update { it.copy(status = readLocalModelStatus(it.settings.model)) }
+        }
+    }
+
+    /**
+     * 只 stat 文件长度，不校验哈希（见 `LlmModelLocator.statusOf`）。
+     * 与 [readAsrStatus] 一样走 IO 线程：那是几次系统调用，而入口页是冷启动后的第一屏。
+     */
+    private suspend fun readLocalModelStatus(modelId: String): LlmModelStatus =
+        withContext(dispatchers.io) {
+            localModelLocator.statusOf(LlmModelCatalog.byId(modelId))
+        }
 
     /**
      * 写盘失败不能只吞掉——那会表现为「点了没反应」，而且**下次启动又变回去**，

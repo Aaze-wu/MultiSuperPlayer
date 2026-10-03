@@ -32,6 +32,17 @@
 -keep class com.k2fsa.sherpa.onnx.** { *; }
 -dontwarn com.k2fsa.sherpa.onnx.**
 
+# --- LiteRT-LM（本地翻译推理引擎）------------------------------------------
+# 与 sherpa-onnx 同一类问题，而且更彻底：这个 AAR 里**没有** aar-metadata.properties、
+# 也**没有** proguard.txt（实测 classes.jar 78 个 class，rules 一条都不带），
+# 于是混淆器对它没有任何约定。
+#
+# 它的绑定方式是「Java 壳 + JNI_OnLoad 里按类名/方法名注册」，并且引擎配置
+# 走的是反射读注解（`@ExperimentalApi` 那一层）。R8 改名或裁剪之后的症状
+# 同样是只有 release 包才会出现的 `UnsatisfiedLinkError` / `NoSuchMethodError`。
+-keep class com.google.ai.edge.litertlm.** { *; }
+-dontwarn com.google.ai.edge.litertlm.**
+
 # --- Koin -------------------------------------------------------------------
 -keep class org.koin.** { *; }
 -dontwarn org.koin.**

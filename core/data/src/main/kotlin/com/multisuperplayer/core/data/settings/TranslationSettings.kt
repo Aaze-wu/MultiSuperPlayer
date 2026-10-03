@@ -43,6 +43,18 @@ data class TranslationSettings(
      * 免得密钥跟着 `data class` 的 `toString()` 跑去日志里。
      */
     val apiKeyStored: Boolean = false,
+    /**
+     * 本地模型的**下载源**（镜像站）。
+     *
+     * 与 [baseUrl] 是两件事：那个是翻译服务的地址，这个是「去哪儿下 345 MB 的模型文件」。
+     * 合成一个字段的后果是设置页把镜像站显示成服务商地址，而且切到本地方案时会
+     * 顺手继承上一家的 API 地址——两处都错得很安静。
+     *
+     * 空串 = 用内置的默认镜像站；具体回落在 `LlmModelCatalog.normalizeLlmModelBaseUrl`
+     * 里（归一化之后为空也回默认站）。所以这里「键不存在」与「用户清空」的**结果**
+     * 一样，不需要像 [baseUrl] 那样区分——下载源本来就没有「必须留空」这个语义。
+     */
+    val localModelSource: String = "",
 ) {
 
     /** 当前服务商的预设。认不出来的 id 会落到「自定义」（见 [TranslationServices.byId]）。 */
@@ -50,6 +62,19 @@ data class TranslationSettings(
 
     /** 密钥这栏对当前服务商是否必需（本地 Ollama 不需要）。 */
     val apiKeyRequired: Boolean get() = provider.requiresApiKey
+
+    /**
+     * 当前服务商是不是跑在**这台设备上**（而不是某个远端 API）。
+     *
+     * 转发 [TranslationService.onDevice] 而不是在这里再算一遍（比如「地址为空」）：
+     * 这个判据同时管着「缺项判定要不要看地址」「引擎要不要走本机」「设置页要不要
+     * 显示地址与密钥输入框」，四处算得不一样就是四种局部错乱，而且都不报错。
+     *
+     * **注意它与 [ready] 不是一件事**：本地模型下载了没有属于运行期的事实
+     * （要看文件系统），不在设置层判——这里说「可以点了」，点下去如果模型没装，
+     * 引擎会给出带模型名与下载指引的失败（`LocalModelMissing`）。
+     */
+    val onDevice: Boolean get() = provider.onDevice
 
     /**
      * 还差哪几项才能开始翻译。空列表表示已经填够。
@@ -70,6 +95,8 @@ data class TranslationSettings(
             apiKeyStored = apiKeyStored,
             // 批大小还不是用户设置项（仓库里写死默认值），这里不报这个缺项。
             batchSize = null,
+            // 设备上的服务商没有地址与密钥，别报两个用户找不到输入框的缺项。
+            onDevice = onDevice,
         )
 
     /**
@@ -111,6 +138,7 @@ internal fun Preferences.toTranslationSettings(): TranslationSettings {
         autoTranslate = this[TranslationKeys.AUTO_TRANSLATE] ?: false,
         glossary = decodeGlossary(this[TranslationKeys.GLOSSARY]),
         apiKeyStored = this[apiKeyPreferenceKey(provider.id)] != null,
+        localModelSource = this[TranslationKeys.LOCAL_MODEL_SOURCE].orEmpty(),
     )
 }
 
@@ -122,4 +150,7 @@ internal object TranslationKeys {
     val TARGET = stringPreferencesKey("translation.target_language")
     val AUTO_TRANSLATE = booleanPreferencesKey("translation.auto_translate")
     val GLOSSARY = stringPreferencesKey("translation.glossary")
+
+    /** 本地模型的下载源。**不是** [BASE_URL]**：那个是翻译服务的地址，这个是模型文件的镜像站。 */
+    val LOCAL_MODEL_SOURCE = stringPreferencesKey("translation.local_model_source")
 }

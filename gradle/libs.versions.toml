@@ -53,6 +53,27 @@ media3 = "1.11.1"
 #    WMV/ASF、RealMedia(RM/RMVB) 至今仍放不了，别指望升级这个库能解决。
 nextlib = "1.11.1-0.16.0"
 
+# 设备上推理引擎（LiteRT-LM）。
+#
+# ⚠️ **必须写死具体版本**，不能用官方文档里那种 `latest.release`：本项目发布的是
+#    可复现构建（README 里承诺了「标签 + 提交与安装包一一对应」），一个会自己往前走的
+#    版本号会让同一个标签在两台机器上产出不同的 APK。
+#
+# 🔴 这个 AAR 的体积几乎全在原生库上（实测 0.17.1，20,493,837 字节）：
+#      classes.jar                    160,701 字节（只有 78 个 class）
+#      jni/arm64-v8a/liblitertlm_jni.so   21,802,960 字节（未压缩）
+#      jni/x86_64/liblitertlm_jni.so      25,968,008 字节（未压缩）
+#    它**只带这两个 ABI**，而 `app/build.gradle.kts` 的 abiFilters 正好也只放这两个，
+#    所以能直接依赖，不必像 sherpa-onnx 那样解包（见 core:asr 的 build.gradle.kts）。
+#    代价是 APK 会明显变大——这是本地推理绕不过去的成本。
+#
+# 传递依赖（POM 里 compile scope，会进 APK）：gson 2.14.0、kotlin-reflect 2.4.0、
+# kotlinx-coroutines-android 1.11.0（最后这个与本项目 coroutines 版本一致）。
+#
+# 已核对：AAR 里**没有** `META-INF/com/android/build/gradle/aar-metadata.properties`，
+# 所以不受 `minCompileSdk` / `minAndroidGradlePluginVersion` 那两条例约束缚。
+litertlm = "0.17.1"
+
 # KotlinX
 coroutines = "1.11.0"
 serialization = "1.11.0"
@@ -102,6 +123,11 @@ media3-session = { module = "androidx.media3:media3-session", version.ref = "med
 # 只在 `:core:player` 里用 `implementation` 引入：它是实现细节，不该出现在
 # `PlaybackController` 的公开签名里（见 MspPlaybackState 里「不泄漏 Media3 类型」的说明）。
 nextlib-media3ext = { module = "io.github.anilbeesetti:nextlib-media3ext", version.ref = "nextlib" }
+
+# --- 设备上推理（LiteRT-LM）---
+# 只在 `:core:llm` 里以 `implementation` 引入：`Engine` / `Conversation` 这些类型
+# 不该出现在任何别的模块的公开签名里（否则换引擎要改一大片）。
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
 
 # --- KotlinX ---
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

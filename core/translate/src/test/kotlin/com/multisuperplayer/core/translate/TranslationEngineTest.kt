@@ -175,6 +175,10 @@ class TranslationEngineTest {
             .translate(doc(4), config = configOf(batchSize = 4, maxAttempts = 1)).toList()
 
         assertEquals(listOf(4, 2, 2), counts)
+        // 本机的 expectedItems 必须就是这一批的条数（提示词里的行数与它是同一个数）。
+        // 约束解码下的 minItems/maxItems 是硬约束：拆批后还钉着 4 去要 2 条，
+        // 模型连一个合法输出都写不出来，而且报错来自 native，看不出是这里钉错了。
+        assertEquals(counts, client.requests.map { it.expectedItems }, "钉住的条数必须跟着批次走")
         val finished = assertIs<TranslationEvent.Finished>(events.last())
         assertEquals(4, finished.done)
         assertTrue(finished.failures.isEmpty())

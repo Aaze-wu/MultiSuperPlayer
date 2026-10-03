@@ -48,6 +48,7 @@ import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
 import com.multisuperplayer.feature.settings.AsrSettingsRoute
+import com.multisuperplayer.feature.settings.LocalModelSettingsRoute
 import com.multisuperplayer.feature.settings.PlaybackSettingsRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
@@ -150,6 +151,19 @@ private const val PLAYBACK_SETTINGS_ROUTE = "settings/playback"
 // 下载任务活在它自己的 `viewModelScope` 里，返回设置页不会把下载掐掉。
 private const val ASR_SETTINGS_ROUTE = "settings/asr"
 private const val ABOUT_ROUTE = "settings/about"
+
+/**
+ * 本地翻译模型的下载与删除。
+ *
+ * 比 [TRANSLATION_SETTINGS_ROUTE] 多一层（挂在翻译设置下面）：它从那一页的
+ * 「本地模型」那一行进来，而不是直接从设置入口页。
+ *
+ * 它必须是**独立目的地**，而不是翻译设置页里的一块：下载要能离开这一屏继续跑，
+ * 而下载任务活在 `LocalModelSettingsViewModel` 自己的 `viewModelScope` 里——
+ * 返回上一页不会把它提前。另外这一页的每个动作都要读磁盘、跑几十秒，
+ * 不应该让「只是来改目标语言」的人碰上。
+ */
+private const val LOCAL_MODEL_ROUTE = "settings/translation/local"
 
 @Composable
 private fun MspAppScaffold() {
@@ -333,7 +347,15 @@ private fun MspAppScaffold() {
                 )
             }
             composable(TRANSLATION_SETTINGS_ROUTE) {
-                TranslationSettingsRoute(onBack = { navController.popBackStack() })
+                TranslationSettingsRoute(
+                    onBack = { navController.popBackStack() },
+                    // 本地模型的入口就在那一页上（选中的服务商是「设备上运行」时才出现），
+                    // 而不是在设置入口页再加一行：那行会与「服务商」这个选择器说同一件事。
+                    onOpenLocalModel = { navController.navigate(LOCAL_MODEL_ROUTE) },
+                )
+            }
+            composable(LOCAL_MODEL_ROUTE) {
+                LocalModelSettingsRoute(onBack = { navController.popBackStack() })
             }
             composable(ASR_SETTINGS_ROUTE) {
                 AsrSettingsRoute(onBack = { navController.popBackStack() })

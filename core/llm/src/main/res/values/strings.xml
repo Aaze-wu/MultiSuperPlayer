@@ -1,0 +1,34 @@
+<resources>
+
+    <!--
+      ===== 设备上推理模型的名字与说明 =====
+
+      与 `core:asr` 的 `msp_asr_*` 同一套约定：这里**不写模型体积**。
+      体积是「这条模型文件到底多大」这个事实的衍生品，写在文案里就等于把一份
+      从别处能算出来的数据手抄了一遍——上游换个量化版本，文案就成了假话，
+      而且不会有人发现。界面上的体积由 `LlmModelInfo.sizeText()` 现算。
+
+      `%1$s` 是格式好的体积（「328.7 MB」）。数字一律当参数传，不要拼进文案里。
+    -->
+    <string name="msp_llm_model_size">约 %1$s</string>
+
+    <!-- 列表项之间的分隔符。带首尾空白必须用双引号包住，否则 aapt2 会裁掉。 -->
+    <string name="msp_llm_detail_sep">" · "</string>
+
+    <string name="msp_llm_model_qwen3_name">Qwen3 0.6B（本地）</string>
+    <string name="msp_llm_model_qwen3_desc">参数只有 0.6B 的轻量中英模型（int4 量化）。完全在本机运行：不联网、不消耗接口额度。长句的译文质量不如云端大模型。</string>
+
+    <!--
+      下载与安装的失败提示。每种失败一句话，因为「下一步该做什么」不同：
+      网络等一等、源不对换一个、空间不够清理一下、校验不过换一个源。
+      合成一句「下载失败」会让人反复重试一个必然失败的操作。
+    -->
+    <string name="msp_llm_error_network">网络连接中断：%1$s</string>
+    <string name="msp_llm_error_http">服务器返回 %1$d</string>
+    <string name="msp_llm_error_source">下载源地址无效：%1$s</string>
+    <string name="msp_llm_error_size">文件不完整（预期 %1$s，实际 %2$s）</string>
+    <string name="msp_llm_error_hash">文件校验不通过（镜像站可能给的是旧版本，可换一个下载源再试）</string>
+    <string name="msp_llm_error_write">写入失败：%1$s</string>
+    <string name="msp_llm_error_unknown">模型操作失败：%1$s</string>
+
+</resources>

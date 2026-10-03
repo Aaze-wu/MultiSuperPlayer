@@ -2,6 +2,7 @@ package com.multisuperplayer.feature.settings.di
 
 import com.multisuperplayer.feature.settings.AboutViewModel
 import com.multisuperplayer.feature.settings.AsrSettingsViewModel
+import com.multisuperplayer.feature.settings.LocalModelSettingsViewModel
 import com.multisuperplayer.feature.settings.SettingsViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -24,4 +25,8 @@ val settingsFeatureModule = module {
     viewModelOf(::AboutViewModel)
     // 语音识别子页单独一个：它要 DataStore、下载器和引擎，只在进那一页时构造。
     viewModelOf(::AsrSettingsViewModel)
+    // 本地翻译模型（下载/删除）自己一页、自己一个 ViewModel：
+    // 它的依赖里有会常驻引擎的 LlmTextGenerator，挂到 Activity 作用域的
+    // SettingsViewModel 上等于每次冷启动都为「用不上本地翻译」的用户构造一份。
+    viewModelOf(::LocalModelSettingsViewModel)
 }

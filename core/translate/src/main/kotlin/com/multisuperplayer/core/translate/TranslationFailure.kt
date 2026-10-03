@@ -120,6 +120,36 @@ sealed interface TranslationFailure {
         val maxTokens: Int,
         val detail: String,
     ) : TranslationFailure
+
+    /**
+     * 设备上那条模型还没下载好（或文件不完整）。[model] 是清单里的 id。
+     *
+     * ## 为什么要单独一档，而不蹭 [NotConfigured]
+     *
+     * 「设置里没填」和「文件没下载」在界面上是两句完全不同的话：前者让人去填输入框，
+     * 后者让人去点下载。而且它们连**在哪一层被发现**都不一样：缺设置是纯数据的判断，
+     * 缺文件得去看文件系统（设置页那里根本不查——它专门有一块「本地模型」）。
+     *
+     * **不重试**：重试一万次还是同一个文件。
+     */
+    data class LocalModelMissing(val model: String) : TranslationFailure
+
+    /**
+     * 设备上的推理引擎起不来：原生库没装上、初始化失败、内存不够、设备不支持。
+     *
+     * 与 [LocalModelMissing] 分开的理由是**下一步相反**：那一档下载就能解决，
+     * 这一档重新下载多少次都没用（去检查设备/内存/重装）。
+     */
+    data class LocalEngineUnavailable(val detail: String) : TranslationFailure
+
+    /**
+     * 引擎可用，但这一次生成挂了。**可以原样重试**。
+     *
+     * 和 [ServerError] 一样属于「本次不行，再试可能行」那一类；与它的差别只在
+     * 文案（本机 vs 厂商），但正因为文案不同才不能合并——把本机的失败说成
+     * 「服务器返回 500」会让用户去刷新服务商的页面，而问题在他的手机上。
+     */
+    data class LocalGenerationFailed(val detail: String) : TranslationFailure
 }
 
 /**
@@ -133,6 +163,8 @@ val TranslationFailure.retryableAsIs: Boolean
         is TranslationFailure.RateLimited,
         is TranslationFailure.ServerError,
         is TranslationFailure.Network,
+        // 本机生成失败与「服务端 5xx」同类：可能只是这一次不行（重试前会重建引擎）。
+        is TranslationFailure.LocalGenerationFailed,
         -> true
 
         else -> false
@@ -150,6 +182,9 @@ val TranslationFailure.abortsJob: Boolean
         is TranslationFailure.Unauthorized,
         is TranslationFailure.QuotaExceeded,
         is TranslationFailure.Rejected,
+        // 模型没下载 / 引擎起不来：后面每一批都会在同一个地方失败。
+        is TranslationFailure.LocalModelMissing,
+        is TranslationFailure.LocalEngineUnavailable,
         -> true
 
         else -> false
@@ -171,4 +206,7 @@ internal fun TranslationFailure.logLine(): String = when (this) {
             "reasoning=$reasoningTokens detail=$detail"
     is TranslationFailure.Truncated ->
         "truncated finish=$finishReason estimated=$estimatedTokens max=$maxTokens detail=$detail"
+    is TranslationFailure.LocalModelMissing -> "local_model_missing model=$model"
+    is TranslationFailure.LocalEngineUnavailable -> "local_engine_unavailable detail=$detail"
+    is TranslationFailure.LocalGenerationFailed -> "local_generation_failed detail=$detail"
 }

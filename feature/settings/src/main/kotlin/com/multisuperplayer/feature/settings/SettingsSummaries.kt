@@ -10,6 +10,9 @@ import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
+import com.multisuperplayer.core.llm.LlmModelCatalog
+import com.multisuperplayer.core.llm.LlmModelInfo
+import com.multisuperplayer.core.llm.LlmModelStatus
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.describeMissingItems
@@ -119,8 +122,13 @@ internal object SettingsSummaries {
      *
      * 缺项清单来自 [TranslationSettings.missingItems]，和「测试连接」按钮同源——
      * 在这里再判一次就会出现「这一行说缺密钥、点进去却说齐了」这种自相矛盾。
+     *
+     * @param localStatus 选的是设备上的服务商时，模型文件在磁盘上的状态；
+     *   `null` = 还没读过盘（首帧）。**不知道就不说**：本地模型有没有下载完不属于
+     *   设置（它是文件系统的事实），而这一行如果说「可以翻译」而模型还没下，
+     *   用户点进播放页才发现——那时他已经离开了唯一能下载模型的地方。
      */
-    fun translation(translation: TranslationSettings): MspText {
+    fun translation(translation: TranslationSettings, localStatus: LlmModelStatus? = null): MspText {
         val provider = translation.provider.displayName
         if (!translation.ready) {
             return join(
@@ -129,6 +137,18 @@ internal object SettingsSummaries {
                     R.string.msp_settings_summary_translation_incomplete,
                     describeMissingItems(translation.missingItems),
                 ),
+            )
+        }
+        // 设备上的服务商：设置里的 `model` 是模型清单的 id（`qwen3-0.6b`，同时是目录名），
+        // 用户认识的是清单里的名字（`Qwen3 0.6B（本地）`）。直接把 id 显示出来，
+        // 他会以为要自己去填一个叫这个的模型名。
+        if (translation.onDevice) {
+            val model = LlmModelCatalog.byId(translation.model)
+            return join(
+                provider,
+                model.name,
+                localStatus?.let { localModelStatus(model, it) },
+                MspText.Res(R.string.msp_settings_summary_translate_to, translation.target.label),
             )
         }
         // 模型名是用户自己填的（与语言无关），但「没填」这件事得说出来。
@@ -140,6 +160,37 @@ internal object SettingsSummaries {
             model,
             MspText.Res(R.string.msp_settings_summary_translate_to, translation.target.label),
         )
+    }
+
+    /**
+     * 本地模型入口行：`Qwen3 0.6B（本地） · 未下载 · 约 328.7 MB`。
+     *
+     * 体积只在下过之前接在后面（同 [asr]）：下到一半时那个数字已经在「已收到 42%」里了，
+     * 再写一遍会让人以为进度和体积是两件事。
+     */
+    fun localModel(model: LlmModelInfo, status: LlmModelStatus): MspText = join(
+        model.name,
+        localModelStatus(model, status),
+        if (status == LlmModelStatus.Absent) model.sizeText() else null,
+    )
+
+    /**
+     * 本地模型文件的磁盘状态：`未下载` / `未下完（已收到 42%）` / `已下载`。
+     *
+     * 与 [asrStatus] 的说法**故意不同**：这里的下载不支持断点续传，所以不能说「已下载 42%」
+     * （那读起来像「再下 58% 就完了」）。「未下完」+ 已收到的字节数才是不骗人的说法。
+     *
+     * ⚠️ 百分比必须有 [model] 才能算：`Incomplete` 只带「已收到多少」，总量在清单里。
+     * 让状态自己带上总量看似更干净，但那个数来自“清单”而不是磁盘，写进状态就多了一份
+     * 可能和清单不一致的副本。
+     */
+    fun localModelStatus(model: LlmModelInfo, status: LlmModelStatus): MspText = when (status) {
+        LlmModelStatus.Absent -> MspText.Res(R.string.msp_settings_summary_local_model_absent)
+        is LlmModelStatus.Incomplete -> MspText.Res(
+            R.string.msp_settings_summary_local_model_partial,
+            percentOf(status.presentBytes, model.sizeBytes),
+        )
+        LlmModelStatus.Ready -> MspText.Res(R.string.msp_settings_summary_local_model_ready)
     }
 
     /**

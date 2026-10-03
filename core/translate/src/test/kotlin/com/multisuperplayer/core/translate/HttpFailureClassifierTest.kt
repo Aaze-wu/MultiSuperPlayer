@@ -150,6 +150,11 @@ class HttpFailureClassifierTest {
             TranslationFailure.BadResponse("x"),
             TranslationFailure.EmptyCompletion("length", 10, 10, "x"),
             TranslationFailure.Truncated("length", 100, 50, "x"),
+            // 本地三档：日志是排查本地翻译时唯一能看到的东西，
+            // 而它们的 detail 恰恰最容易是空串（原生侧有时什么都不给）
+            TranslationFailure.LocalModelMissing("qwen3-0.6b"),
+            TranslationFailure.LocalEngineUnavailable("x"),
+            TranslationFailure.LocalGenerationFailed(""),
         )
         all.forEach { assertTrue(it.logLine().isNotBlank(), "${it::class.simpleName} 的 logLine 为空") }
     }

@@ -62,6 +62,14 @@ data class TranslationConfig(
     val jsonMode: Boolean = true,
     /** 厂商特定参数（关思考等）的 JSON 文本。 */
     val extraBody: String = "",
+    /**
+     * 跑在**设备上**而不是某个服务商（与设置里的「本地」服务商对应）。
+     *
+     * 打开后 [baseUrl] 与 [apiKey] 都不参与，[model] 变成设备端模型清单里的 id。
+     * 做成配置项而不是「地址为空就算本地」：同一份配置会被存进缓存键、
+     * 也会被拿去做「能不能开始翻译」的判断，让它同时表达两件事迟早会错。
+     */
+    val onDevice: Boolean = false,
 )
 
 /** 进度事件。UI 边收边合并，所以中途取消也不会白干。 */
@@ -301,9 +309,16 @@ class TranslationEngine internal constructor(
 
             val protectedTexts = lines.map { protector.protect(it.text) }
             val request = ChatCompletionRequest(
-                url = chatCompletionsUrl(config.baseUrl),
+                // 设备上跑时根本没有端点可拼：`chatCompletionsUrl("")` 会拼出一个
+                // 以 "/chat/completions" 开头的怪地址，而它一旦被真的发出去就是一个
+                // 永远 404 的请求（看起来像「模型名写错了」）。
+                url = if (config.onDevice) "" else chatCompletionsUrl(config.baseUrl),
                 apiKey = config.apiKey,
                 model = config.model,
+                onDeviceModelId = config.model.takeIf { config.onDevice },
+                // 本机那侧拿它去钉住「数组里必须有 N 个元素」（约束解码），
+                // 否则 0.6B 会把整批并成一个字符串，解析器每次都报条数不对。
+                expectedItems = lines.size,
                 systemPrompt = systemPrompt,
                 userPrompt = buildUserPrompt(
                     batch = TranslationBatch(
@@ -436,6 +451,7 @@ class TranslationEngine internal constructor(
                 baseUrl = config.baseUrl,
                 model = config.model,
                 batchSize = config.batchSize,
+                onDevice = config.onDevice,
             ).firstOrNull()?.let(TranslationFailure::NotConfigured)
 
         /**
@@ -455,14 +471,32 @@ class TranslationEngine internal constructor(
             apiKeyRequired: Boolean = false,
             apiKeyStored: Boolean = false,
             batchSize: Int? = null,
+            /** 这家服务商跑在设备上：**没有地址也没有密钥**这两件事。 */
+            onDevice: Boolean = false,
         ): List<MissingConfigItem> = buildList {
-            if (baseUrl.isBlank()) {
-                add(MissingConfigItem.BASE_URL)
-            } else if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
-                add(MissingConfigItem.BASE_URL_SCHEME)
+            // 给设备上的服务商报「地址是空的」，用户会去找一个根本不存在的输入框
+            // —— 这是最典型的「配置项对不上实现」，而且他会一直找不到。
+            //
+            // 本地模型到底下载好了没有，这里判不了（那要读文件系统，而本函数是纯的），
+            // 所以它不属于「设置还缺什么」：跑的时候推理层会报 LocalModelMissing，
+            // 那里带着模型名和「去哪儿下载」的提示。
+            if (!onDevice) {
+                if (baseUrl.isBlank()) {
+                    add(MissingConfigItem.BASE_URL)
+                } else if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
+                    add(MissingConfigItem.BASE_URL_SCHEME)
+                }
             }
+            // 模型名两边都成立：远端填厂商的模型标识，设备上填清单里的 id。
             if (model.isBlank()) add(MissingConfigItem.MODEL)
-            if (apiKeyRequired && !apiKeyStored) add(MissingConfigItem.API_KEY)
+            if (!onDevice) {
+                // 密钥排在模型**后面**（用户看到的句子是「缺少：服务地址、模型名、API 密钥」）。
+                // 这一档顺序不是随手写的：先地址后密钥是用户填表的方向，
+                // 而模型名两边都有，夹在中间才不用把 `!onDevice` 拆成三段。
+                // 它也是**用户可见的输出**，改顺序会同时改掉设置页那行与引擎的报错，
+                // 所以下面两个 `!onDevice` 是故意的，别合并。
+                if (apiKeyRequired && !apiKeyStored) add(MissingConfigItem.API_KEY)
+            }
             if (batchSize != null && batchSize < TranslationBatching.MIN_BATCH_SIZE) {
                 add(MissingConfigItem.BATCH_SIZE)
             }

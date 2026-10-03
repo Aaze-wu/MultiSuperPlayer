@@ -12,6 +12,8 @@ import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
+import com.multisuperplayer.core.llm.LlmModelCatalog
+import com.multisuperplayer.core.llm.LlmModelStatus
 import java.io.File
 import org.junit.Assert
 import org.junit.Assert.assertFalse
@@ -276,6 +278,145 @@ class SettingsSummariesTest {
         assertText("Ollama（本地） · qwen2.5 · 译成简体中文", SettingsSummaries.translation(settings))
     }
 
+    @Test
+    fun `翻译 - 本地方案不把模型 id 当成模型名显示`() {
+        // 设置里存的是清单 id（`qwen3-0.6b`），用户认识的是清单里的名字。
+        // 直接把 id 显示出来，他会以为要自己去填一个叫这个的模型名。
+        val settings = TranslationSettings(providerId = "local", model = "qwen3-0.6b")
+
+        assertText(
+            "本地（设备上运行） · Qwen3 0.6B（本地） · 译成简体中文",
+            SettingsSummaries.translation(settings),
+        )
+    }
+
+    @Test
+    fun `翻译 - 本地这条路仍然要检查模型名，但不报地址和密钥`() {
+        // 少了这条限制，本地方案会把两个**用户看不见输入框**的项报成缺失。
+        val settings = TranslationSettings(providerId = "local", model = "")
+
+        assertText(
+            "本地（设备上运行） · 翻译未就绪（缺少：模型名）",
+            SettingsSummaries.translation(settings),
+        )
+    }
+
+    @Test
+    fun `翻译 - 认识不出的模型 id 也要给个能认的名字`() {
+        // 用户手改过、或者换了版本：目录名对不上了。这时显示的应该是默认那条
+        // 模型的名字，而不是一个他从未见过的 id。
+        val settings = TranslationSettings(providerId = "local", model = "some-other-model")
+
+        val rendered = render(SettingsSummaries.translation(settings))
+
+        assertTrue(rendered.contains("Qwen3 0.6B（本地）"))
+        assertFalse("不能把存储里的 id 原样印出来", rendered.contains("some-other-model"))
+    }
+
+    @Test
+    fun `翻译 - 本地模型状态还没读出来时那一行就少一段`() {
+        // 首帧读盘还没回来（`localStatus == null`）。「不知道就不说」：
+        // 说成「已下载」的话，用户点进播放页才发现模型没下，而他刚离开唯一能下载的地方。
+        val settings = TranslationSettings(providerId = "local", model = LlmModelCatalog.DEFAULT_ID)
+
+        val rendered = render(SettingsSummaries.translation(settings, localStatus = null))
+
+        assertFalse("不知道就不能说已经下好了", rendered.contains("已下载"))
+        assertFalse("也不知道它没下过", rendered.contains("未下载"))
+        assertTrue(rendered.endsWith("译成简体中文"))
+    }
+
+    @Test
+    fun `翻译 - 本地模型就绪时把状态接在模型名后面`() {
+        val settings = TranslationSettings(providerId = "local", model = LlmModelCatalog.DEFAULT_ID)
+
+        assertText(
+            "本地（设备上运行） · Qwen3 0.6B（本地） · 已下载 · 译成简体中文",
+            SettingsSummaries.translation(settings, localStatus = LlmModelStatus.Ready),
+        )
+    }
+
+    @Test
+    fun `翻译 - 本地模型没下完时说的是没下完`() {
+        // 「没下完」与「没下过」的下一步不同（继续下 / 第一次下），
+        // 而「已下载 42%」这一档在本地这条路上是**错话**：这里不支持断点续传。
+        val settings = TranslationSettings(providerId = "local", model = LlmModelCatalog.DEFAULT_ID)
+
+        assertText(
+            "本地（设备上运行） · Qwen3 0.6B（本地） · 未下完（已收到 42%） · 译成简体中文",
+            SettingsSummaries.translation(
+                settings,
+                localStatus = LlmModelStatus.Incomplete(presentBytes = 144_762_133L),
+            ),
+        )
+    }
+
+    // ------------------------------------------------------------------ 本地模型
+
+    @Test
+    fun `本地模型 - 入口行在没下载时把体积接出来`() {
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        // 这一行是用户决定要不要点进去看的唯一依据，而「要花多少流量」正是那个决定
+        // 要看的东西。体积由清单现算（文案里不写），所以也顺带钉住了清单与格式化。
+        assertText(
+            "Qwen3 0.6B（本地） · 未下载 · 约 328.7 MB",
+            SettingsSummaries.localModel(model, LlmModelStatus.Absent),
+        )
+    }
+
+    @Test
+    fun `本地模型 - 一个字节都没有时也不能说成已经下好`() {
+        // 退化输入：`Incomplete(0)` 与 `Absent` 在界面上必须分开。
+        // 说成「已下载」就是谎报，用户点下去才失败。
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        assertText("未下完（已收到 0%）", SettingsSummaries.localModelStatus(model, LlmModelStatus.Incomplete(0L)))
+    }
+
+    @Test
+    fun `本地模型 - 下了一半时给百分比而不是体积`() {
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        // 已经下了一部分时不再接体积：那个数已经在「33%」里了，两个一起说
+        // 会让人以为还要再下 328 MB
+        assertText(
+            "Qwen3 0.6B（本地） · 未下完（已收到 33%）",
+            SettingsSummaries.localModel(model, LlmModelStatus.Incomplete(model.sizeBytes / 3)),
+        )
+    }
+
+    @Test
+    fun `本地模型 - 百分比向下取整，差一个字节不说成 100%`() {
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        // 差一个字节就是没下完。「100%」会让人以为只等着解压，
+        // 而事实是这一个字节永远不会自己回来（不支持续传）。
+        assertText(
+            "未下完（已收到 99%）",
+            SettingsSummaries.localModelStatus(model, LlmModelStatus.Incomplete(model.sizeBytes - 1)),
+        )
+    }
+
+    @Test
+    fun `本地模型 - 收到的比清单还多时也不说成 101%`() {
+        // 文件比清单大（换过源、下的是别的版本）会走到这一档，
+        // 百分比必须夹在 100 以内
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        assertText(
+            "未下完（已收到 100%）",
+            SettingsSummaries.localModelStatus(model, LlmModelStatus.Incomplete(model.sizeBytes + 1_048_576L)),
+        )
+    }
+
+    @Test
+    fun `本地模型 - 已经就绪时只说已下载`() {
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        assertText("Qwen3 0.6B（本地） · 已下载", SettingsSummaries.localModel(model, LlmModelStatus.Ready))
+    }
+
     // ------------------------------------------------------------------ 文件访问
 
     @Test
@@ -521,6 +662,8 @@ class SettingsSummariesTest {
         "core/player/src/main/res/values",
         // 模型名与「约 78.1 MB」住在 core:asr，语音识别那一行要拼它们
         "core/asr/src/main/res/values",
+        // 本机翻译那一行同理：模型名、体积、连接符都在 core:llm
+        "core/llm/src/main/res/values",
     )
 
     /**
@@ -548,6 +691,7 @@ class SettingsSummariesTest {
             com.multisuperplayer.core.data.R.string::class.java,
             com.multisuperplayer.core.player.R.string::class.java,
             com.multisuperplayer.core.asr.R.string::class.java,
+            com.multisuperplayer.core.llm.R.string::class.java,
         ).flatMap { resourceClass ->
             resourceClass.declaredFields.mapNotNull { field ->
                 if (field.type != Int::class.java) return@mapNotNull null

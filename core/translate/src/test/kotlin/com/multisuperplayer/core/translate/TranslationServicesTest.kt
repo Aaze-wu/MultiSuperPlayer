@@ -148,4 +148,27 @@ class TranslationServicesTest {
         assertTrue(buildChatRequestJson(request).containsKey("response_format"))
         assertFalse(buildChatRequestJson(request.copy(jsonMode = false)).containsKey("response_format"))
     }
+
+    @Test
+    fun `本机专用的条数不会跟着请求体发给远端`() {
+        // expectedItems 只服务于「本机约束解码把数组长度钉死」，远端既收不到 schema
+        // 也不认识这个键。同一份 request 数据类被两条路共用，所以它一定会被带到这里。
+        // 额外的键在 OpenAI 兼容端点上一般被忽略，但有的是直接 400——那种报错会显示
+        // 成「服务商返回 400」，而用户唯一做错的事是选了个本地专用的参数。
+        val request = ChatCompletionRequest(
+            url = "https://x/chat/completions",
+            apiKey = null,
+            model = "m",
+            expectedItems = 8,
+            systemPrompt = "s",
+            userPrompt = "u",
+            maxTokens = 100,
+            temperature = 0.3,
+        )
+
+        val body = buildChatRequestJson(request)
+        assertFalse(body.containsKey("expectedItems"), "不要 expectedItems")
+        assertFalse(body.containsKey("minItems"), "不要 minItems")
+        assertTrue(body.containsKey("messages"), "本机的字段不能影响远端请求体")
+    }
 }

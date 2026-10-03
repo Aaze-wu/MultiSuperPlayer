@@ -3,6 +3,7 @@ package com.multisuperplayer.core.data.settings
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.multisuperplayer.core.llm.LlmModelCatalog
 import com.multisuperplayer.core.translate.MissingConfigItem
 import com.multisuperplayer.core.translate.TranslationConfig
 import com.multisuperplayer.core.translate.TranslationEngine
@@ -316,5 +317,122 @@ class TranslationSettingsTest {
         val config = settings.toConfig(apiKey = null)
 
         assertEquals(null, config.apiKey)
+    }
+
+    // ===== 本地（设备上运行）=====
+
+    private val localSourceKey = stringPreferencesKey("translation.local_model_source")
+
+    @Test
+    fun `本地这一家没有地址、不要密钥，而且是跑在设备上的`() {
+        val local = TranslationServices.byId("local")
+
+        assertEquals("local", local.id)
+        assertEquals(TranslationServices.LOCAL_ID, local.id)
+        assertEquals("设备上没有地址可填", "", local.baseUrl)
+        assertFalse("本机跑不需要密钥", local.requiresApiKey)
+        assertTrue("这一个布尔同时管着缺项判定、引擎分支和设置页的栏位", local.onDevice)
+        // 本机没有「必填栏」这回事，模型 id 就是清单里的那一条
+        assertEquals(LlmModelCatalog.DEFAULT_ID, local.model)
+        // 关思考是靠厂商补丁在远端实现的（Kimi 那类）；本机由推理层固定关掉
+        // （ThinkingConfig(enableThinking = false)），带上补丁反而没人认
+        assertEquals("", local.disableThinkingBody)
+    }
+
+    @Test
+    fun `本地不需要地址和密钥就算就绪`() {
+        // 这是 `onDevice` 这个布尔唯一真正的作用：不报两个**用户找不到输入框**的缺项。
+        // 漏了它的话，设置页会显示「还缺：服务地址、API 密钥」，而那两个栏位在本地
+        // 这一路根本不显示——用户会以为自己漏装了什么。
+        val settings = preferencesOf(providerKey to "local").toTranslationSettings()
+
+        assertTrue(settings.onDevice)
+        assertFalse(settings.apiKeyRequired)
+        assertEquals(emptyList<MissingConfigItem>(), settings.missingItems)
+        assertTrue(settings.ready)
+    }
+
+    @Test
+    fun `本地这一路仍然要检查模型 id`() {
+        // 地址与密钥可以不管，模型不能：空 id 会让引擎拿着一个空字符串去 load
+        // （报出来的错会像「文件不存在」，而真正的原因是设置里没写）。
+        val settings = preferencesOf(
+            providerKey to "local",
+            modelKey to "   ",
+        ).toTranslationSettings()
+
+        assertEquals(listOf(MissingConfigItem.MODEL), settings.missingItems)
+        assertFalse(settings.ready)
+    }
+
+    @Test
+    fun `就绪不等于模型已经下载好`() {
+        // 模型文件在不在是**运行期**的事实（要看文件系统），不在设置层判。
+        // 这里说「可以点了」，点下去没装模型时由引擎给出带模型名与下载指引的失败。
+        // 两边都判的后果是设置页要等文件 IO，而两边判得不一致的后果更糟：
+        // 按钮是灰的、却没有任何一句解释。
+        val settings = preferencesOf(providerKey to "local").toTranslationSettings()
+
+        assertTrue("设置层不管文件，所以这里必须是就绪", settings.ready)
+    }
+
+    @Test
+    fun `切到本地时带上预设的模型，地址留空`() {
+        val current = TranslationSettings(
+            providerId = "deepseek",
+            baseUrl = "https://api.deepseek.com",
+            model = "deepseek-flash",
+        )
+
+        val (baseUrl, model) = translationSwitchValues(TranslationServices.byId("local"), current)
+
+        // 继承上一家的 API 地址是最容易漏的一处：本地的缺项判定不看地址，
+        // 所以它不会被任何检查拦下，只会在设置页里显示成一个不该存在的地址。
+        assertEquals("本地不该继承上一家的 API 地址", "", baseUrl)
+        assertEquals(LlmModelCatalog.DEFAULT_ID, model)
+    }
+
+    @Test
+    fun `本地模型 id 透传到引擎配置上`() {
+        val settings = preferencesOf(providerKey to "local").toTranslationSettings()
+
+        val config = settings.toConfig(apiKey = null)
+
+        // 引擎就是靠这个字段决定「这个请求要发给本机引擎」的
+        assertTrue("模型没下载时引擎要能报出缺哪条模型", config.onDevice)
+        assertEquals("", config.baseUrl)
+        assertEquals(LlmModelCatalog.DEFAULT_ID, config.model)
+    }
+
+    @Test
+    fun `本地下载源与翻译服务地址是两个键，互不影响`() {
+        // 合成一个字段的后果是设置页把镜像站显示成服务商地址，
+        // 而且切到本地方案时会顺手继承上一家的 API 地址——两处都错得很安静。
+        val settings = preferencesOf(
+            providerKey to "local",
+            baseUrlKey to "https://api.example.com",
+            modelKey to "m",
+            localSourceKey to "https://mirror.example.com",
+        ).toTranslationSettings()
+
+        assertEquals("https://mirror.example.com", settings.localModelSource)
+        assertEquals("https://api.example.com", settings.baseUrl)
+    }
+
+    @Test
+    fun `没存过下载源时是空串，交给归一化回落到默认站`() {
+        // 这里与 baseUrl 的规矩**故意不同**：baseUrl 的空串是「用户清掉了」，
+        // 必须原样保留；下载源没有「必须留空」这个语义，空串就等于是默认站
+        // （归一化在 LlmModelCatalog.normalizeLlmModelBaseUrl 里）。
+        val settings = preferencesOf(providerKey to "local").toTranslationSettings()
+
+        assertEquals("", settings.localModelSource)
+    }
+
+    @Test
+    fun `远端服务商的下载源默认也是空串`() {
+        val settings = preferencesOf().toTranslationSettings()
+
+        assertEquals("", settings.localModelSource)
     }
 }

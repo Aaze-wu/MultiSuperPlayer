@@ -64,6 +64,7 @@ fun SettingsRoute(
     val playback by viewModel.playback.collectAsStateWithLifecycle()
     val fileAccessGranted by viewModel.fileAccessGranted.collectAsStateWithLifecycle()
     val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
+    val localModelEntry by viewModel.localModelEntry.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -71,11 +72,13 @@ fun SettingsRoute(
     // 一是「所有文件访问」这个系统设置项；二是 ASR 模型——用户可能刚在播放页的
     // 字幕面板里把它下完。所以订阅 `ON_RESUME` 重新问一次，而不是只读一次构造值——
     // 那样用户会看到「我明明开了 / 明明下完了，这里还写着没有」。
+    // 本地模型同理：它是在「字幕与翻译 → 本地模型」子页里下的。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshFileAccess()
                 viewModel.refreshAsrStatus()
+                viewModel.refreshLocalModelStatus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -88,6 +91,7 @@ fun SettingsRoute(
         playback = playback,
         translation = translation,
         asrEntry = asrEntry,
+        localModelEntry = localModelEntry,
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
         fileAccessSupported = viewModel.fileAccessSupported,
         fileAccessGranted = fileAccessGranted,
@@ -118,6 +122,11 @@ fun SettingsScreen(
     playback: PlaybackSettings = PlaybackSettings(),
     translation: TranslationSettings = TranslationSettings(),
     asrEntry: AsrEntryState = AsrEntryState(),
+    /**
+     * 本地翻译模型的状态。选中的服务商不是设备上那一个时它不会被显示，
+     * 但那个判断在 [SettingsSummaries.translation] 里（与缺项判定同源），这里不做。
+     */
+    localModelEntry: LocalModelEntryState = LocalModelEntryState(),
     softwareDecodingAvailable: Boolean = true,
     fileAccessSupported: Boolean = true,
     fileAccessGranted: Boolean = false,
@@ -165,7 +174,12 @@ fun SettingsScreen(
                     // 「字幕外观 + 翻译设置」两段，所以叫「字幕与翻译」而不是「字幕翻译」。
                     // 页面标题和入口名不一样会让人怀疑自己点错了地方。
                     title = stringResource(R.string.msp_settings_translation),
-                    subtitle = SettingsSummaries.translation(translation).string(),
+                    // 选的是「设备上运行」时，摘要里会把模型名和「下了没有」一起说出来：
+                    // 本地翻译的失败原因九成就在这里（模型没下载），而它不像地址/密钥
+                    // 那样打开子页就能看到——它只在不联网的这台手机上。
+                    subtitle = SettingsSummaries
+                        .translation(translation, localModelEntry.status)
+                        .string(),
                     onClick = onOpenTranslationSettings,
                 )
             }

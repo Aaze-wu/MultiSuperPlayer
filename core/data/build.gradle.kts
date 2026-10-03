@@ -48,6 +48,9 @@ dependencies {
     // 语音识别的偏好（选哪条模型、从哪个源下载）要把模型清单类型传给界面：
     // 设置页要显示模型名、体积、语言，这些都定义在 core:asr。
     api(project(":core:asr"))
+    // 设备上的翻译模型同理：清单/位置/下载/安装器的类型都要传到设置页
+    // （模型名、体积、下载进度），所以是 api 而不是 implementation。
+    api(project(":core:llm"))
     // 续播位置的实现要实现 core:player 的 PlaybackPositionStore。
     // 方向是 data → player 而不是反过来：内核不该知道 DataStore 的存在。
     // 用 `implementation`：PlaybackPositionStore 里没有 Media3 类型，

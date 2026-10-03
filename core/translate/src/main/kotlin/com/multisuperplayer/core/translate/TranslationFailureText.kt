@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.translate
 
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.llm.LlmModelCatalog
 
 /**
  * 一条失败要说给用户听的话。
@@ -140,6 +141,31 @@ fun describeTranslationFailure(
                 MspText.Res(R.string.msp_translate_fail_truncated_estimate, it)
             } ?: MspText.Plain(""),
         ),
+        raw = failure.detail.rawOrNull(),
+    )
+
+    // 本地模型名在**显文案这一步**才解析：数据层存的是 id（一会儿要当文件名用），
+    // 而用户认识的是「Qwen3 0.6B（本地）」那个名字。两者都不是对方，也不该互相冒充：
+    // 把 id 显给用户看会让他去搜索一个搜不到的型号；把名字存进数据里则一会儿就
+    // 和实际文件名对不上了。
+    is TranslationFailure.LocalModelMissing -> FailureText(
+        message = MspText.Res(
+            R.string.msp_translate_fail_local_model,
+            LlmModelCatalog.byId(failure.model).name,
+        ),
+        hint = MspText.Res(R.string.msp_translate_fail_local_model_hint),
+    )
+
+    is TranslationFailure.LocalEngineUnavailable -> FailureText(
+        message = MspText.Res(R.string.msp_translate_fail_local_engine),
+        hint = MspText.Res(R.string.msp_translate_fail_local_engine_hint),
+        raw = failure.detail.rawOrNull(),
+    )
+
+    is TranslationFailure.LocalGenerationFailed -> FailureText(
+        message = MspText.Res(R.string.msp_translate_fail_local_generation),
+        hint = MspText.Res(R.string.msp_translate_fail_local_generation_hint)
+            .withCurrent(providerName, model),
         raw = failure.detail.rawOrNull(),
     )
 }

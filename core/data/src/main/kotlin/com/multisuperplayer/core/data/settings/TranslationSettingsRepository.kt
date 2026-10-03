@@ -85,6 +85,16 @@ class TranslationSettingsRepository(
 
     suspend fun setModel(model: String) = edit { it[TranslationKeys.MODEL] = model.trim() }
 
+    /**
+     * 改本地模型的下载源。同 [setBaseUrl]：去首尾空白，**允许空**（空 = 用默认镜像站）。
+     *
+     * 只影响**之后的**下载：正在跑的那一次已经按旧地址在下，中途换源会让
+     * 「下了一半」与「接着下的那一半」来自两个不同的文件（哈希对不上，
+     * 而 `LlmModelDownloader` 是整文件校验的，最后以 `HashMismatch` 收场）。
+     */
+    suspend fun setLocalModelSource(source: String) =
+        edit { it[TranslationKeys.LOCAL_MODEL_SOURCE] = source.trim() }
+
     suspend fun setTarget(target: TranslationTarget) = edit { it[TranslationKeys.TARGET] = target.code }
 
     suspend fun setAutoTranslate(enabled: Boolean) = edit { it[TranslationKeys.AUTO_TRANSLATE] = enabled }
@@ -138,11 +148,15 @@ class TranslationSettingsRepository(
 internal fun translationSwitchValues(
     preset: TranslationService,
     current: TranslationSettings,
-): Pair<String, String> = if (preset.baseUrl.isNotBlank() && preset.model.isNotBlank()) {
-    preset.baseUrl to preset.model
-} else {
+): Pair<String, String> = when {
+    // 设备上的服务商：预设的「空地址」**正是该写进存储的值**。
+    // 跟下面那条「两边都非空才覆盖」的规矩走，它会保留上一家的地址和模型名，
+    // 于是本机拿到的模型 id 是「deepseek-flash」——而失败文案说的是
+    // 「本机模型还没下载」，把人引去下载一个其实已经装好的模型。
+    preset.onDevice -> preset.baseUrl to preset.model
+    preset.baseUrl.isNotBlank() && preset.model.isNotBlank() -> preset.baseUrl to preset.model
     // 自定义服务商没有任何预设值，保持用户已经填好的内容。
-    current.baseUrl to current.model
+    else -> current.baseUrl to current.model
 }
 
 /**
@@ -167,4 +181,7 @@ internal fun TranslationSettings.toConfig(apiKey: String?): TranslationConfig = 
     jsonMode = true,
     // 关掉推理模式的参数随服务商走：漏了它就会「HTTP 200 + 空内容」，见 TranslationService。
     extraBody = provider.disableThinkingBody,
+    // 设备上的服务商：地址与密钥都不参与，`model` 变成设备端清单里的 id。
+    // 这一项必须从设置里一路传到请求上，否则空地址会被拿去拼端点、然后 404。
+    onDevice = onDevice,
 )

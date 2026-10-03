@@ -40,6 +40,22 @@
     <string name="msp_translate_fail_truncated_hint">The limit is %1$d tokens, and %2$sthis batch still does not fit after automatic splitting. Use a model with a higher single-response limit.</string>
     <string name="msp_translate_fail_truncated_estimate">"is estimated to need about %1$d tokens, so "</string>
 
+    <!--
+      The three on-device failure tiers. They must stay separate from the ones
+      above: saying "authentication failed (HTTP 401)" or "the provider hit an
+      internal error" sends users to check their network and account, while the
+      problem is on their phone and nothing ever left it. They must also stay
+      separate from each other: the next step for "model not downloaded" (go
+      download it) and "engine would not start" (downloading changes nothing)
+      is completely different.
+    -->
+    <string name="msp_translate_fail_local_model">The on-device model "%1$s" is not downloaded yet.</string>
+    <string name="msp_translate_fail_local_model_hint">Open Settings → Subtitle translation, pick "On-device", and download the model under "On-device model" first.</string>
+    <string name="msp_translate_fail_local_engine">The on-device engine could not start.</string>
+    <string name="msp_translate_fail_local_engine_hint">Downloading the model will not help here: it is usually low memory or an unsupported device. Restart the app, or switch to a cloud provider; if it must run on this device, use a smaller model.</string>
+    <string name="msp_translate_fail_local_generation">The on-device model produced no result this time.</string>
+    <string name="msp_translate_fail_local_generation_hint">Retrying usually helps. If it keeps failing, use a smaller on-device model or switch to a cloud provider.</string>
+
     <!-- ===== Missing configuration items ===== -->
 
     <string name="msp_translate_missing_base_url">Base URL</string>
@@ -81,6 +97,9 @@
     <string name="msp_translate_svc_ollama_name">Ollama (local)</string>
     <string name="msp_translate_svc_ollama_note">For an Ollama running on this machine, use http://localhost:11434/v1. Plain HTTP on the LAN is blocked by the system policy; only localhost and 10.0.2.2 are allowed.</string>
     <string name="msp_translate_svc_ollama_key_hint">Any value works for a local service, or leave it empty</string>
+    <string name="msp_translate_svc_local_name">On-device</string>
+    <string name="msp_translate_svc_local_note">Runs entirely on this device: no network, no account, and no subtitle text ever leaves it. The model has to be downloaded once under "On-device model" below.</string>
+    <string name="msp_translate_svc_local_key_hint">No key needed</string>
     <string name="msp_translate_svc_openai_note">Networks in mainland China usually need a proxy; point the address at your own relay service.</string>
     <string name="msp_translate_svc_custom_name">Custom (any OpenAI-compatible service)</string>
     <string name="msp_translate_svc_custom_note">Any service with an OpenAI-compatible /chat/completions endpoint works: OpenAI, DeepSeek, Qwen, GLM, Kimi, Ollama, vLLM, LM Studio, one-api relays, and more.</string>

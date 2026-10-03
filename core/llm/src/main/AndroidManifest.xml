@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  这个模块没有 Android 组件，所以 manifest 是空的（与 core:asr 同样的理由）：
+  AGP 要求每个 library 模块都有这个文件，缺了它报的错指不到具体模块。
+-->
+<manifest />

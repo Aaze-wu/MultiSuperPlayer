@@ -35,6 +35,21 @@
     <string name="msp_translate_fail_truncated_hint">本次上限 %1$d tokens，%2$s自動拆分後仍超出：請改用單次輸出上限更高的模型。</string>
     <string name="msp_translate_fail_truncated_estimate">這一批估算需要約 %1$d tokens，</string>
 
+    <!--
+      裝置上跑的三檔失敗。
+
+      它們與上面那幾檔必須分開：說「驗證失敗（HTTP 401）」或「服務商內部錯誤」
+      會把使用者引去查網路與帳號，而問題在他的手機裡，而且從來沒有出過網。
+      三檔之間也同樣要分開：模型沒下載（去下載）與引擎起不來（下載多少次都沒用）
+      的下一步完全不同。
+    -->
+    <string name="msp_translate_fail_local_model">本機模型「%1$s」還沒下載好。</string>
+    <string name="msp_translate_fail_local_model_hint">到「設定 → 字幕翻譯」選「本機（裝置上執行）」，在下面的「本機模型」裡下載好再試。</string>
+    <string name="msp_translate_fail_local_engine">本機推理引擎沒能啟動。</string>
+    <string name="msp_translate_fail_local_engine_hint">下載模型解決不了這一檔：多半是記憶體不足或這台裝置不支援。可以先重啟應用程式，或改用雲端服務商；一定要本機跑的話，請換一條更小的模型。</string>
+    <string name="msp_translate_fail_local_generation">本機模型這次沒能給出結果。</string>
+    <string name="msp_translate_fail_local_generation_hint">重試通常就好。若反覆出現，請換一條更小的本機模型或改用雲端服務商。</string>
+
     <!-- ===== 設定缺項 ===== -->
 
     <string name="msp_translate_missing_base_url">服務位址</string>
@@ -76,6 +91,9 @@
     <string name="msp_translate_svc_ollama_name">Ollama（本機）</string>
     <string name="msp_translate_svc_ollama_note">本機執行的 Ollama 填 http://localhost:11434/v1 即可。區域網路位址的明文 HTTP 會被系統安全策略攔截，只有 localhost 與 10.0.2.2 被放行。</string>
     <string name="msp_translate_svc_ollama_key_hint">本機服務可任意填寫，也可留空</string>
+    <string name="msp_translate_svc_local_name">本機（裝置上執行）</string>
+    <string name="msp_translate_svc_local_note">完全在這台裝置上執行：不連網、不需要帳號，字幕內容不會離開本機。第一次要先在下面的「本機模型」裡把模型下載下來。</string>
+    <string name="msp_translate_svc_local_key_hint">不需要金鑰</string>
     <string name="msp_translate_svc_openai_note">中國大陸的網路通常需要自建代理，可將位址改為自己的中轉服務。</string>
     <string name="msp_translate_svc_custom_name">自訂（任何 OpenAI 相容服務）</string>
     <string name="msp_translate_svc_custom_note">相容 OpenAI 的 /chat/completions 介面即可使用：OpenAI、DeepSeek、通義、GLM、Kimi、Ollama、vLLM、LM Studio、one-api 中轉均可。</string>

@@ -7,9 +7,32 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /** 一次 chat/completions 请求所需的全部信息（已解析好 URL，URL 拼接见 [chatCompletionsUrl]）。 */
 internal data class ChatCompletionRequest(
+    /** 端点。**跑在设备上时是空串**（那时不会有任何出网），见 [onDeviceModelId]。 */
     val url: String,
     val apiKey: String?,
     val model: String,
+    /**
+     * 非 null = 这个请求跑在**设备上**，值是本地模型清单里的 id（见 `:core:llm`）。
+     *
+     * ## 为什么这一个是字段而不是「url 为空就本地」
+     *
+     * 空串在远端那侧是**错误**（没填地址），在这里是**正常**（本地本来就没地址）。
+     * 让同一个值兼两种意思，将来任何一处「顺手把空地址拦掉」的改动都会静默地把
+     * 本地路径改成发一个空 URL 出去。显式一个字段，分发处就只有一处判断，
+     * 而且单测可以断言「带着 id 的请求真的没走到 HTTP 客户端」。
+     */
+    val onDeviceModelId: String? = null,
+    /**
+     * 这批**应该**返回多少条译文。只有本机这条路会用到（远端拿不到 schema，
+     * 见 [buildChatRequestJson]），所以它只为「约束解码把数组长度钉死」而存在。
+     *
+     * 为什么不能由本地客户端自己从提示词里数：提示词是**给人看的文本**，
+     * 数它的行数就是在解析自己的提示词，改一次措辞就静默失灵。调用方本来就知道
+     * 这个数字（`lines.size`），直接传下来。
+     *
+     * `null` = 调用方没有这个概念，本地那一侧退回「只钉形状、不钉条数」。
+     */
+    val expectedItems: Int? = null,
     val systemPrompt: String,
     val userPrompt: String,
     val maxTokens: Int,
@@ -59,10 +82,11 @@ internal sealed interface ModelListOutcome {
 }
 
 /**
- * 唯一的 HTTP 出网口。
+ * 唯一的出网口。
  *
  * 抽成接口只为一件事：让「重试/拆批/加预算」这些策略能在单测里被验证。
- * 真实现是 [HttpChatClient]（`HttpURLConnection`，不引任何 HTTP 库）。
+ * 两个实现：[HttpChatClient]（`HttpURLConnection`，不引任何 HTTP 库）与
+ * [SwitchingChatClient]（按请求选择出网还是在本机跑）。
  */
 internal interface ChatCompletionClient {
     /** 调用方负责切到 IO 线程（[TranslationEngine] 用 `flowOn` 保证）。 */

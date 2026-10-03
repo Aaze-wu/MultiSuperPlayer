@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.3-alpha.1** (pre-release)
+- Current version: **0.6.4-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -130,6 +130,8 @@ Release notes: [docs/release-notes](docs/release-notes/)
 
 - **Any OpenAI-compatible endpoint**: fill in base URL, model name and API key. Presets for common
   providers are included, and a fully custom configuration is supported.
+- **It can also run entirely offline**: the provider list has an extra entry, *Local (runs on this
+device)*, where the model runs on the phone and the subtitle text never leaves it (see section 1.9).
 - **Batching and caching** with context lines and a glossary. Results are cached by a hash of
   (content, target language, model), so identical content is never paid for twice.
 - **Glossary**: names and proper nouns are replaced with placeholders before the request and restored
@@ -199,7 +201,7 @@ Release notes: [docs/release-notes](docs/release-notes/)
 - **Recent**: built from the resume records (position + timestamp), up to 50 entries; opening one resumes
   from where you stopped rather than from the beginning.
 - **No position still means it was played**: an item you opened for a few seconds keeps a position of 0
-  but **stays in the list**, rendered as "Played <time> - no position kept" rather than "00:00".
+  but **stays in the list**, rendered as "Played </time> - no position kept" rather than "00:00".
   "Not worth resuming" and "never played" are two different things; earlier versions collapsed both
   into one branch, so short clips could never appear on the Recent page.
 - **Can be turned off in Settings**: turning it off stops recording new items and **does not delete**
@@ -327,7 +329,59 @@ resulting file goes straight into the subtitle sheet, **already selected**.
 - **Nothing is overwritten**: the result is a new file; existing sidecar subtitles and embedded tracks are
   left exactly as they were.
 
-### 1.9 Roadmap
+### 1.9 On-device offline translation
+
+Settings → Subtitles and translation → the provider list has an extra entry, **"Local (runs on this
+device)"**. It sits next to the cloud providers, but it **never goes online**: no base URL, no API key,
+and the subtitle text never leaves the phone.
+
+- **The model is downloaded on demand**: **Qwen3-0.6B (int4 quantized, about 345 MB)**, defaulting to the
+  `hf-mirror.com` mirror. After the download the file is **verified against sha256**, and a mismatch
+  deletes the partial file — there is no "looks downloaded but will not install" model left behind.
+  The download source is **a separate key** from the speech recognition one (pointing one source somewhere
+  is no reason to silently change the other); leaving it blank restores the default. The download can be
+  stopped mid-way, and resuming is not supported, so a half-finished download **says how much was
+  received** and states that it will start over rather than pretending to resume.
+- **Why it is not bundled into the APK**: the model is 345 MB while the whole installer is about 135 MiB.
+  On-device translation is a feature you need *when you use it*, so making every user pay nearly three
+  times the size for it is a bad trade.
+- **Why 0.6B**: it is the size that actually runs on a phone. Subtitle translation needs no world
+  knowledge, and larger models (1.7B / 4B) take several times as long on the same batch — better to ship
+  one that works than an option that makes you wait ten minutes.
+- **CPU only**: nothing to tune per device, reproducible output, at the cost of speed (a batch of 3–10
+  lines measured at a few seconds to a few tens of seconds). The upside of batching is that the progress
+  indicator keeps moving instead of waiting for one giant answer.
+- **Constrained decoding pins the output shape down.** On this path the JSON Schema is not a suggestion:
+  it is compiled into real **decoding constraints**, so the model never reaches a state where malformed
+  JSON could be produced. That is the opposite of the cloud path, where `response_format` only guarantees
+  "valid JSON" — the **field names are never sent to the model**, which in practice invents its own key
+  names, so the cloud path relies on the format paragraph in the system prompt. In other words, it is the
+  same statement said twice: once in the prompt, once by the local decoder. The two must agree (change
+  one and you must change the other, and the prompt side also has `TRANSLATION_PROMPT_VERSION` to bump
+  because the cache key follows it).
+- **The item count goes into the schema, not the prompt.** The caller already knows how many lines it is
+  sending, so it goes straight into `minItems` / `maxItems` instead of being echoed by the model. Both
+  reasons come from real measurements: 0.6B **reliably** merges a whole batch into **one** string (an
+  array of length 1, with `\n\n` between sentences) and retrying does not help; and asking a model to
+  echo a number it cannot determine is a mistake in itself — every extra required field is one more thing
+  that can be silently dropped. When a batch is split, the count follows that batch's own line count.
+- **Failure reasons are split by "what do I do next"** — these three require completely different
+  actions, so collapsing them into one "translation failed" would explain nothing.
+
+  | What the UI says | What to do next |
+  | --- | --- |
+  | The on-device model "x" has not been downloaded | Download it under *Local model* |
+  | The on-device inference engine could not start | **Downloading a model does not fix this one** — it is usually low memory or an unsupported device; restart the app, switch to a smaller model, or use a cloud provider |
+  | The on-device model produced no result this time | Retrying usually works; if it keeps happening, use a smaller model or a cloud provider |
+
+- **A model can be deleted on its own**: deleting clears only that model's files and **leaves every
+  subtitle already translated untouched**; it can be downloaded again.
+- **One known quirk of the model**: it **copies the "input / output" example** from the prompt — given a
+  contentless short line (like `Line two.`) it emits the example's answer. Neighbouring lines are
+  translated correctly, so this is not an alignment problem. Fixing it touches the whole prompt
+  calibration, so it is left for a later release.
+
+### 1.10 Roadmap
 
 | Version | Content | Status |
 | --- | --- | --- |
@@ -354,7 +408,8 @@ resulting file goes straight into the subtitle sheet, **already selected**.
 | **v0.6** | **On-device offline ASR subtitle generation: incremental download with per-file sha256 verification, deleting a model leaves generated subtitles alone, editable download source (empty = mirror), generated subtitles stored in a private directory and attached and selected automatically** | Done |
 | **v0.6.1** | **"About" page rework, help question marks on settings entries, more professional wording; release signing wired up with a build-time signature self-check** | Done |
 | **v0.6.2** | **Multi-language support (Japanese first): a dedicated Japanese offline model (ReazonSpeech) to download; automatic Shift-JIS (CP932) detection for subtitle files; prompt examples generated per target language; automatic collapsing of spaces between Japanese kana** | Done |
-| **v0.6.3** | **Reordering and transport fixes: playlists and the items inside them can be reordered by long-pressing a whole row (the order is saved, a new playlist goes last); multi-select in the library and file browser follows the order you tapped the items in; fixed the transport row overflowing on 360dp-wide screens (the last button was squeezed into a sliver); cleartext `http://` is allowed (a NAS on your LAN, a local LLM server)** | **Current** |
+| **v0.6.3** | **Reordering and transport fixes: playlists and the items inside them can be reordered by long-pressing a whole row (the order is saved, a new playlist goes last); multi-select in the library and file browser follows the order you tapped the items in; fixed the transport row overflowing on 360dp-wide screens (the last button was squeezed into a sliver); cleartext `http://` is allowed (a NAS on your LAN, a local LLM server)** | Done |
+| **v0.6.4** | **On-device offline translation: the provider list gains *Local (runs on this device)* (Qwen3-0.6B, about 345 MB, downloaded on demand with sha256 verification and a delete-that-model-only action); constrained decoding pins the output shape down (including the item count), fixing two "it can never work on a real device" bugs (a benchmark query that always throws was treated as a failed generation, and 0.6B merging a whole batch into one array element)** | **Current** |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
 ---
@@ -696,6 +751,14 @@ These are deliberate for this release, not oversights:
     edge" loop is the obvious fix, but it feeds back into `LazyListState`'s visible-items callback
     (scroll a bit, row height changes, the drop target changes) and that cycle has to be broken
     cleanly first. Left for a later release.
+16. **The on-device translation model is not bundled either, and it runs on the CPU only.** It is about
+    345 MB, the same trade as the speech recognition models: bundling it would make everyone who does not
+    want the feature wait through an extra download. The cost is that the first run needs the download
+    to finish first (measured: about 83 seconds from the mirror), and **without a network the model
+    cannot be installed** (the translation itself needs no network). Inference is fixed to the CPU
+    backend, which means no per-device tuning and reproducible output at the cost of speed. There is also
+    currently **only one model to choose from**, and the translation cache has **no "clear" action** —
+    forcing a re-translation means editing the subtitle content, or switching target language / model.
 
 ---
 

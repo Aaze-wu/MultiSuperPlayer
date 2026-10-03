@@ -73,6 +73,16 @@
     <string name="msp_settings_summary_asr_partial">已下载 %1$d%%</string>
     <string name="msp_settings_summary_asr_ready">已下载</string>
 
+    <!--
+      本地翻译模型的三种状态。与 ASR 那把不同：这一条**不支持断点续传**，
+      所以「未下完」不能被说成「继续下载」（那是在界面上承诺一件做不到的事）。
+      例：`Qwen3 0.6B（本地） · 未下载 · 约 328.7 MB`。
+    -->
+    <string name="msp_settings_summary_local_model_absent">未下载</string>
+    <!-- `%1$d` 是已收到的整数百分比，向下取整 -->
+    <string name="msp_settings_summary_local_model_partial">未下完（已收到 %1$d%%）</string>
+    <string name="msp_settings_summary_local_model_ready">已下载</string>
+
     <string name="msp_settings_summary_no_logs">还没有任何日志文件</string>
 
     <!-- 例：`12 个 · 1.4 MB`。第一参数是文件数，第二参数是总量 -->
@@ -374,6 +384,47 @@
     <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 开头。</string>
 
     <string name="msp_settings_asr_dismiss">知道了</string>
+
+    <!-- ===== 本地翻译模型（跑在设备上） ===== -->
+
+    <!-- 页面标题，同时也是「字幕与翻译」页上那个入口行的标题 -->
+    <string name="msp_settings_local_model">本地模型</string>
+    <string name="msp_settings_section_local_model">翻译模型</string>
+    <!-- 「不联网」是这条功能的卖点，也是用户第一个会怀疑的事（我的字幕被传到哪去了），所以放在最前面 -->
+    <string name="msp_settings_local_model_hint">翻译全程在这台设备上完成：不联网、不需要账号，字幕内容不会离开手机。模型文件需要先下载一次。</string>
+
+    <!-- 体积写在按钮上，而不是藏进一句说明：这是点下去之前唯一要知道的数字（约 329 MB） -->
+    <string name="msp_settings_local_model_download">下载模型（约 %1$s）</string>
+    <!-- 下了一半时的说法。下载器整文件重下（不支持断点续传），所以这里不能说「继续下载」 -->
+    <string name="msp_settings_local_model_redownload">重新下载（约 %1$s）</string>
+    <string name="msp_settings_local_model_partial_hint">上次没下完，已收到 %1$s。不支持断点续传，会从头开始。</string>
+    <string name="msp_settings_local_model_stop">停止</string>
+    <string name="msp_settings_local_model_downloading">正在下载模型…</string>
+    <!-- 例：`已下载 12.3 MB / 328.7 MB` -->
+    <string name="msp_settings_local_model_download_bytes">已下载 %1$s / %2$s</string>
+    <!-- 校验要读完整份文件（345 MB 约 1 秒）。单独说一句，而且进度条不停在 100%：停在 100% 会造成「卡死了」的错觉 -->
+    <string name="msp_settings_local_model_verifying">正在校验文件完整性…</string>
+    <!-- 例：`Qwen3 0.6B（本地） 已就绪。` -->
+    <string name="msp_settings_local_model_installed">%1$s 已就绪。</string>
+    <!-- 已就绪时替掉「下载」按钮的那句话：它把下一步写出来（去哪儿选它），而不是只说「已下载」 -->
+    <string name="msp_settings_local_model_ready_hint">已经就绪。把「字幕与翻译」里的服务商选成「本地（设备上运行）」就能用它。</string>
+
+    <!-- 例：`删除模型（释放 328.7 MB）`。体积是**实际占用**：下了一半时不能说总体积 -->
+    <string name="msp_settings_local_model_remove">删除模型（释放 %1$s）</string>
+    <string name="msp_settings_local_model_remove_confirm_title">删除这个模型？</string>
+    <!-- `%1$s` 是模型名，`%2$s` 是体积。「已经译好的字幕不受影响」必须说出来：那是删之前最让人犹豫的一点 -->
+    <string name="msp_settings_local_model_remove_confirm_body">%1$s 要重新下载（%2$s）才能再用本地翻译。已经译好的字幕不受影响。</string>
+    <string name="msp_settings_local_model_removed">已删除 %1$s。</string>
+    <!-- 真的没文件可删时的话：不说成「已删除」，那句是假话 -->
+    <string name="msp_settings_local_model_remove_missing">这条模型的文件已经不在手机上了。</string>
+
+    <string name="msp_settings_section_local_model_source">下载源</string>
+    <string name="msp_settings_local_model_source">模型下载地址</string>
+    <string name="msp_settings_local_model_source_support">默认使用国内镜像源</string>
+    <string name="msp_settings_local_model_source_invalid">要以 http:// 或 https:// 开头。</string>
+    <string name="msp_settings_local_model_source_help">默认使用 hf-mirror.com 国内镜像。模型只有一份文件，改这一栏只影响之后的下载。</string>
+
+    <string name="msp_settings_local_model_dismiss">知道了</string>
 
     <!-- ===== 设置项帮助（问号） ===== -->
 

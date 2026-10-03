@@ -38,6 +38,12 @@ dependencies {
     // api 而不是 implementation：TranslationService / FailureText / SubtitleExportFormat
     // 的公开签名里都有 core:common 的 MspText，消费方得能看见它。
     api(project(":core:common"))
+    // 设备上的那一路。本模块**不认识** LiteRT，只认识 `:core:llm` 的公开接口
+    // (LlmTextGenerator / LlmModelCatalog)，真实现由 core:data 在 DI 里装配。
+    // implementation 而不是 api：本模块的公开签名里没有任何 core:llm 的类型
+    // （TranslationConfig 上那个「是否跑在设备上」只是一个 Boolean），
+    // 消费方不需要把 21 MB 的原生库也拉进自己的编译类路径。
+    implementation(project(":core:llm"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.koin.android)

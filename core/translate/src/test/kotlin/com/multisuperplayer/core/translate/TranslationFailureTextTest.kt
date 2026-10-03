@@ -29,6 +29,13 @@ import kotlin.test.assertNotEquals
  */
 class TranslationFailureTextTest {
 
+    /**
+     * 全部失败档。
+     *
+     * 加档时**必须**加进这个列表：`每一档都有话说` 是遍历它跑的，
+     * 漏了一档就等于那一档的文案从来没被检查过——而新档恰恰是最容易只写一半的
+     * （本地的三档就是后来才补上的，`when` 里加了分支，这个列表里却还没有它们）。
+     */
     private fun allFailures(): List<TranslationFailure> = listOf(
         TranslationFailure.NotConfigured(MissingConfigItem.BASE_URL),
         TranslationFailure.Unauthorized(401, "invalid_api_key"),
@@ -40,6 +47,9 @@ class TranslationFailureTextTest {
         TranslationFailure.BadResponse("缺少 translations 字段"),
         TranslationFailure.EmptyCompletion("length", 2048, 2048, "content 为空"),
         TranslationFailure.Truncated("length", 4096, 2048, "括号没闭合"),
+        TranslationFailure.LocalModelMissing("qwen3-0.6b"),
+        TranslationFailure.LocalEngineUnavailable("load failed"),
+        TranslationFailure.LocalGenerationFailed("empty output"),
     )
 
     @Test
@@ -212,6 +222,95 @@ class TranslationFailureTextTest {
 
         assertNotEquals(withWait.hint, without.hint, "没给等待时间就该换一句话，而不是留一个空括号")
         assertEquals(MspText.Res(R.string.msp_translate_fail_rate_limited_hint), without.hint)
+    }
+
+    @Test
+    fun `本地三档各有各的结论，而且与形状档预算档都不重合`() {
+        val missing = describeTranslationFailure(TranslationFailure.LocalModelMissing("qwen3-0.6b"))
+        val engine = describeTranslationFailure(TranslationFailure.LocalEngineUnavailable("load failed"))
+        val generation = describeTranslationFailure(TranslationFailure.LocalGenerationFailed("empty output"))
+        val bad = describeTranslationFailure(TranslationFailure.BadResponse("缺少 translations 字段"))
+        val truncated = describeTranslationFailure(TranslationFailure.Truncated("length", 4096, 2048, "括号没闭合"))
+
+        val messages = listOf(missing, engine, generation, bad, truncated).map { it.message }
+        // ⚠️ 本文件里的 `assertEquals` 是 `kotlin.test` 的那一个（显式 import 压过了
+        // `org.junit.Assert.*` 的星号导入），签名是「期望值、实际值、消息」——
+        // 消息写在**最后**。写成 JUnit 的顺序会让 Kotlin 掉到
+        // `assertEquals(Double, Double, Double)` 那个重载上，报一句「期望 Double」。
+        assertEquals(messages.size, messages.toSet().size, "五档说了五句不同的话")
+        assertEquals(
+            R.string.msp_translate_fail_local_model,
+            (missing.message as MspText.Res).id,
+            "模型没下好给的是「去下载」那一支",
+        )
+        assertEquals(R.string.msp_translate_fail_local_engine, (engine.message as MspText.Res).id)
+        assertEquals(R.string.msp_translate_fail_local_generation, (generation.message as MspText.Res).id)
+    }
+
+    @Test
+    fun `模型没下好时报的是模型名字，不是设置里存的那个 id`() {
+        // 数据层存的是 id（一会儿要当目录名用），用户认识的是「Qwen3 0.6B（本地）」。
+        // 直接把 id 印出来，用户会去搜一个搜不到的型号——这正是两个名字
+        // 必须在这一层（显文案这一步）才转换的理由。
+        val text = describeTranslationFailure(TranslationFailure.LocalModelMissing("qwen3-0.6b"))
+        val flat = text.message.flat()
+
+        assertTrue(
+            "要出现模型的名字",
+            flat.ids.contains(com.multisuperplayer.core.llm.R.string.msp_llm_model_qwen3_name),
+        )
+        assertFalse("id 不该出现在界面上", flat.values.contains("qwen3-0.6b"))
+    }
+
+    @Test
+    fun `认不出的模型 id 也报一个能认的名字`() {
+        // 旧配置、被删掉的模型、手改过的设置都会走到这里。
+        // 不兜底的话这句话会变成「本机模型「」还没下载好」——引号里空空如也。
+        val text = describeTranslationFailure(TranslationFailure.LocalModelMissing("no-such-model"))
+
+        assertTrue(
+            "要回落到默认模型的名字",
+            text.message.flat().ids.contains(com.multisuperplayer.core.llm.R.string.msp_llm_model_qwen3_name),
+        )
+    }
+
+    @Test
+    fun `引擎起不来时要明说下载解决不了`() {
+        // 这一档与「模型没下好」分开，就是因为下一步**相反**：
+        // 一个去下载，一个下载再多次也没用。文案里含糊其辞的话，
+        // 用户会反复删了重下 345 MB。
+        val engine = resource("msp_translate_fail_local_engine_hint")
+        val missing = resource("msp_translate_fail_local_model_hint")
+
+        assertNotEquals(engine, missing)
+        assertTrue("模型档要指向设置里的下载入口，实际是：$missing", missing.contains("设置"))
+        // 引擎档不能只是「不说下载」——它必须**主动**把「再下一次就好了」这个错觉
+        // 按掉。用户刚下完 345 MB，第一反应必然是「是不是没下好」。
+        assertTrue(
+            "引擎档要点明下载解决不了，实际是：$engine",
+            engine.contains("下载") && engine.contains("解决不了"),
+        )
+        assertTrue(
+            "引擎档要给出此刻能做的事，实际是：$engine",
+            engine.contains("重启") || engine.contains("云端"),
+        )
+    }
+
+    @Test
+    fun `本地生成失败要给出当前服务商与模型`() {
+        // 本地档的 providerName 是「本地（设备上运行）」，用户据此确认
+        // 自己确实在用本地那一家，而不是以为还在走云端
+        val text = describeTranslationFailure(
+            TranslationFailure.LocalGenerationFailed("empty output"),
+            providerName = TranslationServices.LOCAL.displayName,
+            model = "qwen3-0.6b",
+        )
+
+        assertTrue(
+            "要点名当前服务商",
+            text.hint!!.flat().ids.contains(R.string.msp_translate_svc_local_name),
+        )
+        assertTrue("要点名当前模型", text.hint.flat().ids.contains(R.string.msp_translate_current_model))
     }
 
     @Test

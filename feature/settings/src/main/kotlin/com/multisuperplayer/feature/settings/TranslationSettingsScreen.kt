@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.FormatColorText
 import androidx.compose.material.icons.outlined.FormatLineSpacing
 import androidx.compose.material.icons.outlined.FormatSize
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.material3.AlertDialog
@@ -32,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +46,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
@@ -79,6 +84,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun TranslationSettingsRoute(
     onBack: () -> Unit,
+    onOpenLocalModel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
@@ -86,12 +92,27 @@ fun TranslationSettingsRoute(
     val connectionTest by viewModel.connectionTest.collectAsStateWithLifecycle()
     val modelList by viewModel.modelList.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
+    val localModel by viewModel.localModelEntry.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 本页会显示「本地模型下了没有」，而那件事是在**另一个页面**（本地模型页）改变的。
+    // 那一步没有任何回调会通知这里，所以从那边退回来时重读一次磁盘。
+    // 与 `SettingsScreen` 刷新 ASR 状态是同一个套路。
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshLocalModelStatus()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     TranslationSettingsScreen(
         settings = settings,
         connectionTest = connectionTest,
         modelList = modelList,
+        localModel = localModel,
         onBack = onBack,
+        onOpenLocalModel = onOpenLocalModel,
         onSelectProvider = viewModel::selectProvider,
         onSetBaseUrl = viewModel::setBaseUrl,
         onSetModel = viewModel::setModel,
@@ -132,6 +153,12 @@ fun TranslationSettingsScreen(
     onTestConnection: () -> Unit,
     onFetchModels: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * 本地模型（设备上运行）的状态与入口。只有在选中的服务商是设备上的那一个时
+     * 才用得到，但默认值仍然给上：没读盘时显示「未下载」比显示空白更容错。
+     */
+    localModel: LocalModelEntryState = LocalModelEntryState(),
+    onOpenLocalModel: () -> Unit = {},
     subtitleStyle: SubtitleStyle = SubtitleStyle.DEFAULT,
     onSetSubtitleTextSize: (SubtitleTextSize) -> Unit = {},
     onSetSubtitleLineSpacing: (SubtitleLineSpacing) -> Unit = {},
@@ -171,55 +198,75 @@ fun TranslationSettingsScreen(
         ) {
             item { SectionHeader(stringResource(R.string.msp_settings_section_provider)) }
             item { ProviderPicker(settings, onSelectProvider) }
-            item {
-                DraftTextField(
-                    key = settings.providerId,
-                    stored = settings.baseUrl,
-                    onCommit = onSetBaseUrl,
-                    label = stringResource(R.string.msp_settings_base_url),
-                    placeholder = "https://api.deepseek.com",
-                    keyboardType = KeyboardType.Uri,
-                    supportingText = stringResource(R.string.msp_settings_base_url_support),
-                    help = stringResource(R.string.msp_settings_base_url_help),
-                )
-            }
-            item {
-                DraftTextField(
-                    key = settings.providerId,
-                    stored = settings.model,
-                    onCommit = onSetModel,
-                    label = stringResource(R.string.msp_settings_model_name),
-                    placeholder = "deepseek-flash",
-                    // 模型名写错是最常见的一类：地址对、密钥对、HTTP 200，
-                    // 但返回的是「模型不存在」，或者更糟——静默返回别的东西。
-                    supportingText = stringResource(R.string.msp_settings_model_support),
-                    trailing = {
-                        TextButton(onClick = onFetchModels, enabled = !modelList.loading) {
-                            Text(
-                                if (modelList.loading) stringResource(R.string.msp_settings_fetching)
-                                else stringResource(R.string.msp_settings_fetch_models),
-                            )
-                        }
-                    },
-                )
-            }
-            if (modelList.failure != null) {
+            if (settings.onDevice) {
+                // 「设备上运行」这一档没有地址、没有密钥、没有可拉取的模型列表——
+                // 不是把三栏藏起来，是这套服务商根本没有这些概念
+                // （见 `TranslationConfig.onDevice`）。留着它们只会得到三个填了也没用的框，
+                // 而那个地址框里的值在切服务商时还会被继承来继承去（那是更安静的一种错）。
+                item { SectionHeader(stringResource(R.string.msp_settings_section_local_model)) }
                 item {
-                    FailureBlock(
-                        failure = modelList.failure,
-                        prefix = stringResource(R.string.msp_settings_fetch_failed_prefix),
+                    SettingActionRow(
+                        icon = Icons.Outlined.Memory,
+                        title = localModel.model.name.string(),
+                        // 这一行的价值全在副标题上：模型是多大、下了没有。
+                        // 「还没下」必须在这里能看出来——否则用户会以为选好服务商就能翻译。
+                        subtitle = SettingsSummaries
+                            .localModel(localModel.model, localModel.status)
+                            .string(),
+                        onClick = onOpenLocalModel,
                     )
                 }
-            } else if (modelList.models.isNotEmpty()) {
+            } else {
                 item {
-                    ModelListBlock(models = modelList.models, current = settings.model) { model ->
-                        onSetModel(model)
+                    DraftTextField(
+                        key = settings.providerId,
+                        stored = settings.baseUrl,
+                        onCommit = onSetBaseUrl,
+                        label = stringResource(R.string.msp_settings_base_url),
+                        placeholder = "https://api.deepseek.com",
+                        keyboardType = KeyboardType.Uri,
+                        supportingText = stringResource(R.string.msp_settings_base_url_support),
+                        help = stringResource(R.string.msp_settings_base_url_help),
+                    )
+                }
+                item {
+                    DraftTextField(
+                        key = settings.providerId,
+                        stored = settings.model,
+                        onCommit = onSetModel,
+                        label = stringResource(R.string.msp_settings_model_name),
+                        placeholder = "deepseek-flash",
+                        // 模型名写错是最常见的一类：地址对、密钥对、HTTP 200，
+                        // 但返回的是「模型不存在」，或者更糟——静默返回别的东西。
+                        supportingText = stringResource(R.string.msp_settings_model_support),
+                        trailing = {
+                            TextButton(onClick = onFetchModels, enabled = !modelList.loading) {
+                                Text(
+                                    if (modelList.loading) stringResource(R.string.msp_settings_fetching)
+                                    else stringResource(R.string.msp_settings_fetch_models),
+                                )
+                            }
+                        },
+                    )
+                }
+                if (modelList.failure != null) {
+                    item {
+                        FailureBlock(
+                            failure = modelList.failure,
+                            prefix = stringResource(R.string.msp_settings_fetch_failed_prefix),
+                        )
+                    }
+                } else if (modelList.models.isNotEmpty()) {
+                    item {
+                        ModelListBlock(models = modelList.models, current = settings.model) { model ->
+                            onSetModel(model)
+                        }
                     }
                 }
-            }
 
-            item { SectionHeader(stringResource(R.string.msp_settings_section_api_key)) }
-            item { ApiKeyBlock(settings, onSaveApiKey, onClearApiKey) }
+                item { SectionHeader(stringResource(R.string.msp_settings_section_api_key)) }
+                item { ApiKeyBlock(settings, onSaveApiKey, onClearApiKey) }
+            }
 
             item { SectionHeader(stringResource(R.string.msp_settings_section_translate)) }
             item { TargetPicker(settings.target, onSetTarget) }

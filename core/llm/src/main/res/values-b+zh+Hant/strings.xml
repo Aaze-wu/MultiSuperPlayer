@@ -1,0 +1,18 @@
+<resources>
+
+    <string name="msp_llm_model_size">約 %1$s</string>
+
+    <string name="msp_llm_detail_sep">" · "</string>
+
+    <string name="msp_llm_model_qwen3_name">Qwen3 0.6B（本機）</string>
+    <string name="msp_llm_model_qwen3_desc">參數只有 0.6B 的輕量中英模型（int4 量化）。完全在本機執行：不連網、不消耗介面額度。長句的譯文品質不如雲端大模型。</string>
+
+    <string name="msp_llm_error_network">網路連線中斷：%1$s</string>
+    <string name="msp_llm_error_http">伺服器回傳 %1$d</string>
+    <string name="msp_llm_error_source">下載源位址無效：%1$s</string>
+    <string name="msp_llm_error_size">檔案不完整（預期 %1$s，實際 %2$s）</string>
+    <string name="msp_llm_error_hash">檔案校驗不通過（鏡像站可能給的是舊版本，可換一個下載源再試）</string>
+    <string name="msp_llm_error_write">寫入失敗：%1$s</string>
+    <string name="msp_llm_error_unknown">模型操作失敗：%1$s</string>
+
+</resources>

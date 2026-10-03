@@ -28,9 +28,15 @@ import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
+import com.multisuperplayer.core.llm.LiteRtLmTextGenerator
+import com.multisuperplayer.core.llm.LlmModelDownloader
+import com.multisuperplayer.core.llm.LlmModelInstaller
+import com.multisuperplayer.core.llm.LlmModelLocator
+import com.multisuperplayer.core.llm.LlmTextGenerator
 import com.multisuperplayer.core.player.PlaybackPositionStore
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
+import java.io.File
 
 val dataModule = module {
     single { MediaStoreScanner(context = androidContext()) }
@@ -150,4 +156,28 @@ val dataModule = module {
 
     // 识别 → 序列化 → 落盘，界面层只能经它生成字幕。
     single { AsrSubtitleGenerator(transcriber = get(), store = get()) }
+
+    // ----------------------------------------------------------- 本地翻译（设备上跑的大模型）
+
+    // 模型文件的位置（filesDir/llm/）。设置页要查「下了没有」，推理层拿它当模型路径，
+    // 所以 locator 单独注册。与 AsrModelLocator 一样只收 filesDir——好在这层能单测。
+    single { LlmModelLocator(LlmModelLocator.rootOf(androidContext().filesDir)) }
+
+    single { LlmModelDownloader(dispatchers = get()) }
+
+    single { LlmModelInstaller(locator = get(), downloader = get()) }
+
+    // 推理引擎的宿主。**必须是单例**：引擎 `initialize()` 最长约 10 s，
+    // 而且同一个进程里并发跑两个原生生成会崩在 native 侧（串行化在它内部）。
+    // cacheDir 只是引擎的工作目录，可再生，所以放 cache 下。
+    //
+    // ⚠️ 删/换模型文件之前要先调 `release()`：模型是 mmap 进去的，
+    // 没释放就删会出现「文件没了但空间没回来」。
+    single<LlmTextGenerator> {
+        LiteRtLmTextGenerator(
+            locator = get(),
+            cacheDir = File(androidContext().cacheDir, "llm"),
+            dispatchers = get(),
+        )
+    }
 }

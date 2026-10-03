@@ -3,6 +3,7 @@ package com.multisuperplayer.core.translate.di
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.translate.ChatCompletionClient
 import com.multisuperplayer.core.translate.HttpChatClient
+import com.multisuperplayer.core.translate.SwitchingChatClient
 import com.multisuperplayer.core.translate.TranslationCacheStore
 import com.multisuperplayer.core.translate.TranslationEditsStore
 import com.multisuperplayer.core.translate.TranslationEngine
@@ -21,7 +22,13 @@ import java.io.File
  */
 val translateModule = module {
 
-    single<ChatCompletionClient> { HttpChatClient() }
+    // 出网还是在本机跑，由**请求自己**带着（见 SwitchingChatClient）：
+    // 引擎不读「用户当前选了哪家服务商」，只把 config 快照发出去，
+    // 所以跑完一半换服务商也不会让同一批里混进两种来源。
+    // LlmTextGenerator 由 core:data 装配（模型目录/下载/引擎都在那边）。
+    single<ChatCompletionClient> {
+        SwitchingChatClient(remote = HttpChatClient(), generator = get())
+    }
 
     single {
         TranslationCacheStore(

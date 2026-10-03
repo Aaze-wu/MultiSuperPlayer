@@ -39,6 +39,15 @@
     <string name="msp_settings_summary_asr_partial">已下載 %1$d%%</string>
     <string name="msp_settings_summary_asr_ready">已下載</string>
 
+    <!--
+      本機翻譯模型的三種狀態。與 ASR 那把不同：這條**不支援斷點續傳**，
+      所以「未下完」不能說成「繼續下載」（那是在介面上承諾一件做不到的事）。
+    -->
+    <string name="msp_settings_summary_local_model_absent">未下載</string>
+    <!-- `%1$d` 是已收到的整數百分比，向下取整 -->
+    <string name="msp_settings_summary_local_model_partial">未下完（已收到 %1$d%%）</string>
+    <string name="msp_settings_summary_local_model_ready">已下載</string>
+
     <string name="msp_settings_summary_no_logs">還沒有任何日誌檔案</string>
     <!-- `%1$d` 是檔案數，`%2$s` 是總大小 -->
     <string name="msp_settings_summary_log_usage">%1$d 個 · %2$s</string>
@@ -274,6 +283,40 @@
     <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 開頭。</string>
 
     <string name="msp_settings_asr_dismiss">知道了</string>
+
+    <!-- ===== 本機翻譯模型（跑在裝置上） ===== -->
+
+    <string name="msp_settings_local_model">本機模型</string>
+    <string name="msp_settings_section_local_model">翻譯模型</string>
+    <!-- 「不連網」是這條功能的賣點，也是使用者第一個會懷疑的事 -->
+    <string name="msp_settings_local_model_hint">翻譯全程在這台裝置上完成：不連網、不需要帳號，字幕內容不會離開手機。模型檔案需要先下載一次。</string>
+
+    <!-- 體積寫在按鈕上：這是按下去之前唯一要知道的數字（約 329 MB） -->
+    <string name="msp_settings_local_model_download">下載模型（約 %1$s）</string>
+    <!-- 下了一半時的說法。下載器整檔案重下（不支援斷點續傳），所以不能說「繼續下載」 -->
+    <string name="msp_settings_local_model_redownload">重新下載（約 %1$s）</string>
+    <string name="msp_settings_local_model_partial_hint">上次沒下完，已收到 %1$s。不支援斷點續傳，會從頭開始。</string>
+    <string name="msp_settings_local_model_stop">停止</string>
+    <string name="msp_settings_local_model_downloading">正在下載模型…</string>
+    <string name="msp_settings_local_model_download_bytes">已下載 %1$s / %2$s</string>
+    <!-- 校驗要讀完整份檔案（345 MB 約 1 秒）。單獨說一句，而且進度條不停在 100% -->
+    <string name="msp_settings_local_model_verifying">正在校驗檔案完整性…</string>
+    <string name="msp_settings_local_model_installed">%1$s 已就緒。</string>
+    <string name="msp_settings_local_model_ready_hint">已經就緒。把「字幕與翻譯」裡的服務商選成「本機（裝置上執行）」就能用它。</string>
+
+    <string name="msp_settings_local_model_remove">刪除模型（釋放 %1$s）</string>
+    <string name="msp_settings_local_model_remove_confirm_title">刪除這個模型？</string>
+    <string name="msp_settings_local_model_remove_confirm_body">%1$s 要重新下載（%2$s）才能再用本機翻譯。已經譯好的字幕不受影響。</string>
+    <string name="msp_settings_local_model_removed">已刪除 %1$s。</string>
+    <string name="msp_settings_local_model_remove_missing">這條模型的檔案已經不在手機上了。</string>
+
+    <string name="msp_settings_section_local_model_source">下載來源</string>
+    <string name="msp_settings_local_model_source">模型下載位址</string>
+    <string name="msp_settings_local_model_source_support">預設使用國內鏡像來源</string>
+    <string name="msp_settings_local_model_source_invalid">要以 http:// 或 https:// 開頭。</string>
+    <string name="msp_settings_local_model_source_help">預設使用 hf-mirror.com 國內鏡像。模型只有一份檔案，改這一欄只影響之後的下載。</string>
+
+    <string name="msp_settings_local_model_dismiss">知道了</string>
 
     <!-- ===== 設定項說明（問號） ===== -->
 

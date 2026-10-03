@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.translate
 
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.llm.LlmModelCatalog
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -9,6 +10,9 @@ import kotlinx.serialization.json.JsonObject
  *
  * @param id 持久化契约，改名等于清空用户已选的预设。
  * @param baseUrl OpenAI 兼容的 base，实际端点见 [chatCompletionsUrl]。
+ *   **跑在设备上的服务商（[TranslationService.onDevice]）这里是空串**：它不出网，
+ *   而空地址在远端那侧恰好是错误——所以别用「地址空不空」判本地还是远端，
+ *   判据是 [TranslationService.onDevice]（数据层）/ 请求上的 `onDeviceModelId`（执行层）。
  * @param disableThinkingBody 关闭「推理模式」的额外请求体（JSON 文本，原样解析后并入请求体）。
  *   推理模型（deepseek 的 thinking、qwen 的 enable_thinking、glm 的新版默认开启思考）**会把
  *   思考 token 算进 `max_tokens`**，结果是 HTTP 200 + 空 content + `finish_reason: length`。
@@ -17,6 +21,13 @@ import kotlinx.serialization.json.JsonObject
  *   带括注的用 [MspText.Res]（「（本地）」「（月之暗面）」要翻译）。
  * @param apiKeyHint 密钥输入框的占位提示。
  * @param note 给用户看的补充说明（地址怎么写、有哪些坑）。
+ * @param onDevice 跑在**这台设备上**：没有地址、没有密钥，[model] 是设备端模型清单里的 id。
+ *
+ *   正因为它是一个**预设自带的事实**而不是「地址是不是空的」这种推导，
+ *   下游几处（设置页要隐藏地址/密钥输入框、缺项判定要跳过地址、切换服务商时
+ *   「预设值要不要覆盖存里的值」、「引擎配置要不要走本机」）才能共用同一个判据。
+ *   用推导的写法，空地址一旦有什么新含义（比如某个中转真的要求空地址），
+ *   这几处会**同时**错，而且都不报错。
  */
 data class TranslationService(
     val id: String,
@@ -27,6 +38,7 @@ data class TranslationService(
     val apiKeyHint: MspText,
     val disableThinkingBody: String = "",
     val note: MspText,
+    val onDevice: Boolean = false,
 )
 
 /**
@@ -49,6 +61,9 @@ data class TranslationService(
 object TranslationServices {
 
     const val CUSTOM_ID = "custom"
+
+    /** 跑在设备上的那一家。预设、设置页的分类、请求上的 `onDeviceModelId` 都认这个 id。 */
+    const val LOCAL_ID = "local"
 
     /** 常见密钥前缀，与语言无关，不需要翻译。 */
     private val SK_HINT = MspText.Plain("sk-…")
@@ -109,6 +124,33 @@ object TranslationServices {
         note = MspText.Res(R.string.msp_translate_svc_ollama_note),
     )
 
+    /**
+     * 跑在**设备上**的那一家。
+     *
+     * ## 为什么它也是一个「服务商」
+     *
+     * 用起来它和云端那几家一模一样：选一个模型、把提示词发出去、拿回 JSON。
+     * 差别只在底下那一层（本机推理 vs HTTP），而那一层已经被
+     * [SwitchingChatClient] 封在接口后面了——所以做成并列的第 N 项，用户不需要
+     * 学一个新概念，设置页也不需要第二套流程。
+     *
+     * [baseUrl] 留空是**故意的**（不是漏填）：本地没有地址这个东西。
+     * [model] 指向 `:core:llm` 模型清单里的默认条目，而不是在这里写死一个字符串：
+     * 写死的话，清单换了默认模型之后，新装的用户会拿到一条已经不存在的 id，
+     * 而失败信息说的是「模型没下载」——把他引到一个没有这条模型的下载页去。
+     */
+    val LOCAL = TranslationService(
+        id = LOCAL_ID,
+        displayName = MspText.Res(R.string.msp_translate_svc_local_name),
+        baseUrl = "",
+        model = LlmModelCatalog.DEFAULT_ID,
+        requiresApiKey = false,
+        apiKeyHint = MspText.Res(R.string.msp_translate_svc_local_key_hint),
+        disableThinkingBody = "",
+        note = MspText.Res(R.string.msp_translate_svc_local_note),
+        onDevice = true,
+    )
+
     val OPENAI = TranslationService(
         id = "openai",
         displayName = MspText.Plain("OpenAI"),
@@ -138,6 +180,7 @@ object TranslationServices {
         ZHIPU,
         MOONSHOT,
         OLLAMA,
+        LOCAL,
         OPENAI,
         CUSTOM,
     )
