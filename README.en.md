@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.2-alpha.1** (pre-release)
+- Current version: **0.6.3-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -183,6 +183,8 @@ Release notes: [docs/release-notes](docs/release-notes/)
   with the sort order; entries with no artist/album/folder fall into an "unknown" group that always
   sorts last.
 - **Multi-select**: long-press to enter selection mode, then select all / clear / add to playlist / play.
+  Actions follow the **order you tapped the items in**: "add to playlist" appends in that order and
+  "play" starts from the first one tapped, so tapping in reverse really does give you a reversed queue.
   Duplicates are skipped and the app **says how many it skipped** ("added 10, 1 was already in the
   list") instead of quietly adding 9. The **built-in file browser uses the same multi-select**
   (section 1.7); both pages share one action bar.
@@ -225,6 +227,12 @@ Release notes: [docs/release-notes](docs/release-notes/)
   library-only check mislabels **every** browser entry as "file is gone", because the library does
   not index those paths in the first place. A failed file-system probe always counts as "gone" —
   better to over-label one row than to claim a deleted file still plays.
+- **Playlists can be reordered by dragging**: both the list of playlists and the items inside one are
+  reordered by **long-pressing a whole row**. The order is saved (it survives killing and reopening the
+  app). A playlist list's order is stored separately as a string of ids and **not written into the
+  playlists themselves**, so the storage format is unchanged and upgrading needs no migration; playlists
+  missing from that order fall back to creation time, which puts **a new playlist at the end**. Dragging
+  does **not auto-scroll**: when a list is longer than one screen, scroll near the target first.
 
 ### 1.7 Built-in file browser
 
@@ -345,7 +353,8 @@ resulting file goes straight into the subtitle sheet, **already selected**.
 | **v0.5.19** | **Sleep timer gains a "Custom…" duration (hours / minutes fields, 1 minute to 24 hours; *Set* stays disabled for invalid or out-of-range input, and an empty form is not treated as an error; a custom duration shows up on the player chip just like a preset, e.g. "3 h 20 m")** | Done |
 | **v0.6** | **On-device offline ASR subtitle generation: incremental download with per-file sha256 verification, deleting a model leaves generated subtitles alone, editable download source (empty = mirror), generated subtitles stored in a private directory and attached and selected automatically** | Done |
 | **v0.6.1** | **"About" page rework, help question marks on settings entries, more professional wording; release signing wired up with a build-time signature self-check** | Done |
-| **v0.6.2** | **Multi-language support (Japanese first): a dedicated Japanese offline model (ReazonSpeech) to download; automatic Shift-JIS (CP932) detection for subtitle files; prompt examples generated per target language; automatic collapsing of spaces between Japanese kana** | **Current** |
+| **v0.6.2** | **Multi-language support (Japanese first): a dedicated Japanese offline model (ReazonSpeech) to download; automatic Shift-JIS (CP932) detection for subtitle files; prompt examples generated per target language; automatic collapsing of spaces between Japanese kana** | Done |
+| **v0.6.3** | **Reordering and transport fixes: playlists and the items inside them can be reordered by long-pressing a whole row (the order is saved, a new playlist goes last); multi-select in the library and file browser follows the order you tapped the items in; fixed the transport row overflowing on 360dp-wide screens (the last button was squeezed into a sliver); cleartext `http://` is allowed (a NAS on your LAN, a local LLM server)** | **Current** |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
 ---
@@ -682,6 +691,11 @@ These are deliberate for this release, not oversights:
     and **none of that is corrected automatically** — the sheet cannot even show "this line had low
     confidence", because the result is just an ordinary SRT. Improving it means running recognition
     again, switching models, or overriding it with an external subtitle.
+15. **Dragging does not auto-scroll.** Dragging a row to the very edge of the screen does not scroll
+    the list, so a target off screen means scrolling near it first. A "keep scrolling while near the
+    edge" loop is the obvious fix, but it feeds back into `LazyListState`'s visible-items callback
+    (scroll a bit, row height changes, the drop target changes) and that cycle has to be broken
+    cleanly first. Left for a later release.
 
 ---
 
