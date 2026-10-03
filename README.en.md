@@ -345,6 +345,10 @@ and the subtitle text never leaves the phone.
 - **Why it is not bundled into the APK**: the model is 345 MB while the whole installer is about 135 MiB.
   On-device translation is a feature you need *when you use it*, so making every user pay nearly three
   times the size for it is a bad trade.
+- **The installer did grow anyway**: about 88.6 MiB in v0.6.3 → about 134.7 MiB now. What grew is the
+  **inference runtime** `liblitertlm_jni.so` (arm64-v8a 21,802,960 B + x86_64 25,968,008 B, stored
+  uncompressed), and that part cannot be dropped — without it the on-device model cannot run at all.
+  The model itself is still downloaded on demand.
 - **Why 0.6B**: it is the size that actually runs on a phone. Subtitle translation needs no world
   knowledge, and larger models (1.7B / 4B) take several times as long on the same batch — better to ship
   one that works than an option that makes you wait ten minutes.
@@ -759,6 +763,9 @@ These are deliberate for this release, not oversights:
     backend, which means no per-device tuning and reproducible output at the cost of speed. There is also
     currently **only one model to choose from**, and the translation cache has **no "clear" action** —
     forcing a re-translation means editing the subtitle content, or switching target language / model.
+    Note that **"the model is not bundled" does not mean "the installer did not grow"**: to make the
+    on-device inference run at all, the installer went from about 88.6 MiB in v0.6.3 to about 134.7 MiB
+    (that is `liblitertlm_jni.so`, about 45.6 MiB across both ABIs, stored uncompressed).
 
 ---
 
