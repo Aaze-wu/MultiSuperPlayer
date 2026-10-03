@@ -124,6 +124,23 @@ val keystoreProperties = Properties().apply {
 }
 val hasReleaseKeystore = keystoreProperties.getProperty("storeFile") != null
 
+// 把「本次 release 到底用了哪个签名」打一行在构建日志里。
+//
+// 起因：`keystore.properties` 里那四行如果**值填对了、行首却还留着 `#`**，`storeFile`
+// 这个键就读不到，于是静默回退 debug 签名——构建成功、包装得上、单测全绿，唯一的异常
+// 是签名是错的（后果被推迟到用户升级时才爆发：系统以证书不一致为由拒绝安装）。
+// 这类故障没有任何其他征兆，所以判定结果必须由构建自己报出来。
+//
+// 只打印文件名，绝不打印口令。
+if (hasReleaseKeystore) {
+    logger.lifecycle("[签名] release 使用正式密钥：${keystoreProperties.getProperty("storeFile")}")
+} else {
+    logger.lifecycle(
+        "[签名] 未读到 keystore.properties 的 storeFile（文件缺失，或该行仍是注释）——" +
+            "release 将回退 debug 签名，该包不可用于分发。"
+    )
+}
+
 android {
     namespace = "com.multisuperplayer.player"
     compileSdk = 36
@@ -165,6 +182,23 @@ android {
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
+
+                // 签名方案必须在这里显式定下来，而且**第一个正式包就是唯一的机会**：
+                //
+                // - v1（JAR 签名）对我们是死的：它只为 Android 7.0 以下（API < 24）服务，
+                //   而 minSdk 是 26。AGP 的默认值本来就是 false，写出来是防止以后有人
+                //   以为「没写就是没签」。
+                // - v2 是 API 24+ 的验签依据，必须有。
+                // - v3 的用途是**密钥更换（key rotation）**：Android 9+ 换签名密钥时，要靠
+                //   新包里的 lineage 证明「新密钥由旧密钥授权」，而这个 lineage 只能被
+                //   旧包自己携带的 v3 签名背书。也就是说，**如果第一个发布包只签了 v2，
+                //   以后就再也换不了密钥**——只能换包名重新发布，用户数据全丢。
+                //   打开它不花任何代价，关掉它则是不可逆的。
+                // - v4 是配合 adb 增量安装（.idsig）用的，侧载分发用不到。
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = false
             }
         }
     }
