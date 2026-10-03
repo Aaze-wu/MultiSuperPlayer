@@ -23,11 +23,10 @@
     <string name="msp_player_reading">正在读取字幕…</string>
     <string name="msp_player_cues">%1$s · %2$d 条</string>
     <!--
-      只讲**外挂**字幕。这句在「外挂没挂上、内嵌也没认领」时显示，但只要片源里
-      有字幕轨，第一句台词到达之前就会短暂处于这个状态（内嵌轨是边播边读的）。
-      写成「没有挂上任何字幕」是一句**全局断言**，而那一刻片源自带的字幕轨其实
-      已经选好了——同一个面板上面说「什么都没挂上」、下面列着两条可选轨。
-      片源里有字幕轨时改走 msp_player_embedded_no_cues_yet。
+      只讲**外挂**字幕。「外挂没挂上、片源里也没有可选的轨」时显示。
+      写成「没有挂上任何字幕」是一句**全局断言**，而片源里可能本来就有字幕轨、
+      只是还没挂上（内嵌轨是边播边读的）：同一个面板上面说「什么都没挂上」、
+      下面列着两条可选轨。片源里有字幕轨时改走 msp_player_embedded_choose_one。
     -->
     <string name="msp_player_none_attached">未加载外挂字幕文件。</string>
     <string name="msp_player_translation_missing_shown_original">这份字幕没有译文，已按原文显示。</string>
@@ -37,9 +36,16 @@
     <string name="msp_player_no_usable_subtitle">文件夹中未找到可用的字幕文件。</string>
     <string name="msp_player_embedded_section">片源自带的字幕</string>
     <string name="msp_player_embedded_track">内嵌字幕 %1$d</string>
-    <!-- 片源里有字幕轨、但一行还没读到（见 msp_player_none_attached 的注释）。 -->
-    <string name="msp_player_embedded_no_cues_yet">片源包含字幕轨，尚未读取到第一句台词。</string>
-    <!-- 时间轴微调：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
+    <!--
+      片源里有字幕轨、但一条都没挂上。这不是「等一下就好」的中间态，而是**等用户动手**：
+      内核那条保守规则没肯自动选中（语言对不上……），用户坐在那里等的是一个永远不会
+      自己发生的事，所以这里说「请在上面选一条」。
+      「已选中某条、只是还没读到台词」是另一种状态，见 msp_player_embedded_lines_pending。
+    -->
+    <string name="msp_player_embedded_choose_one">片源包含字幕轨，请在上面选一条。</string>
+    <!-- 跟着「当前挂着哪条」下面那行小字：轨已认领，但一行台词还没读到。 -->
+    <string name="msp_player_embedded_lines_pending">尚未读到台词</string>
+    <!-- 时间轴纠偏：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
     <string name="msp_player_subtitle_sync">字幕时间轴</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
     <string name="msp_player_subtitle_sync_reset">归零</string>

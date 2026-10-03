@@ -25,6 +25,13 @@ import org.junit.Test
  *
  * 断言方式是直接和**同一套拼接函数**拼出来的期望值比：这样钉住的是
  * 「格式那一格是哪一条」，而不是重抄一遍实现里的字符串顺序。
+ *
+ * ## 另外两处（同一块面板上的另外两行）
+ *
+ * 标题位 [embeddedTitle] 与「还没读到台词」那行小字 [embeddedStatusDetails] 也在这里，
+ * 因为这三处都在回答同一个问题：**用户凭什么判断「要不要挂这条轨」**。
+ * 三处各有各的坑：格式那格会写成「未知」（MIME 在 codecs 里）、标题位会写成 `zh`
+ * （语言标签顶替了名字）、小字那句会在读到台词之后还留着（进行时被当成了状态）。
  */
 class SubtitleEmbeddedTrackTextTest {
 
@@ -84,16 +91,105 @@ class SubtitleEmbeddedTrackTextTest {
         assertEquals(SubtitleFormat.SRT, document.track.format)
     }
 
+    @Test
+    fun `还没读到台词时在格式后面补一句进行时`() {
+        // 内嵌轨是**边播边读**的：轨知道了、第一句台词还没到。这一段里界面上必须说
+        // 「还没读到」而不是断言什么也没有——用户看到的是一个会自己变的状态，
+        // 不是一句要他自己动手的提示（那一句在 `nothingAttachedText` 里，另一个位置）。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/x-subrip")
+
+        assertEquals(
+            MspText.join(
+                SUBTITLE_DETAIL_SEPARATOR,
+                listOf(
+                    track.describeDetails(),
+                    MspText.Res(R.string.msp_player_embedded_lines_pending),
+                ),
+            ),
+            embeddedStatusDetails(track, cueCount = 0),
+        )
+    }
+
+    @Test
+    fun `一读到台词那句话就必须消失`() {
+        // 补的话是进行时，不是状态：「尚未读到台词」在多读一行之后继续显示的话，
+        // 每一帧都在说一件已经不成立的事。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/x-subrip")
+
+        assertEquals(track.describeDetails(), embeddedStatusDetails(track, cueCount = 1))
+        assertEquals(track.describeDetails(), embeddedStatusDetails(track, cueCount = 42))
+    }
+
+    @Test
+    fun `标题位不写语言标签`() {
+        // 设备上实测（`embedded-test.mkv`，一条 `chi` 轨）：`label` 是 null、`language`
+        // 是 `zh`，而 `displayLabel` 的兜底会把它原样写到标题位。结果是
+        //
+        //     zh
+        //     SubRip · zh · 默认 · 尚未读到台词
+        //
+        // 标题位重复小字里的语言，而且给的是语言**标签**这种代码——看起来像
+        // 「这个界面不知道这条轨叫什么」。语言归小字那行，标题位说「第几条」。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/x-subrip")
+
+        assertEquals(
+            MspText.Res(R.string.msp_player_embedded_track, 1),
+            track.embeddedTitle(),
+        )
+    }
+
+    @Test
+    fun `序号从一开始数是给用户看的那一个`() {
+        // `indexInGroup` 是 0 基的（Media3 给的原始下标），界面上必须 1 基：
+        // 「内嵌字幕 0」是程序员才看得懂的编号。
+        val track = embedded(
+            mimeType = "application/x-media3-cues",
+            codec = "application/x-subrip",
+            indexInGroup = 2,
+        )
+
+        assertEquals(MspText.Res(R.string.msp_player_embedded_track, 3), track.embeddedTitle())
+    }
+
+    @Test
+    fun `轨自带名字时用它的名字`() {
+        // 有些 mkv 会给轨道写 label（「简体中文」）——那是别人给这条轨起的名字，
+        // 比序号有用得多。
+        val track = embedded(
+            mimeType = "application/x-media3-cues",
+            codec = "application/x-subrip",
+            label = "简体中文",
+        )
+
+        assertEquals(MspText.Plain("简体中文"), track.embeddedTitle())
+    }
+
+    @Test
+    fun `名字是空白时退回序号`() {
+        // 空白 label 与没有 label 是一回事，别在标题位上留一格空白。
+        val track = embedded(
+            mimeType = "application/x-media3-cues",
+            codec = "application/x-subrip",
+            label = "   ",
+        )
+
+        assertEquals(MspText.Res(R.string.msp_player_embedded_track, 1), track.embeddedTitle())
+    }
+
     private fun embedded(
         mimeType: String,
         codec: String?,
         isDefault: Boolean = false,
+        label: String? = null,
+        indexInGroup: Int = 0,
     ) = MspTrackInfo(
         id = "TEXT:3:0",
         kind = MspTrackKind.TEXT,
+        label = label,
         language = "zh",
         mimeType = mimeType,
         codec = codec,
+        indexInGroup = indexInGroup,
         isDefault = isDefault,
     )
 }

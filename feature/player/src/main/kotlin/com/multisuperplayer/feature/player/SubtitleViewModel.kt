@@ -217,11 +217,19 @@ class SubtitleViewModel(
      * 内嵌的 cues 是**流式**长出来的：刚开始没有，放着放着就有了。所以这里
      * 每一批都重新构造 document（而不是增量改）。构造本身是 O(n)，而 n 在一部
      * 两小时的片子里约两千；真正重的是解析，这里不碰。
+     *
+     * ## 轨道清单也必须是一路输入，不能只读 `.value`
+     *
+     * 「内核已经选了一条文本轨、但第一句台词还没到」那一段里 `embeddedSubtitle`
+     * 一次都不会发（cues 还是空的），只有 `tracks.tracks` 会发。要是这里只订阅 cues、
+     * 顺手在回调里读一次 `tracks.tracks.value`，认领就要等到第一句台词到达才发生——
+     * 而那正好是面板自相矛盾的那几秒（见 [withEmbedded] 的 KDoc）。
      */
     private val resolvedLoadState: StateFlow<SubtitleLoadState> = combine(
         loadState,
         tracks.embeddedSubtitle,
-    ) { load, embedded ->
+        tracks.tracks,
+    ) { load, embedded, trackList ->
         load.withEmbedded(
             // 「自动」时用内核**实际选中**的那条，而不是自己再挑一遍。
             //
@@ -229,7 +237,7 @@ class SubtitleViewModel(
             // （`init` 里设的 `setPreferredTextLanguages` + `setSelectUndeterminedTextLanguage`），
             // 内核一条都没选时才是 `autoSelectTextTrack` 那套保守规则。
             // 字幕层再算第三遍就会出现三份规则、三个结果。
-            autoTrack = tracks.tracks.value.firstSelectedTextTrack(),
+            autoTrack = trackList.firstSelectedTextTrack(),
             cues = embedded.cues,
             mediaUri = entry.value?.uri,
         )
@@ -1037,6 +1045,28 @@ internal fun SubtitleDocument.hasTranslation(): Boolean =
  * - **自动兑底**：用户在「自动」上、外挂一条也没挂上、而内核已经选了一条内嵌轨，
  *   才用它。外挂优先是刻意的——两个都自动挂上会让屏幕同时出现两份字幕，
  *   而它们的时间轴还可能不一样。
+ *
+ * ## 认领发生在**第一句台词之前**（这里曾经判错过）
+ *
+ * 内嵌轨是边播边读的：容器里那几条轨在轨道清单解析出来那一刻就知道了，而第一句
+ * 台词要等播放头走到有字幕的地方才到。这里原来写的是「一行都没读到就按兵不动」，
+ * 理由是「免得外挂字幕稍后加载完成时状态先变一下」。那个理由站不住：上面那个
+ * `takeIf` 已经要求 `attached == null && document == null`——外挂那一路一旦有结果
+ * 就再也走不到这里，不存在「先认了内嵌、外挂后来又要顶掉它」的竞争。
+ *
+ * 而按兵不动的代价是**实测过的一场自相矛盾**（`multi.mkv`，40 秒片段、字幕从 23 秒起，
+ * 中间约 **4.8 秒**）：扫描算出来的「文件夹里没有和片名同名的字幕」还挂在面板上，
+ * 旁边「片源自带的字幕」分区里已经列着两条可选轨，而内核**已经选了其中一条**
+ * 在等第一句台词——面板上没有任何地方说出这件事，用户会去改字幕文件名。
+ *
+ * 所以现在无条件认领。认领之后面板从头到尾只说一件事：挂的是哪条轨
+ * （[embeddedTrack]），「这个目录里没有能用的字幕」是过时结论（[issue] 清掉），
+ * 「还没读到台词」由 `document == null` 自己表达（界面那一层把它说成一句话）。
+ *
+ * 反过来说，`document == null` 是这条路径上**合法**的中间态，不是失败：
+ * [SubtitleLoadState] 里 `document != null` 就等价于「至少读到一行」。手选那条
+ * 也一样（原来手选时会造一个空文档，「已经挂上但一句都没有」和「挂上了一份空字幕」
+ * 就成了两个看起来一样、实际不一样的状态）。
  */
 internal fun SubtitleLoadState.withEmbedded(
     autoTrack: MspTrackInfo?,
@@ -1048,19 +1078,19 @@ internal fun SubtitleLoadState.withEmbedded(
         autoSelected && attached == null && document == null && phase == SubtitlePhase.READY
     } ?: return this
 
-    // 一行都还没读到（播放头没走到有台词的地方）。手选的那条要把状态定下来，
-    // 否则面板里看不到「已经切到内嵌轨了」；自动兑底那条则什么都不改——
-    // 没读到东西时按兵不动，才能在外挂字幕稍后加载完成时不再变。
-    if (cues.isEmpty() && manual == null) return this
-
-    val document = embeddedDocumentOf(chosen, cues, mediaUri)
+    // 还没读到任何一行：先把**轨**认下来，文档等第一句台词到了再造。
+    val document = if (cues.isEmpty()) null else embeddedDocumentOf(chosen, cues, mediaUri)
     return copy(
         document = document,
         embeddedTrack = chosen,
         attached = null,
-        hasTranslation = document.hasTranslation(),
-        // 自动兑底上内嵌轨之后，「这个目录里没有能用的字幕」就是过时的结论了：
-        // 屏幕上明明有字幕，面板里却写着找不到，用户会去改字幕文件名。
+        hasTranslation = document?.hasTranslation() ?: false,
+        // 挂了内嵌轨之后，「这个目录里没有能用的字幕」就是过时的结论了：屏幕上明明
+        // 有字幕，面板里却写着找不到，用户会去改字幕文件名。
+        //
+        // 这句清空必须对**两种来源**都生效。它原来写在 `copy(...)` 里，而上面那句
+        // 「没读到就 return this」让手选那条路根本执行不到这里——于是手选内嵌轨时，
+        // 扫描算出的 `NoMatch` / `NoSubtitles` 会一直挂在面板上不下来。
         issue = null,
     )
 }

@@ -44,7 +44,10 @@ internal fun SubtitleOverlay(
     val document = state.document ?: return
     // 查 cue 和逐字高亮必须用**同一个**时刻：两者用不同的时刻会让逐字高亮
     // 跑到下一句上去（唱到一半整行换掉）。所以这里只算一次。
-    val cuePositionMs = subtitleCuePosition(positionMs, state.timelineOffsetMs)
+    val cuePositionMs = subtitleCuePosition(
+        positionMs = positionMs,
+        timelineOffsetMs = state.timelineOffsetMs,
+    )
     val cue = document.cueAt(cuePositionMs) ?: return
 
     val lines = cueLinesFor(cue, state.effectiveMode)

@@ -25,7 +25,8 @@
     <string name="msp_player_no_usable_subtitle">資料夾中未找到可用的字幕檔案。</string>
     <string name="msp_player_embedded_section">片源自帶的字幕</string>
     <string name="msp_player_embedded_track">內嵌字幕 %1$d</string>
-    <string name="msp_player_embedded_no_cues_yet">片源包含字幕軌，尚未讀取到第一句台詞。</string>
+    <string name="msp_player_embedded_choose_one">片源包含字幕軌，請在上面選一條。</string>
+    <string name="msp_player_embedded_lines_pending">尚未讀到台詞</string>
     <string name="msp_player_subtitle_sync">字幕時間軸</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
     <string name="msp_player_subtitle_sync_reset">歸零</string>

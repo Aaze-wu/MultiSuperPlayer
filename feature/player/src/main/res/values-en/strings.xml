@@ -22,7 +22,8 @@
     <string name="msp_player_no_usable_subtitle">No usable subtitle file in this folder.</string>
     <string name="msp_player_embedded_section">Subtitles in the file itself</string>
     <string name="msp_player_embedded_track">Embedded subtitle %1$d</string>
-    <string name="msp_player_embedded_no_cues_yet">This file contains subtitle tracks, but no line has been read yet.</string>
+    <string name="msp_player_embedded_choose_one">This file has subtitle tracks; pick one above.</string>
+    <string name="msp_player_embedded_lines_pending">No line read yet</string>
     <string name="msp_player_subtitle_sync">Subtitle timing</string>
     <string name="msp_player_subtitle_sync_step">%1$s s</string>
     <string name="msp_player_subtitle_sync_reset">Reset</string>

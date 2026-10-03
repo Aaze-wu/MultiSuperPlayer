@@ -51,7 +51,7 @@ internal fun LyricsPane(
     timelineOffsetMs: Long = 0L,
 ) {
     val listState = rememberLazyListState()
-    // 高亮行和逐字高亮用同一个「微调后」的时刻，否则条子和高亮会差半秒。
+    // 高亮行和逐字高亮用同一个「纠偏后」的时刻，否则条子和高亮会差半秒。
     val cuePositionMs = subtitleCuePosition(positionMs, timelineOffsetMs)
     val activeIndex = document.cueFocusIndexAt(cuePositionMs)
 

@@ -135,3 +135,54 @@ internal fun MspTrackInfo.describeDetails(): MspText = MspText.join(
         if (isForced) add(MspText.Res(R.string.msp_player_detail_forced))
     },
 )
+
+/**
+ * 内嵌轨在标题位上写什么（`内嵌字幕 1` / 它自己的 `label`）。
+ *
+ * ## 为什么不直接用 [MspTrackInfo.displayLabel]
+ *
+ * `displayLabel` 的兜底顺序是 `label ?: language ?: 兜底文案`，而设备上实测
+ * （`embedded-test.mkv`、一条 `chi` 轨）`label` 是 null、`language` 是 `zh`，
+ * 于是标题位写出来是 **`zh`**——下面那行小字里本来就有一模一样的 `zh`
+ * （格式 · **语言** · 默认…），屏幕上就成了：
+ *
+ * ```
+ * zh
+ * SubRip · zh · 默认 · 尚未读到台词
+ * ```
+ *
+ * 标题位重复小字里的语言、而且给的是**语言标签**这种代码：用户看到的是
+ * 「这个界面不知道这条轨叫什么」。语言已经由小字那行负责了，标题位该说的是
+ * 「这是第几条内嵌轨」——那正是用户点了哪一条的依据。
+ *
+ * 轨**自带** label 的时候（有些 mkv 会写「简体中文」）当然用它的：那是别人给这条轨
+ * 起的名字，比序号有用。
+ */
+internal fun MspTrackInfo.embeddedTitle(): MspText =
+    label?.takeIf { it.isNotBlank() }?.let { MspText.Plain(it) }
+        ?: MspText.Res(R.string.msp_player_embedded_track, indexInGroup + 1)
+
+/**
+ * 「当前挂着哪条」那一格下面那行小字：格式 / 语言 / 默认…，再加一句「还没读到台词」。
+ *
+ * 内嵌轨是**边播边读**的：轨很快就认下来了（容器一解析出轨道清单就认），而第一句
+ * 台词要等播放头走到有字幕的地方才到。这一段窗口里面板上如果只写着「内嵌字幕 1」
+ * 加一行格式，看起来就跟一份**空字幕**一样，用户会以为切过去没生效、或者字幕坏了。
+ *
+ * `cueCount == 0` 时补的那句话必须是**进行时**（「还没读到」）而不是断言
+ * （「没有台词」）：Media3 要播完才知道总数，我们现在确实不知道。
+ *
+ * 抽成纯函数是为了能断言——这句话只在真的**一行都没有**时出现，一有台词就必须消失。
+ */
+internal fun embeddedStatusDetails(track: MspTrackInfo, cueCount: Int): MspText =
+    if (cueCount > 0) {
+        track.describeDetails()
+    } else {
+        MspText.join(
+            SUBTITLE_DETAIL_SEPARATOR,
+            listOf(
+                track.describeDetails(),
+                MspText.Res(R.string.msp_player_embedded_lines_pending),
+            ),
+        )
+    }

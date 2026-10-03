@@ -229,12 +229,7 @@ private fun StatusBlock(state: SubtitleUiState) {
             when {
                 embedded != null -> Column {
                     Text(
-                        text = embedded.displayLabel(
-                            stringResource(
-                                R.string.msp_player_embedded_track,
-                                embedded.indexInGroup + 1,
-                            ),
-                        ),
+                        text = embedded.embeddedTitle().string(),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -242,8 +237,11 @@ private fun StatusBlock(state: SubtitleUiState) {
                     // 只给「什么格式、什么语言」，不给条数：内嵌轨是边播边读的，
                     // 读到的总数只有播完才知道。给一个一直在涨的数字，
                     // 用户会以为字幕不完整。
+                    //
+                    // 一行都还没读到时补一句「还没读到台词」：那一段窗口里面板上只有
+                    // 轨名和格式，看起来跟一份空字幕一样（见 withEmbedded 的 KDoc）。
                     Text(
-                        text = embedded.describeDetails().string(),
+                        text = embeddedStatusDetails(embedded, state.cueCount).string(),
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                     )
@@ -267,14 +265,16 @@ private fun StatusBlock(state: SubtitleUiState) {
                     )
                 }
 
-                // 「片源里有字幕轨」和「一条字幕都没有」是两件不同的事，不能共用一句话。
+                // 「片源里有字幕轨，只是还没选中一条」和「一条字幕都没有」是两件不同的事，
+                // 不能共用一句话。
                 //
-                // 内嵌轨是**边播边读**的：在容器的第一句台词到达之前，`embeddedTrack`
-                // 仍然是 null（见 `SubtitleLoadState.withEmbedded` 里那句按兵不动），
-                // 而候选列表里**已经列着**那几条轨了。这中间有一个几秒的窗口，此时
-                // 说「没有挂上外挂字幕文件」是准确的，说「没有挂上任何字幕」就把片源
-                // 自带的那几条一起否掉了——同一个面板上面说「什么都没挂上」、下面
-                // 列着两条可选轨，用户只会去看字幕文件名。
+                // 内嵌轨是**边播边读**的：容器里那几条轨在轨道清单解析出来那一刻就知道了，
+                // 而第一句台词要等播放头走到有字幕的地方才到。这一段窗口里 `embeddedTrack`
+                // 可能仍然是 null——内核没选（语言对不上、或被别的规则挡下）、用户把
+                // 「自动」关掉了——而候选列表里**已经列着**那几条轨了。这时说
+                // 「没有挂上外挂字幕文件」是准确的，说「没有挂上任何字幕」就把片源自带的
+                // 那几条一起否掉了：同一个面板上面说「什么都没挂上」、下面列着两条可选轨，
+                // 用户只会去看字幕文件名。
                 else -> Text(
                     text = stringResource(nothingAttachedText(state.embeddedTracks.isNotEmpty())),
                     style = MaterialTheme.typography.bodyMedium,
@@ -335,14 +335,14 @@ internal fun showsNoUsableSubtitleHint(state: SubtitleUiState): Boolean =
 /**
  * 「当前挂着哪条」那一格在**什么都没挂**时该说哪句话。
  *
- * ## 为什么不能只留一句话
+ * ## 为什么要分成两句
  *
- * 原来只有「当前没有挂上任何字幕。」一句，而它是一句**全局断言**：用户在那一刻
- * 会认为片子里没有任何字幕可用。可是内嵌轨是边播边读的——容器里那几条轨在
- * `onTracksChanged` 时就已经知道了（候选列表里已经列出来），而第一句台词要等到
- * 播放头走到有字幕的地方才到。实测（`multi.mkv`，40 秒片段、字幕从 23 秒起）：
- * 中间有 **4 秒多**的窗口，面板上面写着「没有挂上任何字幕」、下面「片源自带的字幕」
- * 分区里列着两条可选轨。
+ * 原来的「当前没有挂上任何字幕。」是一句**全局断言**：用户在那一刻会认为片子里
+ * 没有任何字幕可用。可是内嵌轨是边播边读的——容器里那几条轨在 `onTracksChanged`
+ * 时就已经知道了（候选列表里已经列出来），而第一句台词要等到播放头走到有字幕的
+ * 地方才到。实测（`multi.mkv`，40 秒片段、字幕从 23 秒起）：中间有 **4 秒多**的
+ * 窗口，面板上面写着「没有挂上任何字幕」、下面「片源自带的字幕」分区里列着两条
+ * 可选轨。
  *
  * 代价不是难看：用户会去改字幕文件名，而字幕其实好好的，只是还没开口。
  *
@@ -352,11 +352,21 @@ internal fun showsNoUsableSubtitleHint(state: SubtitleUiState): Boolean =
  * 而「已选中的那条」要等内核/我们选完才非 null，两个信号的时序不同。这里要回答的
  * 是「这个片子里有没有字幕」，前者才是对的提问方式：即使那条轨因为语言对不上而
  * 没被自动选中，下面候选列表里也列着它、用户可以自己点，说「没有字幕」仍然是错的。
+ *
+ * ## 有轨可选的时候不能说「还没读到台词」
+ *
+ * 这句文案跟着状态走：片源里**有**轨可选、而一条都没挂上时，那不是一个「等一下就好」
+ * 的中间态，而是一个**等用户动手**的状态（内核那条保守规则没肯自动选中，例如语言
+ * 和系统语言都对不上），所以这句话要说成「请选一条」而不是「尚未读取到第一句台词」——
+ * 后者会让用户坐在那里等一个永远不会自己发生的事。
+ *
+ * 「已经选中某条、只是还没读到台词」那另一种状态由 [embeddedStatusDetails] 负责，
+ * 它是另一句话、另一个位置。
  */
 @StringRes
 internal fun nothingAttachedText(hasEmbeddedTracks: Boolean): Int =
     if (hasEmbeddedTracks) {
-        R.string.msp_player_embedded_no_cues_yet
+        R.string.msp_player_embedded_choose_one
     } else {
         R.string.msp_player_none_attached
     }
@@ -369,7 +379,20 @@ internal fun nothingAttachedText(hasEmbeddedTracks: Boolean): Int =
 private val SUBTITLE_SYNC_STEPS = listOf(-500L, -100L, 100L, 500L)
 
 /**
- * 字幕时间轴微调。
+ * 字幕时间轴纠偏：**偏移**（平移）与**速率**（比例）。
+ *
+ * ## 为什么是两个旋钮而不是一个
+ *
+ * 「字幕对不上」有两个成因，数学上一个是加、一个是乘：
+ *
+ * - 全片每一句都早/晚**同样多**（字幕整体延后 0.5 秒、片头有一段黑场） ⇒ **偏移**。
+ * - 越到后面偏得越多（字幕与片源**帧率**不一致，23.976 的字幕配 25 的片源）
+ *   ⇒ **速率**。这种用偏移把开头调准就一定会把结尾调错。
+ *
+ * 拿掉任何一个，另一类问题就无解：只有偏移时用户会把整片往前拽几秒，
+ * 结果开头变成早 3 秒、结尾变成晚 3 秒，他会以为这个功能坏了。
+ *
+ * 两个方向上「正数」的含义是一致的：都在把字幕往**后**推。
  *
  * ## 只在真的挂着一条字幕时出现
  *
@@ -379,8 +402,8 @@ private val SUBTITLE_SYNC_STEPS = listOf(-500L, -100L, 100L, 500L)
  * ## 为什么放在面板里而不是播放页上
  *
  * 它是一个**纠偏**动作：只有在画面上看出字幕对不上时才会去做，做的时候需要
- * 看着画面反复微调。面板是上面的浮层，调的时候画面还在后面放着；而把四个
- * 按钮摆到控制栏里，每一天正常的播放都要多挨四个按钮。
+ * 看着画面反复微调。面板是上面的浮层，调的时候画面还在后面放着；而把这两排
+ * 按钮摆到控制栏里，每一天正常的播放都要多挨这两排。
  */
 @Composable
 private fun SubtitleSyncSection(
@@ -587,10 +610,11 @@ private fun CandidateList(
     // 「自动选择」那一行现在有两种可能的赢家（外挂文件 / 内嵌轨），两种都要能报出名字，
     // 否则自动挑了内嵌轨时这一行会显示成「按片名从候选里挑一条最吻合的」——一个
     // 与正在发生的事不符的说明，而真正挂着的那条在列表里看不出选中态。
+    //
+    // 名字走 embeddedTitle() 而不是 displayLabel()：后者会把语言标签（`zh`）顶成名字，
+    // 于是这一行写成「已自动选中『zh』」——读起来像是选了一种**语言**。
     val autoPicked = if (state.autoSelected) {
-        state.embeddedTrack?.let {
-            it.displayLabel(stringResource(R.string.msp_player_embedded_track, it.indexInGroup + 1))
-        } ?: state.attached?.fileName
+        state.embeddedTrack?.embeddedTitle()?.string() ?: state.attached?.fileName
     } else {
         null
     }
@@ -629,9 +653,8 @@ private fun CandidateList(
 
             state.embeddedTracks.forEach { track ->
                 SourceRow(
-                    title = track.displayLabel(
-                        stringResource(R.string.msp_player_embedded_track, track.indexInGroup + 1),
-                    ),
+                    // 同 [autoPicked]：语言标签不能当名字用，格式/语言由下面那行小字负责。
+                    title = track.embeddedTitle().string(),
                     details = track.describeDetails().string(),
                     selected = !state.autoSelected && state.embeddedTrack?.id == track.id,
                     onClick = { onSelectEmbedded(track) },
