@@ -24,6 +24,7 @@ import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
 import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -177,6 +178,25 @@ class ExoPlayerController(
     /** 内嵌字幕行。切换条目时清空。 */
     private val _embeddedSubtitle = MutableStateFlow(EmbeddedSubtitleState())
     override val embeddedSubtitle: StateFlow<EmbeddedSubtitleState> = _embeddedSubtitle.asStateFlow()
+
+    /** 整轨字幕预读的状态。切条目、换轨、轨道信息还没出来时都是 `Off`。 */
+    private val _embeddedPreRead = MutableStateFlow<EmbeddedPreReadState>(EmbeddedPreReadState.Off)
+    override val embeddedPreRead: StateFlow<EmbeddedPreReadState> = _embeddedPreRead.asStateFlow()
+
+    /** 正在跑的那一次预读。换条目 / 换轨都要先取消它。 */
+    private var preReadJob: Job? = null
+
+    /**
+     * 已经（或正在）预读的目标，格式 `条目 id|轨道 id`；null = 没有目标。
+     *
+     * 存在的理由是**重复触发**：`onTracksChanged` 会在播放过程中反复回调，
+     * 而每回调一次就重扫一遍整个文件是不可接受的（几十 GB 的片子要读很久）。
+     * 见 [restartPreRead]。
+     */
+    private var preReadKey: String? = null
+
+    /** 预读器按需创建：它要一个 `Context`，而大部人多媒体根本用不着预读。 */
+    private val preReader by lazy { EmbeddedSubtitlePreReader(appContext, dispatchers.io) }
 
     /**
      * 字幕偏好的语言，取自**应用界面语言**。
@@ -372,6 +392,11 @@ class ExoPlayerController(
                     // 音频没有自动挑选那一步，只能显式清。
                     clearAudioOverride()
                     _embeddedSubtitle.value = EmbeddedSubtitleState()
+                    // 预读同理：上一部片子那份整轨台词表（甚至只是「正在读」这个状态）
+                    // 留下来，新片子就会在没读完之前一直显示「正在预读字幕」，而读的是
+                    // 上一部。这里只**取消并归零**，不重启：新片子的轨道清单还没下来，
+                    // 现在重启只会拿着旧清单去猜，真正的启动在 [syncTracks] 末尾。
+                    cancelPreRead()
 
                     // 「本集结束」那一档必须在这里拦，而不是等 STATE_ENDED：
                     // 循环模式是「列表循环/单曲循环」时，内核**直接切到下一条**，
@@ -413,6 +438,10 @@ class ExoPlayerController(
                  * 关掉 `SubtitleView` 之后它们也就真的不显示了（README 第 12 条）。
                  */
                 override fun onCues(cueGroup: CueGroup) {
+                    // 整轨预读已经就绪时**必须停写**流式表：它只装「已经播过的段落」，
+                    // 让它继续写，就是把刚读出来的整表一点点换回那份越播越少的流式表，
+                    // 表现正是要修的那个 bug（调快没反应、调慢有时有效）。
+                    if (_embeddedPreRead.value is EmbeddedPreReadState.Ready) return
                     val texts = cueGroup.cues.mapNotNull { cue: Cue ->
                         cue.text?.toString()?.takeIf { it.isNotBlank() }
                     }
@@ -500,6 +529,9 @@ class ExoPlayerController(
         }
         _tracks.value = list
         autoSelectTextTrack(list)
+        // 轨道清单定下来了，这时才知道「该预读哪条轨」——最后启动一次。
+        // 上面那次自动选轨可能已经启动过（同一个目标时 [restartPreRead] 直接返回）。
+        restartPreRead()
     }
 
     /**
@@ -579,6 +611,61 @@ class ExoPlayerController(
         // 覆盖生效后内核会重新回调 `onTracksChanged`，清单里的 isSelected 随之更新；
         // 但那条路径依赖内核的调度，这里先按已选好算一遍，界面才不会有一下「没勾上」的帧。
         _tracks.value = _tracks.value.map { if (it.id == id) it.copy(isSelected = true) else it }
+        // 换字幕轨 = 换预读目标。不指望内核一定会回调 `onTracksChanged` 才重挂：
+        // 预读是后台任务，让它晚几百毫秒才开始，用户看到的是「切了轨之后字幕速率
+        // 过一会儿才生效」这种说不清的现象。
+        if (kind == MspTrackKind.TEXT) restartPreRead()
+    }
+
+    // ------------------------------------------------------------------ 整轨预读
+
+    /**
+     * 重启整轨预读。
+     *
+     * 只有三个时刻需要它（也是唯一该调它的地方）：轨道清单重建（[syncTracks]）、
+     * 用户换字幕轨（[selectTrack]）。切条目那一处只取消（[cancelPreRead]）。
+     *
+     * ## 为什么按「条目 + 轨道」去重
+     *
+     * `onTracksChanged` 在播放过程中会反复触发（自适应、内核重新解析），而**每触发
+     * 一次就重扫一遍整个文件**是不可接受的。所以 [preReadKey] 记住「这个目标已经试过了」，
+     * 不论是读成了、读失败了、还是正在读，都不重来。
+     *
+     * 它不会卡死在一次失败上：换轨、换条目、切走再切回来都会得到新的 key。
+     * 「同一个目标只尝试一次」也是有意的——重试要在**用户能看见的行**上发生
+     * （他在面板里重新选一下），而不是在后台无限重扫。
+     */
+    private fun restartPreRead() {
+        val entry = _currentEntry.value
+        val target = entry?.let { _tracks.value.preReadRequest(it.uri) }
+        val key = if (entry == null || target == null) null else "${entry.id}|${target.track.id}"
+        if (key != null && key == preReadKey) return
+        preReadJob?.cancel()
+        preReadJob = null
+        preReadKey = key
+        if (entry == null || target == null) {
+            // 「不适用」不是失败：界面上那一条必须写成「这条片子用不着预读」，
+            // 不能画成出错。
+            _embeddedPreRead.value = EmbeddedPreReadState.Off
+            return
+        }
+        _embeddedPreRead.value = EmbeddedPreReadState.Reading
+        preReadJob = scope.launch {
+            val result = preReader.read(entry.uri, target)
+            // 读的过程中目标可能已经换了（用户切了轨/切了条目），那时**必须丢掉**这个结果：
+            // 上一部片子的台词表盖到新片子上，是「内容不对而界面看不出」那一类错误。
+            if (preReadKey != key) return@launch
+            _embeddedPreRead.value = result
+            MspLog.d(TAG) { "整轨预读结束：$key → ${result.describe()}" }
+        }
+    }
+
+    /** 取消预读并把状态归零（切条目时用：新清单还没下来，还不知道该读哪条）。 */
+    private fun cancelPreRead() {
+        preReadJob?.cancel()
+        preReadJob = null
+        preReadKey = null
+        _embeddedPreRead.value = EmbeddedPreReadState.Off
     }
 
     override fun useAutomaticTracks() {
@@ -1382,6 +1469,11 @@ class ExoPlayerController(
     override fun release() {
         // 先取消计时器再释放内核，否则那条循环可能在下一次 tick 时碰到已释放的 player。
         scope.cancel()
+        // 显式归零，而不是只靠 `scope.cancel()`：预读是个可能还在跑几十秒的 IO 任务，
+        // 而 `embeddedPreRead` 是个会留在内存里的 StateFlow——不置 `Off` 的话，
+        // 控制器已经释放了，最后订阅到它的界面（退出播放页那一帧）读到的仍是
+        // `Reading`，那个「正在预读」就永远画在屏幕上了。
+        cancelPreRead()
         stopServiceIfRunning()
         player.release()
     }

@@ -509,6 +509,8 @@ fun PlayerRoute(
             onSelectEmbedded = subtitleViewModel::selectEmbeddedTrack,
             onNudgeTimeline = subtitleViewModel::nudgeTimelineOffset,
             onResetTimeline = subtitleViewModel::resetTimelineOffset,
+            onNudgeRate = subtitleViewModel::nudgeSubtitleRate,
+            onSetRate = subtitleViewModel::setSubtitleRate,
             onSetTextSize = subtitleViewModel::setTextSize,
             onSetLineSpacing = subtitleViewModel::setLineSpacing,
             onSetOutline = subtitleViewModel::setOutline,
@@ -1015,7 +1017,18 @@ private fun LandscapeLayout(
 }
 
 /**
- * 横屏音频：左边封面与曲目信息，右边歌词，控制条压在歌词底下常驻。
+ * 横屏音频：左边封面与曲目信息，右边歌词，控制常驻。
+ *
+ * ## 控件在哪一栏（这一版的改动）
+ *
+ * 原来的版面是「两栏 + 控制条压在歌词底下」，而控制块约 172dp（进度 64 + 芯片 40 +
+ * 传输 60 + 内边距）**全部从歌词的高度里扣**：914×411dp 的横屏上歌词只剩约 208dp，
+ * 也就是三行半。而左栏只占屏宽 1/3、里面只放一个正方形封面，高度是富余的。
+ *
+ * 所以够宽的时候（判据在 `AudioLyricsSpaceRules.landscapeControlsPlacement`）
+ * 把芯片和传输控制搬到**左栏**封面下面，右栏只留进度条：歌词拿到约 310dp（六行）。
+ * 窄窗口搬不动就退回原版面——那时左栏装不下那两排，硬搬只会让按钮溢出。
+ * 两条路径都是**完整的一套版面**，不存在「搬了一半」的中间态。
  *
  * ## 为什么音频不能用视频那一套
  *
@@ -1060,89 +1073,141 @@ private fun AudioLandscapeLayout(
         if (ui.locked) ui.applyLocked(false)
     }
 
-    Row(modifier = Modifier.fillMaxSize()) {
-        // 左栏固定占 1/3：封面是正方形的，宽度定下来它的高度也就定下来了，
-        // 剩下两栏不用跟着封面换算。
-        BoxWithConstraints(
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        ) {
-            val artworkSize = AudioLandscapeRules.artworkSize(
-                availableWidth = maxWidth,
-                availableHeight = maxHeight,
-            )
-            Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                // 出口。位置和视频横屏的「退出全屏」**在同一个角**（左上），
-                // 只是那一处是跟着覆盖层淡出的，这里常驻。
-                PlayerExitChip(
-                    label = stringResource(R.string.msp_player_exit_fullscreen),
-                    onClick = { ui.applyFullscreen(false) },
-                    modifier = Modifier.align(Alignment.Start).padding(top = 8.dp),
-                )
-                Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    AudioArtwork(entry = entry, size = artworkSize)
-                    // 和竖屏是同一个 composable：标题 + 「格式 · 解码方式」。
-                    // 复用而不是另写一份，就不会出现「竖屏写了、横屏忘了」的偏差。
-                    TrackInfo(entry = entry, decoderKind = state.decoderKind)
-                }
-            }
+    // 控件放哪一栏只看**屏宽**，而这一页没有别的地方量得到它（下面的 BoxWithConstraints
+    // 量到的是某一栏的宽度，不是窗口的）。
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val placement = AudioLyricsSpaceRules.landscapeControlsPlacement(maxWidth)
+        val inLeftColumn = placement is LandscapeControlsPlacement.InLeftColumn
+        // 搬不动时退回原来的 1/3 / 2/3：封面是正方形的，宽度定下来它的高度也就
+        // 定下来了，那一栏不用跟着封面换算。
+        val leftWeight = when (placement) {
+            is LandscapeControlsPlacement.InLeftColumn -> placement.leftWeight
+            LandscapeControlsPlacement.UnderLyrics -> 1f / 3f
         }
 
-        // 右栏：歌词（占满剩余高度）+ 常驻控制条。
-        Column(modifier = Modifier.weight(2f).fillMaxHeight()) {
-            val slot = AudioLandscapeRules.lyricsSlot(subtitleState)
-            Box(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                contentAlignment = Alignment.Center,
+        Row(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier.weight(leftWeight).fillMaxHeight(),
             ) {
-                when (slot) {
-                    is LyricsSlot.Lines -> LyricsPane(
-                        document = slot.document,
-                        positionMs = positionMs,
-                        mode = subtitleState.effectiveMode,
-                        onSeekTo = onSeekTo,
-                        modifier = Modifier.fillMaxSize(),
-                        timelineOffsetMs = subtitleState.timelineOffsetMs,
-                    )
-
-                    is LyricsSlot.Notice -> LyricsNotice(
-                        kind = slot.kind,
-                        onOpenSubtitles = onOpenSubtitles,
-                    )
+                // 控件搬进左栏之后封面要再把那两排的高度让出去：不预留的话它们会被
+                // 顶出屏幕（那个 `weight(1f)` 只保证「优先被压缩」，不保证放得下）。
+                val artworkReserve = if (inLeftColumn) {
+                    AudioLyricsSpaceRules.LANDSCAPE_CONTROLS_RESERVE
+                } else {
+                    0.dp
                 }
-
-                // 只在真的在画歌词时铺：说明态是居中的一块，本来就不贴边，
-                // 铺上去反而会把那句说明的上下沾上一层灰。
-                if (slot is LyricsSlot.Lines) {
-                    val fade = MaterialTheme.colorScheme.surface
-                    LyricEdgeFade(Alignment.TopCenter, listOf(fade, Color.Transparent))
-                    LyricEdgeFade(Alignment.BottomCenter, listOf(Color.Transparent, fade))
+                val artworkSize = AudioLandscapeRules.artworkSize(
+                    availableWidth = maxWidth,
+                    availableHeight = maxHeight - artworkReserve,
+                )
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                        .padding(horizontal = AudioLyricsSpaceRules.LEFT_COLUMN_PADDING),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    // 出口。位置和视频横屏的「退出全屏」**在同一个角**（左上），
+                    // 只是那一处是跟着覆盖层淡出的，这里常驻。
+                    PlayerExitChip(
+                        label = stringResource(R.string.msp_player_exit_fullscreen),
+                        onClick = { ui.applyFullscreen(false) },
+                        modifier = Modifier.align(Alignment.Start).padding(top = 8.dp),
+                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        AudioArtwork(entry = entry, size = artworkSize)
+                        // 和竖屏是同一个 composable：标题 + 「格式 · 解码方式」。
+                        // 复用而不是另写一份，就不会出现「竖屏写了、横屏忘了」的偏差。
+                        TrackInfo(entry = entry, decoderKind = state.decoderKind)
+                    }
+                    if (inLeftColumn) {
+                        AudioLandscapeLeftControls(
+                            state = state,
+                            ui = ui,
+                            subtitleState = subtitleState,
+                            audioTrackChip = audioTrackChip,
+                            onTogglePlayPause = onTogglePlayPause,
+                            onSkipNext = onSkipNext,
+                            onSkipPrevious = onSkipPrevious,
+                            onCycleRepeat = onCycleRepeat,
+                            onToggleShuffle = onToggleShuffle,
+                            onOpenSubtitles = onOpenSubtitles,
+                            onCycleAbRepeat = onCycleAbRepeat,
+                        )
+                    }
                 }
             }
 
-            AudioLandscapeControls(
-                state = state,
-                ui = ui,
-                subtitleState = subtitleState,
-                audioTrackChip = audioTrackChip,
-                sessionChips = sessionChips,
-                positionMs = positionMs,
-                bufferedMs = bufferedMs,
-                onTogglePlayPause = onTogglePlayPause,
-                onSkipNext = onSkipNext,
-                onSkipPrevious = onSkipPrevious,
-                onSeekTo = onSeekTo,
-                onCycleRepeat = onCycleRepeat,
-                onToggleShuffle = onToggleShuffle,
-                onOpenSubtitles = onOpenSubtitles,
-                onCycleAbRepeat = onCycleAbRepeat,
-            )
+            // 右栏：歌词（占满剩余高度）+ 底部常驻控件。
+            Column(modifier = Modifier.weight(1f - leftWeight).fillMaxHeight()) {
+                val slot = AudioLandscapeRules.lyricsSlot(subtitleState)
+                // 用 `BoxWithConstraints` 而不是 `Box`：这里量到的 `maxHeight` **就是**
+                // 歌词视口的高度（`weight(1f)` 已经扣掉了下面那块控件），所以紧凑与否
+                // 不用去估控件多高——估错的话会在阈值附近忽紧忽不紧。
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val compact = AudioLyricsSpaceRules.isLyricsViewportTight(maxHeight)
+                    when (slot) {
+                        is LyricsSlot.Lines -> LyricsPane(
+                            document = slot.document,
+                            positionMs = positionMs,
+                            mode = subtitleState.effectiveMode,
+                            onSeekTo = onSeekTo,
+                            modifier = Modifier.fillMaxSize(),
+                            timelineOffsetMs = subtitleState.timelineOffsetMs,
+                            ratePermille = subtitleState.subtitleRatePermille,
+                            compact = compact,
+                        )
+
+                        is LyricsSlot.Notice -> LyricsNotice(
+                            kind = slot.kind,
+                            onOpenSubtitles = onOpenSubtitles,
+                        )
+                    }
+
+                    // 只在真的在画歌词时铺：说明态是居中的一块，本来就不贴边，
+                    // 铺上去反而会把那句说明的上下沾上一层灰。
+                    if (slot is LyricsSlot.Lines) {
+                        val fade = MaterialTheme.colorScheme.surface
+                        LyricEdgeFade(Alignment.TopCenter, listOf(fade, Color.Transparent))
+                        LyricEdgeFade(Alignment.BottomCenter, listOf(Color.Transparent, fade))
+                    }
+                }
+
+                if (inLeftColumn) {
+                    // 控件搬去左栏了，右栏只留进度条（会话芯片跟着它，见
+                    // [AudioLandscapeProgressControls] 的注释）。
+                    AudioLandscapeProgressControls(
+                        state = state,
+                        positionMs = positionMs,
+                        bufferedMs = bufferedMs,
+                        sessionChips = sessionChips,
+                        onSeekTo = onSeekTo,
+                    )
+                } else {
+                    AudioLandscapeControls(
+                        state = state,
+                        ui = ui,
+                        subtitleState = subtitleState,
+                        audioTrackChip = audioTrackChip,
+                        sessionChips = sessionChips,
+                        positionMs = positionMs,
+                        bufferedMs = bufferedMs,
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipNext = onSkipNext,
+                        onSkipPrevious = onSkipPrevious,
+                        onSeekTo = onSeekTo,
+                        onCycleRepeat = onCycleRepeat,
+                        onToggleShuffle = onToggleShuffle,
+                        onOpenSubtitles = onOpenSubtitles,
+                        onCycleAbRepeat = onCycleAbRepeat,
+                    )
+                }
+            }
         }
     }
 }
@@ -1176,7 +1241,101 @@ private fun BoxScope.LyricEdgeFade(edge: Alignment, colors: List<Color>) {
 }
 
 /**
+ * 横屏音频左栏底部的控件（够宽时用）：功能芯片 → 传输控制。
+ *
+ * 只搬这两排：进度条留在右栏（见 [AudioLandscapeProgressControls]）——它是
+ * 「现在放到哪」的仪表，和歌词是同一条时间轴的两个视角，贴在一起才看得懂。
+ *
+ * 不铺那层淡 `surfaceVariant`：那是用来把控件和**上面可滚动的歌词**分开的，
+ * 这里上面是封面和标题，静态的，铺上去只会多一块方形色斑。
+ *
+ * 音轨芯片保留、画面比例不摆——同 [AudioLandscapeControls]，只是位置对调了。
+ */
+@Composable
+private fun AudioLandscapeLeftControls(
+    state: MspPlaybackState,
+    ui: PlayerUiState,
+    subtitleState: SubtitleUiState,
+    audioTrackChip: PlayerBarChip?,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    onToggleShuffle: () -> Unit,
+    onOpenSubtitles: () -> Unit,
+    onCycleAbRepeat: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        PlayerActionChips(
+            speed = state.playbackSpeed,
+            abRepeat = state.abRepeat,
+            onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
+            onCycleAbRepeat = onCycleAbRepeat,
+            audioTrack = audioTrackChip,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        PlayerTransportControls(
+            state = state,
+            subtitlesActive = subtitleState.isRendering,
+            onTogglePlayPause = onTogglePlayPause,
+            onSkipNext = onSkipNext,
+            onSkipPrevious = onSkipPrevious,
+            onCycleRepeat = onCycleRepeat,
+            onToggleShuffle = onToggleShuffle,
+            onOpenSubtitles = onOpenSubtitles,
+            // 这一行不提供全屏按钮：横屏**就是**全屏，左上角那个「退出全屏」
+            // 才是有意义的那一个。
+            fullscreen = null,
+            onToggleFullscreen = {},
+            compact = true,
+        )
+    }
+}
+
+/**
+ * 横屏音频右栏底部的「只剩进度条」（控件搬去左栏时用）。
+ *
+ * 为什么进度条不跟着搬：进度条和歌词是同一条时间轴的两个视角，分到两栏去之后
+ * 眼睛要在屏幕两头来回跑。为什么另写一个而不是给 [AudioLandscapeControls] 加一个
+ * 「不要芯片」的开关：搬与不搬是两套完整版面，加开关会让那个函数同时存在两种形态，
+ * 读的人得在脑子里拼。
+ *
+ * 会话芯片（睡眠定时/队列/画中画）留在这儿不跟去左栏：它们经常是空的
+ * （三个入口都没开时 [PlayerSessionChips] 自己不占高度），让它们去吃左栏已经
+ * 算好的高度预算并不划算；而「这次播放现在什么状态」和进度、时间本来也是一类信息。
+ */
+@Composable
+private fun AudioLandscapeProgressControls(
+    state: MspPlaybackState,
+    positionMs: Long,
+    bufferedMs: Long,
+    sessionChips: PlayerSessionChipSet,
+    onSeekTo: (Long) -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            PlayerSeekBar(
+                positionMs = positionMs,
+                bufferedMs = bufferedMs,
+                durationMs = state.durationMs,
+                enabled = state.hasKnownDuration,
+                onSeekTo = onSeekTo,
+                abRepeat = state.abRepeat,
+            )
+            PlayerSessionChips(
+                session = sessionChips,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
  * 横屏音频右栏底部的常驻控制条：进度 → 倍速/A-B → 传输控制。
+ *
+ * 只在**窄窗口**用：够宽时芯片和传输控制会被搬到左栏
+ * （见 [AudioLandscapeLeftControls] 与 `AudioLyricsSpaceRules.landscapeControlsPlacement`），
+ * 那时这里整块不画，右栏换成 [AudioLandscapeProgressControls]。
  *
  * 里面**没有**画面比例按钮：音频没有画面比例可调，摆出来只会让人点开一个
  * 永远无效的面板（呼应 [PlayerActionChips] 里那个可选参数）。
@@ -1431,6 +1590,16 @@ private fun signedSeconds(deltaMs: Long): MspText {
  *
  * 有歌词时封面**缩小并上移**，把中间那块让给歌词；没歌词时保持原来那个大封面。
  * 不做「封面 + 歌词叠加」是因为两条信息会互相遮：封面是图，歌词是字。
+ *
+ * ## 封面让位（这一版的改动）
+ *
+ * 原来封面写死 112dp、歌词拿剩下的。下面那一串控件的高度不是常数（字体缩放、
+ * 窗口大小、有没有会话芯片都会变），所以屏幕一矮，被挤掉的全是歌词——而且是
+ * 按比例挤，在模拟器的高屏上看不出来。
+ *
+ * 现在封面尺寸由**量出来的舞台高度**决定：够就 112dp，不够就缩，再不够就不画
+ * （连那道空隙一起收掉），保证歌词至少 [AudioLyricsSpaceRules.MIN_LYRICS_HEIGHT]。
+ * 高屏上算出来仍然是 112dp，所以这个改动对小屏是净收益、对大屏是无变化。
  */
 @Composable
 private fun AudioStage(
@@ -1445,22 +1614,32 @@ private fun AudioStage(
         return
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        AudioArtwork(
-            entry = entry,
-            size = 112.dp,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        LyricsPane(
-            document = document,
-            positionMs = positionMs,
-            mode = subtitleState.effectiveMode,
-            onSeekTo = onSeekTo,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
+    // 舞台高度只能量、不能按屏高猜：这一块拿到的是「屏高减掉上面那串控件」的剩余。
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val lyricsHeight = AudioLyricsSpaceRules.portraitLyricsHeight(maxHeight)
+        val artworkSize = AudioLyricsSpaceRules.portraitArtworkSize(maxHeight)
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // 封面缩到 0 时连那道空隙一起消失，否则「已经让位了」而歌词还被一条
+            // 12dp 的空白压着。
+            if (artworkSize > 0.dp) {
+                AudioArtwork(
+                    entry = entry,
+                    size = artworkSize,
+                    modifier = Modifier.padding(top = AudioLyricsSpaceRules.ARTWORK_GAP),
+                )
+            }
+            LyricsPane(
+                document = document,
+                positionMs = positionMs,
+                mode = subtitleState.effectiveMode,
+                onSeekTo = onSeekTo,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                compact = AudioLyricsSpaceRules.isLyricsViewportTight(lyricsHeight),
+            )
+        }
     }
 }
 

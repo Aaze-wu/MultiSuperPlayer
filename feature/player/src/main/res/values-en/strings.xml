@@ -24,10 +24,16 @@
     <string name="msp_player_embedded_track">Embedded subtitle %1$d</string>
     <string name="msp_player_embedded_choose_one">This file has subtitle tracks; pick one above.</string>
     <string name="msp_player_embedded_lines_pending">No line read yet</string>
+    <string name="msp_player_embedded_prereading">Pre-reading subtitles…</string>
+    <string name="msp_player_embedded_preread_failed">Could not pre-read subtitles, rate adjustment may be off</string>
     <string name="msp_player_subtitle_sync">Subtitle timing</string>
     <string name="msp_player_subtitle_sync_step">%1$s s</string>
     <string name="msp_player_subtitle_sync_reset">Reset</string>
     <string name="msp_player_subtitle_sync_hint">Subtitles ahead of the audio: adjust positive. Behind the audio: adjust negative.</string>
+    <string name="msp_player_subtitle_rate">Subtitle rate</string>
+    <string name="msp_player_subtitle_rate_value">%1$s×</string>
+    <string name="msp_player_subtitle_rate_step">%1$s%%</string>
+    <string name="msp_player_subtitle_rate_hint">Rate fixes a gap that grows over the file: lower it when subtitles run early, raise it when they run late.</string>
     <string name="msp_player_audio_track">Audio track</string>
     <string name="msp_player_audio_track_n">Audio track %1$d</string>
     <string name="msp_player_channels">%1$d ch</string>

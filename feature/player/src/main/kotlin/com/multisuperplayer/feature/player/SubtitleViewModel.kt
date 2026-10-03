@@ -36,9 +36,11 @@ import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleOrigin
 import com.multisuperplayer.core.model.SubtitleTrack
+import com.multisuperplayer.core.player.EmbeddedPreReadState
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import com.multisuperplayer.core.player.TrackSelectionController
+import com.multisuperplayer.core.player.cuesOrNull
 import com.multisuperplayer.core.player.embeddedTextTracks
 import com.multisuperplayer.core.player.firstSelectedTextTrack
 
@@ -55,6 +57,7 @@ import com.multisuperplayer.core.translate.translationMediaKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -191,6 +194,28 @@ class SubtitleViewModel(
      */
     private val timelineOffset = MutableStateFlow(0L)
 
+    /**
+     * 字幕速率（千分比，`1000` = 原速）。
+     *
+     * 和 [timelineOffset] 是**两件事**：偏移是整体平移（全片每一句都早/晚同样多），
+     * 速率是**比例缩放**（越到后面偏得越多）。片源和字幕的帧率对不上时只有速率能修——
+     * 那时用偏移把开头调准就一定会把结尾调错。
+     *
+     * 用整数千分比而不是 `Float`：一是和 [formatSubtitleOffset] 同一个理由
+     * （浮点在显示和相等判断上都会咬人），二是「1.02×」这种值本来就只有三位
+     * 有效数字，`Float` 只是在给二进制误差留位置。
+     */
+    private val subtitleRate = MutableStateFlow(SUBTITLE_RATE_BASE_PERMILLE)
+
+    /** [state] 那一层的两个「纠偏」参数。合成一个小对象，`combine` 才只占一格。 */
+    private data class SyncTuning(val offsetMs: Long, val ratePermille: Int)
+
+    /** 偏移 + 速率。两者都是「本次播放」的状态，都不落设置。 */
+    private val syncTuning: Flow<SyncTuning> =
+        combine(timelineOffset, subtitleRate) { offsetMs, ratePermille ->
+            SyncTuning(offsetMs, ratePermille)
+        }
+
     /** 加载结果。只依赖「哪条媒体 + 选了哪条字幕 + 第几次扫」。 */
     private val loadState: StateFlow<SubtitleLoadState> = combine(
         entry,
@@ -229,7 +254,8 @@ class SubtitleViewModel(
         loadState,
         tracks.embeddedSubtitle,
         tracks.tracks,
-    ) { load, embedded, trackList ->
+        tracks.embeddedPreRead,
+    ) { load, embedded, trackList, preRead ->
         load.withEmbedded(
             // 「自动」时用内核**实际选中**的那条，而不是自己再挑一遍。
             //
@@ -240,6 +266,8 @@ class SubtitleViewModel(
             autoTrack = trackList.firstSelectedTextTrack(),
             cues = embedded.cues,
             mediaUri = entry.value?.uri,
+            // 整轨预读有了结果就整表替换流式那批（见 withEmbedded 的 KDoc）。
+            preRead = preRead,
         )
     }.stateIn(
         viewModelScope,
@@ -271,8 +299,8 @@ class SubtitleViewModel(
         settingsRepository.settings,
         translation.texts,
         tracks.tracks,
-        timelineOffset,
-    ) { load, settings, texts, trackList, offsetMs ->
+        syncTuning,
+    ) { load, settings, texts, trackList, tuning ->
         val merged = load.document?.let { texts.appliedTo(it, load.translationToken()) }
         resolveSubtitleState(
             load = if (merged == null) load else load.copy(
@@ -281,7 +309,8 @@ class SubtitleViewModel(
             ),
             displayMode = settings.displayMode,
             embeddedTracks = trackList.embeddedTextTracks(),
-            timelineOffsetMs = offsetMs,
+            timelineOffsetMs = tuning.offsetMs,
+            subtitleRatePermille = tuning.ratePermille,
             style = settings.style,
         )
     }.stateIn(
@@ -354,6 +383,9 @@ class SubtitleViewModel(
         // 时间轴微调同理：为上一部片子调出来的偏移量套到下一部上就是「字幕忽然全错」，
         // 而用户不会想到是这回事（面板上那个数字平时根本不看）。
         timelineOffset.value = 0L
+        // 速率同理，而且更隐蔽：`1.04×` 是「这一份字幕的帧率和片子对不上」这件事
+        // 被记成了一个数字，换一部片子后它没有任何意义，只会让字幕慢慢飘走。
+        subtitleRate.value = SUBTITLE_RATE_BASE_PERMILLE
         lastAutoCueIndex = -1
     }
 
@@ -487,6 +519,26 @@ class SubtitleViewModel(
     /** 把微调归零。 */
     fun resetTimelineOffset() {
         timelineOffset.value = 0L
+    }
+
+    /**
+     * 字幕速率调一档（千分比）。正数 = 让字幕更快地「跟上」，即把时间轴向后拉。
+     *
+     * 夹在 [SUBTITLE_RATE_BASE_PERMILLE] ± [SUBTITLE_RATE_LIMIT_PERMILLE] 之间，
+     * 理由同 [nudgeTimelineOffset]：这个旋钮是用来修「差了一点点」的，不是用来放幻灯片的。
+     */
+    fun nudgeSubtitleRate(deltaPermille: Int) {
+        setSubtitleRate(subtitleRate.value + deltaPermille)
+    }
+
+    /**
+     * 直接跳到某个速率（固定档位用）。
+     *
+     * 档位里本来就含 [SUBTITLE_RATE_BASE_PERMILLE]（`1.00×`），所以**没有**单独的
+     * 「归零」入口：同一段里出现两个叫归零的按钮，会让人以为按它会连时间轴偏移一起清掉。
+     */
+    fun setSubtitleRate(permille: Int) {
+        subtitleRate.value = clampSubtitleRate(permille)
     }
 
     // ------------------------------------------------------------------ 翻译
@@ -767,6 +819,37 @@ class SubtitleViewModel(
 /** 日志标签。生成字幕跑在设备上，只能靠日志确认「存下了没有」。 */
 private const val TAG = "SubtitleViewModel"
 
+/** 原速（千分比）。`1_000` = `1.00×`。 */
+internal const val SUBTITLE_RATE_BASE_PERMILLE = 1_000
+
+/**
+ * 速率的上下限（相对原速的千分比）：`0.90× ~ 1.10×`。
+ *
+ * 和偏移的 ±10 秒同一个理由：它修的是「字幕和片源差了一点点」。放到 2× 那种幅度上，
+ * 用户一旦挂错了字幕（比如拿了另一集的那份），会把整片拖成幻灯片，
+ * 而看不出真正的问题在挂错了文件。
+ *
+ * ±10% 刚好盖住真正会发生的那几种错配：23.976↔25 帧（4.27%）、24↔25（4.17%）、
+ * PAL 加速（4%）。再大就不是帧率问题，而是挂错了。
+ */
+internal const val SUBTITLE_RATE_LIMIT_PERMILLE = 100
+
+/**
+ * 速率的固定档位（千分比）。一次点选，不用连按。
+ *
+ * 只给「整百分点」而不给 0.1% 级：档位是用来**一眼选**的（4% 那几种帧率错配都是
+ * 整百分点），而 0.1% 级的贴合交给步长按钮。
+ */
+internal val SUBTITLE_RATE_PRESETS_PERMILLE = listOf(960, 980, 1_000, 1_020, 1_040)
+
+/**
+ * 速率的累加步长（千分比）。±1% 拉近，±0.1% 贴合。
+ *
+ * 两档而不是一档，理由同 `SUBTITLE_SYNC_STEPS`：只留一档必然有一半人用不顺——
+ * 嫌粗的人会以为这个功能没用（按一下跳太多），嫌细的人要按十几次。
+ */
+internal val SUBTITLE_RATE_STEPS_PERMILLE = listOf(-10, -1, 1, 10)
+
 /** 用户对「用哪条字幕」的选择。换条目时回到 [Auto]。 */
 internal sealed interface SubtitleSelection {
     data object Auto : SubtitleSelection
@@ -891,6 +974,15 @@ data class SubtitleLoadState(
     val autoSelected: Boolean = true,
     /** 当前挂着的内嵌字幕轨。null = 用的是外挂字幕（或者没挂）。 */
     val embeddedTrack: MspTrackInfo? = null,
+    /**
+     * 内嵌字幕的**整轨预读**状态（`core:player` 的 `EmbeddedPreReadState`）。
+     *
+     * 只有内嵌这条路上才有意义，别的一律是 `Off`。放进这里而不是让界面层自己
+     * 再订阅一个流：预读的结果直接决定 [document] 里装的是**整表**还是流式的那几行，
+     * 两者必须同步就能看到（分开订阅会出现「面板还在说正在预读、字幕已经按整表
+     * 画出来了」这种自相矛盾的一帧）。
+     */
+    val embeddedPreRead: EmbeddedPreReadState = EmbeddedPreReadState.Off,
 ) {
     /**
      * 这份译文属于哪份字幕。
@@ -934,6 +1026,14 @@ data class SubtitleUiState(
     /** 当前挂着的内嵌字幕轨。null = 用的是外挂字幕（或者没挂）。 */
     val embeddedTrack: MspTrackInfo? = null,
     /**
+     * 内嵌字幕的整轨预读状态，供面板说「正在预读字幕」/「预读失败」。
+     *
+     * 面板上那一行小字（`embeddedStatusDetails`）靠它才能说清「现在什么都没有」
+     * 到底是「正在读」还是「读不了」——而这两件事用户的动作完全不同：
+     * 前者等，后者去检查字幕。
+     */
+    val embeddedPreRead: EmbeddedPreReadState = EmbeddedPreReadState.Off,
+    /**
      * 字幕时间轴微调（毫秒）。正数 = 字幕比声音**晚**出现。
      *
      * 只影响「拿哪个时刻去查 cue」，不影响进度条、跳转、拖动手势：那些都是
@@ -944,6 +1044,17 @@ data class SubtitleUiState(
      * 没有任何东西提示「你以前调过」。换条目时归零（见 `SubtitleViewModel.bindEntry`）。
      */
     val timelineOffsetMs: Long = 0L,
+    /**
+     * 字幕速率（千分比，`1000` = 原速）。
+     *
+     * 与 [timelineOffsetMs] 是两件事：那个是整体平移（全片每句都早/晚同样多），
+     * 这个是**比例**缩放（越到后面偏得越多）。片源与字幕的帧率对不上时只有它能修。
+     *
+     * 同样是**本次播放的**状态，不落设置、换条目归零（见 `SubtitleViewModel.bindEntry`）：
+     * 把「这份字幕是 23.976 帧压出来的」这件事记成一个全局数字，
+     * 下一部片子会静默地一直飘。
+     */
+    val subtitleRatePermille: Int = SUBTITLE_RATE_BASE_PERMILLE,
     /**
      * 字幕外观（字号 / 行距 / 描边 / 底部距离）。
      *
@@ -973,6 +1084,7 @@ internal fun resolveSubtitleState(
     displayMode: SubtitleDisplayMode,
     embeddedTracks: List<MspTrackInfo> = emptyList(),
     timelineOffsetMs: Long = 0L,
+    subtitleRatePermille: Int = SUBTITLE_RATE_BASE_PERMILLE,
     style: SubtitleStyle = SubtitleStyle.DEFAULT,
 ): SubtitleUiState {
     val document = load.document
@@ -995,7 +1107,9 @@ internal fun resolveSubtitleState(
         translatableCount = document?.translatableIndices()?.size ?: 0,
         embeddedTracks = embeddedTracks,
         embeddedTrack = load.embeddedTrack,
+        embeddedPreRead = load.embeddedPreRead,
         timelineOffsetMs = timelineOffsetMs,
+        subtitleRatePermille = subtitleRatePermille,
         style = style,
     )
 }
@@ -1003,12 +1117,32 @@ internal fun resolveSubtitleState(
 /**
  * 字幕层该拿哪个时刻去查 cue。
  *
- * `微调 > 0` 表示「字幕晚出现」，所以要把查询时刻往回推：t 时刻该显示的是
- * 原本 `t - 微调` 那一刻的台词。抽成一个函数（而不是在两处渲染里各写一遍减号）
- * 是为了让符号方向只有一个地方可以写错，并且能钉在单测里。
+ * ```
+ * t' = t × 速率 − 偏移
+ * ```
+ *
+ * `偏移 > 0` 表示「字幕晚出现」，所以要把查询时刻往回推：t 时刻该显示的是
+ * 原本 `t - 偏移` 那一刻的台词。速率是**比例**缩放，方向词和偏移一致
+ * （字幕越到后面越早出现就调小，越晚出现就调大），但只能修「越到后面越偏」——
+ * 全片固定早/晚若干秒那种用偏移，速率调不出来。
+ *
+ * ## 为什么先缩放再平移
+ *
+ * 反过来（先减偏移再乘速率）会把用户已经调好的偏移量一起放大：调成 +2 秒之后
+ * 再动速率，那个 2 秒会变成 2.08 秒——两个旋钮互相干扰，用户只能来回试。
+ * 先缩放再平移的话「偏移就是偏移」，与速率无关。这也正是 nextlib 里
+ * `syncSpeedMultiplier` 的算法（它的 `getOffsetAdjustedPositionUs` 就是
+ * `pos * mult - offsetMs * 1000`）。
+ *
+ * 抽成一个函数（而不是在两处渲染里各写一遍减号）是为了让符号方向只有一个地方
+ * 可以写错，并且能钉在单测里；整数运算且只在最后截断，
+ * 所以「几十小时的位置 × 1.1」也不会溢出。
  */
-internal fun subtitleCuePosition(positionMs: Long, timelineOffsetMs: Long): Long =
-    positionMs - timelineOffsetMs
+internal fun subtitleCuePosition(
+    positionMs: Long,
+    timelineOffsetMs: Long,
+    ratePermille: Int = SUBTITLE_RATE_BASE_PERMILLE,
+): Long = positionMs * ratePermille / SUBTITLE_RATE_BASE_PERMILLE - timelineOffsetMs
 
 /**
  * 微调值的显示文本：`+0.5` / `-1.0` / `0`。
@@ -1021,6 +1155,50 @@ internal fun formatSubtitleOffset(offsetMs: Long): String {
     val sign = if (offsetMs > 0) "+" else "-"
     val abs = kotlin.math.abs(offsetMs)
     return "$sign${abs / 1000}.${(abs % 1000) / 100}"
+}
+
+/**
+ * 把速率钳进允许区间（[SUBTITLE_RATE_BASE_PERMILLE] ± [SUBTITLE_RATE_LIMIT_PERMILLE]）。
+ *
+ * 抽成纯函数是为了能钉住边界。这个区间就是「别把这个旋钮当搜索条」那条护栏：
+ * 一首 4 分钟的歌配上 `2.0×` 会让整屏台词全挤在一起，用户看到的是「字幕坏了」
+ * 而不是「我把速率调歪了」。
+ */
+internal fun clampSubtitleRate(permille: Int): Int = permille.coerceIn(
+    SUBTITLE_RATE_BASE_PERMILLE - SUBTITLE_RATE_LIMIT_PERMILLE,
+    SUBTITLE_RATE_BASE_PERMILLE + SUBTITLE_RATE_LIMIT_PERMILLE,
+)
+
+/**
+ * 速率的显示文本：`1.02` / `0.96` / `1.001`（`×` 那半截在资源里）。
+ *
+ * 纯整数运算，理由同 [formatSubtitleOffset]：`String.format("%.2f")` 在小数点用
+ * 逗号的地区会变成 `1,02`，而速率不是一个人写给另一个人看的字段。
+ *
+ * 精度跟着值走：整百分点（`1020`）显示两位，细调出来的（`1001`）才显示第三位。
+ * 固定两位的话「+0.1%」这一步看起来什么都没发生——按钮按了、数字没变。
+ */
+internal fun formatSubtitleRate(permille: Int): String {
+    val whole = permille / SUBTITLE_RATE_BASE_PERMILLE
+    val frac = permille % SUBTITLE_RATE_BASE_PERMILLE
+    val twoDigits = frac % 10 == 0
+    val fracText = if (twoDigits) frac / 10 else frac
+    val width = if (twoDigits) 2 else 3
+    return "$whole.${fracText.toString().padStart(width, '0')}"
+}
+
+/**
+ * 步长按钮的文本：`+1` / `-0.1`（`%` 那半截在资源里）。
+ *
+ * 步长是**千分比**，而按钮上要写**百分比**：`10‰ = 1%`。两套单位混用正是最容易
+ * 写错的地方，所以换算只在这里做一次。
+ */
+internal fun formatSubtitleRateStep(deltaPermille: Int): String {
+    val sign = if (deltaPermille >= 0) "+" else "-"
+    val abs = kotlin.math.abs(deltaPermille)
+    val whole = abs / 10
+    val frac = abs % 10
+    return if (frac == 0) "$sign$whole" else "$sign$whole.$frac"
 }
 
 /**
@@ -1072,17 +1250,31 @@ internal fun SubtitleLoadState.withEmbedded(
     autoTrack: MspTrackInfo?,
     cues: List<SubtitleCue>,
     mediaUri: String?,
+    preRead: EmbeddedPreReadState = EmbeddedPreReadState.Off,
 ): SubtitleLoadState {
     val manual = embeddedTrack
     val chosen = manual ?: autoTrack?.takeIf {
         autoSelected && attached == null && document == null && phase == SubtitlePhase.READY
     } ?: return this
 
+    // ## 整轨预读有结果就用它整表替换流式那批
+    //
+    // 流式表（[cues]）只装「已经播过的段落」，而且最后一条 cue 的结束时间是
+    // `OPEN_CUE_END_MS`（= `Long.MAX_VALUE`，因为它只能等到下一批回调才知道自己什么时候结束）。
+    // 速率是按**表**换算查询位置的（见 `subtitleCuePosition`），拿一份越播越少、
+    // 末尾还悬在无穷远的表去换算，表现就是**调快没反应、调慢才有反应**——
+    // 整轨预读就是为这件事做的。
+    //
+    // preRead 没有结果时照旧用流式：它是「整表」而不是「唯一的路」，
+    // 预读失败/不适用（网络流、位图字幕）时不能演成没有字幕。
+    val effectiveCues = preRead.cuesOrNull ?: cues
+
     // 还没读到任何一行：先把**轨**认下来，文档等第一句台词到了再造。
-    val document = if (cues.isEmpty()) null else embeddedDocumentOf(chosen, cues, mediaUri)
+    val document = if (effectiveCues.isEmpty()) null else embeddedDocumentOf(chosen, effectiveCues, mediaUri)
     return copy(
         document = document,
         embeddedTrack = chosen,
+        embeddedPreRead = preRead,
         attached = null,
         hasTranslation = document?.hasTranslation() ?: false,
         // 挂了内嵌轨之后，「这个目录里没有能用的字幕」就是过时的结论了：屏幕上明明

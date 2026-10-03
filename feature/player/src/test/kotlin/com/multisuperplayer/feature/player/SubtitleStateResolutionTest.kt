@@ -161,6 +161,47 @@ class SubtitleStateResolutionTest {
         assertEquals(SubtitlePhase.IDLE, state.phase)
     }
 
+    // ------------------------------------------------------------ 速率带进状态
+
+    @Test
+    fun `速率被带进状态里`() {
+        // 覆盖层（`SubtitleOverlay`）和歌词页（`LyricsPane`）都从 `SubtitleUiState`
+        // 取速率。这一格要是没接上，界面上数字会变、字幕却一动不动——
+        // 而「按了没反应」是最难查的一类：没有任何日志、没有任何报错。
+        val state = resolveSubtitleState(
+            load = loaded(document(cue(0, "Hello")), hasTranslation = false),
+            displayMode = SubtitleDisplayMode.ORIGINAL_ONLY,
+            subtitleRatePermille = 1_040,
+        )
+
+        assertEquals(1_040, state.subtitleRatePermille)
+    }
+
+    @Test
+    fun `不传速率时默认原速`() {
+        val state = resolveSubtitleState(
+            load = loaded(document(cue(0, "Hello")), hasTranslation = false),
+            displayMode = SubtitleDisplayMode.ORIGINAL_ONLY,
+        )
+
+        assertEquals(SUBTITLE_RATE_BASE_PERMILLE, state.subtitleRatePermille)
+    }
+
+    @Test
+    fun `速率只改时间映射，不影响其他判定`() {
+        // 速率是「同一份字幕换个时间轴」，不是「换一份字幕」：
+        // 可渲染性、条数、显示模式都不该跟着变。
+        val slow = resolveSubtitleState(
+            load = loaded(document(cue(0, "Hello")), hasTranslation = false),
+            displayMode = SubtitleDisplayMode.ORIGINAL_ONLY,
+            subtitleRatePermille = 960,
+        )
+
+        assertTrue(slow.isRendering)
+        assertEquals(1, slow.cueCount)
+        assertEquals(SubtitleDisplayMode.ORIGINAL_ONLY, slow.effectiveMode)
+    }
+
     @Test
     fun `扫描和加载阶段都要能让界面显示进度`() {
         val scanning = resolveSubtitleState(

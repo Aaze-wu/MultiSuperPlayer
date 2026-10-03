@@ -47,6 +47,7 @@ internal fun SubtitleOverlay(
     val cuePositionMs = subtitleCuePosition(
         positionMs = positionMs,
         timelineOffsetMs = state.timelineOffsetMs,
+        ratePermille = state.subtitleRatePermille,
     )
     val cue = document.cueAt(cuePositionMs) ?: return
 

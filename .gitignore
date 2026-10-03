@@ -18,6 +18,7 @@ release/
 keystore.properties
 *.jks
 *.keystore
+todo/
 
 # Kotlin 2.x 的会话/错误缓存目录，每次构建都会变动
 .kotlin/

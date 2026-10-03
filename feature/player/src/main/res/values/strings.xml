@@ -45,11 +45,30 @@
     <string name="msp_player_embedded_choose_one">片源包含字幕轨，请在上面选一条。</string>
     <!-- 跟着「当前挂着哪条」下面那行小字：轨已认领，但一行台词还没读到。 -->
     <string name="msp_player_embedded_lines_pending">尚未读到台词</string>
+    <!--
+      同一位置：整轨预读正在读整个文件（大文件要读一会儿）。
+      说「正在预读」而不是「还没读到」是必要的：前者要等，后者看起来像坏了。
+    -->
+    <string name="msp_player_embedded_prereading">正在预读字幕…</string>
+    <!--
+      同一位置：整轨预读失败（不支持的容器、找不到匹配的轨、文件读不动）。
+      字幕本身还能边播边读，但「字幕速率」要按整表换算才准——不说这一句，
+      用户遇到的就是「调了没反应」。
+    -->
+    <string name="msp_player_embedded_preread_failed">预读字幕失败，速率调整可能不准</string>
     <!-- 时间轴纠偏：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
     <string name="msp_player_subtitle_sync">字幕时间轴</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
     <string name="msp_player_subtitle_sync_reset">归零</string>
     <string name="msp_player_subtitle_sync_hint">字幕早于声音出现调整为正值，晚于声音调整为负值。</string>
+    <!--
+      字幕速率：**比例**缩放（与上面的「时间轴」不同，那个是整体平移）。
+      方向和时间轴一致：越到后面越早出现就调小，越晚出现就调大。
+    -->
+    <string name="msp_player_subtitle_rate">字幕速率</string>
+    <string name="msp_player_subtitle_rate_value">%1$s×</string>
+    <string name="msp_player_subtitle_rate_step">%1$s%%</string>
+    <string name="msp_player_subtitle_rate_hint">整片越到后面偏得越多时用速率：字幕越来越早出现调小，越来越晚调大。</string>
     <!-- 音轨选择。只在片源里真的有多条音轨时才会出现入口。 -->
     <string name="msp_player_audio_track">音轨</string>
     <string name="msp_player_audio_track_n">音轨 %1$d</string>

@@ -63,6 +63,8 @@ internal fun SubtitleTrackPicker(
     onSelectEmbedded: (MspTrackInfo) -> Unit,
     onNudgeTimeline: (Long) -> Unit,
     onResetTimeline: () -> Unit,
+    onNudgeRate: (Int) -> Unit,
+    onSetRate: (Int) -> Unit,
     onSetTextSize: (SubtitleTextSize) -> Unit,
     onSetLineSpacing: (SubtitleLineSpacing) -> Unit,
     onSetOutline: (SubtitleOutline) -> Unit,
@@ -139,6 +141,8 @@ internal fun SubtitleTrackPicker(
                 state = state,
                 onNudge = onNudgeTimeline,
                 onReset = onResetTimeline,
+                onNudgeRate = onNudgeRate,
+                onSetRate = onSetRate,
             )
 
             SubtitleStyleSection(
@@ -241,7 +245,7 @@ private fun StatusBlock(state: SubtitleUiState) {
                     // 一行都还没读到时补一句「还没读到台词」：那一段窗口里面板上只有
                     // 轨名和格式，看起来跟一份空字幕一样（见 withEmbedded 的 KDoc）。
                     Text(
-                        text = embeddedStatusDetails(embedded, state.cueCount).string(),
+                        text = embeddedStatusDetails(embedded, state.cueCount, state.embeddedPreRead).string(),
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                     )
@@ -410,6 +414,8 @@ private fun SubtitleSyncSection(
     state: SubtitleUiState,
     onNudge: (Long) -> Unit,
     onReset: () -> Unit,
+    onNudgeRate: (Int) -> Unit,
+    onSetRate: (Int) -> Unit,
 ) {
     val attached = state.attached != null || state.embeddedTrack != null
     if (!attached || state.displayMode == SubtitleDisplayMode.OFF) return
@@ -458,6 +464,79 @@ private fun SubtitleSyncSection(
 
         Text(
             text = stringResource(R.string.msp_player_subtitle_sync_hint),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // 速率：标题 + 当前值，然后上面一排细调步长、下面一排固定档位。
+        //
+        // 两排都要：档位是「一眼选」（帧率错配就是那几个整百分点），步长是「贴合」
+        // （差 0.4% 的人只能靠 ±0.1% 一点点对）。只有档位会让微调无解，
+        // 只有步长要按十几次——和偏移那里「0.5 秒 / 0.1 秒两档」同一个理由。
+        //
+        // 下面那排固定档位就是速率的「归零」：`1.00×` 在里面。不另加一个归零按钮，
+        // 是因为同一段里出现两个叫「归零」的按钮会让人以为按它会同时清掉偏移。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.msp_player_subtitle_rate),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(
+                    R.string.msp_player_subtitle_rate_value,
+                    formatSubtitleRate(state.subtitleRatePermille),
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (state.subtitleRatePermille == SUBTITLE_RATE_BASE_PERMILLE) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+            )
+        }
+
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SUBTITLE_RATE_STEPS_PERMILLE.forEach { step ->
+                TextButton(onClick = { onNudgeRate(step) }) {
+                    Text(
+                        stringResource(
+                            R.string.msp_player_subtitle_rate_step,
+                            formatSubtitleRateStep(step),
+                        ),
+                    )
+                }
+            }
+        }
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SUBTITLE_RATE_PRESETS_PERMILLE.forEach { preset ->
+                FilterChip(
+                    selected = preset == state.subtitleRatePermille,
+                    onClick = { onSetRate(preset) },
+                    label = {
+                        Text(
+                            text = stringResource(
+                                R.string.msp_player_subtitle_rate_value,
+                                formatSubtitleRate(preset),
+                            ),
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    },
+                )
+            }
+        }
+
+        Text(
+            text = stringResource(R.string.msp_player_subtitle_rate_hint),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -123,8 +123,11 @@ data class MspTrackInfo(
  * 在这里写成常量而不是 import，是为了让本文件保持「不依赖 Media3 的纯逻辑」
  * （它的单测才不会被动拖进一个播放器）。常量值用 `javap -constants` 对着
  * `media3-common:1.11.1` 核对过。
+ *
+ * 对本模块（`EmbeddedPreRead`）开放：整轨预读也要按这个 MIME 决定「解 cue 包」还是
+ * 「自己解析原始样本」，两处必须用同一个字符串。
  */
-private const val MEDIA3_CUES_MIME = "application/x-media3-cues"
+internal const val MEDIA3_CUES_MIME = "application/x-media3-cues"
 
 /**
  * 位图字幕的 MIME——我们画不出来，必须从「可选字幕轨」里排除。
@@ -236,6 +239,63 @@ data class EmbeddedSubtitleState(
 }
 
 /**
+ * 内嵌字幕**整轨预读**的进展。
+ *
+ * ## 为什么需要它
+ *
+ * [EmbeddedSubtitleState] 是 Media3 的流式回调攒出来的，只有「已经播到的那一段」，
+ * 而且最后一条 cue 的结束时间是「无限」（[OPEN_CUE_END_MS]）。字幕速率的换算
+ * （`SubtitleViewModel.subtitleCuePosition`）要把「当前播放位置」映射成「查表位置」——
+ * 表里只有后半段时，往慢的方向调（0.96×）还能查到行，往快的方向调（1.10×）换算结果
+ * 落在表尾，永远是同一条（实测就是这样）。这就是「速率只往一个方向有效」的根因。
+ *
+ * 整轨预读把**整条轨道的台词表**一次性读出来，查表对两个方向就都成立了。
+ *
+ * ## 为什么和 [EmbeddedSubtitleState] 并列，而不是替换它
+ *
+ * 预读是「锦上添花」：读不出来时必须能退回流式表。所以两个状态各有各的生命周期，
+ * 由消费方决定用哪个（见 `SubtitleViewModel.withEmbedded`）。
+ */
+sealed interface EmbeddedPreReadState {
+
+    /**
+     * 对当前条目不适用：没有选中的文本轨、选中的是位图字幕、或者片源不是本地文件。
+     *
+     * 界面**不能**把它画成「失败」——「这里不需要预读」和「读了但没读出来」
+     * 是两件事，混成一句会让用户以为播放器坏了。
+     */
+    data object Off : EmbeddedPreReadState
+
+    /** 正在后台读整条轨道。此期间字幕仍旧走流式表。 */
+    data object Reading : EmbeddedPreReadState
+
+    /** 读完了。[cues] 是整条轨道的台词表（保证非空——读出来是空的会报 [Failed]）。 */
+    data class Ready(val cues: List<SubtitleCue>) : EmbeddedPreReadState
+
+    /** 没读出来。[reason] 决定界面文案，也是唯一的排错线索。 */
+    data class Failed(val reason: EmbeddedPreReadReason) : EmbeddedPreReadState
+}
+
+/** 预读失败的原因。文案在 `feature:player`（这一层不带资源）。 */
+enum class EmbeddedPreReadReason {
+    /** 认不出封装格式（没有对应解封装器），或片源不是可随机读取的本地文件。 */
+    CONTAINER_UNSUPPORTED,
+
+    /** 文件里找不到当前选中的那条文本轨（语言/标签都对不上）。 */
+    TRACK_NOT_FOUND,
+
+    /** 找到了轨，但一条台词都没读出来（格式不支持，或这条轨本身是空的）。 */
+    NO_CUES,
+
+    /** 读取或解析过程中出错。 */
+    READ_ERROR,
+}
+
+/** 预读结果里的整轨台词表；不是 [EmbeddedPreReadState.Ready] 时为 null。 */
+val EmbeddedPreReadState.cuesOrNull: List<SubtitleCue>?
+    get() = (this as? EmbeddedPreReadState.Ready)?.cues
+
+/**
  * 语言代码归一化：ISO-639-2/B（Matroska 常写 `chi`）→ ISO-639-1（`zh`）。
  *
  * 认不出来 / `und`（未定）/ 空 → null，也就是「这条轨没告诉我们是什么语言」。
@@ -336,6 +396,14 @@ interface TrackSelectionController {
      * 而用户从界面上完全看不出这是「没收走」造成的。
      */
     val embeddedSubtitle: StateFlow<EmbeddedSubtitleState>
+
+    /**
+     * 内嵌字幕整轨预读的进展（见 [EmbeddedPreReadState]）。
+     *
+     * 换媒体条目、换字幕轨、以及轨道信息还没解析出来时，都必须是 [EmbeddedPreReadState.Off]
+     * ——上一部片子的整轨台词表留在新片子上，是「内容不对而界面看不出」那种错误。
+     */
+    val embeddedPreRead: StateFlow<EmbeddedPreReadState>
 
     /**
      * 选定某一条轨道（用户明确点的）。

@@ -1,7 +1,10 @@
 package com.multisuperplayer.feature.player
 
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.player.EmbeddedPreReadReason
+import com.multisuperplayer.core.player.EmbeddedPreReadState
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import org.junit.Assert.assertEquals
@@ -119,6 +122,73 @@ class SubtitleEmbeddedTrackTextTest {
         assertEquals(track.describeDetails(), embeddedStatusDetails(track, cueCount = 1))
         assertEquals(track.describeDetails(), embeddedStatusDetails(track, cueCount = 42))
     }
+
+    @Test
+    fun `整轨预读跑着的时候说正在预读而不是尚未读到`() {
+        // 两句话说的是两件事，而用户的动作完全不同：
+        // 「尚未读到台词」= 现在还没有（而它自己在变）；
+        // 「正在预读字幕」= 我们在读整个文件（大文件要读一会儿）。
+        // 后者不能没有——没有它那几秒看起来就是「字幕坏了」。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/x-subrip")
+
+        assertEquals(
+            MspText.join(
+                SUBTITLE_DETAIL_SEPARATOR,
+                listOf(
+                    track.describeDetails(),
+                    MspText.Res(R.string.msp_player_embedded_prereading),
+                ),
+            ),
+            embeddedStatusDetails(track, cueCount = 0, preRead = EmbeddedPreReadState.Reading),
+        )
+    }
+
+    @Test
+    fun `预读失败时即使已经读到台词也要说一句`() {
+        // 这一句不只是安慰：字幕速率是按**整表**换算查询位置的
+        // （见 `subtitleCuePosition`），预读失败时用的是越播越少、末尾悬在
+        // `Long.MAX_VALUE` 的流式表——「调快没反应」就是从这里来的。
+        // 不说这一句，用户只能自己猜为什么调了没反应。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/x-subrip")
+
+        assertEquals(
+            MspText.join(
+                SUBTITLE_DETAIL_SEPARATOR,
+                listOf(
+                    track.describeDetails(),
+                    MspText.Res(R.string.msp_player_embedded_preread_failed),
+                ),
+            ),
+            embeddedStatusDetails(
+                track,
+                cueCount = 120,
+                preRead = EmbeddedPreReadState.Failed(EmbeddedPreReadReason.READ_ERROR),
+            ),
+        )
+    }
+
+    @Test
+    fun `预读成功时回到原来的样子不多说一句`() {
+        // `Ready` 之后「尚未读到台词」必须消失，而且**不能**换成另一句：
+        // 整表已经在手，面板上没有任何要解释的事。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/x-subrip")
+
+        assertEquals(
+            track.describeDetails(),
+            embeddedStatusDetails(
+                track,
+                cueCount = 1,
+                preRead = EmbeddedPreReadState.Ready(listOf(cue(0))),
+            ),
+        )
+    }
+
+    private fun cue(index: Int) = SubtitleCue(
+        index = index,
+        startMs = index * 1_000L,
+        endMs = index * 1_000L + 900L,
+        text = "line $index",
+    )
 
     @Test
     fun `标题位不写语言标签`() {

@@ -5,6 +5,8 @@ import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleTrack
+import com.multisuperplayer.core.player.EmbeddedPreReadReason
+import com.multisuperplayer.core.player.EmbeddedPreReadState
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import org.junit.Assert.assertEquals
@@ -227,5 +229,80 @@ class SubtitleEmbeddedClaimTest {
             armed,
             armed.withEmbedded(autoTrack = null, cues = listOf(cue(0)), mediaUri = null),
         )
+    }
+
+    // ------------------------------------------------------------ 整轨预读
+
+    @Test
+    fun `整轨预读有结果时用整表替换流式那批`() {
+        // 两条来源**不是**要并起来：流式表只装「已经播过的段落」，它是整表的子集。
+        // 并起来（或让整表只当补充）的话，同一个时间点会有两条 cue——
+        // 屏幕上同一句台词上下各一遍，而且它们的结束时间还不一样。
+        val streaming = listOf(cue(0, "流式的第一行"))
+        val whole = listOf(cue(0, "整表第一行"), cue(1, "整表第二行"), cue(2, "整表第三行"))
+
+        val result = armed.withEmbedded(
+            autoTrack = track(),
+            cues = streaming,
+            mediaUri = "file:///m.mkv",
+            preRead = EmbeddedPreReadState.Ready(whole),
+        )
+
+        assertEquals(3, result.document?.cues?.size)
+        assertEquals(listOf("整表第一行", "整表第二行", "整表第三行"), result.document?.cues?.map { it.text })
+    }
+
+    @Test
+    fun `刚切进片子时整表就能直接出字幕`() {
+        // 这是整轨预读最大的好处：流式表在播到第 23 秒之前一直是空的，
+        // 而整表在切进来的那一刻就在手上——「切进去字幕就已经在了」。
+        val result = armed.withEmbedded(
+            autoTrack = track(),
+            cues = emptyList(),
+            mediaUri = "file:///m.mkv",
+            preRead = EmbeddedPreReadState.Ready(listOf(cue(0, "整表第一行"))),
+        )
+
+        assertEquals(1, result.document?.cues?.size)
+    }
+
+    @Test
+    fun `预读失败时照旧用流式不能演成没字幕`() {
+        // 预读只是「更好的那条路」，不是唯一的路：它失败/不适用（网络流、位图字幕、
+        // 不支持的容器）时，边播边读照旧工作。把 Failed 当成「没有字幕」会让
+        // 一个纯粹的优化把字幕整个吃掉。
+        for (preRead in listOf(
+            EmbeddedPreReadState.Failed(EmbeddedPreReadReason.CONTAINER_UNSUPPORTED),
+            EmbeddedPreReadState.Failed(EmbeddedPreReadReason.TRACK_NOT_FOUND),
+            EmbeddedPreReadState.Failed(EmbeddedPreReadReason.NO_CUES),
+            EmbeddedPreReadState.Failed(EmbeddedPreReadReason.READ_ERROR),
+            EmbeddedPreReadState.Reading,
+            EmbeddedPreReadState.Off,
+        )) {
+            val result = armed.withEmbedded(
+                autoTrack = track(),
+                cues = listOf(cue(0, "流式第一行")),
+                mediaUri = null,
+                preRead = preRead,
+            )
+
+            assertEquals("$preRead：流式表必须还在", 1, result.document?.cues?.size)
+            assertEquals("流式第一行", result.document?.cues?.first()?.text)
+            assertEquals("状态要原样带出去，面板靠它说话", preRead, result.embeddedPreRead)
+        }
+    }
+
+    @Test
+    fun `预读阶段跟着状态带出去`() {
+        // 面板上那一行小字要把「还没有」与「正在读」分开，靠的就是这个字段。
+        val result = armed.withEmbedded(
+            autoTrack = track(),
+            cues = emptyList(),
+            mediaUri = null,
+            preRead = EmbeddedPreReadState.Reading,
+        )
+
+        assertEquals(EmbeddedPreReadState.Reading, result.embeddedPreRead)
+        assertEquals("只有预读阶段时不该造一个空文档", null, result.document)
     }
 }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -40,6 +39,16 @@ import com.multisuperplayer.core.model.SubtitleDocument
  * 2. 用户正在手动滑动时不抢。手指还在屏幕上就把列表拽回去，表现为
  *    「怎么滑都被弹回当前行」——用 `isScrollInProgress` 挡掉这一次，
  *    松手之后下一次换行会自然接上。
+ *
+ * ## 为什么有 [compact]
+ *
+ * 视口是自己决定的不了的事：音频页的歌词高度是「屏高减掉一串定高的控件」剩下的，
+ * 屏幕一矮就只剩三行。那时上下各 24dp 的留白已经吃掉四分之一的高度，所以让边距
+ * 先让位（24 → 8、行距 12 → 8），换回来大约一行歌词。判断在
+ * [AudioLyricsSpaceRules.isLyricsViewportTight] 里，这里只负责照办。
+ *
+ * @param compact 视口很紧。**只影响内边距和行距**：字号不动（歌词大小是这一页的
+ *   主体，缩字号等于把内容本身改小）。
  */
 @Composable
 internal fun LyricsPane(
@@ -49,10 +58,12 @@ internal fun LyricsPane(
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
     timelineOffsetMs: Long = 0L,
+    ratePermille: Int = SUBTITLE_RATE_BASE_PERMILLE,
+    compact: Boolean = false,
 ) {
     val listState = rememberLazyListState()
     // 高亮行和逐字高亮用同一个「纠偏后」的时刻，否则条子和高亮会差半秒。
-    val cuePositionMs = subtitleCuePosition(positionMs, timelineOffsetMs)
+    val cuePositionMs = subtitleCuePosition(positionMs, timelineOffsetMs, ratePermille)
     val activeIndex = document.cueFocusIndexAt(cuePositionMs)
 
     LaunchedEffect(activeIndex) {
@@ -64,8 +75,11 @@ internal fun LyricsPane(
     LazyColumn(
         state = listState,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(
+            horizontal = if (compact) 16.dp else 24.dp,
+            vertical = if (compact) 8.dp else 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
     ) {
         // 不给 key：字幕 cue 的 index 由解析器给，万一重复会让 LazyColumn 直接
         // 抛异常（"Key was already used"），而按位置做 key 在「列表只增不改」

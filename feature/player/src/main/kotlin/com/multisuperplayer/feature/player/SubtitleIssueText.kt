@@ -6,6 +6,7 @@ import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.isAutoMatchable
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleOrigin
+import com.multisuperplayer.core.player.EmbeddedPreReadState
 import com.multisuperplayer.core.player.MspTrackInfo
 
 
@@ -172,17 +173,35 @@ internal fun MspTrackInfo.embeddedTitle(): MspText =
  * `cueCount == 0` 时补的那句话必须是**进行时**（「还没读到」）而不是断言
  * （「没有台词」）：Media3 要播完才知道总数，我们现在确实不知道。
  *
+ * ## 为什么还要看 [preRead]
+ *
+ * 「还没读到台词」在两种情形下说的是不同的事，而用户的动作完全不同：
+ * 预读**正在跑**时他应该等，预读**失败**时他应该去检查字幕（而且在预读成功之前，
+ * 字幕速率是按流式表换算的，调快的方向本来就不生效）。所以预读有结论时
+ * （`Reading` / `Failed`）用它替换掉那句「尚未读到台词」——它比后者精确得多。
+ * `Ready` / `Off` 时行为与改动前完全一致。
+ *
  * 抽成纯函数是为了能断言——这句话只在真的**一行都没有**时出现，一有台词就必须消失。
  */
-internal fun embeddedStatusDetails(track: MspTrackInfo, cueCount: Int): MspText =
-    if (cueCount > 0) {
+internal fun embeddedStatusDetails(
+    track: MspTrackInfo,
+    cueCount: Int,
+    preRead: EmbeddedPreReadState = EmbeddedPreReadState.Off,
+): MspText {
+    val note: MspText? = when (preRead) {
+        EmbeddedPreReadState.Reading -> MspText.Res(R.string.msp_player_embedded_prereading)
+        // 失败时不管已经读到几行都说：速率要按**整表**换算才准确，
+        // 而「预读失败」是用户唯一能看出「为什么调了没反应」的线索。
+        is EmbeddedPreReadState.Failed -> MspText.Res(R.string.msp_player_embedded_preread_failed)
+        EmbeddedPreReadState.Off, is EmbeddedPreReadState.Ready ->
+            if (cueCount > 0) null else MspText.Res(R.string.msp_player_embedded_lines_pending)
+    }
+    return if (note == null) {
         track.describeDetails()
     } else {
         MspText.join(
             SUBTITLE_DETAIL_SEPARATOR,
-            listOf(
-                track.describeDetails(),
-                MspText.Res(R.string.msp_player_embedded_lines_pending),
-            ),
+            listOf(track.describeDetails(), note),
         )
     }
+}
