@@ -12,6 +12,12 @@
     <!-- 「語音辨識」與「字幕與翻譯」是兩條不同的路：一條是本機把語音轉成字幕，一條是把字幕換成另一種語言 -->
     <string name="msp_settings_asr">語音辨識</string>
     <string name="msp_settings_file_access">檔案存取</string>
+    <!--
+      入口頁第 5 行。它原來就叫「檔案存取」、點下去直接跳系統頁；現在進去是一個頁面，
+      裡面「所有檔案存取」只是四行之一，所以標題換成上位概念。
+      `msp_settings_file_access` 那一句留著給權限頁裡的「所有檔案存取」用。
+    -->
+    <string name="msp_settings_permissions">權限</string>
     <string name="msp_settings_about">關於</string>
 
     <!-- 摘要片段之間的分隔符。 -->
@@ -67,6 +73,56 @@
     <string name="msp_settings_file_access_on">已開啟，可以瀏覽任意資料夾</string>
     <string name="msp_settings_file_access_off">未開啟，點這裡去系統設定開啟</string>
     <string name="msp_settings_file_access_unsupported">本機系統版本不支援</string>
+
+    <!--
+      權限入口列的三種說法。**只看「媒體庫讀取」那一項**（理由見 `PermissionSummaries.entry`）：
+      它是四項裡唯一「不處理就會被誤解」的一項——不允許時媒體庫是空的，使用者會以為掃描壞了；
+      另外三項沒允許是**預設狀態**，把它們彙總進來說「3 項未開啟」只會讓每個使用者
+      都以為自己出了問題。
+      `partial` 必須和 `ok` 分開：說成「已允許」的人會以為影片也能看了。
+    -->
+    <string name="msp_settings_summary_permissions_ok">已允許讀取媒體庫</string>
+    <string name="msp_settings_summary_permissions_partial">只允許了一部分媒體庫</string>
+    <string name="msp_settings_summary_permissions_missing">未允許讀取媒體庫</string>
+
+    <!-- ===== 權限 ===== -->
+
+    <string name="msp_permissions_section_changeable">可以更改的權限</string>
+
+    <string name="msp_permissions_media">媒體庫讀取</string>
+    <string name="msp_permissions_media_desc">用來掃描手機裡的音樂和影片。不允許的話媒體庫會是空的。</string>
+    <!-- 這一項的標題複用 `msp_settings_file_access`（README 第 7 節裡寫的就是那一句） -->
+    <string name="msp_permissions_all_files_desc">允許後可以播放任意資料夾裡的檔案，包括系統不當作媒體的那些格式。不開啟也能聽歌看影片，只是要逐個資料夾授權。</string>
+    <string name="msp_permissions_notification">通知</string>
+    <string name="msp_permissions_notification_desc">系統 13 起預設關閉。播放控制的通知是前台服務通知，不受這一項影響；這一項管的是應用程式自己發出的提示。</string>
+    <string name="msp_permissions_bluetooth">藍牙</string>
+    <string name="msp_permissions_bluetooth_desc">系統 12 起才有這一項。目前版本還沒有功能需要它，宣告保留是為了將來接藍牙播放裝置時不必再申請一次。</string>
+
+    <!--
+      六種狀態，**必須分開說**，因為它們各自對應的下一步不同：
+      「未開啟」可以就地彈框，「已被拒絕」只能去系統設定裡改，「本機不支援」則永遠沒有。
+      合成一句「未開啟」會讓使用者反覆點一個不彈框的按鈕。
+    -->
+    <string name="msp_permissions_state_granted">已允許</string>
+    <string name="msp_permissions_state_partial">只允許了一部分</string>
+    <string name="msp_permissions_state_not_asked">未開啟，可以在這裡申請</string>
+    <string name="msp_permissions_state_ask_again">未開啟，可以再申請一次</string>
+    <string name="msp_permissions_state_denied">已被拒絕</string>
+    <string name="msp_permissions_state_unsupported">本機系統版本不支援</string>
+
+    <!-- 只有兩個動作詞：就地彈系統框，或者去系統設定裡改 -->
+    <string name="msp_permissions_action_request">申請</string>
+    <string name="msp_permissions_action_settings">去設定</string>
+
+    <string name="msp_permissions_other_header">其他權限</string>
+    <string name="msp_permissions_other_note">下面這些在安裝時就已經授予，應用程式自己關不掉，也不能在這裡更改。列出來是為了讓你看到這個應用程式一共申請了什麼。</string>
+
+    <string name="msp_permissions_other_internet">網路存取</string>
+    <string name="msp_permissions_other_network_state">查看網路狀態</string>
+    <string name="msp_permissions_other_foreground_service">前台服務</string>
+    <string name="msp_permissions_other_foreground_service_media_playback">媒體播放前台服務</string>
+    <string name="msp_permissions_other_wake_lock">保持喚醒</string>
+    <string name="msp_permissions_other_modify_audio_settings">更改音訊設定</string>
 
     <string name="msp_settings_section_base_theme">主題基底</string>
     <string name="msp_settings_section_color_source">取色來源</string>

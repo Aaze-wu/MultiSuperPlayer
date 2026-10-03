@@ -12,6 +12,12 @@
     <!-- Speech-to-text and subtitle translation are different paths: one turns speech into subtitles, the other turns subtitles into another language. -->
     <string name="msp_settings_asr">Speech recognition</string>
     <string name="msp_settings_file_access">File access</string>
+    <!--
+      Row 5 of the entry screen. It used to be called "File access" and jumped straight to a
+      system page; it now opens a screen where "all files access" is only one of four rows,
+      so the title moved up one level. `msp_settings_file_access` stays as the row title.
+    -->
+    <string name="msp_settings_permissions">Permissions</string>
     <string name="msp_settings_about">About</string>
 
     <!-- Separator between summary fragments. -->
@@ -68,6 +74,47 @@
     <string name="msp_settings_file_access_on">On — you can browse any folder</string>
     <string name="msp_settings_file_access_off">Off — tap to turn it on in system settings</string>
     <string name="msp_settings_file_access_unsupported">Not supported on this Android version</string>
+
+    <!--
+      The three wordings for the permissions row. They only look at MEDIA, the one permission
+      that is misunderstood when ignored (an empty library reads as a broken scanner). The other
+      three are off by default, so summing them up would make every user think something is wrong.
+    -->
+    <string name="msp_settings_summary_permissions_ok">Media library access allowed</string>
+    <string name="msp_settings_summary_permissions_partial">Media library partially allowed</string>
+    <string name="msp_settings_summary_permissions_missing">Media library access not allowed</string>
+
+    <!-- ===== Permissions ===== -->
+
+    <string name="msp_permissions_section_changeable">Permissions you can change</string>
+
+    <string name="msp_permissions_media">Media library</string>
+    <string name="msp_permissions_media_desc">Used to scan music and videos on this device. Without it the library stays empty.</string>
+    <string name="msp_permissions_all_files_desc">Allows playing files in any folder, including formats the system does not treat as media. Playback works without it — granted folders just have to be added one by one.</string>
+    <string name="msp_permissions_notification">Notifications</string>
+    <string name="msp_permissions_notification_desc">Off by default from Android 13 on. Playback controls use a foreground-service notification and are not affected by this; this covers messages the app itself posts.</string>
+    <string name="msp_permissions_bluetooth">Bluetooth</string>
+    <string name="msp_permissions_bluetooth_desc">Only present from Android 12 on. Nothing in this version needs it yet; it stays declared so connecting Bluetooth playback devices later does not mean asking for it again.</string>
+
+    <string name="msp_permissions_state_granted">Allowed</string>
+    <string name="msp_permissions_state_partial">Partially allowed</string>
+    <string name="msp_permissions_state_not_asked">Off — you can ask for it here</string>
+    <string name="msp_permissions_state_ask_again">Off — you can ask once more</string>
+    <string name="msp_permissions_state_denied">Denied</string>
+    <string name="msp_permissions_state_unsupported">Not supported on this Android version</string>
+
+    <string name="msp_permissions_action_request">Request</string>
+    <string name="msp_permissions_action_settings">Settings</string>
+
+    <string name="msp_permissions_other_header">Other permissions</string>
+    <string name="msp_permissions_other_note">These are granted at install time. The app cannot turn them off and they cannot be changed here. They are listed so you can see everything this app asks for.</string>
+
+    <string name="msp_permissions_other_internet">Internet access</string>
+    <string name="msp_permissions_other_network_state">View network state</string>
+    <string name="msp_permissions_other_foreground_service">Foreground service</string>
+    <string name="msp_permissions_other_foreground_service_media_playback">Media playback foreground service</string>
+    <string name="msp_permissions_other_wake_lock">Keep awake</string>
+    <string name="msp_permissions_other_modify_audio_settings">Change audio settings</string>
 
     <string name="msp_settings_section_base_theme">Base theme</string>
     <string name="msp_settings_section_color_source">Colour source</string>

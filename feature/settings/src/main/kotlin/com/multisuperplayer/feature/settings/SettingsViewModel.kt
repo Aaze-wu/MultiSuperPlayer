@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.settings
 
-import android.content.Intent
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.asr.AsrModelInfo
@@ -10,7 +10,8 @@ import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
-import com.multisuperplayer.core.data.browser.StorageAccess
+import com.multisuperplayer.core.data.permissions.AppPermissions
+import com.multisuperplayer.core.data.permissions.PermissionSnapshot
 import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
@@ -125,7 +126,7 @@ class SettingsViewModel(
     private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
-    private val storage: StorageAccess,
+    private val permissions: AppPermissions,
     private val dispatchers: DispatcherProvider,
     /**
      * 语音识别的两条依赖。
@@ -160,33 +161,32 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     /**
-     * 有没有「所有文件访问」。这是一个**系统设置项**，没有回调：用户去系统设置里
-     * 开完再回来，进程还活着，我们收不到任何通知。所以界面必须在外层
-     * `ON_RESUME` 时调 [refreshFileAccess] 重新问一次。
+     * 四项权限的当前状态。
      *
-     * 构造时同步读一次（`Environment.isExternalStorageManager()` 是本地查询，不碰盘）。
-     * 初值不能省：这一行的副标题就是当前状态，先显示「未开启」再跳成「已开启」
-     * 会让用户以为刚才自己看错了。
+     * 入口页那一行的副标题只用得上媒体那一项（理由见 `PermissionSummaries.entry`），
+     * 但这里给的是**整份**状态：权限页和入口页共用这一个 ViewModel，
+     * 它们必须是同一个结论（入口说未开启、进去却是已开启，是用户最难信任的一种界面）。
+     *
+     * 权限是**系统里的状态**，没有回调：用户去系统设置里改完再回来，进程还活着，
+     * 我们收不到任何通知。所以界面必须在外层 `ON_RESUME` 时调 [refreshPermissions]
+     * 重新问一次。
+     *
+     * 构造时同步读一次（都是本地查询，不碰盘）。初值不能省：这一行的副标题就是
+     * 当前状态，先显示「未允许」再跳成「已允许」会让用户以为刚才自己看错了。
      */
-    private val fileAccessState = MutableStateFlow(storage.hasAllFilesAccess())
-    val fileAccessGranted: StateFlow<Boolean> = fileAccessState.asStateFlow()
+    private val permissionStateFlow = MutableStateFlow(permissions.snapshot(activity = null))
+    val permissionState: StateFlow<PermissionSnapshot> = permissionStateFlow.asStateFlow()
 
     /**
-     * 本机有没有这个概念。API < 30 上系统设置里根本没有这一页，界面要把这一行置灰
-     * （见 `SettingsScreen`），**不能**给一个点了没反应的入口。
+     * 重新问一次系统。
+     *
+     * [activity] 用来读 `shouldShowRequestPermissionRationale`（只有 `Activity` 有），
+     * 它决定「被拒过一次」和「已被永久拒绝」要不要分开说。传 `null` 只少这一层分辨，
+     * 「已允许 / 未允许」的结论不受影响。
      */
-    val fileAccessSupported: Boolean = storage.supported()
-
-    fun refreshFileAccess() {
-        fileAccessState.value = storage.hasAllFilesAccess()
+    fun refreshPermissions(activity: Activity?) {
+        permissionStateFlow.value = permissions.snapshot(activity)
     }
-
-    /**
-     * 去系统设置页。先试本应用的那一页，系统没有时才退到总开关列表——
-     * 这个筛选在 `StorageAccess.preferredSettingsIntent()` 里，因为它需要
-     * `PackageManager`，不属于 ViewModel 的职责。
-     */
-    fun fileAccessIntent(): Intent = storage.preferredSettingsIntent()
 
     /**
      * 用 `Eagerly` 而不是 `WhileSubscribed`：主题要在界面出现之前就位，
@@ -510,7 +510,7 @@ class SettingsViewModel(
     /**
      * 重新读一次模型在磁盘上的状态。
      *
-     * 与 [refreshFileAccess] 同一个理由，只是更弱一点：模型也**可能是在播放页的字幕面板里**
+     * 与 [refreshPermissions] 同一个理由，只是更弱一点：模型也**可能是在播放页的字幕面板里**
      * 下完的，那条流程完全发生在这个 ViewModel 之外，没有任何回调会通知这里。
      * 界面在外层 `ON_RESUME` 时调一次。
      */

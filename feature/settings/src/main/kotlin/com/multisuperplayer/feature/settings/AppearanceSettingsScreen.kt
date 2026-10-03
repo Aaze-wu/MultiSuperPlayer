@@ -1,8 +1,5 @@
 package com.multisuperplayer.feature.settings
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -92,19 +89,6 @@ fun AppearanceSettingsRoute(
         },
         modifier = modifier,
     )
-}
-
-/**
- * 从 Context 上找到真正的 Activity。
- *
- * Compose 给的 `LocalContext` 可能是包了好几层的 `ContextWrapper`（主题包装、
- * `ContextThemeWrapper`、[androidx.activity.ComponentActivity] 自己的包装），
- * 一层 `as? Activity` 会静默地拿到 null——症状就是「切了语言没反应」，但不报错。
- */
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

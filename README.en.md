@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.6-alpha.1** (pre-release)
+- Current version: **0.6.7-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -256,9 +256,18 @@ system picker.
   access" permission), plus every granted SAF tree. Each source carries a **status line**; when the
   permission is missing it says "not enabled, tap to open system settings" instead of a bare failure.
 - **The permission is explicit and optional**: "all files access" (`MANAGE_EXTERNAL_STORAGE`) is **off by
-  default** and is **never requested on first launch**. Settings has a "File access" row with three
-  distinct states (granted / not granted / unsupported on this device); tapping it jumps to the system
-  permission page, and returning from that page **refreshes the state automatically** instead of keeping
+  default** and is **never requested on first launch**. It lives on the Settings **Permissions** page,
+  which lists all four things the app can ask for (media read / all files access / notifications /
+  Bluetooth) together with a **state** (granted / partially granted / not enabled / denied / unsupported
+  on this device) and an **action** — request it in place when the system still shows a dialog, jump to
+  the system page when that is the only way, and show **"Open settings" rather than a dead "Request"
+  button** once the system has stopped showing dialogs. A collapsible note below lists the six
+  permissions granted at install time that the app itself cannot change (network, foreground service,
+  and so on), so it is visible what the app asks for in total.
+- **One request at first launch**: the first launch after install asks for **notifications** and **media
+  read** (music & audio, photos & videos) in turn; "all files access" and Bluetooth are **not** part of
+  that batch. It never nags again — the system would not show the dialogs anyway once the user has
+  declined. Returning from a system settings page **refreshes the state automatically** instead of keeping
   a stale conclusion.
 - **Crumbs record the route taken, not a recomputed path**: walking into a SAF folder and back follows
   one chain in one tree, so no path-splicing rule can land you somewhere that does not exist.
@@ -508,8 +517,9 @@ directory, attached and selected automatically. Settings → Speech recognition 
 | **v0.6.3** | **Reordering and transport fixes: playlists and the items inside them can be reordered by long-pressing a whole row (the order is saved, a new playlist goes last); multi-select in the library and file browser follows the order you tapped the items in; fixed the transport row overflowing on 360dp-wide screens (the last button was squeezed into a sliver); cleartext `http://` is allowed (a NAS on your LAN, a local LLM server)** | Done |
 | **v0.6.4** | **On-device offline translation: the provider list gains *Local (runs on this device)* (Qwen3-0.6B, about 345 MB, downloaded on demand with sha256 verification and a delete-that-model-only action); constrained decoding pins the output shape down (including the item count), fixing two "it can never work on a real device" bugs (a benchmark query that always throws was treated as a failed generation, and 0.6B merging a whole batch into one array element)** | Done |
 | **v0.6.5** | **Cloud speech recognition subtitle generation: *Recognition method* gains *Cloud* (OpenAI-compatible `/audio/transcriptions`, four presets plus custom); upload in fixed 5-minute chunks (about 9.6 MB each) with per-sentence timestamps when `segments` are returned and one cue per chunk otherwise; 20 failure classes split by "what to do next"; the address field shows the final request URL live and an unfinished address greys out the player button; two privacy notices** | Done |
-| **v0.6.6** | **More translation models: on-device gains *Tencent Hunyuan HY-MT2-1.8B* (int8, about 1.7 GB, translation-specialised, offered as an optional high-quality tier while 0.6B stays the default); the memory requirement is stated before the download and one extra hint appears when it exceeds 40% of the device's total memory (a hint, never a block); the Ollama preset now defaults to Hunyuan HY-MT1.5-1.8B; target languages go 5 → 15 (Russian / Spanish / French / German / Portuguese / Italian / Arabic / Thai / Vietnamese / Indonesian added)** | **Current** |
-| Later | A permissions page, requesting permissions on first launch, a background-playback keep-alive switch, audio translation, equalizer | Planned |
+| **v0.6.6** | **More translation models: on-device gains *Tencent Hunyuan HY-MT2-1.8B* (int8, about 1.7 GB, translation-specialised, offered as an optional high-quality tier while 0.6B stays the default); the memory requirement is stated before the download and one extra hint appears when it exceeds 40% of the device's total memory (a hint, never a block); the Ollama preset now defaults to Hunyuan HY-MT1.5-1.8B; target languages go 5 → 15 (Russian / Spanish / French / German / Portuguese / Italian / Arabic / Thai / Vietnamese / Indonesian added)** | Done |
+| **v0.6.7** | **Permissions: a new *Permissions* page in Settings lists the four things the app can ask for (media read / all files access / notifications / Bluetooth) with their state and action, plus a collapsible note for the six permissions granted at install time; the first launch after install asks once for notifications and media read (not for all files access or Bluetooth); the library re-scans itself when a permission was granted elsewhere and the app comes back to the foreground** | **Current** |
+| Later | A background-playback keep-alive switch, audio translation, equalizer | Planned |
 
 ---
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -280,6 +281,52 @@ internal fun SettingActionRow(
             }
         },
     )
+}
+
+/**
+ * 带一个按钮的整行：状态在左边，动作在右边，**行本身不可点**。
+ *
+ * 和 [SettingActionRow] 的分工不是审美问题，而是「一行上只有一个动作」：
+ * [SettingActionRow] 里整行都是那个动作（点哪儿都一样），这里的状态文字与动作
+ * 是两件事——整行可点的话，用户想在读状态时点了半行就跳走了。所以只有按钮是目标。
+ *
+ * 按钮不用 `TextButton` 而用 `OutlinedButton`：整行没有自己的容器色，纯文字的
+ * 按钮在这片空白上会被读成一段普通文本（尤其是窄屏上刚好和状态那行并排时）。
+ *
+ * [action] 为 `null` 表示这一行不该有动作（这一项在本机上不存在），此时右边留空，
+ * 而不是给一个灰按钮——见 `PermissionSummaries.action` 的说明。
+ */
+@Composable
+internal fun SettingActionButtonRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    action: String?,
+    onAction: () -> Unit,
+    help: String? = null,
+) {
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        headlineContent = { TitleWithHelp(title = title, help = help) },
+        supportingContent = { Text(subtitle) },
+        trailingContent = {
+            if (action != null) {
+                // 横向内边距比默认小一点：这一行的标题已经在左侧占了不少宽度，
+                // 默认的内边距会让「已拒绝，可以再申请」这种长状态在窄屏上被挤成两行。
+                OutlinedButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                    Text(action)
+                }
+            }
+        },
+    )
+    Spacer(Modifier.height(4.dp))
 }
 
 @Composable

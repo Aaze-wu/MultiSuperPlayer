@@ -3,6 +3,7 @@ package com.multisuperplayer.feature.settings.di
 import com.multisuperplayer.feature.settings.AboutViewModel
 import com.multisuperplayer.feature.settings.AsrSettingsViewModel
 import com.multisuperplayer.feature.settings.LocalModelSettingsViewModel
+import com.multisuperplayer.feature.settings.PermissionsViewModel
 import com.multisuperplayer.feature.settings.SettingsViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -29,4 +30,8 @@ val settingsFeatureModule = module {
     // 它的依赖里有会常驻引擎的 LlmTextGenerator，挂到 Activity 作用域的
     // SettingsViewModel 上等于每次冷启动都为「用不上本地翻译」的用户构造一份。
     viewModelOf(::LocalModelSettingsViewModel)
+    // 权限页 + 首次启动那一次申请。**Activity 作用域**，而且必须如此：
+    // 设置入口页那一行的副标题和权限页里的四行要同时是新的，
+    // 分成两个实例就会出现「入口说未开启、进去却是已开启」。
+    viewModelOf(::PermissionsViewModel)
 }

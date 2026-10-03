@@ -1,5 +1,8 @@
 package com.multisuperplayer.player
 
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -15,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +31,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.MediaEntry
@@ -49,6 +54,8 @@ import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
 import com.multisuperplayer.feature.settings.AsrSettingsRoute
 import com.multisuperplayer.feature.settings.LocalModelSettingsRoute
+import com.multisuperplayer.feature.settings.PermissionsRoute
+import com.multisuperplayer.feature.settings.PermissionsViewModel
 import com.multisuperplayer.feature.settings.PlaybackSettingsRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
@@ -72,6 +79,54 @@ fun MspApp() {
     // 主题包在最外层：它要覆盖底部导航栏，也要覆盖以后可能出现的对话框。
     val settingsViewModel: SettingsViewModel = koinViewModel()
     val theme by settingsViewModel.theme.collectAsStateWithLifecycle()
+
+    // 首次启动（安装后第一次进来）的那一次权限申请。
+    //
+    // 三条刻意的取舍：
+    // - **放在这里而不是 `MainActivity.onCreate`**：`onCreate` 里弹授权框会抢在首帧
+    //   之前，用户看到的是「应用刚打开就一个弹窗」而不知道它是谁。等到界面画完
+    //   再延迟一小段，用户至少已经看到媒体库的样子。
+    // - **延迟 1.2 秒而不是等某个信号**：要的效果是「界面已经稳定」，没有一个可靠的
+    //   「首帧画完了」事件可以等（`LaunchedEffect` 只保证组合完成，不保证已经绘制）。
+    // - **只做一次**：判断和记账在 `AppPermissions.hasAskedAtStartup/markStartupAsked`
+    //   里（那是**安装级**的一次性开关）。没有这一层，每次冷启动都会弹一次
+    //   —— 系统在用户拒绝后不会重复弹框，于是用户看到的是「启动时屏幕闪一下」。
+    val permissionsViewModel: PermissionsViewModel = koinViewModel()
+
+    // 全应用**唯一**的权限 launcher，挂在根上而不是权限页里。
+    //
+    // 为什么必须有待办通道（`pending`）而不是直接调：申请权限是「一次性事件」，
+    // 必须发生在组合完成之后。若直接把 launcher 递给每一行，点一下就调一次，
+    // 而同一个 launcher 同时弹两个框时后一个会把前一个挤掉——两个框都以为
+    // 「已经申请过了」的那个则会被记账（`markAsked`），于是永久拒绝与「没问过」
+    // 分不开。所以申请请求统一排队，根上一次只处理一个。
+    val pendingPermissions by permissionsViewModel.pending.collectAsStateWithLifecycle()
+    val activity = LocalActivity.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        // 结果本身不看：`RequestMultiplePermissions` 回的是「这一次问了什么」，
+        // 而真相在系统里（媒体那一项还要看「只勾了一部分视频」这种结果）。
+        //
+        // 立刻用当前 Activity 重算一次状态，而不是只等页面的 `ON_RESUME`：
+        // 带 Activity 的刷新能分清「被拒过一次」与「已永久拒绝」，而有些权限
+        // 系统根本不弹框就直接拒（例如没有蓝牙适配器的设备上的 `BLUETOOTH_CONNECT`），
+        // 那种情况压根没有 ON_RESUME 可等——不在这里刷新的话，权限页会一直停在
+        // 「未开启，可以在这里申请」，按下去什么都不会发生。
+        permissionsViewModel.onRequestLaunched(activity)
+    }
+
+    // 需求③：安装后的第一次启动申请一次权限。
+    LaunchedEffect(Unit) {
+        delay(STARTUP_PERMISSION_DELAY_MS)
+        permissionsViewModel.requestAtStartup()
+    }
+
+    // 待办一旦出现就交给 launcher（首次启动那一次也走这条路，所以它同样会被弹出来）。
+    LaunchedEffect(pendingPermissions) {
+        val requested = pendingPermissions ?: return@LaunchedEffect
+        permissionLauncher.launch(requested.toTypedArray())
+    }
 
     // 封面取色的通道。持有者放在这一层只有一个原因：MspTheme 在树的最外层，
     // 而真正知道「现在放的是哪张封面」的是深处的播放页——让深处写、浅处读，
@@ -151,6 +206,24 @@ private const val PLAYBACK_SETTINGS_ROUTE = "settings/playback"
 // 下载任务活在它自己的 `viewModelScope` 里，返回设置页不会把下载掐掉。
 private const val ASR_SETTINGS_ROUTE = "settings/asr"
 private const val ABOUT_ROUTE = "settings/about"
+
+/**
+ * 权限页：列出用户能自己改的那四项权限（媒体读取 / 所有文件访问 / 通知 / 蓝牙）。
+ *
+ * 它是一个**真目的地**，而不是把原来的「文件访问」那一行继续当外链：现在那一行进去
+ * 是一份清单，而「所有文件访问」只是其中一行。这也是 README 第 7 节里那句
+ * 「设置页里有一行『文件访问』，点它跳到系统的授权页面」变成过去式的原因。
+ */
+private const val PERMISSIONS_ROUTE = "settings/permissions"
+
+/**
+ * 首次启动申请权限前先等多久（毫秒）。
+ *
+ * 意义不是「等界面画完」——没有这样的事件可等——而是「别抢在用户看清这是哪个应用之前」。
+ * 1200ms 是实测手感：媒体库第一帧已经出来（首页要等一次媒体库扫描，扫描完才有东西），
+ * 而用户也还没有时间点进任何一处。想改这个值只需要改这一处。
+ */
+private const val STARTUP_PERMISSION_DELAY_MS = 1200L
 
 /**
  * 本地翻译模型的下载与删除。
@@ -344,6 +417,7 @@ private fun MspAppScaffold() {
                     onOpenTranslationSettings = { navController.navigate(TRANSLATION_SETTINGS_ROUTE) },
                     onOpenAsrSettings = { navController.navigate(ASR_SETTINGS_ROUTE) },
                     onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
+                    onOpenPermissions = { navController.navigate(PERMISSIONS_ROUTE) },
                 )
             }
             composable(TRANSLATION_SETTINGS_ROUTE) {
@@ -359,6 +433,9 @@ private fun MspAppScaffold() {
             }
             composable(ASR_SETTINGS_ROUTE) {
                 AsrSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(PERMISSIONS_ROUTE) {
+                PermissionsRoute(onBack = { navController.popBackStack() })
             }
             composable(APPEARANCE_SETTINGS_ROUTE) {
                 AppearanceSettingsRoute(onBack = { navController.popBackStack() })

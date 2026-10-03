@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RecordVoiceOver
@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
+import com.multisuperplayer.core.data.permissions.PermissionSnapshot
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -37,7 +38,7 @@ import org.koin.androidx.compose.koinViewModel
 /**
  * 设置**入口页**：六行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
- * 为什么把它拆成入口页 + 五个子页，而不是继续把设置项铺在一页里：
+ * 为什么把它拆成入口页 + 六个子页，而不是继续把设置项铺在一页里：
  *
  * 1. 一页铺开的表在设置项变多之后必然要滚两三屏，而用户每次进来只为一件事。
  *    找「长按倍速」要先滚过所有主题选项，这个成本会随每一项新增而增长。
@@ -47,7 +48,7 @@ import org.koin.androidx.compose.koinViewModel
  * 3. 「关于」这类信息页和「调什么」的设置页混在一起，是后面加「检查更新」、
  *    开源许可、导出日志时最别扭的地方。分开之后它们各有各的地方。
  *
- * 这个页面因此**不需要**任何写入回调，只读摘要 + 五条导航。
+ * 这个页面因此**不需要**任何写入回调，只读摘要 + 六条导航。
  */
 @Composable
 fun SettingsRoute(
@@ -57,26 +58,31 @@ fun SettingsRoute(
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenPermissions: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val translation by viewModel.translation.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
-    val fileAccessGranted by viewModel.fileAccessGranted.collectAsStateWithLifecycle()
+    val permissionState by viewModel.permissionState.collectAsStateWithLifecycle()
     val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
     val localModelEntry by viewModel.localModelEntry.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 两件事都是「发生在这一页之外、没有任何回调」的变化：
-    // 一是「所有文件访问」这个系统设置项；二是 ASR 模型——用户可能刚在播放页的
-    // 字幕面板里把它下完。所以订阅 `ON_RESUME` 重新问一次，而不是只读一次构造值——
+    // 三件事都是「发生在这一页之外、没有任何回调」的变化：
+    // 一是四项权限（权限是系统里的状态，去系统设置里改完回来进程还活着，收不到通知）；
+    // 二是 ASR 模型——用户可能刚在播放页的字幕面板里把它下完；
+    // 三是本地翻译模型，它是在「字幕与翻译 → 本地模型」子页里下的。
+    // 所以订阅 `ON_RESUME` 重新问一次，而不是只读一次构造值——
     // 那样用户会看到「我明明开了 / 明明下完了，这里还写着没有」。
-    // 本地模型同理：它是在「字幕与翻译 → 本地模型」子页里下的。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshFileAccess()
+                // 带 Activity 是为了让「被拒过一次」与「已被永久拒绝」分得开。
+                // 入口页的副标题只用得上「允许了没有」，但同一份状态也喂给权限页（
+                // 两边共用这一个 ViewModel），所以在这里算准一点。
+                viewModel.refreshPermissions(context.findActivity())
                 viewModel.refreshAsrStatus()
                 viewModel.refreshLocalModelStatus()
             }
@@ -93,18 +99,14 @@ fun SettingsRoute(
         asrEntry = asrEntry,
         localModelEntry = localModelEntry,
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
-        fileAccessSupported = viewModel.fileAccessSupported,
-        fileAccessGranted = fileAccessGranted,
+        permissionState = permissionState,
         modifier = modifier,
         onOpenAppearance = onOpenAppearance,
         onOpenPlayback = onOpenPlayback,
         onOpenTranslationSettings = onOpenTranslationSettings,
         onOpenAsrSettings = onOpenAsrSettings,
         onOpenAbout = onOpenAbout,
-        // 「系统没有这一项」的情况由 `fileAccessSupported` 在下面挡住
-        // （`SettingActionRow.enabled`），所以这里**不**再包一层「能不能跳」的判断：
-        // 多一个 if 就多一条可能与界面不一致的真相。
-        onOpenFileAccess = { context.startActivity(viewModel.fileAccessIntent()) },
+        onOpenPermissions = onOpenPermissions,
     )
 }
 
@@ -128,14 +130,13 @@ fun SettingsScreen(
      */
     localModelEntry: LocalModelEntryState = LocalModelEntryState(),
     softwareDecodingAvailable: Boolean = true,
-    fileAccessSupported: Boolean = true,
-    fileAccessGranted: Boolean = false,
+    permissionState: PermissionSnapshot = PermissionSnapshot(),
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
-    onOpenFileAccess: () -> Unit = {},
+    onOpenPermissions: () -> Unit = {},
 ) {
     // 系统取色要 Android 12。判断放这里而不是塞进 [SettingsSummaries]：
     // `Build.VERSION.SDK_INT` 在 JVM 单测里恒为 0，进了纯函数就测不了「支持」那条分支。
@@ -199,15 +200,13 @@ fun SettingsScreen(
             }
             item {
                 SettingActionRow(
-                    icon = Icons.Outlined.FolderOpen,
-                    title = stringResource(R.string.msp_settings_file_access),
-                    subtitle = SettingsSummaries.fileAccess(
-                        supported = fileAccessSupported,
-                        granted = fileAccessGranted,
-                    ).string(),
-                    onClick = onOpenFileAccess,
-                    // 系统没有这一页时置灰：点进去也找不到开关（见 `SettingActionRow`）。
-                    enabled = fileAccessSupported,
+                    // 这一行原本叫「文件访问」、只能把用户送去系统页面开「所有文件访问」。
+                    // 现在它是个真的导航目的地：进去是四项权限的清单，
+                    // 「所有文件访问」只是其中一行（另见 README 第 7 节的说明）。
+                    icon = Icons.Outlined.Lock,
+                    title = stringResource(R.string.msp_settings_permissions),
+                    subtitle = PermissionSummaries.entry(permissionState).string(),
+                    onClick = onOpenPermissions,
                 )
             }
             item {

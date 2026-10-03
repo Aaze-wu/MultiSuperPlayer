@@ -14,6 +14,7 @@ import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
 import com.multisuperplayer.core.data.library.SafTreeScanner
 import com.multisuperplayer.core.data.library.SafTreeStore
+import com.multisuperplayer.core.data.permissions.AppPermissions
 import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
@@ -51,6 +52,10 @@ val dataModule = module {
     // 「所有文件访问」的状态与授权入口。默认关闭、永不主动申请，
     // 详情与理由见 StorageAccess 的类注释。
     single { StorageAccess(context = androidContext()) }
+
+    // 权限页与首次启动申请要问的那几件事（状态 / 该申请什么 / 该去哪儿）。
+    // 它把上面两个单例和「问过没有」的记忆拼在一起，所以排在这两个之后。
+    single { AppPermissions(context = androidContext(), scanner = get(), storage = get()) }
 
     // 内置文件浏览器（只读）。依赖上面三个，所以排在这里。
     single {

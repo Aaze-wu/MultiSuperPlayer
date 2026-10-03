@@ -121,6 +121,16 @@ private data class LibraryViewOptions(
 )
 
 /**
+ * 回到前台时该不该重扫媒体库。
+ *
+ * 抽成顶层纯函数是为了能**钉住这条策略本身**：它曾经不存在，症状是「启动时统一弹框
+ * 授权之后，媒体库还停在『需要媒体授权』，要点一下按钮才刷新」——一个看起来像
+ * 授权失败、其实只是没人去重扫的状态。
+ */
+internal fun shouldRescanOnResume(state: MediaLibraryState): Boolean =
+    state is MediaLibraryState.NeedsPermission
+
+/**
  * 媒体库 ViewModel。
  *
  * 这一层只做三件事：合并「数据状态 + 筛选 + 搜索」、转发用户动作、管理观察的生命周期。
@@ -234,6 +244,20 @@ class LibraryViewModel(
 
     fun refresh() {
         repository.refresh()
+    }
+
+    /**
+     * 回到前台时调用：只在「上次的结论是一个权限都没有」时重扫。
+     *
+     * 这一格是给**别人**申请的权限补的路：应用首次启动时统一弹的系统框由应用根上的
+     * launcher 发起，媒体库自己的 launcher 拿不到那次回调，于是用户刚点完「允许」，
+     * 媒体库还停在「需要媒体授权」。切回前台时重扫一次就自愈了。
+     *
+     * 别的结论都不重扫：`Ready` 重扫是白花钱（每次回前台都要查一遍 MediaStore），
+     * `Loading` 本来就在扫。
+     */
+    fun onResumed() {
+        if (shouldRescanOnResume(repository.state.value)) repository.refresh()
     }
 
     /**
