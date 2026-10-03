@@ -98,9 +98,10 @@ fun BrowseRoute(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 选择集是**界面瞬态**（和媒体库页一样，不进 ViewModel、不落盘）。
+    // 选择集是**界面瞬态**（和媒体库页一样，不进 ViewModel、不落盘），
+    // 而且**有顺序**：用户先点哪条、后点哪条，就是加入播放列表/开始播放的顺序。
     var selectedIds by rememberSaveable(stateSaver = MEDIA_SELECTION_SAVER) {
-        mutableStateOf(emptySet<String>())
+        mutableStateOf(emptyList<String>())
     }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -164,7 +165,7 @@ fun BrowseRoute(
     //
     // 必须写在上一句**后面**：`OnBackPressedDispatcher` 是后注册者优先
     // （它用倒序遍历回调查表），两个都启用时最后注册的那个才会被调用。
-    BackHandler(enabled = selectedIds.isNotEmpty()) { selectedIds = emptySet() }
+    BackHandler(enabled = selectedIds.isNotEmpty()) { selectedIds = emptyList() }
 
     // 动作条、行的勾选框、两个动作（播放 / 加入播放列表）都从这里往下传，
     // 界面层不再各自判断「现在是多选还是平常」。
@@ -173,7 +174,7 @@ fun BrowseRoute(
         count = selectedEntries.size,
         allSelected = LibrarySelectionRules.allSelected(selectedIds, selectable),
         onToggle = { id -> selectedIds = toggleSelection(selectedIds, selectable, id) },
-        onExit = { selectedIds = emptySet() },
+        onExit = { selectedIds = emptyList() },
         onSelectAll = { selectedIds = LibrarySelectionRules.addAll(selectedIds, selectable) },
         onClear = { selectedIds = LibrarySelectionRules.removeAll(selectedIds, selectable) },
         onAddToPlaylist = { pickerOpen = true },
@@ -238,12 +239,12 @@ fun BrowseRoute(
             onPick = { playlistId ->
                 viewModel.addToPlaylist(playlistId, selectedEntries)
                 pickerOpen = false
-                selectedIds = emptySet()
+                selectedIds = emptyList()
             },
             onCreate = { name ->
                 viewModel.createPlaylistWith(name, selectedEntries)
                 pickerOpen = false
-                selectedIds = emptySet()
+                selectedIds = emptyList()
             },
         )
     }

@@ -47,6 +47,10 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <!-- `networkSecurityConfig`：targetSdk ≥ 28 起系统默认禁明文 HTTP，而这个应用的
+         网络播放、云端翻译、云端识别都要连用户自己填的 `http://<局域网 IP>` 地址
+         （NAS、本地 LLM 服务……）。放开明文 + 不变更 HTTPS 证书策略的理由，
+         全都写在那一份 XML 的注释里。 -->
     <application
         android:name=".MspApplication"
         android:allowBackup="true"
@@ -56,6 +60,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MultiSuperPlayer"

@@ -77,16 +77,19 @@
       ===== 网络失败的补充说明 =====
 
       这三句分别对应「重试一百次也不好」的三种情况：超时是等，DNS 是地址填错，
-      明文被拦是地址不在放行名单里。系统的原始异常信息照原样附在前面。
+      明文被拦是本地安全策略在拦。系统的原始异常信息照原样附在前面。
 
-      明文那条刻意不写 adb reverse 这类命令：面向发行版的用户文案里不该出现开发工具，
-      这里只说清「哪些地址被放行」就够了。要连本机服务的人自己知道怎么做端口转发。
+      明文那条**不再写「哪些地址被放行」**：本应用已经用 network_security_config
+      放行了一切明文地址（连局域网里的 NAS 与本地 LLM 服务都要靠它），
+      所以这里只说「被拦了」这个事实。如果它真的又出现，说明系统或某种安全软件
+      在应用之上又加了一层策略——让用户拿着这句去查，比拿着一句已经过期的
+      「只有 localhost 被放行」去查有用。
     -->
     <!-- 系统原始异常信息 + 我们的补充说明。拼接交给资源，是因为中英文之间要不要空格不一样。 -->
     <string name="msp_translate_network_detail">%1$s%2$s</string>
     <string name="msp_translate_network_timeout">（请求超时。长字幕耗时较长，可在设置中调大读超时）</string>
     <string name="msp_translate_network_unresolved">（域名无法解析：请检查地址拼写与网络）</string>
-    <string name="msp_translate_network_cleartext">（明文 HTTP 被系统安全策略拦截，只有 localhost 与 10.0.2.2 被放行）</string>
+    <string name="msp_translate_network_cleartext">（明文 HTTP 被系统安全策略拦截）</string>
 
     <!-- ===== 服务商预设 ===== -->
 

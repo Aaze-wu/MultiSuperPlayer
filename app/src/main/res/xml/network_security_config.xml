@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    允许明文（http://）连接。
+
+    ## 为什么要放开
+
+    targetSdk ≥ 28 起，系统默认**禁止**一切明文 HTTP（`cleartextTrafficPermitted`
+    默认是 false），只对回环地址开了个例外。而这个应用的三个功能都天然要连
+    `http://` 的地址，且地址由用户自己填：
+
+    · **网络播放**——家里的 NAS/Jellyfin/dlna 大多是 `http://192.168.x.x/...`；
+    · **云端翻译**——本地部署的 LLM 服务（Ollama、LM Studio、one-api、llama.cpp
+      的 server、new-api 之类）默认就是 `http://<局域网 IP>:<端口>`；
+    · **云端语音识别**——同上，自建的 whisper/faster-whisper 服务。
+
+    表现上它不像「网络断了」，而是播放器直接报 `ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED`、
+    翻译直接报失败，用户看不出原因（这正是「http 被拦截」的现象）。
+
+    ## 为什么不用 <domain-config> 精确放行
+
+    `<domain>` 只接受**具体主机名或字面量的 IP**，不支持 `192.168.0.0/16` 这种网段。
+    用户自己要连的那个地址是安装时才出现的（每个家庭网段都不一样），
+    穷举不了。要么全放，要么让功能对着一大半用户不可用——那还不如告诉用户
+    「本应用不做 TLS 强制」这件事。
+
+    ## 为什么不是「加一个开关」
+
+    明文策略是编译进 APK 的静态配置（`NetworkSecurityPolicy` 读的就是这份 XML），
+    运行时改不了；真要按开关走，得自己给每个请求做 TLS 校验，等于自己重写一遍
+    平台的网络安全栈。所以这里选择一次性放开，并在界面上把「你正在用不加密连接」
+    如实说清楚（`msp_translate_network_cleartext` 那条文案）。
+
+    ## 没有动到 HTTPS 的信任链
+
+    下面显式写出 `trust-anchors = system`，就是**平台默认值**：系统预置 CA 信任，
+    用户自己装的 CA 不信任（targetSdk ≥ 24 的默认行为）。写出来是为了让
+    「这次只改了明文策略、没碰证书校验」在文件里看得见，而不是靠读文档推断。
+    TLS 该失败还是会失败。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

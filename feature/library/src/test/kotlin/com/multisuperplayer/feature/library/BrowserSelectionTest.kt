@@ -74,8 +74,8 @@ class BrowserSelectionTest {
     @Test
     fun `选择集的键就是媒体 id`() {
         val selectable = selectableMedia(listing)
-        val selected = LibrarySelectionRules.addAll(emptySet(), selectable)
-        assertEquals(selectable.map { it.id }.toSet(), selected)
+        val selected = LibrarySelectionRules.addAll(emptyList(), selectable)
+        assertEquals(selectable.map { it.id }, selected)
         assertTrue(selected.all { BrowserEntry.isBrowserMediaId(it) })
     }
 
@@ -88,18 +88,18 @@ class BrowserSelectionTest {
     @Test
     fun `全选后是取消全选`() {
         val selectable = selectableMedia(listing)
-        val all = LibrarySelectionRules.addAll(emptySet(), selectable)
+        val all = LibrarySelectionRules.addAll(emptyList(), selectable)
         assertTrue(LibrarySelectionRules.allSelected(all, selectable))
         // 一个可播的都没有时不能显示「取消全选」——那是个点了没反应的说法。
-        assertFalse(LibrarySelectionRules.allSelected(emptySet(), emptyList()))
+        assertFalse(LibrarySelectionRules.allSelected(emptyList(), emptyList()))
     }
 
     @Test
     fun `取消选择只清掉当前目录这一批`() {
         val selectable = selectableMedia(listing)
-        val selected = LibrarySelectionRules.addAll(setOf("file:/other/x.mp4"), selectable)
+        val selected = LibrarySelectionRules.addAll(listOf("file:/other/x.mp4"), selectable)
         assertEquals(
-            setOf("file:/other/x.mp4"),
+            listOf("file:/other/x.mp4"),
             LibrarySelectionRules.removeAll(selected, selectable),
         )
     }
@@ -107,25 +107,38 @@ class BrowserSelectionTest {
     @Test
     fun `选择集里的条目解析回可播清单`() {
         val selectable = selectableMedia(listing)
-        val selected = setOf(BrowserEntry.mediaIdOf("/mnt/c.mkv"))
+        val selected = listOf(BrowserEntry.mediaIdOf("/mnt/c.mkv"))
         assertEquals(listOf("/mnt/c.mkv"), LibrarySelectionRules.resolve(selectable, selected).map { it.uri })
     }
 
     @Test
+    fun `逆序点选后的顺序就是点击顺序`() {
+        // 目录里 a 在 c 前面，但用户先点了 c。加入播放列表/开始播放都必须以 c 为先。
+        val selectable = selectableMedia(listing)
+        val c = BrowserEntry.mediaIdOf("/mnt/c.mkv")
+        val a = BrowserEntry.mediaIdOf("/mnt/a.mp4")
+        val selected = toggleSelection(toggleSelection(emptyList(), selectable, c), selectable, a)
+        assertEquals(
+            listOf("/mnt/c.mkv", "/mnt/a.mp4"),
+            LibrarySelectionRules.resolve(selectable, selected).map { it.uri },
+        )
+    }
+
+    @Test
     fun `换到另一个目录后旧选择被剪掉`() {
-        val previous = setOf(BrowserEntry.mediaIdOf("/mnt/a.mp4"), BrowserEntry.mediaIdOf("/mnt/c.mkv"))
+        val previous = listOf(BrowserEntry.mediaIdOf("/mnt/a.mp4"), BrowserEntry.mediaIdOf("/mnt/c.mkv"))
         val nextDir = listOf(file("z.mp4"))
-        assertEquals(emptySet<String>(), pruneSelection(previous, selectableMedia(nextDir)))
+        assertEquals(emptyList<String>(), pruneSelection(previous, selectableMedia(nextDir)))
     }
 
     @Test
     fun `清单里还在的 id 会保留`() {
-        val selected = setOf(
+        val selected = listOf(
             BrowserEntry.mediaIdOf("/mnt/a.mp4"),
             BrowserEntry.mediaIdOf("/mnt/已删除.mp4"),
         )
         assertEquals(
-            setOf(BrowserEntry.mediaIdOf("/mnt/a.mp4")),
+            listOf(BrowserEntry.mediaIdOf("/mnt/a.mp4")),
             pruneSelection(selected, selectableMedia(listing)),
         )
     }
@@ -134,18 +147,18 @@ class BrowserSelectionTest {
     fun `选择集没变时返回同一个实例`() {
         // 调用方靠 `!==` 决定「要不要写回状态」：每进一次目录都白写一次状态
         // 就是每次切目录多重组一遍整页。
-        val selected = setOf(BrowserEntry.mediaIdOf("/mnt/a.mp4"))
+        val selected = listOf(BrowserEntry.mediaIdOf("/mnt/a.mp4"))
         assertSame(selected, pruneSelection(selected, selectableMedia(listing)))
         // 空集合一律原样返回（连算都不用算）。
-        assertSame(emptySet<String>(), pruneSelection(emptySet(), selectableMedia(listing)))
+        assertSame(emptyList<String>(), pruneSelection(emptyList(), selectableMedia(listing)))
     }
 
     @Test
     fun `离开目录等于清空选择`() {
         // 回到来源清单时 `content` 不是 Ready ⇒ 可播清单是空的 ⇒ 全部被剪掉。
         // 也就是说「退出目录即退出多选」，不需要另一个状态字段来记这件事。
-        val selected = setOf(BrowserEntry.mediaIdOf("/mnt/a.mp4"))
-        assertEquals(emptySet<String>(), pruneSelection(selected, emptyList()))
+        val selected = listOf(BrowserEntry.mediaIdOf("/mnt/a.mp4"))
+        assertEquals(emptyList<String>(), pruneSelection(selected, emptyList()))
     }
 
     @Test
@@ -154,17 +167,17 @@ class BrowserSelectionTest {
         // 而操作条写着「已选 0 项」——两个数字当面对不上。根因是长按落在整行
         // 上，把不可选的 id 也塞了进来。
         val selectable = selectableMedia(listing)
-        val selected = toggleSelection(emptySet(), selectable, BrowserEntry.mediaIdOf("/mnt/Movies"))
-        assertEquals(emptySet<String>(), selected)
-        assertSame(emptySet<String>(), selected)
+        val selected = toggleSelection(emptyList(), selectable, BrowserEntry.mediaIdOf("/mnt/Movies"))
+        assertEquals(emptyList<String>(), selected)
+        assertSame(emptyList<String>(), selected)
     }
 
     @Test
     fun `字幕的 id 塞不进选择集`() {
         val selectable = selectableMedia(listing)
         assertEquals(
-            emptySet<String>(),
-            toggleSelection(emptySet(), selectable, BrowserEntry.mediaIdOf("/mnt/b.srt")),
+            emptyList<String>(),
+            toggleSelection(emptyList(), selectable, BrowserEntry.mediaIdOf("/mnt/b.srt")),
         )
     }
 
@@ -172,16 +185,16 @@ class BrowserSelectionTest {
     fun `能播的 id 正常进出选择集`() {
         val selectable = selectableMedia(listing)
         val id = BrowserEntry.mediaIdOf("/mnt/a.mp4")
-        val selected = toggleSelection(emptySet(), selectable, id)
-        assertEquals(setOf(id), selected)
-        assertEquals(emptySet<String>(), toggleSelection(selected, selectable, id))
+        val selected = toggleSelection(emptyList(), selectable, id)
+        assertEquals(listOf(id), selected)
+        assertEquals(emptyList<String>(), toggleSelection(selected, selectable, id))
     }
 
     @Test
     fun `不可选的 id 不影响已经选好的那批`() {
         val selectable = selectableMedia(listing)
         val id = BrowserEntry.mediaIdOf("/mnt/a.mp4")
-        val selected = toggleSelection(emptySet(), selectable, id)
+        val selected = toggleSelection(emptyList(), selectable, id)
         // 返回**同一个实例**：不必白触发一次重组。
         assertSame(selected, toggleSelection(selected, selectable, BrowserEntry.mediaIdOf("/mnt/Movies")))
     }

@@ -143,6 +143,32 @@ class PlaylistsViewModel(
         viewModelScope.launch { store.removeItems(id, mediaIds) }
     }
 
+    /**
+     * 拖动排序。
+     *
+     * [from] / [to] 是**当前列表里的下标**，越界时 [PlaylistStore.moveItem] 什么都不做
+     * （而不是夹到最近的位置）：拖动期间列表可能被别处改短，夹取会把条目放到用户
+     * 没指过的地方，而「什么都没发生」最多让人再拖一次。
+     *
+     * 只在手指松开时调用一次。拖动过程中每一帧都落盘一次没有意义，而且会让
+     * DataStore 一直重写整条列表。
+     */
+    fun moveItem(id: String, from: Int, to: Int) {
+        viewModelScope.launch { store.moveItem(id, from, to) }
+    }
+
+    /**
+     * 拖动播放列表**本身**排序。
+     *
+     * 和 [moveItem] 的区别只在落点：这一条改的是「列表页里各个播放列表的先后」，
+     * [moveItem] 改的是「某个播放列表内部条目的先后」。两者的下标是两套坐标系，
+     * 混起来（把列表页的下标传给 `store.moveItem`）不会报错，
+     * 只会默默改掉另一个列表的内容——所以两个方法各叫各的名字。
+     */
+    fun move(from: Int, to: Int) {
+        viewModelScope.launch { store.move(from, to) }
+    }
+
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
     }

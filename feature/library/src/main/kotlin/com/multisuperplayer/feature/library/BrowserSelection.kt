@@ -21,17 +21,17 @@ internal fun selectableMedia(entries: List<BrowserEntry>): List<MediaEntry> =
     entries.mapNotNull { if (it.playable) it.toMediaEntry() else null }
 
 /**
- * 把选择集剪到「当前这份可播清单里还存在的」那些 id。
+ * 把选择集剪到「当前这份可播清单里还存在的」那些 id，保持原有选择顺序。
  *
  * 必须剪：进另一个目录、换排序、文件被删之后，选择集里会留下**屏幕上没有**的
  * 条目，操作条于是显示「已选 5 项」而只有 2 行是勾上的，而「播放」会播到
  * 用户看不见的东西。空集合直接返回**同一个实例**，这样调用方可以靠
  * `!==` 判断「要不要写回状态」，不必白触发一次重组。
  */
-internal fun pruneSelection(selected: Set<String>, selectable: List<MediaEntry>): Set<String> {
+internal fun pruneSelection(selected: List<String>, selectable: List<MediaEntry>): List<String> {
     if (selected.isEmpty()) return selected
     val alive = selectable.mapTo(HashSet()) { it.id }
-    val pruned = selected.intersect(alive)
+    val pruned = selected.filter { it in alive }
     return if (pruned.size == selected.size) selected else pruned
 }
 
@@ -48,7 +48,7 @@ internal fun pruneSelection(selected: Set<String>, selectable: List<MediaEntry>)
  * 保证每次改动都过一遍剪枝；这里在入口上判一次，代价是每次点击一遍 O(清单长度)，
  * 换来的是「不可选的 id 根本进不来」这条不变式。
  */
-internal fun toggleSelection(selected: Set<String>, selectable: List<MediaEntry>, id: String): Set<String> =
+internal fun toggleSelection(selected: List<String>, selectable: List<MediaEntry>, id: String): List<String> =
     if (selectable.any { it.id == id }) LibrarySelectionRules.toggle(selected, id) else selected
 
 /**
@@ -67,7 +67,7 @@ internal fun toggleSelection(selected: Set<String>, selectable: List<MediaEntry>
  * 而界面上显示的那个必须是看得见的那个。
  */
 internal class BrowserSelection(
-    val ids: Set<String> = emptySet(),
+    val ids: List<String> = emptyList(),
     val count: Int = 0,
     val allSelected: Boolean = false,
     val onToggle: (String) -> Unit = {},

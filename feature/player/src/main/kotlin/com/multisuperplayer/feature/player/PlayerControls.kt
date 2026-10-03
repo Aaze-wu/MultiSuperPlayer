@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -274,114 +275,129 @@ internal fun PlayerTransportControls(
     onToggleFullscreen: () -> Unit = {},
     compact: Boolean = false,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = 24.dp,
-                vertical = if (compact) 6.dp else 20.dp,
-            ),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onToggleShuffle) {
-            Icon(
-                imageVector = Icons.Filled.Shuffle,
-                contentDescription = stringResource(
-                    if (state.shuffleEnabled) {
-                        R.string.msp_player_shuffle_off
-                    } else {
-                        R.string.msp_player_shuffle_on
-                    },
+    // 侧按钮个数必须和下面真正摆出来的那几个对得上：多算一个会把播放键白白缩小一档，
+    // 少算一个就是又回到「最后一个被压成缝」。加/删按钮时这里要一起改，
+    // 而 TransportLayoutRulesTest 会拿着这组数字去校验「放得下」。
+    val sideSlots = if (fullscreen != null) 6 else 5
+
+    // 按**实际拿到的宽度**排版，而不是按屏幕宽度：这一行外面还可能套着父级的
+    // 内边距或 weight，猜错了就等于没修（见 TransportLayoutRules）。
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val layout = TransportLayoutRules.layoutFor(
+            availableWidth = maxWidth,
+            sideSlots = sideSlots,
+            compact = compact,
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = layout.horizontalPadding,
+                    vertical = if (compact) 6.dp else 20.dp,
                 ),
-                tint = if (state.shuffleEnabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-
-        FilledTonalIconButton(onClick = onSkipPrevious) {
-            Icon(
-                Icons.Filled.SkipPrevious,
-                contentDescription = stringResource(R.string.msp_player_previous),
-            )
-        }
-
-        FilledIconButton(
-            onClick = onTogglePlayPause,
-            modifier = Modifier.size(if (compact) 56.dp else 64.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = stringResource(
-                    if (state.isPlaying) R.string.msp_player_pause else R.string.msp_player_play,
-                ),
-                modifier = Modifier.size(32.dp),
-            )
-        }
-
-        FilledTonalIconButton(onClick = onSkipNext) {
-            Icon(
-                Icons.Filled.SkipNext,
-                contentDescription = stringResource(R.string.msp_player_next),
-            )
-        }
-
-        IconButton(onClick = onCycleRepeat) {
-            Icon(
-                imageVector = if (state.repeatMode == MspRepeatMode.ONE) {
-                    Icons.Filled.RepeatOne
-                } else {
-                    Icons.Filled.Repeat
-                },
-                contentDescription = stringResource(
-                    when (state.repeatMode) {
-                        MspRepeatMode.OFF -> R.string.msp_player_repeat_off
-                        MspRepeatMode.ALL -> R.string.msp_player_repeat_all
-                        MspRepeatMode.ONE -> R.string.msp_player_repeat_one
-                    },
-                ),
-                tint = if (state.repeatMode == MspRepeatMode.OFF) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-            )
-        }
-
-        // 字幕入口。高亮 = 现在屏幕上真的有字幕在显示，而不是「挂了字幕但关着」：
-        // 只表达前者，用户扫一眼就知道现在这个按钮该不该点。
-        IconButton(onClick = onOpenSubtitles) {
-            Icon(
-                imageVector = Icons.Filled.Subtitles,
-                contentDescription = stringResource(R.string.msp_player_subtitle_entry),
-                tint = if (subtitlesActive) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-
-        if (fullscreen != null) {
-            IconButton(onClick = onToggleFullscreen) {
+            IconButton(onClick = onToggleShuffle) {
                 Icon(
-                    imageVector = if (fullscreen) {
-                        Icons.Filled.FullscreenExit
-                    } else {
-                        Icons.Filled.Fullscreen
-                    },
+                    imageVector = Icons.Filled.Shuffle,
                     contentDescription = stringResource(
-                        if (fullscreen) {
-                            R.string.msp_player_exit_fullscreen
+                        if (state.shuffleEnabled) {
+                            R.string.msp_player_shuffle_off
                         } else {
-                            R.string.msp_player_enter_fullscreen
+                            R.string.msp_player_shuffle_on
                         },
                     ),
+                    tint = if (state.shuffleEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
+            }
+
+            FilledTonalIconButton(onClick = onSkipPrevious) {
+                Icon(
+                    Icons.Filled.SkipPrevious,
+                    contentDescription = stringResource(R.string.msp_player_previous),
+                )
+            }
+
+            FilledIconButton(
+                onClick = onTogglePlayPause,
+                modifier = Modifier.size(layout.playButtonSize),
+                colors = IconButtonDefaults.filledIconButtonColors(),
+            ) {
+                Icon(
+                    imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(
+                        if (state.isPlaying) R.string.msp_player_pause else R.string.msp_player_play,
+                    ),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+
+            FilledTonalIconButton(onClick = onSkipNext) {
+                Icon(
+                    Icons.Filled.SkipNext,
+                    contentDescription = stringResource(R.string.msp_player_next),
+                )
+            }
+
+            IconButton(onClick = onCycleRepeat) {
+                Icon(
+                    imageVector = if (state.repeatMode == MspRepeatMode.ONE) {
+                        Icons.Filled.RepeatOne
+                    } else {
+                        Icons.Filled.Repeat
+                    },
+                    contentDescription = stringResource(
+                        when (state.repeatMode) {
+                            MspRepeatMode.OFF -> R.string.msp_player_repeat_off
+                            MspRepeatMode.ALL -> R.string.msp_player_repeat_all
+                            MspRepeatMode.ONE -> R.string.msp_player_repeat_one
+                        },
+                    ),
+                    tint = if (state.repeatMode == MspRepeatMode.OFF) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+
+            // 字幕入口。高亮 = 现在屏幕上真的有字幕在显示，而不是「挂了字幕但关着」：
+            // 只表达前者，用户扫一眼就知道现在这个按钮该不该点。
+            IconButton(onClick = onOpenSubtitles) {
+                Icon(
+                    imageVector = Icons.Filled.Subtitles,
+                    contentDescription = stringResource(R.string.msp_player_subtitle_entry),
+                    tint = if (subtitlesActive) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+
+            if (fullscreen != null) {
+                IconButton(onClick = onToggleFullscreen) {
+                    Icon(
+                        imageVector = if (fullscreen) {
+                            Icons.Filled.FullscreenExit
+                        } else {
+                            Icons.Filled.Fullscreen
+                        },
+                        contentDescription = stringResource(
+                            if (fullscreen) {
+                                R.string.msp_player_exit_fullscreen
+                            } else {
+                                R.string.msp_player_enter_fullscreen
+                            },
+                        ),
+                    )
+                }
             }
         }
     }

@@ -67,7 +67,7 @@
     <string name="msp_translate_network_detail">%1$s%2$s</string>
     <string name="msp_translate_network_timeout">" (request timed out. Long subtitles take a while; raise the read timeout in settings)"</string>
     <string name="msp_translate_network_unresolved">" (the domain could not be resolved: check the address spelling and your network)"</string>
-    <string name="msp_translate_network_cleartext">" (plain HTTP was blocked by the system policy; only localhost and 10.0.2.2 are allowed)"</string>
+    <string name="msp_translate_network_cleartext">" (plain HTTP was blocked by the system security policy)"</string>
 
     <!-- ===== Provider presets ===== -->
 

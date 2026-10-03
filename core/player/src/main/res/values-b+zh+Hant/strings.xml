@@ -26,7 +26,7 @@
 
     <string name="msp_playback_error_file_not_found">找不到該檔案，可能已被移動或刪除</string>
     <string name="msp_playback_error_no_permission">沒有讀取該檔案的權限。請重新選擇這個檔案或資料夾以授予存取權限</string>
-    <string name="msp_playback_error_cleartext">系統禁止明文 HTTP 播放。請在設定中允許該位址使用未加密連線</string>
+    <string name="msp_playback_error_cleartext">系統禁止明文 HTTP 播放</string>
     <string name="msp_playback_error_network_failed">無法連線到伺服器，請檢查網路或播放位址</string>
     <string name="msp_playback_error_network_timeout">連線伺服器逾時，請檢查網路</string>
     <string name="msp_playback_error_http_status">伺服器回傳了錯誤狀態碼，播放位址可能已失效</string>

@@ -151,8 +151,10 @@ fun LibraryScreen(
     // 只需要 partial / truncated 这两个信息，分支判定整个交给 state.pane（纯函数，有单测）。
     val ready = state.library as? MediaLibraryState.Ready
 
+    // 选择集**是有顺序的**：条目按点选顺序进选择集（见 LibrarySelectionRules），
+    // 加入播放列表、从选中项开始播放都用这个顺序，所以这里必须是 List 而不是 Set。
     var selectedIds by rememberSaveable(stateSaver = MEDIA_SELECTION_SAVER) {
-        mutableStateOf(emptySet<String>())
+        mutableStateOf(emptyList<String>())
     }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -161,9 +163,10 @@ fun LibraryScreen(
     // （「已选 5 项」但屏幕上只有 2 行是勾上的），而且「播放」会播到看不见的东西。
     // 用 entries 做 key：内容没变时（结构相等）effect 不会重启，选择照旧保留。
     LaunchedEffect(state.entries) {
-        val alive = state.entries.mapTo(HashSet()) { it.id }
-        val pruned = selectedIds.intersect(alive)
-        if (pruned.size != selectedIds.size) selectedIds = pruned
+        // 用 pruneSelection 而不是自己写一遍：它已经保证了「没变就返回同一个实例」，
+        // 于是这里可以靠 !== 判断要不要写回状态，也不必再比一次 size。
+        val pruned = pruneSelection(selectedIds, state.entries)
+        if (pruned !== selectedIds) selectedIds = pruned
     }
 
     val rows = remember(state.entries, state.sort, state.groupMode) {
@@ -195,7 +198,7 @@ fun LibraryScreen(
                 SelectionTopBar(
                     count = selectedEntries.size,
                     allSelected = LibrarySelectionRules.allSelected(selectedIds, state.entries),
-                    onExit = { selectedIds = emptySet() },
+                    onExit = { selectedIds = emptyList() },
                     onSelectAll = {
                         selectedIds = LibrarySelectionRules.addAll(selectedIds, state.entries)
                     },
@@ -327,12 +330,12 @@ fun LibraryScreen(
             onPick = { playlistId ->
                 onAddToPlaylist(playlistId, selectedEntries)
                 pickerOpen = false
-                selectedIds = emptySet()
+                selectedIds = emptyList()
             },
             onCreate = { name ->
                 onCreatePlaylistWith(name, selectedEntries)
                 pickerOpen = false
-                selectedIds = emptySet()
+                selectedIds = emptyList()
             },
         )
     }
@@ -480,7 +483,7 @@ private fun LibraryGroupMenu(current: LibraryGroupMode, onSelect: (LibraryGroupM
 private fun MediaEntryList(
     rows: List<LibraryRow>,
     queue: List<MediaEntry>,
-    selectedIds: Set<String>,
+    selectedIds: List<String>,
     unknownGroupLabel: String,
     onToggleSelection: (String) -> Unit,
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit,
@@ -524,7 +527,7 @@ private fun MediaEntryList(
 private fun MediaEntryGrid(
     rows: List<LibraryRow>,
     queue: List<MediaEntry>,
-    selectedIds: Set<String>,
+    selectedIds: List<String>,
     unknownGroupLabel: String,
     onToggleSelection: (String) -> Unit,
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit,

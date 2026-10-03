@@ -21,6 +21,14 @@ internal object PlaylistRules {
     const val MAX_PLAYLISTS = 100
 
     /**
+     * 拖动结果用哪个字符分隔。
+     *
+     * 逗号：播放列表 id 是 `pl-` + 12 位十六进制（见 `PlaylistStore.newId`），
+     * 不可能含逗号，所以不需要转义。
+     */
+    private const val ORDER_SEPARATOR = ','
+
+    /**
      * 名字清洗：去掉首尾空白并截断长度。
      *
      * 不做「空了就改成『未命名』」——那是一个**面向用户的默认值**，
@@ -58,15 +66,72 @@ internal object PlaylistRules {
      *
      * 界面上拿到的下标可能已经过期（列表在拖动期间被别处改了），
      * 所以越界时**原样返回**而不是抛异常或 clamp——clamp 到一个「看起来很近」
-     * 的位置会让条目跑到用户没指定的地方。
+     * 的位置会让条目跑到用户没指定的地方。没动时也返回**同一个实例**，
+     * 调用方可以按 `!==` 判断「不用写盘了」。
+     *
+     * 泛型是为了让**两个层次共用同一套算术**：一个播放列表里的条目
+     * （[PlaylistItem]）和播放列表本身（一串 id）。两处各写一遍的话，
+     * 「向前移和向后移」这种容易写反的边界就会只修到其中一处。
      */
-    fun move(items: List<PlaylistItem>, from: Int, to: Int): List<PlaylistItem> {
+    fun <T> move(items: List<T>, from: Int, to: Int): List<T> {
         if (from == to) return items
         if (from !in items.indices || to !in items.indices) return items
         val result = items.toMutableList()
         result.add(to, result.removeAt(from))
         return result
     }
+
+    /**
+     * 按用户拖出来的顺序重排播放列表。
+     *
+     * [orderedIds] 是**上一次拖动留下的 id 序列**（见
+     * [com.multisuperplayer.core.data.playlist.PlaylistStore]）。这里面有三种
+     * 「对不上」，而每一种都必须是无害的：
+     *
+     * - 有 id 已经不在 [playlists] 里（列表被删了）→ 忽略它；
+     * - 有 [playlists] 里的 id 不在 [orderedIds] 里（刚建的，还没拖过）→
+     *   按创建时间排在后面；
+     * - [orderedIds] 里有重复 → 以第一次出现的位置为准。
+     *
+     * 所以这个函数**永远能给出一个完整顺序**，不需要在新建/删除播放列表时
+     * 同步维护那个键。换成「给每条播放列表存一个第几位」就不是这样了：
+     * 那种做法要在新建、删除、拖动三个地方都记得更新，而漏掉任何一处都不会
+     * 报错——只会让顺序悄悄变得和用户排的不一样。
+     */
+    fun applyOrder(playlists: List<Playlist>, orderedIds: List<String>): List<Playlist> {
+        if (playlists.isEmpty()) return playlists
+        val rank = HashMap<String, Int>(orderedIds.size)
+        orderedIds.forEachIndexed { index, id -> rank.putIfAbsent(id, index) }
+        // 没排过的（rank 里查不到）一律排到最后，内部再按创建时间——也就是
+        // 「拖动之前的老顺序」。`sortedWith` 是稳定排序，所以同 rank 的相对
+        // 次序永远由后两个键决定，不会因为 HashMap 的遍历顺序而变。
+        return playlists.sortedWith(
+            compareBy(
+                { rank[it.id] ?: Int.MAX_VALUE },
+                { it.createdAtMs },
+                { it.id },
+            ),
+        )
+    }
+
+    /**
+     * 把拖动结果写成一行文本（逗号分隔的 id 序列）。
+     *
+     * 编解码放在这里而不是 `PlaylistStore` 里：那个类要 DataStore、Context
+     * 才能构造，跑不了单测；而「段怎么切、空串怎么办」恰恰是容易出错的部分。
+     * 纯函数留在这里就能被直接测试。
+     */
+    fun encodeOrder(ids: List<String>): String = ids.joinToString(ORDER_SEPARATOR.toString())
+
+    /**
+     * 读回拖动结果。
+     *
+     * 空串与空段一律滤掉（`""`、`"a,,b"`）：那个键是纯文本，人来手改过、
+     * 或者哪次写了个空列表进去，都不该在界面上变成一条不存在的播放列表。
+     * [decodeOrder] 与 [encodeOrder] 往返后必然相等（去掉空段之后）。
+     */
+    fun decodeOrder(raw: String?): List<String> =
+        raw?.split(ORDER_SEPARATOR)?.filter { it.isNotEmpty() }.orEmpty()
 
     /** 按 id 删条目；不存在的 id 直接忽略。 */
     fun withRemoved(items: List<PlaylistItem>, mediaIds: Collection<String>): List<PlaylistItem> {

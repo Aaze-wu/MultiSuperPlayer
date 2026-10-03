@@ -62,7 +62,7 @@
     <string name="msp_translate_network_detail">%1$s%2$s</string>
     <string name="msp_translate_network_timeout">（請求逾時。長字幕耗時較長，可在設定中調大讀取逾時）</string>
     <string name="msp_translate_network_unresolved">（網域名稱無法解析：請檢查位址拼寫與網路）</string>
-    <string name="msp_translate_network_cleartext">（明文 HTTP 被系統安全策略攔截，只有 localhost 與 10.0.2.2 被放行）</string>
+    <string name="msp_translate_network_cleartext">（明文 HTTP 被系統安全策略攔截）</string>
 
     <!-- ===== 服務商預設 ===== -->
 

@@ -32,6 +32,24 @@ internal val Context.mspPlaylistStore: DataStore<Preferences> by preferencesData
 internal const val PLAYLIST_KEY_PREFIX = "list."
 
 /**
+ * 播放列表**本身**的顺序。
+ *
+ * 值是一个用逗号连起来的 id 序列（「先哪个、后哪个」）。
+ *
+ * ## 为什么单独一个键，而不是给每条播放列表加个「第几位」
+ *
+ * 顺序是**所有条目之间**的关系，不是某一条自己的属性。给每条存一个序号意味着
+ * 每次拖动都要改一大片记录（或者还要处理「两条序号撞了」），而且新建、删除时
+ * 也得跟着重排——漏掉一处不报错，只是顺序悄悄变。存成一个 id 序列则永远只有
+ * 一个写入点（用户拖动），读取时按 [PlaylistRules.applyOrder] 合并，
+ * 对不上（删了的 / 新加的）都是无害的。
+ *
+ * 键名**不带** [PLAYLIST_KEY_PREFIX]，所以不会被 `PlaylistStore.decodeAll`
+ * 当成一条播放列表读进来。
+ */
+private const val ORDER_KEY = "order"
+
+/**
  * 播放列表的持久化。
  *
  * ## 一次读全表
@@ -54,10 +72,13 @@ class PlaylistStore(
     private val store: DataStore<Preferences> get() = appContext.mspPlaylistStore
 
     /**
-     * 全部播放列表，按**创建时间从早到晚**。
+     * 全部播放列表，按用户排的顺序。
      *
-     * 创建顺序而不是名字排序：用户自己建的东西，位置应该稳定——按名字排序的话
-     * 重命名会让它在列表里跳位置。
+     * 顺序有两层：
+     * - 用户拖动过 → 按那份拖动结果（`order` 键里的 id 序列）；
+     * - 没拖过（或后来新建的）→ 退化成**创建时间从早到晚**，也就是拖动之前的
+     *   行为。按创建顺序而不是名字：用户自己建的东西位置应该稳定，
+     *   按名字排序的话重命名会让它在列表里跳位置。
      *
      * 读不出来的记录会被**跳过**（见 [PlaylistCodec.decode]），
      * 而不是让整个 Flow 抛异常。
@@ -120,6 +141,29 @@ class PlaylistStore(
         update(id) { playlist -> playlist.copy(items = PlaylistRules.move(playlist.items, from, to)) }
     }
 
+    /**
+     * 拖动播放列表**本身**排序。
+     *
+     * 落盘的是**整个 id 序列**，而不是「这一条的新位置」：顺序描述的是所有条目之间
+     * 的相对关系，只改其中一条的位置等于说「其余的都往后挪」，而那部分信息不在
+     * 任何单独一条记录里。写一个几十字节的字符串，比给 100 条播放列表各加一个
+     * 「第几位」字段（还得保证它们不冲突）便宜得多。
+     *
+     * 越界或原地不动时什么都不写（[PlaylistRules.move] 会原样返回同一个实例）。
+     */
+    suspend fun move(from: Int, to: Int) = withContext(dispatchers.io) {
+        try {
+            store.edit { prefs ->
+                val ids = decodeAll(prefs).map { it.id }
+                val moved = PlaylistRules.move(ids, from, to)
+                if (moved === ids) return@edit
+                prefs[orderKey] = PlaylistRules.encodeOrder(moved)
+            }
+        } catch (error: IOException) {
+            MspLog.w(TAG, error) { "更新播放列表顺序失败" }
+        }
+    }
+
     /** 读一条（不订阅）。找不到返回 null。 */
     suspend fun playlist(id: String): Playlist? = withContext(dispatchers.io) {
         PlaylistCodec.decode(prefsSnapshot()[playlistKey(id)])
@@ -152,14 +196,17 @@ class PlaylistStore(
         emptyPreferences()
     }
 
-    private fun decodeAll(prefs: Preferences): List<Playlist> =
-        prefs.asMap()
+    private fun decodeAll(prefs: Preferences): List<Playlist> {
+        val playlists = prefs.asMap()
             .filterKeys { it.name.startsWith(PLAYLIST_KEY_PREFIX) }
             .values
             .mapNotNull { value -> PlaylistCodec.decode(value as? String) }
-            .sortedWith(compareBy<Playlist> { it.createdAtMs }.thenBy { it.id })
+        return PlaylistRules.applyOrder(playlists, PlaylistRules.decodeOrder(prefs[orderKey]))
+    }
 
     private fun playlistKey(id: String): Preferences.Key<String> = stringPreferencesKey(PLAYLIST_KEY_PREFIX + id)
+
+    private val orderKey: Preferences.Key<String> = stringPreferencesKey(ORDER_KEY)
 
     /**
      * 播放列表 id。

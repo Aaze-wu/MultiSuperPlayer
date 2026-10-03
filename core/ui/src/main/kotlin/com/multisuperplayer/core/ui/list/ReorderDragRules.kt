@@ -1,15 +1,20 @@
-package com.multisuperplayer.feature.player
+package com.multisuperplayer.core.ui.list
 
 /**
- * 队列拖拽的落点换算。
+ * 拖动排序的落点换算。
  *
  * ## 为什么是一组纯函数
  *
  * 「手指移动了多少像素 = 应该插到第几位」是一道**可以拿例子钉住的算术**，而它的
  * 边界（拖到列表外面、行高不是整数、只拖了六成行高就松手）恰恰是手感问题：
  * 留在 composable 里就只能靠真机试出来「好像有点飘」，改一次要重新装一次。
- * 抽出来之后每个边界都能单测（见 `QueueDragRulesTest`），界面那边只剩
- * 「把手指的位移喂进来、把下标交给 [com.multisuperplayer.core.player.QueueRules.move]」。
+ * 抽出来之后每个边界都能单测（见 `ReorderDragRulesTest`），界面那边只剩
+ * 「把手指的位移喂进来、把手势结束时的落点交给调用方的 `move`」。
+ *
+ * 放在 `core:ui` 而不是某个 feature 里，是因为**好几处列表都用它**：播放队列
+ * （`feature:player`，按把手拖动）、播放列表详情里的条目、以及播放列表**清单**
+ * （后两处都在 `feature:library`，长按整行拖动，手势封装见 `Modifier.reorderDrag`）。
+ * 各抄一份的话，手感修一处、别处不会跟着变，而那种差异没人会去复现。
  *
  * ## 全部按「跨过几行」算，不按像素比
  *
@@ -17,7 +22,7 @@ package com.multisuperplayer.feature.player
  * 「往上拖过一行就换一格」在任何设备上都成立，而「拖 56 像素换一格」只在
  * 这个行高下成立。
  */
-internal object QueueDragRules {
+object ReorderDragRules {
 
     /**
      * 位移跨过了几行。正数往下、负数往上。
@@ -56,9 +61,9 @@ internal object QueueDragRules {
     /**
      * 这一拖到底改了没有。
      *
-     * 单独列出来是因为调用方在拖动结束时要判断「要不要真的改队列」：落点和出发点
-     * 一样时**什么都不要做**，否则会白跑一次 `moveMediaItem`，而那个操作会
-     * 让当前播放项重新缓冲一下——一次没意义的抖动。
+     * 单独列出来是因为调用方在拖动结束时要判断「要不要真的改顺序」：落点和出发点
+     * 一样时**什么都不要做**，否则会白跑一次落盘（队列那边还会让当前播放项
+     * 重新缓冲一下——一次没意义的抖动）。
      */
     fun isNoOp(from: Int, to: Int): Boolean = from == to
 }

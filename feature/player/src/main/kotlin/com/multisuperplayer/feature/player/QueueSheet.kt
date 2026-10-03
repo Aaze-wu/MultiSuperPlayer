@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.ui.list.ReorderDragRules
 
 /**
  * 播放队列面板：看现在排了什么，直接跳到某一条，删掉、重排。
@@ -59,7 +60,7 @@ import com.multisuperplayer.core.model.MediaEntry
  * ## 为什么这一行不显示时长
  *
  * 队列里的条目在拖动排序时会移动位置，每一行的高度必须**完全一致**
- * （[QUEUE_ROW_HEIGHT]），否则落点换算（[QueueDragRules]）就会算错行数。
+ * （[QUEUE_ROW_HEIGHT]），否则落点换算（[ReorderDragRules]）就会算错行数。
  * 让每一行只有一行标题 + 一行副标题，高度就是定值，不用去管每条媒体的
  * 时长文字长短、封面有没有解析出来这些差异。
  *
@@ -209,7 +210,7 @@ private fun QueueList(
                                     dragTarget = -1
                                     // 落点和出发点一样时什么都不做：`moveMediaItem`
                                     // 即使移到自己身上也会让当前项重新缓冲一下。
-                                    if (from != null && !QueueDragRules.isNoOp(from, target)) {
+                                    if (from != null && !ReorderDragRules.isNoOp(from, target)) {
                                         onMove(from, target)
                                     }
                                 },
@@ -224,7 +225,7 @@ private fun QueueList(
                             ) { change, dragAmount ->
                                 change.consume()
                                 dragOffsetY += dragAmount.y
-                                dragTarget = QueueDragRules.targetIndex(
+                                dragTarget = ReorderDragRules.targetIndex(
                                     from = index,
                                     dragOffsetY = dragOffsetY,
                                     rowHeightPx = rowHeightPx,
@@ -254,7 +255,7 @@ private fun QueueList(
  * 队列里的一行。
  *
  * 高度固定（[QUEUE_ROW_HEIGHT]）是**功能要求**，不是审美偏好：拖拽的落点换算
- * 用的是「跨过几行」（[QueueDragRules]），行高不一致就意味着算出来的位置和
+ * 用的是「跨过几行」（[ReorderDragRules]），行高不一致就意味着算出来的位置和
  * 眼睛看到的位置不是一回事。
  */
 @Composable

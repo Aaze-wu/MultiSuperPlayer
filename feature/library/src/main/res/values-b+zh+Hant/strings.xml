@@ -135,6 +135,7 @@
     <string name="msp_playlists_item_missing">檔案已不在</string>
     <string name="msp_playlists_missing_banner">其中 %1$d 條檔案已不在，播放時可能失敗。</string>
     <string name="msp_playlists_remove_item">從播放清單移除</string>
+    <string name="msp_playlists_drag_hint">長按條目可拖動排序</string>
 
     <!-- ============================================================
          目录浏览（点进某个来源之后）

@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,12 @@ import com.multisuperplayer.core.ui.text.string
  * [supporting] 留成 `String?` 而不是 `MspText`：调用方传进来的已经是拼好的整句
  * （「播放到 12:34 · 2026-02-14 09:31」），里面既有用户数据又有本地化文案，
  * 再往上抽象一层只会让每个调用点多写一个 `MspText.join`。
+ *
+ * [containerColor] 与 [onLongClick] 都是为播放列表详情的拖动排序开的两个口子：
+ * 那一页要用底色标出「松手会落在这里」（而底色是画在这一行的 `Surface` 上的，
+ * 外面再包一层背景会被它盖住），并且要求长按**不再**触发点击手势——
+ * `combinedClickable` 的长按会一直吞事件到手指抬起，拖拽的那套手势收不到移动，
+ * 表现就是「长按之后列表纹丝不动」。两者都给默认值，其余页面照旧。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -61,19 +68,26 @@ internal fun MediaEntryRow(
     selected: Boolean = false,
     selectionMode: Boolean = false,
     supporting: String? = null,
+    containerColor: Color? = null,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Surface(
-        color = if (selected) {
+        color = containerColor ?: if (selected) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {
             MaterialTheme.colorScheme.surface
         },
-        modifier = Modifier.fillMaxWidth().combinedClickable(
-            onClick = onClick,
-            onLongClick = onLongClick,
+        modifier = Modifier.fillMaxWidth().then(
+            // 默认（不传长按）用普通 clickable：`combinedClickable` 即使长按回调是
+            // 空的也会装一个长按检测，而那东西和「长按拖动」是同一个手势，
+            // 谁先认领谁就吃掉另一个。两种手势只能装一种。
+            if (onLongClick == null) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            },
         ),
     ) {
         ListItem(
@@ -172,9 +186,9 @@ internal val EntryRowTrailingSpacing = 4.dp
  * 存在这里而不是某个页面里：媒体库页和浏览页的选中集合是同一个东西，
  * 两个页面各写一份 saver，迟早会有一边忘了处理空集（restore 出一个 `null`）。
  */
-internal val MEDIA_SELECTION_SAVER = listSaver<Set<String>, String>(
-    save = { it.toList() },
-    restore = { it.toSet() },
+internal val MEDIA_SELECTION_SAVER = listSaver<List<String>, String>(
+    save = { it },
+    restore = { it },
 )
 
 /**

@@ -37,6 +37,9 @@ class PlaylistRulesTest {
         source = MediaSource.MEDIA_STORE,
     )
 
+    private fun playlist(id: String, createdAtMs: Long) =
+        Playlist(id = id, name = id, createdAtMs = createdAtMs)
+
     // --------------------------------------------------------------- 名字清洗
 
     @Test
@@ -247,5 +250,88 @@ class PlaylistRulesTest {
     @Test
     fun `空列表解析成空列表`() {
         assertTrue(PlaylistRules.resolve(emptyList(), emptyMap()).isEmpty())
+    }
+
+    // ------------------------------------------------------------ 列表顺序
+
+    @Test
+    fun `没拖动过时按创建时间从早到晚`() {
+        // 拖动之前的行为必须一点不变：老用户升级上来不该看到列表重排。
+        val playlists = listOf(playlist("pl-b", 200L), playlist("pl-a", 100L))
+
+        val result = PlaylistRules.applyOrder(playlists, orderedIds = emptyList())
+
+        assertEquals(listOf("pl-a", "pl-b"), result.map { it.id })
+    }
+
+    @Test
+    fun `拖动之后按拖出来的顺序而不是创建时间`() {
+        val playlists = listOf(playlist("pl-a", 100L), playlist("pl-b", 200L))
+
+        val result = PlaylistRules.applyOrder(playlists, orderedIds = listOf("pl-b", "pl-a"))
+
+        assertEquals(listOf("pl-b", "pl-a"), result.map { it.id })
+    }
+
+    @Test
+    fun `顺序里已经不存在的 id 被忽略`() {
+        // 删掉一个播放列表后，那个键里还留着它的 id（删的时候不去改那个键）。
+        val playlists = listOf(playlist("pl-a", 100L), playlist("pl-b", 200L))
+
+        val result = PlaylistRules.applyOrder(playlists, listOf("pl-gone", "pl-b", "pl-a"))
+
+        assertEquals(listOf("pl-b", "pl-a"), result.map { it.id })
+    }
+
+    @Test
+    fun `拖过顺序之后新建的播放列表排在最后`() {
+        // 最容易写反的一条：新建的应该接在**后面**（rank 相同时的哨兵值要比
+        // 任何真实下标都大）。写反了不报错，只是新建的列表突然跑到最前面。
+        val playlists = listOf(
+            playlist("pl-new", 999L),
+            playlist("pl-a", 100L),
+            playlist("pl-b", 200L),
+        )
+
+        val result = PlaylistRules.applyOrder(playlists, listOf("pl-b", "pl-a"))
+
+        assertEquals(listOf("pl-b", "pl-a", "pl-new"), result.map { it.id })
+    }
+
+    @Test
+    fun `顺序里重复的 id 以第一次出现为准`() {
+        val playlists = listOf(playlist("pl-a", 100L), playlist("pl-b", 200L))
+
+        val result = PlaylistRules.applyOrder(playlists, listOf("pl-b", "pl-b", "pl-a"))
+
+        assertEquals(listOf("pl-b", "pl-a"), result.map { it.id })
+    }
+
+    @Test
+    fun `没有播放列表时原样返回`() {
+        val playlists = emptyList<Playlist>()
+
+        assertSame(playlists, PlaylistRules.applyOrder(playlists, listOf("pl-a")))
+    }
+
+    @Test
+    fun `移动对任意列表都成立`() {
+        // 条目列表和播放列表清单共用同一套算术。
+        assertEquals(listOf("b", "a", "c"), PlaylistRules.move(listOf("a", "b", "c"), 0, 1))
+    }
+
+    @Test
+    fun `顺序能编码成一行再解回来`() {
+        val ids = listOf("pl-aaa111", "pl-bbb222")
+
+        assertEquals(ids, PlaylistRules.decodeOrder(PlaylistRules.encodeOrder(ids)))
+    }
+
+    @Test
+    fun `顺序里的空段被丢掉`() {
+        // 那个键是纯文本，手改过就可能含有空段；空段不该变成一条不存在的播放列表。
+        assertEquals(listOf("pl-a", "pl-b"), PlaylistRules.decodeOrder("pl-a,,pl-b"))
+        assertTrue(PlaylistRules.decodeOrder("").isEmpty())
+        assertTrue(PlaylistRules.decodeOrder(null).isEmpty())
     }
 }

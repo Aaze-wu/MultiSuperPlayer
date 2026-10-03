@@ -136,6 +136,7 @@
     <string name="msp_playlists_item_missing">File is gone</string>
     <string name="msp_playlists_missing_banner">%1$d item(s) point to files that are gone; playback may fail.</string>
     <string name="msp_playlists_remove_item">Remove from playlist</string>
+    <string name="msp_playlists_drag_hint">Long-press an item to reorder</string>
 
     <!-- ============================================================
          目录浏览（点进某个来源之后）
