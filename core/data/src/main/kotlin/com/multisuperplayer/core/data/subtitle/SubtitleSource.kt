@@ -3,6 +3,7 @@ package com.multisuperplayer.core.data.subtitle
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.SubtitleOrigin
 
 /**
  * 自动挂载字幕的最低匹配分。
@@ -40,7 +41,11 @@ val SubtitleSource.isAutoMatchable: Boolean get() = matchScore >= AUTO_MATCH_SCO
  * ## 四层，从「对不对」到「稳不稳」
  *
  * 1. **关联分降序**——这是唯一衡量「是不是这条片子的字幕」的量。
- * 2. **片名之外的标记越少越靠前**。这一层是真正解决「同分」的：
+ * 2. **优先人工、其次应用自己生成的**。分数相同意味着「都是这条片子的字幕」，
+ *    此时唯一有意义的问题就是「谁更可信」：外挂文件是人做的（有断句、有标点、
+ *    专有名词也对），语音识别的结果只是「没有更好选择」时的保底。
+ *    这一层不改变纯外挂场景的结果（它们的来源都一样）。
+ * 3. **片名之外的标记越少越靠前**。这一层是真正解决「同分」的：
  *    `Show.srt` / `Show.chs.srt` / `Show.bilingual.srt` 的关联分**完全相等**
  *    （片名都等于媒体名，[SubtitleFileNaming.matchScore] 只看片名）。
  *    此时唯一有意义的区别就是「谁的名字里多说了点什么」——而多出来的每一段标记
@@ -48,20 +53,33 @@ val SubtitleSource.isAutoMatchable: Boolean get() = matchScore >= AUTO_MATCH_SCO
  *    最可能就是「这片子的字幕」本身。
  *    （不用文件名字典序来当这一层：那等于让 `bilingual` 里那个 `b` 决定结果，
  *    换个名字答案就变，而且没人能从界面上理解为什么。）
- * 3. **强制字幕靠后**。`forced` 只覆盖外语对白那几句，挂上它大部分时间是空屏；
+ * 4. **强制字幕靠后**。`forced` 只覆盖外语对白那几句，挂上它大部分时间是空屏；
  *    旁边有完整字幕时不该选它。
- * 4. **文件名升序**——纯稳定性兜底。少了它，MediaStore 每次返回的顺序都能让
+ * 5. **文件名升序**——纯稳定性兜底。少了它，MediaStore 每次返回的顺序都能让
  *    「这次打开挂的字幕」变一次，而用户完全无从理解。
  *
  * 语言偏好（「我会中文，优先挑中文字幕」）刻意不在这里：那需要用户设置，
- * 属于翻译/语言那一版的事。**这一层将来就插在第 2 层之后**——在那之前，
+ * 属于翻译/语言那一版的事。**这一层将来就插在第 3 层之后**——在那之前，
  * 一个「未标语言」的文件和一个「简体中文」的文件只能靠标记数分先后。
  */
 private val candidateOrder: Comparator<SubtitleSource> =
     compareByDescending<SubtitleSource> { it.matchScore }
+        .thenBy { it.origin.selectionRank }
         .thenBy { it.trailingTagCount }
         .thenBy { it.isForced }
         .thenBy { it.fileName }
+
+/**
+ * 同分时谁更可信。[SubtitleOrigin] 的声明顺序**不能**直接 ordinal——
+ * 哪天有人往枚举中间插一个值，排序就会默默地变，所以这里显式写清楚。
+ */
+private val SubtitleOrigin.selectionRank: Int
+    get() = when (this) {
+        SubtitleOrigin.EXTERNAL_FILE -> 0
+        SubtitleOrigin.EMBEDDED -> 1
+        SubtitleOrigin.GENERATED_ASR -> 2
+        SubtitleOrigin.TRANSLATED -> 3
+    }
 
 /** 按 [candidateOrder] 排好序的候选。面板列表与自动挑选都走这里。 */
 fun List<SubtitleSource>.sortedForSelection(): List<SubtitleSource> = sortedWith(candidateOrder)
@@ -106,6 +124,14 @@ data class SubtitleSource(
      * 比较器会被调用 O(n log n) 次，每次重解析一遍文件名属于白烧 CPU。
      */
     val trailingTagCount: Int,
+    /**
+     * 这条字幕是哪来的。
+     *
+     * 默认值让「扫描目录找到的外挂文件」不必写这个参数（绝大多数调用点都是它）；
+     * 语音识别生成的字幕会填 [SubtitleOrigin.GENERATED_ASR]，
+     * 界面上据此显示「本机语音识别」而不是一个哈希文件名。
+     */
+    val origin: SubtitleOrigin = SubtitleOrigin.EXTERNAL_FILE,
 ) {
     /** 是否可以自动挂上（而不是只能出现在手动列表里）。 */
     val matchesMedia: Boolean get() = matchScore > SubtitleFileNaming.NO_MATCH

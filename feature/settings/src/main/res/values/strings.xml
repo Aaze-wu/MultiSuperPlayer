@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  设置模块（入口页 + 外观 / 播放 / 字幕翻译 / 关于）的文案。
+  设置模块（入口页 + 外观 / 播放 / 字幕翻译 / 语音识别 / 关于）的文案。
 
   这个文件里**不该**出现别处已有的句子：主题名和强调色名在 `core:ui`，
   播放错误在 `core:player`，翻译失败在 `core:translate`。这里只放本模块自己说的
@@ -20,10 +20,12 @@
     <!-- 设置读盘失败。不要写异常文本：用户能做的只有「重试」 -->
     <string name="msp_settings_read_failed">读取设置失败，请重试。</string>
 
-    <!-- 入口页五行 -->
+    <!-- 入口页六行 -->
     <string name="msp_settings_appearance">外观</string>
     <string name="msp_settings_playback">播放</string>
     <string name="msp_settings_translation">字幕与翻译</string>
+    <!-- 「语音识别」与「字幕与翻译」是两条不同的路：一条是本地把语音转成字幕，一条是把字幕换成另一种语言 -->
+    <string name="msp_settings_asr">语音识别</string>
     <string name="msp_settings_file_access">文件访问</string>
     <string name="msp_settings_about">关于</string>
 
@@ -61,6 +63,15 @@
 
     <!-- 还没配好。`%1$s` 是缺项清单（逗号分隔）。写清缺什么比「请检查设置」有用 -->
     <string name="msp_settings_summary_translation_incomplete">还不能翻译（缺：%1$s）</string>
+
+    <!--
+      ASR 的三种状态，同样**必须分开**：它们对应的下一步是「下载 / 继续下载 / 已经能用」。
+      例：`离线中文（小模型） · 未下载 · 约 78 MB`、`离线中文（小模型） · 已下载 42%`。
+    -->
+    <string name="msp_settings_summary_asr_absent">未下载</string>
+    <!-- `%1$d` 是整数百分比，向下取整（99.6% 不能说成 100%，那时还差最后一个字节） -->
+    <string name="msp_settings_summary_asr_partial">已下载 %1$d%%</string>
+    <string name="msp_settings_summary_asr_ready">已下载</string>
 
     <string name="msp_settings_summary_no_logs">还没有任何日志文件</string>
 
@@ -307,5 +318,40 @@
     <string name="msp_settings_subtitle_reset">恢复默认样式</string>
     <string name="msp_settings_subtitle_reset_desc">字号、行距、描边、底部距离一起恢复</string>
     <string name="msp_settings_subtitle_reset_already">当前就是默认样式</string>
+
+    <!-- ===== 语音识别（本机 ASR） ===== -->
+
+    <string name="msp_settings_section_asr_model">识别模型</string>
+    <!-- 「不上传」是这条功能的卖点，也是用户第一个会怀疑的事，所以放在最前面 -->
+    <string name="msp_settings_asr_model_hint">识别只在这台手机上跑，音频不会上传。片长多长，识别大概就要多久。</string>
+
+    <string name="msp_settings_asr_download">下载模型</string>
+    <string name="msp_settings_asr_resume">继续下载</string>
+    <string name="msp_settings_asr_stop">停止</string>
+    <string name="msp_settings_asr_downloading">正在下载模型…</string>
+    <!-- 例：`已下载 12.3 MB / 78.1 MB` -->
+    <string name="msp_settings_asr_download_bytes">已下载 %1$s / %2$s</string>
+    <!-- 例：`离线中文（小模型） 已就绪。` -->
+    <string name="msp_settings_asr_install_done">%1$s 已就绪。</string>
+
+    <!-- 已就绪时替掉「下载」按钮的那句话：它把下一步写出来，而不是只说「已下载」 -->
+    <string name="msp_settings_asr_ready_hint">已经就绪。在播放页打开字幕面板，点「生成字幕」就能用它。</string>
+
+    <!-- 例：`删除模型（释放 189.9 MB）`。体积是**实际占用**：下了一半时不能说总体积 -->
+    <string name="msp_settings_asr_remove">删除模型（释放 %1$s）</string>
+    <string name="msp_settings_asr_remove_confirm_title">删除这个模型？</string>
+    <!-- `%1$s` 是模型名，`%2$s` 是体积。「已经生成的字幕不受影响」必须说出来：那是删之前最让人犹豫的一点 -->
+    <string name="msp_settings_asr_remove_confirm_body">%1$s 要重新下载（%2$s）才能再用。已经生成的字幕不受影响。</string>
+    <string name="msp_settings_asr_remove_done">已删除 %1$s。</string>
+    <!-- 真的没文件可删时的话：不说成「已删除」，那句是假话 -->
+    <string name="msp_settings_asr_remove_missing">这条模型的文件已经不在手机上了。</string>
+
+    <string name="msp_settings_section_asr_source">下载源</string>
+    <string name="msp_settings_asr_source">模型下载地址</string>
+    <string name="msp_settings_asr_source_support">默认走国内镜像 hf-mirror.com。填 https://huggingface.co 则是官方源（国内常常慢到像卡住）。</string>
+    <!-- 输入框下的提示，只有一个要求：少写协议头是这一栏唯一常见的错法 -->
+    <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 开头。</string>
+
+    <string name="msp_settings_asr_dismiss">知道了</string>
 
 </resources>

@@ -37,6 +37,8 @@
     <string name="msp_player_detail_forced">forced</string>
     <string name="msp_player_detail_default_track">default</string>
     <string name="msp_player_detail_matches_title">matches the title</string>
+    <!-- Provenance of a generated subtitle: replaces the language slot (see describeDetails). -->
+    <string name="msp_player_detail_generated">on-device recognition</string>
     <string name="msp_player_format_lrc">LRC lyrics</string>
     <string name="msp_player_format_lrc_enhanced">Enhanced LRC (per syllable)</string>
 
@@ -83,6 +85,18 @@
     <string name="msp_player_show_raw">Show the raw response</string>
     <string name="msp_player_hide_raw">Hide the raw response</string>
     <string name="msp_player_export">Export translation…</string>
+
+    <!-- ===== Speech recognition (subtitle generation) ===== -->
+    <string name="msp_player_asr_title">Speech recognition</string>
+    <string name="msp_player_asr_hint">Turns speech into subtitles on this device; the audio is never uploaded. It takes roughly as long as the video.</string>
+    <string name="msp_player_asr_generate">Generate subtitles</string>
+    <string name="msp_player_asr_need_model">This needs a speech model first (%1$s). Once downloaded, no network is required.</string>
+    <string name="msp_player_asr_download_generate">Download model and generate (%1$s)</string>
+    <string name="msp_player_asr_downloading">Downloading model…</string>
+    <string name="msp_player_asr_download_bytes">%1$s of %2$s downloaded</string>
+    <string name="msp_player_asr_recognizing">Recognizing…</string>
+    <string name="msp_player_asr_progress">%1$d lines recognized · %2$s / %3$s</string>
+    <string name="msp_player_asr_progress_unknown">%1$d lines recognized</string>
 
     <!-- ===== Playback controls ===== -->
     <string name="msp_player_decoder_ffmpeg">FFmpeg software decoding</string>

@@ -469,47 +469,6 @@ private fun ProviderPicker(settings: TranslationSettings, onSelect: (String) -> 
     }
 }
 
-/**
- * 跟着存储走、但用户一开始输入就交给他的输入框。
- *
- * `draft == null` 表示「用户还没动过这一栏」，此时显示存储里的值：
- * 设置是异步读盘的，第一帧拿到的往往是空串，所以初值必须能**晚到**；
- * 而一旦绑死到存储上，每敲一个字符都会写盘、回流、把光标和刚敲的字符冲掉
- * （DataStore 的写是异步的，回流顺序没有保证）。
- *
- * 换了服务商（[key] 变）就丢掉草稿：那时存储里的地址/模型本来就是另一份。
- */
-@Composable
-private fun DraftTextField(
-    key: Any?,
-    stored: String,
-    onCommit: (String) -> Unit,
-    label: String,
-    placeholder: String,
-    supportingText: String? = null,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    trailing: (@Composable () -> Unit)? = null,
-) {
-    var draft by remember(key) { mutableStateOf<String?>(null) }
-
-    OutlinedTextField(
-        value = draft ?: stored,
-        onValueChange = {
-            draft = it
-            onCommit(it)
-        },
-        label = { Text(label) },
-        placeholder = { Text(placeholder) },
-        supportingText = supportingText?.let { { Text(it) } },
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
-        trailingIcon = trailing,
-        singleLine = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-    )
-}
-
 @Composable
 private fun ModelListBlock(models: List<String>, current: String, onPick: (String) -> Unit) {
     Column(

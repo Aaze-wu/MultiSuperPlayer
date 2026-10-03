@@ -42,6 +42,12 @@ dependencies {
     // 只用到 `SoftwareDecoderSupport` 这一个接口（Koin 在 playerModule 里绑定），
     // 不会把 nextlib 暴露到设置模块。
     implementation(project(":core:player"))
+    // 「语音识别」子页要真的管模型：读体积（`AsrModelLocator.statusOf`）、下载
+    // （`AsrModelInstaller`）、删除（`remove`），还要用 `AsrModelCatalog` 这两条
+    // 候选列出模型和体积。这些都是 `:core:asr` 自己的公开类型——`:core:data`
+    // 虽然也依赖它，但**不要**靠别的模块把依赖顺过来：哪天 `:core:data` 不再需要
+    // ASR，这个模块就会莫名其妙编译不过。
+    implementation(project(":core:asr"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

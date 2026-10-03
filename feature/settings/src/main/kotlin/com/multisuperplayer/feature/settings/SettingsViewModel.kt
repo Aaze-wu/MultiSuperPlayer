@@ -3,6 +3,9 @@ package com.multisuperplayer.feature.settings
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.asr.AsrModelInfo
+import com.multisuperplayer.core.asr.AsrModelLocator
+import com.multisuperplayer.core.asr.AsrModelStatus
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
@@ -10,6 +13,8 @@ import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.browser.StorageAccess
 import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.data.settings.AsrSettings
+import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
@@ -40,6 +45,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -69,6 +75,19 @@ data class ModelListState(
 )
 
 /**
+ * 入口页「语音识别」那一行的两个数。
+ *
+ * 放在同一个 data class 里、一次更新，是因为它们总是一起显示：分开成两个 Flow
+ * 会在换完模型的那几帧里拼出「中文离线 · 已下载」——而那个「已下载」说的是**上一条**模型。
+ */
+data class AsrEntryState(
+    val settings: AsrSettings = AsrSettings(),
+    val status: AsrModelStatus = AsrModelStatus.Absent,
+) {
+    val model: AsrModelInfo get() = settings.model
+}
+
+/**
  * 设置页的状态。
  *
  * 这里**只装载当前内核已经会读的设置项**。一个没人读的开关，用户拨它只会得到
@@ -87,6 +106,15 @@ class SettingsViewModel(
     private val probe: TranslationProbe,
     private val storage: StorageAccess,
     private val dispatchers: DispatcherProvider,
+    /**
+     * 语音识别的两条依赖。
+     *
+     * 入口页那一行要显示「用哪条模型、下了没有」，所以这里需要设置存储和文件定位器。
+     * **不需要** [com.multisuperplayer.core.asr.AsrModelInstaller]：下载只发生在
+     * 「语音识别」子页里（`AsrSettingsViewModel`），入口页不碰网络。
+     */
+    private val asrSettingsRepository: AsrSettingsRepository,
+    private val asrModelLocator: AsrModelLocator,
     /**
      * 构建信息。设置入口页的「关于」那一行要显示版本号。
      *
@@ -429,6 +457,44 @@ class SettingsViewModel(
             }
         }
     }
+
+    // ------------------------------------------------------------------ 语音识别
+
+    private val asrEntryState = MutableStateFlow(AsrEntryState())
+
+    /** 入口页「语音识别」那一行要的两个数。见 [AsrEntryState]。 */
+    val asrEntry: StateFlow<AsrEntryState> = asrEntryState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            asrSettingsRepository.settings.collect { settings ->
+                // 设置一变就重读一次磁盘。两件事（用的哪条 / 那条在不在）分开更新，
+                // 会在入口页上拼出一条自相矛盾的摘要（新模型名 + 旧模型的状态）。
+                asrEntryState.value = AsrEntryState(settings, readAsrStatus(settings.model))
+            }
+        }
+    }
+
+    /**
+     * 重新读一次模型在磁盘上的状态。
+     *
+     * 与 [refreshFileAccess] 同一个理由，只是更弱一点：模型也**可能是在播放页的字幕面板里**
+     * 下完的，那条流程完全发生在这个 ViewModel 之外，没有任何回调会通知这里。
+     * 界面在外层 `ON_RESUME` 时调一次。
+     */
+    fun refreshAsrStatus() {
+        viewModelScope.launch {
+            asrEntryState.update { it.copy(status = readAsrStatus(it.settings.model)) }
+        }
+    }
+
+    /**
+     * 只 stat 文件长度，不校验哈希（见 `AsrModelLocator.statusOf`）。
+     * 那也是几次系统调用，所以走 IO 线程——入口页是应用冷启动后第一屏，
+     * 在主线程上 stat 一个 190 MB 的目录是要还的。
+     */
+    private suspend fun readAsrStatus(model: AsrModelInfo): AsrModelStatus =
+        withContext(dispatchers.io) { asrModelLocator.statusOf(model) }
 
     /**
      * 写盘失败不能只吞掉——那会表现为「点了没反应」，而且**下次启动又变回去**，

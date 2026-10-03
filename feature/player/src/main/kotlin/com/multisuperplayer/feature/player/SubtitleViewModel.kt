@@ -3,7 +3,14 @@ package com.multisuperplayer.feature.player
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.asr.AsrModelCatalog
+import com.multisuperplayer.core.asr.AsrModelInstaller
+import com.multisuperplayer.core.asr.AsrModelLocator
+import com.multisuperplayer.core.asr.describeAsrFailure
+import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.settings.AsrSettings
+import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
 import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
@@ -12,6 +19,7 @@ import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleStyle
 import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.subtitle.AsrSubtitleGenerator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleLoadResult
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
@@ -39,7 +47,9 @@ import com.multisuperplayer.core.translate.exportFileName
 import com.multisuperplayer.core.translate.translatableIndices
 import com.multisuperplayer.core.translate.translatedCount
 import com.multisuperplayer.core.translate.translationMediaKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,10 +57,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -87,6 +99,13 @@ class SubtitleViewModel(
     translationCache: TranslationCacheStore,
     translationEdits: TranslationEditsStore,
     private val exportWriter: SubtitleExportWriter,
+    /** 语音识别的偏好（用哪条模型、从哪个源下载）。 */
+    private val asrSettings: AsrSettingsRepository,
+    /** 模型装好了没有。按钮文案（「生成字幕」/「下载模型并生成」）与「先下再识别」都要它。 */
+    private val asrModels: AsrModelLocator,
+    private val asrInstaller: AsrModelInstaller,
+    /** 识别 → 序列化 → 落盘，见 core:data 的 `AsrSubtitleGenerator`。 */
+    private val subtitleGenerator: AsrSubtitleGenerator,
 ) : ViewModel() {
 
     /**
@@ -134,6 +153,28 @@ class SubtitleViewModel(
      * 否则「重扫之后界面还是旧的」——两条更新路径会各自写一次状态，谁后写谁赢。
      */
     private val revision = MutableStateFlow(0)
+
+    /**
+     * 生成字幕（语音识别）的状态。
+     *
+     * 独立于 [state] 那条管线：识别进度每 250 ms 报一次，混进 [SubtitleUiState]
+     * 会让整条合成管线（含字幕文档）每 250 ms 重算一遍，而界面每 250 ms 重建一次
+     * 上千行的候选列表。
+     */
+    private val _asrState = MutableStateFlow<AsrUiState>(
+        // 设置还没读到时先按默认模型显示「未安装」。这个初值只活到第一次读到设置，
+        // 而按钮按下去时的实际判断在 generateSubtitles 里重做一遍，不依赖它。
+        AsrUiState.Idle(model = AsrModelCatalog.byId(null), installed = false),
+    )
+
+    /** 生成字幕的状态，供选择面板显示进度 / 失败。 */
+    val asrState: StateFlow<AsrUiState> = _asrState.asStateFlow()
+
+    /** 正在跑的那一次生成。取消它 = 用户按了「停止」。 */
+    private var generationJob: Job? = null
+
+    /** 最近一次读到的 ASR 设置。取消之后要把状态放回 Idle，需要它。 */
+    private var lastAsrSettings: AsrSettings? = null
 
     /**
      * 字幕时间轴微调（毫秒，正数 = 字幕晚出现）。
@@ -247,6 +288,23 @@ class SubtitleViewModel(
                 )
             }
         }
+
+        // 用哪条模型、装好了没有：面板上按钮的文案要它。跑着的时候不覆盖状态，
+        // 否则会把进度抹成「未安装」。
+        viewModelScope.launch {
+            asrSettings.settings.collect { settings ->
+                lastAsrSettings = settings
+                if (_asrState.value is AsrUiState.Idle) {
+                    _asrState.value = idleAsrState()
+                }
+            }
+        }
+    }
+
+    /** 「没在跑」的状态。模型没装时界面据此把按钮换成「下载模型并生成（体积）」。 */
+    private fun idleAsrState(): AsrUiState.Idle {
+        val model = lastAsrSettings?.model ?: AsrModelCatalog.byId(null)
+        return AsrUiState.Idle(model = model, installed = asrModels.isReady(model))
     }
 
     /** 播放页在「当前条目」变化时调用。条目为 null 表示队列空了。 */
@@ -303,6 +361,78 @@ class SubtitleViewModel(
     /** 重新扫目录（用户刚把字幕文件拷进来、或者上次查询失败）。 */
     fun rescan() {
         revision.value += 1
+    }
+
+    // ------------------------------------------------------- 生成字幕（语音识别）
+
+    /**
+     * 生成字幕：模型没下好就先下，然后识别、落盘。
+     *
+     * ## 为什么下载也在这里做
+     *
+     * 面板上就一个按钮。要用户先去设置页把模型下好再回来，等于告诉他「这个功能现在
+     * 不能用，但你不知道该去哪」。代价是必须在按下之前把体积写清楚（按钮文案带模型
+     * 大小），否则就是在用户没同意的情况下用流量下几十上百 MB。
+     *
+     * ## 为什么生成完不直接切到新字幕
+     *
+     * 自动挑选会按排序规则决定（匹配分、来源优先级，见 `SubtitleSource`）：已经有
+     * 一份对得上的外挂字幕时，把一个刚生成的字幕顶上去就是把用户手里更好的东西换走。
+     * 这里只让重扫把新字幕带进候选列表，选不选是排序规则和用户的事。
+     */
+    fun generateSubtitles() {
+        // 识别要几分钟，连点两下就会跑两次（第二次还会把第一次的进度覆盖掉）。
+        if (generationJob?.isActive == true) return
+        val media = entry.value ?: return
+
+        generationJob = viewModelScope.launch {
+            // 进度回调可能在取消之后才被执行到（取消是在下载/解码循环里被发现的），
+            // 用这个作用域判一下，免得进度盖掉已经放回去的 Idle。
+            val scope = this
+            try {
+                val settings = lastAsrSettings
+                    ?: asrSettings.settings.first().also { lastAsrSettings = it }
+                val model = settings.model
+
+                if (!asrModels.isReady(model)) {
+                    _asrState.value = AsrUiState.Downloading(model)
+                    asrInstaller.install(model, settings.baseUrl) { progress ->
+                        if (scope.isActive) _asrState.value = AsrUiState.Downloading(model, progress)
+                    }
+                }
+
+                _asrState.value = AsrUiState.Transcribing()
+                val generated = subtitleGenerator.generate(media.uri, model) { progress ->
+                    if (scope.isActive) _asrState.value = AsrUiState.Transcribing(progress)
+                }
+                MspLog.i(TAG) { "生成字幕完成：${generated.cueCount} 条" }
+                // 重扫：新字幕随后会出现在候选列表里（不一定被自动挂上，理由见上）。
+                revision.value += 1
+                _asrState.value = idleAsrState()
+            } catch (cancelled: CancellationException) {
+                // 取消不是失败：翻成「识别失败」会让用户以为白等了，而其实是他自己停的。
+                throw cancelled
+            } catch (failure: Throwable) {
+                MspLog.w(TAG, failure) { "生成字幕失败" }
+                _asrState.value = AsrUiState.Failed(failure.describeAsrFailure())
+            }
+        }
+    }
+
+    /**
+     * 停止正在跑的那一次生成（下模型或识别）。
+     *
+     * 旧的字幕不会被动：中途停下只损失算力，不该让用户连原来那份也没了。
+     */
+    fun cancelGeneration() {
+        generationJob?.cancel()
+        generationJob = null
+        _asrState.value = idleAsrState()
+    }
+
+    /** 关掉失败提示（它不自动消失，用户可能正盯着进度条那条位置看）。 */
+    fun dismissAsrFailure() {
+        if (_asrState.value is AsrUiState.Failed) _asrState.value = idleAsrState()
     }
 
     /**
@@ -591,6 +721,9 @@ class SubtitleViewModel(
         const val SUBTITLE_OFFSET_LIMIT_MS = 10_000L
     }
 }
+
+/** 日志标签。生成字幕跑在设备上，只能靠日志确认「存下了没有」。 */
+private const val TAG = "SubtitleViewModel"
 
 /** 用户对「用哪条字幕」的选择。换条目时回到 [Auto]。 */
 internal sealed interface SubtitleSelection {

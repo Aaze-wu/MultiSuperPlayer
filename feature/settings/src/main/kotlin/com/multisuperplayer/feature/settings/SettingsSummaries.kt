@@ -1,5 +1,7 @@
 package com.multisuperplayer.feature.settings
 
+import com.multisuperplayer.core.asr.AsrModelInfo
+import com.multisuperplayer.core.asr.AsrModelStatus
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.log.LogSummary
@@ -138,6 +140,49 @@ internal object SettingsSummaries {
             model,
             MspText.Res(R.string.msp_settings_summary_translate_to, translation.target.label),
         )
+    }
+
+    /**
+     * 语音识别：`中文离线（小模型） · 已下载`。
+     *
+     * 没下过的时候把体积也接在后面（`中文离线（小模型） · 未下载 · 约 78.1 MB`）：
+     * 入口页这一行是用户决定要不要点进去看的**唯一**依据，而「这条要花 78 MB 还是 190 MB」
+     * 正是那个决定要看的东西。已经下了一部分时不接体积：那时那个数字已经在「42%」里了。
+     */
+    fun asr(model: AsrModelInfo, status: AsrModelStatus): MspText = join(
+        model.name,
+        asrStatus(model, status),
+        if (status == AsrModelStatus.Absent) model.sizeText() else null,
+    )
+
+    /**
+     * 一条模型的磁盘状态：`未下载` / `已下载 42%` / `已下载`。
+     *
+     * 三种说法必须分开，理由同 [fileAccess]：它们对应的下一步完全不同
+     * （下载 / 继续下载 / 已经可以直接用），合成一句「未就绪」等于让用户自己猜。
+     */
+    fun asrStatus(model: AsrModelInfo, status: AsrModelStatus): MspText = when (status) {
+        AsrModelStatus.Absent -> MspText.Res(R.string.msp_settings_summary_asr_absent)
+        is AsrModelStatus.Partial -> MspText.Res(
+            R.string.msp_settings_summary_asr_partial,
+            percentOf(status.presentBytes, model.totalBytes),
+        )
+        AsrModelStatus.Ready -> MspText.Res(R.string.msp_settings_summary_asr_ready)
+    }
+
+    /**
+     * 已下比例的整数百分比，向下取整。
+     *
+     * **向下**取：下到 99.6% 时说「100%」会让人以为已经能用了，而 `statusOf` 认的
+     * 是「每个文件的字节数都对得上」，差一个字节就还是 `Partial`——说 100% 就是错话。
+     *
+     * `totalBytes <= 0` 时返回 0 而不抛：体积来自代码里的常量表，但一条写错的条目
+     * 不该把设置页变成崩溃页（同一原则见 `Resource` 类文档里的取舍）。
+     */
+    private fun percentOf(presentBytes: Long, totalBytes: Long): Int {
+        if (totalBytes <= 0L) return 0
+        val percent = presentBytes.coerceAtLeast(0L) * 100 / totalBytes
+        return percent.toInt().coerceIn(0, 100)
     }
 
     /**

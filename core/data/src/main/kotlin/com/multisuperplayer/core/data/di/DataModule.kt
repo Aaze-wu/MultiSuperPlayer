@@ -1,5 +1,9 @@
 package com.multisuperplayer.core.data.di
 
+import com.multisuperplayer.core.asr.AsrModelDownloader
+import com.multisuperplayer.core.asr.AsrModelInstaller
+import com.multisuperplayer.core.asr.AsrModelLocator
+import com.multisuperplayer.core.asr.AsrTranscriber
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.browser.BrowserRepository
 import com.multisuperplayer.core.data.browser.StorageAccess
@@ -11,12 +15,15 @@ import com.multisuperplayer.core.data.library.SafTreeScanner
 import com.multisuperplayer.core.data.library.SafTreeStore
 import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.data.settings.ApiKeyStore
+import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.subtitle.AsrSubtitleGenerator
 import com.multisuperplayer.core.data.subtitle.FileSystemSubtitleLocator
+import com.multisuperplayer.core.data.subtitle.GeneratedSubtitleStore
 import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
@@ -107,6 +114,11 @@ val dataModule = module {
     // 导出译文用。走 SAF，不申请存储权限。
     single { SubtitleExportWriter(context = androidContext(), dispatchers = get()) }
 
+    // 应用自己生成的字幕（语音识别）存在这里，理由见类注释：
+    // 放在私有目录而不是片子旁边，因为对那个目录没有写权限。
+    // 它收 filesDir 而不是 Context，和 AsrModelLocator 一样——好在这层能单测。
+    single { GeneratedSubtitleStore(filesDir = androidContext().filesDir, dispatchers = get()) }
+
     // parserRegistry 来自 core:subtitle 的 subtitleModule，由 MspApplication 一并加载。
     single {
         SubtitleRepository(
@@ -115,7 +127,27 @@ val dataModule = module {
             safLocator = get(),
             fileSystemLocator = get(),
             parserRegistry = get(),
+            generatedStore = get(),
             dispatchers = get(),
         )
     }
+
+    // ----------------------------------------------------------- 语音识别（生成字幕）
+
+    single { AsrSettingsRepository(context = androidContext(), dispatchers = get()) }
+
+    // 模型文件的位置（filesDir/asr/<模型 id>/）。设置页要查「下了没有」，
+    // 所以 locator 单独注册而不藏在识别器里。
+    single { AsrModelLocator(AsrModelLocator.rootOf(androidContext().filesDir)) }
+
+    single { AsrModelDownloader(dispatchers = get()) }
+
+    single { AsrModelInstaller(locator = get(), downloader = get()) }
+
+    // 组装 PcmExtractor / 引擎工厂 / locator 的活留在 core:asr（构造函数是 internal 的），
+    // 这里只认生产入口。
+    single { AsrTranscriber.create(androidContext(), get()) }
+
+    // 识别 → 序列化 → 落盘，界面层只能经它生成字幕。
+    single { AsrSubtitleGenerator(transcriber = get(), store = get()) }
 }

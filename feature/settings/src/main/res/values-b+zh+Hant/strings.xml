@@ -9,6 +9,8 @@
     <string name="msp_settings_appearance">外觀</string>
     <string name="msp_settings_playback">播放</string>
     <string name="msp_settings_translation">字幕與翻譯</string>
+    <!-- 「語音辨識」與「字幕與翻譯」是兩條不同的路：一條是本機把語音轉成字幕，一條是把字幕換成另一種語言 -->
+    <string name="msp_settings_asr">語音辨識</string>
     <string name="msp_settings_file_access">檔案存取</string>
     <string name="msp_settings_about">關於</string>
 
@@ -27,6 +29,15 @@
     <string name="msp_settings_summary_model_unset">未填模型名</string>
     <string name="msp_settings_summary_translate_to">譯成%1$s</string>
     <string name="msp_settings_summary_translation_incomplete">還不能翻譯（缺：%1$s）</string>
+
+    <!--
+      ASR 的三種狀態，同樣**必須分開**：它們對應的下一步是「下載 / 繼續下載 / 已經能用」。
+      例：`離線中文（小模型） · 未下載 · 約 78 MB`、`離線中文（小模型） · 已下載 42%`。
+    -->
+    <string name="msp_settings_summary_asr_absent">未下載</string>
+    <!-- `%1$d` 是整數百分比，向下取整（99.6% 不能說成 100%，那時還差最後一個位元組） -->
+    <string name="msp_settings_summary_asr_partial">已下載 %1$d%%</string>
+    <string name="msp_settings_summary_asr_ready">已下載</string>
 
     <string name="msp_settings_summary_no_logs">還沒有任何日誌檔案</string>
     <!-- `%1$d` 是檔案數，`%2$s` 是總大小 -->
@@ -221,5 +232,40 @@
     <string name="msp_settings_subtitle_reset">恢復預設樣式</string>
     <string name="msp_settings_subtitle_reset_desc">字號、行距、描邊、底部距離一起恢復</string>
     <string name="msp_settings_subtitle_reset_already">目前就是預設樣式</string>
+
+    <!-- ===== 語音辨識（本機 ASR） ===== -->
+
+    <string name="msp_settings_section_asr_model">辨識模型</string>
+    <!-- 「不上傳」是這條功能的賣點，也是使用者第一個會懷疑的事，所以放在最前面 -->
+    <string name="msp_settings_asr_model_hint">辨識只在這台手機上跑，音訊不會上傳。片長多長，辨識大概就要多久。</string>
+
+    <string name="msp_settings_asr_download">下載模型</string>
+    <string name="msp_settings_asr_resume">繼續下載</string>
+    <string name="msp_settings_asr_stop">停止</string>
+    <string name="msp_settings_asr_downloading">正在下載模型…</string>
+    <!-- 例：`已下載 12.3 MB / 78.1 MB` -->
+    <string name="msp_settings_asr_download_bytes">已下載 %1$s / %2$s</string>
+    <!-- 例：`離線中文（小模型） 已就緒。` -->
+    <string name="msp_settings_asr_install_done">%1$s 已就緒。</string>
+
+    <!-- 已就緒時替掉「下載」按鈕的那句話：它把下一步寫出來，而不是只說「已下載」 -->
+    <string name="msp_settings_asr_ready_hint">已經就緒。在播放頁打開字幕面板，點「產生字幕」就能用它。</string>
+
+    <!-- 例：`刪除模型（釋放 189.9 MB）`。體積是**實際佔用**：下了一半時不能說總體積 -->
+    <string name="msp_settings_asr_remove">刪除模型（釋放 %1$s）</string>
+    <string name="msp_settings_asr_remove_confirm_title">刪除這個模型？</string>
+    <!-- `%1$s` 是模型名，`%2$s` 是體積。「已經產生的字幕不受影響」必須說出來：那是刪之前最讓人猶豫的一點 -->
+    <string name="msp_settings_asr_remove_confirm_body">%1$s 要重新下載（%2$s）才能再用。已經產生的字幕不受影響。</string>
+    <string name="msp_settings_asr_remove_done">已刪除 %1$s。</string>
+    <!-- 真的沒檔案可刪時的話：不說成「已刪除」，那句是假話 -->
+    <string name="msp_settings_asr_remove_missing">這條模型的檔案已經不在手機上了。</string>
+
+    <string name="msp_settings_section_asr_source">下載來源</string>
+    <string name="msp_settings_asr_source">模型下載位址</string>
+    <string name="msp_settings_asr_source_support">預設走國內鏡像 hf-mirror.com。填 https://huggingface.co 則是官方來源（國內常常慢到像卡住）。</string>
+    <!-- 輸入框下的提示，只有一個要求：少寫協議頭是這一欄唯一常見的錯法 -->
+    <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 開頭。</string>
+
+    <string name="msp_settings_asr_dismiss">知道了</string>
 
 </resources>

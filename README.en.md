@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.5.7**
+- Current version: **0.6.0**
 - License: [GPL-3.0](LICENSE)
 
 中文文档：[README.md](README.md)
@@ -259,7 +259,45 @@ on the SD card all find their `.srt` / `.ass` / `.lrc` counterparts. This needs 
 permission: **when the directory cannot be read the app says "cannot read this folder", never "this
 folder has no subtitles"** — the two need opposite fixes (grant a permission vs. rename a file).
 
-### 1.8 Roadmap
+### 1.8 On-device offline speech recognition (advanced goal)
+
+No network, no upload: the audio track is turned into subtitles using the phone's own compute, and the
+resulting file goes straight into the subtitle sheet, **already selected**.
+
+- **Two models to choose from**: Chinese offline (Paraformer small, about 78.1 MB) and bilingual streaming
+  (Zipformer, about 190 MB). Size and intended use are part of each option, and **only the selected model
+  is downloaded** — the other one is not fetched "while we are at it".
+- **Download source is editable**: the default is the Chinese mirror `hf-mirror.com`; entering
+  `https://huggingface.co` switches to the official source, and **clearing the field goes back to the
+  default**. A wrong-looking address is flagged and explained, but never blocks the *Download* button —
+  only the network stack knows whether a mirror is alive, and a format check cannot tell.
+- **Per-file sha256 verification**: a mismatch is treated as "verification failed" and the partially
+  downloaded file is deleted, so there is never a half-finished model that "looks downloaded but cannot
+  be loaded".
+- **Models can be deleted on their own**: deleting clears just that model's files and
+  **never touches subtitles you already generated** (that is what the confirmation says, and it was
+  verified on a real device); the VAD segmentation model is a **shared resource** and stays.
+- **Recognition never goes online**: audio does not leave the device.
+- **Four different failures, four different messages**: "this file has no usable audio track" /
+  "no speech detected" / "subtitles were recognized but could not be saved" / "decoding failed". Their
+  next steps are completely different (pick another file / pick audio with someone talking / free up
+  space / use another file), so collapsing them into one "recognition failed" would explain nothing.
+- **Decode and recognize in one pass, no intermediate file**: an intermediate wav for a 33-second clip is
+  already a few MB, and for a full-length video it reaches GB territory. The whole run shares **one**
+  engine instance (building one takes seconds, so rebuilding it per segment costs more than the
+  recognition itself). Progress is reported as **samples processed**, so the bar shows "processed / total"
+  instead of spinning forever.
+- **Where the output lives, and what it is called**: the file lands in the app-private directory
+  `files/generated_subtitles/<hash of the media uri>.srt`, and shows up in the sheet as `<title>.asr.srt`,
+  tagged "On-device · SubRip" and **auto-selected** — making the user hunt for it in a list afterwards
+  would be as good as never saying "it is done". The trade-offs behind a private directory (writing next
+  to the video is more portable, but library entries are read-only) and behind hashing instead of using
+  the title (titles contain `/`, `:`, spaces, and can collide) are documented in the KDoc of
+  `GeneratedSubtitleStore`.
+- **Nothing is overwritten**: the result is a new file; existing sidecar subtitles and embedded tracks are
+  left exactly as they were.
+
+### 1.9 Roadmap
 
 | Version | Content | Status |
 | --- | --- | --- |
@@ -282,8 +320,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.16** | **Subtitle style: presets for text size / line spacing / outline / bottom margin, edited from either the player or the settings page (one shared setting, applied immediately), with a one-tap reset (the default presets match v0.5.15's rendering parameters exactly)** | Done |
 | **v0.5.17** | **Embedded subtitles are no longer drawn twice (the `SubtitleView` inside `PlayerView` is hidden), which also makes display mode *Hidden* actually hide; the subtitle panel now tells "no external subtitle attached" apart from "embedded tracks exist but no line has been read yet"; the automatic embedded-track pick now logs why it did or did not act** | Done |
 | **v0.5.18** | **Sleep timer (5 min – 1 h 30 m / *until the end of this item*, with a live countdown and a way to cancel it); picture-in-picture (auto-enters on HOME, or manually from the player page, with a play/pause action in the small window); playback queue panel (tap a row to jump, remove one item, drag the handle to reorder, clear the whole queue), with the queue order kept strictly in sync with the underlying playlist** | Done |
-| **v0.5.19** | **Sleep timer gains a "Custom…" duration (hours / minutes fields, 1 minute to 24 hours; *Set* stays disabled for invalid or out-of-range input, and an empty form is not treated as an error; a custom duration shows up on the player chip just like a preset, e.g. "3 h 20 m")** | **Current** |
-| v0.6 | On-device ASR subtitle generation | Planned |
+| **v0.5.19** | **Sleep timer gains a "Custom…" duration (hours / minutes fields, 1 minute to 24 hours; *Set* stays disabled for invalid or out-of-range input, and an empty form is not treated as an error; a custom duration shows up on the player chip just like a preset, e.g. "3 h 20 m")** | Done |
+| **v0.6** | **On-device offline ASR subtitle generation: two models (Paraformer ~78.1 MB / Zipformer ~189.8 MB), incremental download with per-file sha256 verification, deleting a model leaves generated subtitles alone, editable download source (empty = mirror), generated subtitles stored in a private directory and attached and selected automatically** | **Current** |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
 ---
@@ -379,7 +417,7 @@ The version lives in `appVersionName` at the top of `app/build.gradle.kts`; `ver
 are both derived from it:
 
 ```text
-versionCode = major * 10000 + minor * 100 + patch      // 0.5.7 -> 507
+versionCode = major * 10000 + minor * 100 + patch      // 0.6.0 -> 600
 ```
 
 Do not write a second copy of the number in `defaultConfig`. That was how it used to work, and the result
@@ -413,6 +451,7 @@ core/
   data/                  Data sources (MediaStore scanning, SAF, settings persistence)
   subtitle/              Subtitle/lyrics parsing engine (pure logic, unit-testable)
   translate/             Subtitle translation (provider presets, batching/cache/glossary, export)
+  asr/                   On-device speech recognition (sherpa-onnx: VAD segmentation + offline Paraformer/Zipformer)
   ui/                    Design system and theming (dynamic color, presets, custom accents)
   player/                Media3 playback wrapper and playback service
 feature/
@@ -438,6 +477,7 @@ graph TD
     ct[":core:translate"]
     cp[":core:player"]
     cd[":core:data"]
+    ca[:":core:asr"]
 
     app --> fl
     app --> fp
@@ -448,6 +488,7 @@ graph TD
     app --> cd
     app --> cp
     app --> cs
+    app --> ca
 
     fl --> cc
     fl --> cm
@@ -465,6 +506,7 @@ graph TD
     fs --> cm
     fs --> cu
     fs --> cd
+    fs --> ca
 
     cu --> cc
     cu --> cm
@@ -483,6 +525,7 @@ graph TD
     cd --> cs
     cd --> ct
     cd --> cp
+    cd --> ca
 ```
 
 Rules that must not be broken:
@@ -492,7 +535,7 @@ Rules that must not be broken:
    "Known limitations" below.
 2. **`feature:*` modules never depend on each other**, and never on `:app` (`:app` depends on them).
    Anything shared across feature domains belongs in `core:*` or travels by navigation.
-3. **Only `:app` is a `com.android.application`**; the other ten modules are `com.android.library`.
+3. **Only `:app` is a `com.android.application`**; the other eleven modules are `com.android.library`.
 4. **`android.nonTransitiveRClass=true`**: modules **cannot reference each other's `R` classes.**
    If two modules need the same sentence, each keeps its own copy (for example `core:common`'s
    `msp_wrapped_in_parens` and `feature:player`'s `msp_player_wrapped_in_parens` are the same sentence).
@@ -554,6 +597,10 @@ These are deliberate for this release, not oversights:
    (measured uncompressed: 7.5 MB for arm64-v8a, 11.1 MB for x86_64). The cost is that 32-bit devices
    **cannot install it** — the installer refuses outright, rather than installing something that doesn't
    work. Supporting them properly means ABI splits or an AAB.
+   The speech recognition engine's native libraries (`core/asr/src/main/jniLibs/`) **keep only these two
+   ABIs as well**: the other two (about 57 MB) can never reach the APK, so there is no reason to carry
+   them in the repository. To support 32-bit devices, extract them from `sherpa-onnx-1.13.8.aar`
+   (`jni/<abi>/`) and put them back — directory and file names must match upstream, JNI loads by name.
 4. **`core:subtitle` parse warnings are still Chinese.** The warning type is `List<String>`, tied to the
    **dependency-free `core:model`**. The right fix is to move `MspText` into `core:model` (which is itself
    dependency-free, so it fits that module's role) and make the warnings `List<MspText>`. Deferred.
@@ -598,6 +645,19 @@ These are deliberate for this release, not oversights:
     looks like "this file has no embedded subtitles"). Supporting it for real means giving bitmap tracks a
     rendering path of their own, at the cost of two subtitle layers having to agree on "who drew text at
     which instant". Left for a later version.
+13. **The on-device speech recognition models are not bundled into the APK; the user downloads them.**
+    The two models are about 78.1 MB and 189.8 MB, and putting 78 MB into the installer would make
+    everyone who does not want this feature wait through an extra download, so the flow is "pick a model,
+    then download it". The cost is that the first run needs a download first (measured: 78.1 MB from the
+    mirror in about a minute), and **without a network the model cannot be installed** (recognition
+    itself needs no network). Recognition runs on the CPU, so speed depends on the phone (about 8 seconds
+    for a 33-second clip on an x86_64 emulator) and scales with length; the result is computed **in one
+    go** — there is no "stream the first half while playback continues" mode.
+14. **Recognition quality is entirely a property of the source audio.** Pure music, heavy background
+    noise, several people talking over each other and strong dialects can come out empty or misspelled,
+    and **none of that is corrected automatically** — the sheet cannot even show "this line had low
+    confidence", because the result is just an ordinary SRT. Improving it means running recognition
+    again, switching models, or overriding it with an external subtitle.
 
 ---
 

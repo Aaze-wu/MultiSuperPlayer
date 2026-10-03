@@ -141,6 +141,9 @@ fun PlayerRoute(
     val subtitleViewModel: SubtitleViewModel = koinViewModel()
     val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
     val translationState by subtitleViewModel.translationState.collectAsStateWithLifecycle()
+    // 识别进度只在面板开着的时候需要，但面板本身也是这个界面的一部分，
+    // 而 StateFlow 的订阅生命周期由 collectAsStateWithLifecycle 管，不必再分层。
+    val asrState by subtitleViewModel.asrState.collectAsStateWithLifecycle()
     val exportMessage by subtitleViewModel.exportMessage.collectAsStateWithLifecycle()
     var showSubtitleSheet by remember { mutableStateOf(false) }
 
@@ -498,6 +501,7 @@ fun PlayerRoute(
         SubtitleTrackPicker(
             state = subtitleState,
             translation = translationState,
+            asr = asrState,
             exportMessage = exportMessage,
             onDismiss = { showSubtitleSheet = false },
             onSelectMode = subtitleViewModel::setDisplayMode,
@@ -513,6 +517,9 @@ fun PlayerRoute(
             onUseAuto = subtitleViewModel::useAutoSelection,
             onRescan = subtitleViewModel::rescan,
             onPickFile = { manualSubtitleLauncher.launch(arrayOf("*/*")) },
+            onGenerateSubtitles = subtitleViewModel::generateSubtitles,
+            onCancelGeneration = subtitleViewModel::cancelGeneration,
+            onDismissAsrFailure = subtitleViewModel::dismissAsrFailure,
             onTranslateAll = subtitleViewModel::translateAll,
             onTranslateUpTo = { subtitleViewModel.translateUpTo(positionMs) },
             onCancelTranslation = subtitleViewModel::cancelTranslation,

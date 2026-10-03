@@ -21,17 +21,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 
 /**
@@ -279,5 +287,57 @@ internal fun <T> ChoiceDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.msp_settings_cancel)) }
         },
+    )
+}
+
+// ------------------------------------------------------------- 输入框
+
+/**
+ * 跟着存储走、但用户一开始输入就交给他的输入框。
+ *
+ * `draft == null` 表示「用户还没动过这一栏」，此时显示存储里的值：
+ * 设置是异步读盘的，第一帧拿到的往往是空串，所以初值必须能**晚到**；
+ * 而一旦绑死到存储上，每敲一个字符都会写盘、回流、把光标和刚敲的字符冲掉
+ * （DataStore 的写是异步的，回流顺序没有保证）。
+ *
+ * [key] 变了就丢掉草稿：那时存储里的值本来就是另一份（换服务商、换模型）。
+ * 只有一份存储值时传常量，不传 `null`——见 `AsrSettingsScreen.SOURCE_FIELD_KEY`。
+ *
+ * [enabled] 为 false 时连输入都不收：用于「有一个长任务正在跑，改这一栏会让用户
+ * 以为改动已经作用到那次运行上了」的场合（下载中的下载源、下载中的模型列表）。
+ * 这种时候正确的动作是停止，所以整栏禁用比允许编辑、再悄悄忽略更清楚。
+ */
+@Composable
+internal fun DraftTextField(
+    key: Any?,
+    stored: String,
+    onCommit: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    supportingText: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    trailing: (@Composable () -> Unit)? = null,
+    isError: Boolean = false,
+    enabled: Boolean = true,
+) {
+    var draft by remember(key) { mutableStateOf<String?>(null) }
+
+    OutlinedTextField(
+        value = draft ?: stored,
+        onValueChange = {
+            draft = it
+            onCommit(it)
+        },
+        label = { Text(label) },
+        placeholder = { Text(placeholder) },
+        supportingText = supportingText?.let { { Text(it) } },
+        isError = isError,
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+        trailingIcon = trailing,
+        singleLine = true,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     )
 }

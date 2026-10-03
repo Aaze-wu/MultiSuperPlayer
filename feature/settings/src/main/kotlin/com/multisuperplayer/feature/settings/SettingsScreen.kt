@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -34,9 +35,9 @@ import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 设置**入口页**：五行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
+ * 设置**入口页**：六行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
- * 为什么把它拆成入口页 + 四个子页，而不是继续把设置项铺在一页里：
+ * 为什么把它拆成入口页 + 五个子页，而不是继续把设置项铺在一页里：
  *
  * 1. 一页铺开的表在设置项变多之后必然要滚两三屏，而用户每次进来只为一件事。
  *    找「长按倍速」要先滚过所有主题选项，这个成本会随每一项新增而增长。
@@ -46,7 +47,7 @@ import org.koin.androidx.compose.koinViewModel
  * 3. 「关于」这类信息页和「调什么」的设置页混在一起，是后面加「检查更新」、
  *    开源许可、导出日志时最别扭的地方。分开之后它们各有各的地方。
  *
- * 这个页面因此**不需要**任何写入回调，只读摘要 + 四条导航。
+ * 这个页面因此**不需要**任何写入回调，只读摘要 + 五条导航。
  */
 @Composable
 fun SettingsRoute(
@@ -54,6 +55,7 @@ fun SettingsRoute(
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
+    onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
@@ -61,15 +63,20 @@ fun SettingsRoute(
     val translation by viewModel.translation.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
     val fileAccessGranted by viewModel.fileAccessGranted.collectAsStateWithLifecycle()
+    val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 「所有文件访问」是系统设置项，**没有回调**：用户去系统设置里开完再回到这里，
-    // 除了重新问一次没有别的办法知道。所以订阅 `ON_RESUME`，而不是只读一次构造值——
-    // 那样用户会看到「我明明开了，这里还写着未开启」。
+    // 两件事都是「发生在这一页之外、没有任何回调」的变化：
+    // 一是「所有文件访问」这个系统设置项；二是 ASR 模型——用户可能刚在播放页的
+    // 字幕面板里把它下完。所以订阅 `ON_RESUME` 重新问一次，而不是只读一次构造值——
+    // 那样用户会看到「我明明开了 / 明明下完了，这里还写着没有」。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshFileAccess()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshFileAccess()
+                viewModel.refreshAsrStatus()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -80,6 +87,7 @@ fun SettingsRoute(
         buildInfo = viewModel.buildInfo,
         playback = playback,
         translation = translation,
+        asrEntry = asrEntry,
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
         fileAccessSupported = viewModel.fileAccessSupported,
         fileAccessGranted = fileAccessGranted,
@@ -87,6 +95,7 @@ fun SettingsRoute(
         onOpenAppearance = onOpenAppearance,
         onOpenPlayback = onOpenPlayback,
         onOpenTranslationSettings = onOpenTranslationSettings,
+        onOpenAsrSettings = onOpenAsrSettings,
         onOpenAbout = onOpenAbout,
         // 「系统没有这一项」的情况由 `fileAccessSupported` 在下面挡住
         // （`SettingActionRow.enabled`），所以这里**不**再包一层「能不能跳」的判断：
@@ -108,12 +117,14 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     playback: PlaybackSettings = PlaybackSettings(),
     translation: TranslationSettings = TranslationSettings(),
+    asrEntry: AsrEntryState = AsrEntryState(),
     softwareDecodingAvailable: Boolean = true,
     fileAccessSupported: Boolean = true,
     fileAccessGranted: Boolean = false,
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
+    onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenFileAccess: () -> Unit = {},
 ) {
@@ -129,8 +140,8 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            // 四行平铺，不加小节标题：「设置」标题下紧跟一个「设置」小节是废话，
-            // 而四个分类各自就是一个小节名，再加一层分组只是多两行留白。
+            // 六行平铺，不加小节标题：「设置」标题下紧跟一个「设置」小节是废话，
+            // 而这几个分类各自就是一个小节名，再加一层分组只是多两行留白。
             item {
                 SettingActionRow(
                     icon = Icons.Outlined.Palette,
@@ -156,6 +167,17 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_translation),
                     subtitle = SettingsSummaries.translation(translation).string(),
                     onClick = onOpenTranslationSettings,
+                )
+            }
+            item {
+                SettingActionRow(
+                    icon = Icons.Outlined.RecordVoiceOver,
+                    // 排在「字幕与翻译」后面：它是另一条**产出字幕**的路（本机识别），
+                    // 与上面那条「把字幕翻成另一种语言」是两件事，但用户找它们时
+                    // 脑子里是同一句话（「我要给这部片子配字幕」），所以挨着。
+                    title = stringResource(R.string.msp_settings_asr),
+                    subtitle = SettingsSummaries.asr(asrEntry.model, asrEntry.status).string(),
+                    onClick = onOpenAsrSettings,
                 )
             }
             item {

@@ -47,6 +47,7 @@ import com.multisuperplayer.feature.library.RecentRoute
 import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
+import com.multisuperplayer.feature.settings.AsrSettingsRoute
 import com.multisuperplayer.feature.settings.PlaybackSettingsRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
@@ -145,6 +146,9 @@ private const val TRANSLATION_SETTINGS_ROUTE = "settings/translation"
  */
 private const val APPEARANCE_SETTINGS_ROUTE = "settings/appearance"
 private const val PLAYBACK_SETTINGS_ROUTE = "settings/playback"
+// 模型管理要能离开页面继续下载（见 `AsrSettingsViewModel`），所以它是独立目的地；
+// 下载任务活在它自己的 `viewModelScope` 里，返回设置页不会把下载掐掉。
+private const val ASR_SETTINGS_ROUTE = "settings/asr"
 private const val ABOUT_ROUTE = "settings/about"
 
 @Composable
@@ -324,11 +328,15 @@ private fun MspAppScaffold() {
                     onOpenAppearance = { navController.navigate(APPEARANCE_SETTINGS_ROUTE) },
                     onOpenPlayback = { navController.navigate(PLAYBACK_SETTINGS_ROUTE) },
                     onOpenTranslationSettings = { navController.navigate(TRANSLATION_SETTINGS_ROUTE) },
+                    onOpenAsrSettings = { navController.navigate(ASR_SETTINGS_ROUTE) },
                     onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
                 )
             }
             composable(TRANSLATION_SETTINGS_ROUTE) {
                 TranslationSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(ASR_SETTINGS_ROUTE) {
+                AsrSettingsRoute(onBack = { navController.popBackStack() })
             }
             composable(APPEARANCE_SETTINGS_ROUTE) {
                 AppearanceSettingsRoute(onBack = { navController.popBackStack() })

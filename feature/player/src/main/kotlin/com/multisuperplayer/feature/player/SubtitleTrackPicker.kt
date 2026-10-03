@@ -55,6 +55,7 @@ import com.multisuperplayer.core.ui.text.string
 internal fun SubtitleTrackPicker(
     state: SubtitleUiState,
     translation: TranslationUiState,
+    asr: AsrUiState,
     exportMessage: MspText?,
     onDismiss: () -> Unit,
     onSelectMode: (SubtitleDisplayMode) -> Unit,
@@ -70,6 +71,9 @@ internal fun SubtitleTrackPicker(
     onUseAuto: () -> Unit,
     onRescan: () -> Unit,
     onPickFile: () -> Unit,
+    onGenerateSubtitles: () -> Unit,
+    onCancelGeneration: () -> Unit,
+    onDismissAsrFailure: () -> Unit,
     onTranslateAll: () -> Unit,
     onTranslateUpTo: () -> Unit,
     onCancelTranslation: () -> Unit,
@@ -120,6 +124,16 @@ internal fun SubtitleTrackPicker(
                     Text(stringResource(R.string.msp_player_pick_file))
                 }
             }
+
+            // 「生成字幕」放在这里：它和上面两个按钮是同一件事的第三种找法
+            // （自己识别出一份）。下面 [SubtitleSyncSection] 起都是「已经有一条字幕了」
+            // 才能调的东西，而这一块恰恰是「一条都没有」时唯一有用的。
+            AsrSection(
+                asr = asr,
+                onGenerate = onGenerateSubtitles,
+                onCancel = onCancelGeneration,
+                onDismissFailure = onDismissAsrFailure,
+            )
 
             SubtitleSyncSection(
                 state = state,

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  这个模块没有任何 Android 组件（无 Activity / Service / Provider），所以这里
+  只有空 manifest。
+
+  它存在的原因是 AGP 要求每个 library 模块都得有 `src/main/AndroidManifest.xml`
+  （即使是空的）—— 文件不在这里时构建不会报「缺 manifest」，而是会在合并阶段
+  给出一个指不到具体模块的含糊错误。
+-->
+<manifest />

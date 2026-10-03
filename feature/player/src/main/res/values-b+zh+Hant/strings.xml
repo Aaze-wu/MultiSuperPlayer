@@ -40,6 +40,8 @@
     <string name="msp_player_detail_forced">強制</string>
     <string name="msp_player_detail_default_track">預設</string>
     <string name="msp_player_detail_matches_title">與片名吻合</string>
+    <!-- 產生字幕的來源標記：候選行裡替掉「未標語言」那一格（見 describeDetails）。 -->
+    <string name="msp_player_detail_generated">本機辨識</string>
     <string name="msp_player_format_lrc">LRC 歌詞</string>
     <string name="msp_player_format_lrc_enhanced">增強型 LRC（逐字）</string>
 
@@ -86,6 +88,18 @@
     <string name="msp_player_show_raw">看服務商回傳的原文</string>
     <string name="msp_player_hide_raw">收起服務商回傳的原文</string>
     <string name="msp_player_export">匯出譯文…</string>
+
+    <!-- ===== 語音辨識（產生字幕） ===== -->
+    <string name="msp_player_asr_title">語音辨識</string>
+    <string name="msp_player_asr_hint">在這台裝置上把語音辨識成字幕，音訊不會上傳。辨識所需時間大致與片長相當。</string>
+    <string name="msp_player_asr_generate">產生字幕</string>
+    <string name="msp_player_asr_need_model">需要先下載辨識模型（%1$s），下載後就不需要網路了。</string>
+    <string name="msp_player_asr_download_generate">下載模型並產生（%1$s）</string>
+    <string name="msp_player_asr_downloading">正在下載模型…</string>
+    <string name="msp_player_asr_download_bytes">已下載 %1$s / %2$s</string>
+    <string name="msp_player_asr_recognizing">正在辨識…</string>
+    <string name="msp_player_asr_progress">已辨識 %1$d 句 · %2$s / %3$s</string>
+    <string name="msp_player_asr_progress_unknown">已辨識 %1$d 句</string>
 
     <!-- ===== 播放控制 ===== -->
     <string name="msp_player_decoder_ffmpeg">FFmpeg 軟體解碼</string>

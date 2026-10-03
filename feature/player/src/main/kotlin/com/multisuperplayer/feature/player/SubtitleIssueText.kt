@@ -5,6 +5,7 @@ import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.isAutoMatchable
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.SubtitleOrigin
 import com.multisuperplayer.core.player.MspTrackInfo
 
 
@@ -69,23 +70,38 @@ internal fun SubtitleIssue.describe(): MspText = when (this) {
  */
 internal val SUBTITLE_DETAIL_SEPARATOR: MspText = MspText.Res(R.string.msp_player_detail_sep)
 
-/** 候选行的副标题：格式、语言、以及「是不是和片名吻合」。 */
-internal fun SubtitleSource.describeDetails(): MspText = MspText.join(
-    SUBTITLE_DETAIL_SEPARATOR,
-    buildList {
-        add(format.label())
-        add(
-            languageTag?.let { MspText.Plain(it) }
-                ?: MspText.Res(R.string.msp_player_detail_language_unknown),
-        )
-        // 「双语」跟显示模式里那一条同名同义，直接复用，免得两处译法慢慢分叉。
-        if (isBilingual) add(MspText.Res(R.string.msp_player_mode_bilingual))
-        if (isForced) add(MspText.Res(R.string.msp_player_detail_forced))
-        // 不显示具体分数：数字对用户没有意义，但「会不会被自动选中」有。
-        // 门槛和关联规则绑在一起，见 `AUTO_MATCH_SCORE`。
-        if (isAutoMatchable) add(MspText.Res(R.string.msp_player_detail_matches_title))
-    },
-)
+/** 候选行的副标题：来源、格式、语言、以及「是不是和片名吻合」。 */
+internal fun SubtitleSource.describeDetails(): MspText {
+    // 生成的字幕有两个格子必须跳过，理由在下面两处注释里：
+    // 它们描述的是「外来文件怎么和片名对上」，而这条文件是我们自己刚写出来的。
+    val generated = origin == SubtitleOrigin.GENERATED_ASR
+
+    return MspText.join(
+        SUBTITLE_DETAIL_SEPARATOR,
+        buildList {
+            // 来源放在最前：它比格式更影响用户能拿它做什么（比如它可以被重新生成）。
+            if (generated) add(MspText.Res(R.string.msp_player_detail_generated))
+            add(format.label())
+            // 生成的字幕不带语言标签（识别时没有做语种判定）。显示「语言未知」
+            // 是在报一个我们自己没打算知道的字段——用户刚按下那个按钮，他知道这是什么语言。
+            if (!generated) {
+                add(
+                    languageTag?.let { MspText.Plain(it) }
+                        ?: MspText.Res(R.string.msp_player_detail_language_unknown),
+                )
+            }
+            // 「双语」跟显示模式里那一条同名同义，直接复用，免得两处译法慢慢分叉。
+            if (isBilingual) add(MspText.Res(R.string.msp_player_mode_bilingual))
+            if (isForced) add(MspText.Res(R.string.msp_player_detail_forced))
+            // 不显示具体分数：数字对用户没有意义，但「会不会被自动选中」有。
+            // 门槛和关联规则绑在一起，见 `AUTO_MATCH_SCORE`。
+            //
+            // 生成的字幕不报这一格：它的文件名本来就是根据片名拼的，
+            // 「与片名吻合」在这里是句废话。
+            if (isAutoMatchable && !generated) add(MspText.Res(R.string.msp_player_detail_matches_title))
+        },
+    )
+}
 
 /** 一句话概括当前挂着的字幕。 */
 internal fun SubtitleSource.describeAttached(): MspText = MspText.join(

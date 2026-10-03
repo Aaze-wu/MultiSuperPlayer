@@ -41,6 +41,7 @@ class SubtitleRepository(
     private val safLocator: SafSubtitleLocator,
     private val fileSystemLocator: FileSystemSubtitleLocator,
     private val parserRegistry: SubtitleParserRegistry,
+    private val generatedStore: GeneratedSubtitleStore,
     private val dispatchers: DispatcherProvider,
 ) {
 
@@ -56,12 +57,21 @@ class SubtitleRepository(
     }
 
     /**
-     * 找出这条媒体的外挂字幕候选，按关联度从高到低排序。
+     * 找出这条媒体的字幕候选，按关联度从高到低排序。
      *
      * 不抛异常：所有失败都翻译成 [SubtitleScan] 的具体分支，让调用方（以及界面）
      * 必须对每种情况给出不同的提示。
+     *
+     * 结果里会有两种东西：目录里找到的外挂文件，以及**应用自己生成的字幕**
+     * （见 [GeneratedSubtitleStore]，下面叫它「生成字幕」）。后者不依赖任何目录
+     * 权限，所以它能在下面每一档里都出现——包括「拿不到目录」那几档。
      */
     suspend fun scan(entry: MediaEntry): SubtitleScan = withContext(dispatchers.io) {
+        scanExternal(entry).withGenerated(generatedSourceOf(entry))
+    }
+
+    /** 只看目录里那一条来源。生成字幕由 [scan] 另外接上去。 */
+    private suspend fun scanExternal(entry: MediaEntry): SubtitleScan = withContext(dispatchers.io) {
         // displayName 才是磁盘上的真实文件名，用它做匹配；title 是给界面看的，
         // 可能已经被「去后缀」「未知标题兜底」改过。
         val mediaName = entry.displayName?.takeIf { it.isNotBlank() } ?: entry.title
@@ -120,6 +130,70 @@ class SubtitleRepository(
                 SubtitleScan.Found(sources)
             }
         }
+    }
+
+    /**
+     * 把生成字幕合进扫描结果。
+     *
+     * ## 为什么「拿不到目录」也要合
+     *
+     * 那几档原本回答的是「这个片子的文件夹里有没有外挂字幕」，而生成字幕**不在**
+     * 任何文件夹里（它在应用私有目录），也不会因为权限被挡住。要是不合，后果最重
+     * 的一类设备正好中招：Android 9 及以下拿不到 `relativePath`，媒体库条目就走
+     * 了 `NoDirectory`——而那恰好是最需要语音识别的场景（旁边什么都没有）。
+     * 所以宁可丢掉「目录读不到」这句提示，也不能让用户看着自己刚生成的字幕
+     * 却被告知「没有可用字幕」。
+     *
+     * 代价是那一档的提示看不到了。这一点是知道的：用户按「重新扫描」走的是同一个
+     * 函数，所以他也看不到——不去管它，因为「想找外挂字幕而找不到」这件事，
+     * 在用户已经有一条能用字幕时不再是当前要解决的问题。
+     */
+    private fun SubtitleScan.withGenerated(generated: SubtitleSource?): SubtitleScan {
+        if (generated == null) return this
+        return when (this) {
+            is SubtitleScan.Found -> SubtitleScan.Found((sources + generated).sortedForSelection())
+
+            SubtitleScan.NoDirectory,
+            SubtitleScan.DirectoryInvisible,
+            is SubtitleScan.Failed,
+            -> SubtitleScan.Found(listOf(generated))
+        }
+    }
+
+    /**
+     * 这条媒体自己没有生成字幕时的候选；没有就返回 null。
+     *
+     * ## 关联分定在自动挂载的门槛上
+     *
+     * [AUTO_MATCH_SCORE] 就是「可以不经用户确认就挂上」的最低分。生成字幕正好
+     * 属于这一档：分数再低就会变成「生成了却不会自动显示」，用户会认为功能坏了；
+     * 再高就会压过真正的外挂字幕（同分时 [sortedForSelection] 会把外挂文件排前面，
+     * 见那里的第 2 层）。
+     *
+     * ## 为什么语言是空的
+     *
+     * 文件名（也就是这片子的来源）里没有任何语言信息。填一个猜来的语言值，
+     * 以后「按语言挑字幕」这类功能会拿它当真——猜错的代价是挑了条用户看不懂的
+     * 字幕，而他现在明明看见字幕就在屏幕上。让它空着，界面会照常显示「语言未知」。
+     */
+    private fun generatedSourceOf(entry: MediaEntry): SubtitleSource? {
+        val generatedUri = generatedStore.uriFor(entry.uri)
+        if (!generatedStore.exists(generatedUri)) return null
+
+        return SubtitleSource(
+            uri = generatedUri,
+            // 磁盘上的名字是哈希（见 GeneratedSubtitleStore），但这个名字要出现在
+            // 解析失败提示和日志里，所以用能读的「片名.asr.srt」。
+            fileName = "${(entry.displayName ?: entry.title).substringBeforeLast('.')}.asr.${GeneratedSubtitleStore.EXTENSION}",
+            format = SubtitleFormat.SRT,
+            languageTag = null,
+            isForced = false,
+            isBilingual = false,
+            sizeBytes = generatedStore.sizeBytes(generatedUri),
+            matchScore = AUTO_MATCH_SCORE,
+            trailingTagCount = 0,
+            origin = SubtitleOrigin.GENERATED_ASR,
+        )
     }
 
     /**
@@ -193,7 +267,18 @@ class SubtitleRepository(
         )
     }
 
-    private fun readBytes(source: SubtitleSource): ByteArray {
+    private suspend fun readBytes(source: SubtitleSource): ByteArray {
+        // 生成字幕的 uri 是合成的（见 [GeneratedSubtitleStore.uriFor]），不是任何
+        // provider 的文档，交给 ContentResolver 开只会得到一个空流。它是存在应用
+        // 私有目录里的普通文件，直接读。
+        if (source.origin == SubtitleOrigin.GENERATED_ASR) {
+            val text = generatedStore.read(source.uri)
+                ?: throw SubtitleReadException(
+                    MspText.Res(R.string.msp_subtitle_reason_file_unreadable),
+                )
+            return text.toByteArray(Charsets.UTF_8)
+        }
+
         if (source.sizeBytes > MAX_SOURCE_BYTES) {
             throw SubtitleReadException(tooLargeText(source.sizeBytes))
         }
@@ -247,7 +332,10 @@ class SubtitleRepository(
         return SubtitleDocument(
             track = SubtitleTrack(
                 id = source.uri,
-                origin = SubtitleOrigin.EXTERNAL_FILE,
+                // 用来源自带的 origin，不写死：语音识别生成的文档要是被标成
+                // EXTERNAL_FILE，界面上就会把它说成「外挂文件」，
+                // 而且用户无从知道这份字幕是机器听出来的。
+                origin = source.origin,
                 format = parsed.format,
                 languageTag = source.languageTag,
                 label = source.fileName,

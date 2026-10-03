@@ -9,6 +9,8 @@
     <string name="msp_settings_appearance">Appearance</string>
     <string name="msp_settings_playback">Playback</string>
     <string name="msp_settings_translation">Subtitles &amp; translation</string>
+    <!-- Speech-to-text and subtitle translation are different paths: one turns speech into subtitles, the other turns subtitles into another language. -->
+    <string name="msp_settings_asr">Speech recognition</string>
     <string name="msp_settings_file_access">File access</string>
     <string name="msp_settings_about">About</string>
 
@@ -27,6 +29,15 @@
     <string name="msp_settings_summary_model_unset">Model not set</string>
     <string name="msp_settings_summary_translate_to">Translating to %1$s</string>
     <string name="msp_settings_summary_translation_incomplete">Not ready to translate (missing: %1$s)</string>
+
+    <!--
+      The three ASR states, kept separate for the same reason as file access: they mean
+      download / resume / ready to use. Example: `Offline Chinese (small) · Not downloaded · about 78 MB`.
+    -->
+    <string name="msp_settings_summary_asr_absent">Not downloaded</string>
+    <!-- `%1$d` is a whole percentage, rounded down (99.6% is not 100%: one byte is still missing). -->
+    <string name="msp_settings_summary_asr_partial">%1$d%% downloaded</string>
+    <string name="msp_settings_summary_asr_ready">Downloaded</string>
 
     <string name="msp_settings_summary_no_logs">No log files yet</string>
     <!-- `%1$d` files, `%2$s` total size -->
@@ -223,5 +234,40 @@
     <string name="msp_settings_subtitle_reset">Reset subtitle style</string>
     <string name="msp_settings_subtitle_reset_desc">Restores text size, line spacing, outline and bottom margin together</string>
     <string name="msp_settings_subtitle_reset_already">Already using the default style</string>
+
+    <!-- ===== Speech recognition (on-device ASR) ===== -->
+
+    <string name="msp_settings_section_asr_model">Recognition model</string>
+    <!-- Nothing is uploaded — that is both the selling point and the first thing users doubt, so it comes first. -->
+    <string name="msp_settings_asr_model_hint">Recognition runs entirely on this phone; your audio is never uploaded. Expect roughly as long as the video itself.</string>
+
+    <string name="msp_settings_asr_download">Download model</string>
+    <string name="msp_settings_asr_resume">Resume download</string>
+    <string name="msp_settings_asr_stop">Stop</string>
+    <string name="msp_settings_asr_downloading">Downloading model…</string>
+    <!-- Example: `12.3 MB / 78.1 MB downloaded` -->
+    <string name="msp_settings_asr_download_bytes">%1$s / %2$s downloaded</string>
+    <!-- Example: `Offline Chinese (small) is ready.` -->
+    <string name="msp_settings_asr_install_done">%1$s is ready.</string>
+
+    <!-- This replaces the download button once the model is ready, so it points at the next step. -->
+    <string name="msp_settings_asr_ready_hint">Ready. In the player, open the subtitle panel and tap Generate subtitles.</string>
+
+    <!-- Example: `Delete model (frees 189.9 MB)`. The size is what is actually on disk, not the full model. -->
+    <string name="msp_settings_asr_remove">Delete model (frees %1$s)</string>
+    <string name="msp_settings_asr_remove_confirm_title">Delete this model?</string>
+    <!-- `%1$s` is the model name, `%2$s` its size. The last sentence matters: it is the thing users worry about. -->
+    <string name="msp_settings_asr_remove_confirm_body">%1$s would have to be downloaded again (%2$s) to be used. Subtitles you already generated are not affected.</string>
+    <string name="msp_settings_asr_remove_done">Deleted %1$s.</string>
+    <!-- Used when there was nothing to delete: claiming `Deleted` would be a lie. -->
+    <string name="msp_settings_asr_remove_missing">The files for this model are no longer on this phone.</string>
+
+    <string name="msp_settings_section_asr_source">Download source</string>
+    <string name="msp_settings_asr_source">Model download URL</string>
+    <string name="msp_settings_asr_source_support">Defaults to the hf-mirror.com mirror. Enter https://huggingface.co for the official source; it is often so slow here that it looks stuck.</string>
+    <!-- The only common mistake in this field: leaving out the scheme. -->
+    <string name="msp_settings_asr_source_invalid">Must start with http:// or https://</string>
+
+    <string name="msp_settings_asr_dismiss">Got it</string>
 
 </resources>

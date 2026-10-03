@@ -1,5 +1,10 @@
 package com.multisuperplayer.feature.settings
 
+import com.multisuperplayer.core.asr.AsrEngine
+import com.multisuperplayer.core.asr.AsrFileRole
+import com.multisuperplayer.core.asr.AsrModelCatalog
+import com.multisuperplayer.core.asr.AsrModelInfo
+import com.multisuperplayer.core.asr.AsrModelStatus
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.log.LogSummary
 import com.multisuperplayer.core.common.text.MspText
@@ -298,6 +303,83 @@ class SettingsSummariesTest {
         assertText("本机系统版本不支持", SettingsSummaries.fileAccess(supported = false, granted = true))
     }
 
+    // ------------------------------------------------------------------ 语音识别
+
+    @Test
+    fun `语音识别 - 未下载时说未下载并把体积接出来`() {
+        val model = AsrModelCatalog.byId(AsrModelCatalog.PARA_FORMER_ID)
+
+        // 没下过的时候把体积也接在后面：入口页这一行是用户决定要不要点进去看的
+        // **唯一**依据，而「这条要花 78 MB 还是 190 MB」正是那个决定要看的东西。
+        assertText(
+            "中文离线（Paraformer 小模型） · 未下载 · 约 78.1 MB",
+            SettingsSummaries.asr(model, AsrModelStatus.Absent),
+        )
+    }
+
+    @Test
+    fun `语音识别 - 下了一半时给百分比而不是体积`() {
+        val model = AsrModelCatalog.byId(AsrModelCatalog.PARA_FORMER_ID)
+        // 权重下完了、token 表还没下：最普通的「下到一半」形状
+        val partial = AsrModelStatus.Partial(
+            presentBytes = model.file(AsrFileRole.MODEL).sizeBytes,
+            missing = listOf(model.file(AsrFileRole.TOKENS)),
+        )
+
+        // 已经下了一部分时不再接体积：那个数已经在「99%」里了，两个一起说会让人
+        // 以为还要再下 78 MB
+        assertText("中文离线（Paraformer 小模型） · 已下载 99%", SettingsSummaries.asr(model, partial))
+    }
+
+    @Test
+    fun `语音识别 - 百分比向下取整，差一个字节不说成 100%`() {
+        val model = AsrModelCatalog.byId(AsrModelCatalog.PARA_FORMER_ID)
+        // 权重下完了，tokens 表只差几 KB：99.9% 必须说 99。
+        // 「就绪」认的是每个文件字节数都对得上，说 100% 就是错话。
+        val partial = AsrModelStatus.Partial(
+            presentBytes = model.totalBytes - 1,
+            missing = listOf(model.file(AsrFileRole.TOKENS)),
+        )
+
+        assertText("中文离线（Paraformer 小模型） · 已下载 99%", SettingsSummaries.asr(model, partial))
+    }
+
+    @Test
+    fun `语音识别 - 已经就绪时只说已下载`() {
+        val model = AsrModelCatalog.byId(AsrModelCatalog.ZIPFORMER_ID)
+
+        assertText("中英双语流式（Zipformer） · 已下载", SettingsSummaries.asr(model, AsrModelStatus.Ready))
+    }
+
+    @Test
+    fun `语音识别 - 清单体积写错成 0 时不说 NaN 也不说 100%`() {
+        // 体积来自代码里的常量表。一条写错的条目不该把设置页变成崩溃页，
+        // 但也不能除出 NaN/Infinity 显示到屏幕上
+        val broken = AsrModelInfo(
+            id = "broken",
+            engine = AsrEngine.OFFLINE,
+            repo = "owner/repo",
+            name = MspText.Plain("坏条目"),
+            description = MspText.Plain(""),
+            languageTag = "zh-CN",
+            files = emptyList(),
+        )
+
+        assertText(
+            "坏条目 · 已下载 0%",
+            SettingsSummaries.asr(broken, AsrModelStatus.Partial(presentBytes = 1_024L, missing = emptyList())),
+        )
+    }
+
+    @Test
+    fun `语音识别 - 单个模型的状态也能单独要一句话`() {
+        val model = AsrModelCatalog.byId(AsrModelCatalog.PARA_FORMER_ID)
+
+        // `AsrModelStatus.occupiedBytesOf` 之外，列表里每条都要能拿到自己那句话
+        assertText("未下载", SettingsSummaries.asrStatus(model, AsrModelStatus.Absent))
+        assertText("已下载", SettingsSummaries.asrStatus(model, AsrModelStatus.Ready))
+    }
+
     // ------------------------------------------------------------------ 关于
 
     @Test
@@ -413,11 +495,15 @@ class SettingsSummariesTest {
             assertTrue("模板「$template」用了第 $index 个参数，但只给了 ${args.size} 个", index in 1..args.size)
             args[index - 1].toString()
         }
-        return BARE_ARG.replace(indexed) {
+        val filled = BARE_ARG.replace(indexed) {
             val value = args.getOrNull(next++)
             assertTrue("模板「$template」的参数不够填", value != null)
             value.toString()
         }
+        // Android 的字符串资源里百分号要写成 `%%`（`已下载 %1$d%%`），
+        // 真正取文案时由 aapt2 收成一个 `%`。这里要跟它一致，否则「已下载 99%」
+        // 会被本地渲染成「已下载 99%%」而生产代码其实是对的。
+        return filled.replace("%%", "%")
     }
 
     /** 资源 id → 键名。JVM 单测里拿不到 `Resources`，而 `MspText.Res` 里只有 id。 */
@@ -433,6 +519,8 @@ class SettingsSummariesTest {
         "core/translate/src/main/res/values",
         "core/data/src/main/res/values",
         "core/player/src/main/res/values",
+        // 模型名与「约 78.1 MB」住在 core:asr，语音识别那一行要拼它们
+        "core/asr/src/main/res/values",
     )
 
     /**
@@ -459,6 +547,7 @@ class SettingsSummariesTest {
             com.multisuperplayer.core.translate.R.string::class.java,
             com.multisuperplayer.core.data.R.string::class.java,
             com.multisuperplayer.core.player.R.string::class.java,
+            com.multisuperplayer.core.asr.R.string::class.java,
         ).flatMap { resourceClass ->
             resourceClass.declaredFields.mapNotNull { field ->
                 if (field.type != Int::class.java) return@mapNotNull null

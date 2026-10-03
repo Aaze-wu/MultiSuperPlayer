@@ -18,6 +18,20 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+# --- sherpa-onnx（语音识别引擎）--------------------------------------------
+# 上游 AAR 里的 proguard.txt 是**空文件**（0 字节），也就是它不发 consumer rules，
+# 而它的 Java 类全是 JNI 壳：方法体就是 native 调用，另有一部分绑定是在
+# `JNI_OnLoad` 里按「类名 + 方法名 + 签名」注册的。
+#
+# R8 在 release 里默认会改名、也会把「只有 native 声明、没人调用」的成员删掉，
+# 两种情况的结果都是原生侧找不到实现：
+#   java.lang.UnsatisfiedLinkError: No implementation found for
+#     void com.k2fsa.sherpa.onnx.Vad.acceptWaveform(float[])
+# 而 debug 包（未混淆）一切正常 —— 这是典型的「只有 release 崩」的缺陷，
+# 装机测试时最容易漏掉。
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-dontwarn com.k2fsa.sherpa.onnx.**
+
 # --- Koin -------------------------------------------------------------------
 -keep class org.koin.** { *; }
 -dontwarn org.koin.**

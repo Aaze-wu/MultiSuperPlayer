@@ -40,6 +40,7 @@ include(":core:model")    // 领域模型（媒体条目、字幕、轨道、播
 include(":core:data")     // 数据来源（MediaStore 扫描、SAF、设置持久化）
 include(":core:subtitle") // 字幕/歌词解析引擎（纯逻辑、可单测）
 include(":core:translate") // 字幕翻译（厂商预设、批量/缓存/术语表、导出，纯逻辑 + 无依赖 HTTP）
+include(":core:asr")       // 语音识别（sherpa-onnx 引擎封装、模型下载与管理、切分与成句）
 include(":core:ui")       // 设计系统与主题（动态取色、预设、自定义）
 include(":core:player")   // Media3 播放内核封装与播放服务
 
