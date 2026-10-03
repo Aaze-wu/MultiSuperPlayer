@@ -106,6 +106,22 @@ class TranslationServicesTest {
     }
 
     @Test
+    fun `Ollama 预设默认指向本机的翻译专用模型`() {
+        // 这一条值是**产品决定**，不是随手填的：字幕翻译不需要通用模型的「世界知识」，
+        // 而通用 8B 模型要多花 5 倍显存、5 倍等待换回一样的结果。所以钉住它，
+        // 免得下一次重构时又「顺手换成比较好拉的那个」。
+        //
+        // 同时钉住 baseUrl：默认值指向模拟器映射宿主机的地址，
+        // 换了它会让「模拟器上开箱即用」这件事悄悄失效。
+        assertEquals("demonbyron/HY-MT1.5-1.8B", TranslationServices.OLLAMA.model)
+        assertEquals("http://10.0.2.2:11434/v1", TranslationServices.OLLAMA.baseUrl)
+        // 翻译模型没有思考模式：多余的字段会让严格的网关直接 400。
+        assertTrue(TranslationServices.OLLAMA.disableThinkingBody.isBlank())
+        // 本机服务不该逼用户填密钥——`missingItems` 会把密钥列成缺项，界面变成红色。
+        assertFalse(TranslationServices.OLLAMA.requiresApiKey)
+    }
+
+    @Test
     fun `关思考参数解析不出来时返回 null 而不是抛异常`() {
         assertNull(parseExtraBody(""))
         assertNull(parseExtraBody("   "))

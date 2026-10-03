@@ -13,6 +13,7 @@ import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
+import com.multisuperplayer.core.llm.LlmMemoryAdvice
 import com.multisuperplayer.core.llm.LlmModelCatalog
 import com.multisuperplayer.core.llm.LlmModelStatus
 import java.io.File
@@ -364,6 +365,35 @@ class SettingsSummariesTest {
             "Qwen3 0.6B（本地） · 未下载 · 约 328.7 MB",
             SettingsSummaries.localModel(model, LlmModelStatus.Absent),
         )
+    }
+
+    @Test
+    fun `本地模型 - 内存需求也在下载前就写出来`() {
+        val model = LlmModelCatalog.byId(LlmModelCatalog.HY_MT2_18B_ID)
+
+        // 内存与体积一样是「决定要不要下」要看的东西，而且它比体积更不能事后补救：
+        // 1.82 GB 的流量花掉之后才知道跑不动，用户没有任何退路。
+        assertText("运行需约 2.7 GB 内存", model.memoryText()!!)
+    }
+
+    @Test
+    fun `本地模型 - 上游没给实测内存的模型一行都不显示`() {
+        // 宁可不写也不猜。写成「运行需约 0 MB」或者随便给个默认值，都是在替
+        // 用户做一个他没法验证的结论——而这条结论错的那个方向（本该警告却没警告）
+        // 代价是白下 1.82 GB。
+        val model = LlmModelCatalog.byId(LlmModelCatalog.DEFAULT_ID)
+
+        Assert.assertNull(model.memoryText())
+    }
+
+    @Test
+    fun `本地模型 - 内存不足的提示说的是这台机器有多少`() {
+        // 这句和上一句长得很像（都带一个容量），但说的是**两件事**：
+        // `.memoryText()` 是模型的固定需求，这句是本机总内存。
+        // 说反了不会崩，只会让用户拿到一个数字完全对不上的建议。
+        val rendered = render(LlmMemoryAdvice.warningText(4L * 1024 * 1024 * 1024))
+
+        Assert.assertEquals("本机总内存约 4.0 GB，这条模型可能跑不起来", rendered)
     }
 
     @Test

@@ -29,34 +29,43 @@ class TranslationPromptTest {
     private class Expectations(val required: String, val forbidden: List<String>)
 
     /**
-     * 各语言的招牌词。
+     * 各语言的招牌词：示例输出里**必须**出现的那一串。
+     *
+     * 15 门语言意味着「不许出现别的语言」有 15×14 种组合。手写这份清单的话，
+     * 每加一门语言就要回头改 14 条既有条目——而漏掉的那些组合恰好是没人会去
+     * 手动验证的（谁会在选了俄语之后逐字确认示例里没有意大利语）。
+     * 所以只维护这一列招牌词，禁忌表由它自己推出来。
+     *
+     * 招牌词也必须**两两不同**，否则「示例用了别的语言」这个检查会自相矛盾。
      *
      * 注意英语那一条：它的**输入**示例是中文（拿英语当源去示范「翻成英语」等于什么
-     * 都没示范），所以英语的 [Expectations.forbidden] 里不能有「你去哪儿？」这个输入串
-     * ——下面的检查只看输出行，所以本来也不会撞上。
+     * 都没示范），而下面的检查只看输出行，所以输入串不会撞上禁忌表。
      */
-    private val expectations = mapOf(
-        TranslationTarget.SIMPLIFIED_CHINESE to Expectations(
-            required = "你要去哪儿？",
-            forbidden = listOf("你要去哪裡？", "どこへ行くの？", "어디 가는 거야?"),
-        ),
-        TranslationTarget.TRADITIONAL_CHINESE to Expectations(
-            required = "你要去哪裡？",
-            forbidden = listOf("你要去哪儿？", "どこへ行くの？", "어디 가는 거야?"),
-        ),
-        TranslationTarget.ENGLISH to Expectations(
-            required = "Where are you going?",
-            forbidden = listOf("你要去哪儿？", "你要去哪裡？", "どこへ行くの？", "어디 가는 거야?"),
-        ),
-        TranslationTarget.JAPANESE to Expectations(
-            required = "どこへ行くの？",
-            forbidden = listOf("你要去哪儿？", "你要去哪裡？", "어디 가는 거야?"),
-        ),
-        TranslationTarget.KOREAN to Expectations(
-            required = "어디 가는 거야?",
-            forbidden = listOf("你要去哪儿？", "你要去哪裡？", "どこへ行くの？"),
-        ),
+    private val signatures = mapOf(
+        TranslationTarget.SIMPLIFIED_CHINESE to "你要去哪儿？",
+        TranslationTarget.TRADITIONAL_CHINESE to "你要去哪裡？",
+        TranslationTarget.ENGLISH to "Where are you going?",
+        TranslationTarget.JAPANESE to "どこへ行くの？",
+        TranslationTarget.KOREAN to "어디 가는 거야?",
+        TranslationTarget.RUSSIAN to "Куда ты идёшь?",
+        TranslationTarget.SPANISH to "¿A dónde vas?",
+        TranslationTarget.FRENCH to "Où vas-tu ?",
+        TranslationTarget.GERMAN to "Wohin gehst du?",
+        TranslationTarget.PORTUGUESE to "Aonde você vai?",
+        TranslationTarget.ITALIAN to "Dove vai?",
+        TranslationTarget.ARABIC to "إلى أين تذهب؟",
+        TranslationTarget.THAI to "คุณจะไปไหน",
+        TranslationTarget.VIETNAMESE to "Bạn đi đâu đấy?",
+        TranslationTarget.INDONESIAN to "Kamu mau ke mana?",
     )
+
+    /** 见 [signatures]：禁忌 = 其余所有语言的招牌词。 */
+    private val expectations = signatures.entries.associate { (target, required) ->
+        target to Expectations(
+            required = required,
+            forbidden = signatures.filterKeys { it != target }.values.toList(),
+        )
+    }
 
     /** 取提示词里「输入：」或「输出：」那一行的**内容**（不含前缀）。 */
     private fun exampleLine(prompt: String, prefix: String): String =
@@ -71,6 +80,16 @@ class TranslationPromptTest {
             TranslationTarget.entries.toSet(),
             expectations.keys,
         )
+    }
+
+    @Test
+    fun `招牌词两两不同`() {
+        // 禁忌表是由招牌词推出来的，所以两个语言共用同一串招牌词会让检查自我矛盾：
+        // 无论示例写哪一种，它都必然「含另一种语言的词」，而报出来的错看起来像
+        // 示例写错了。这条先把这个前提钉住，免得以后的报错指错方向。
+        val all = signatures.values
+
+        assertEquals("有两门语言的招牌词一模一样", all.size, all.toSet().size)
     }
 
     @Test

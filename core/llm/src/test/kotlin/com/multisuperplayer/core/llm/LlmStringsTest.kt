@@ -51,10 +51,18 @@ class LlmStringsTest {
         // `LlmModelInfo.sizeText()` 传进来的是**格式化好的**体积（`328.7 MB`）。
         // 占位符写成 `%1$d` 会在真机上抛 IllegalFormatConversionException——
         // 也就是「打开设置页就崩」，而单测里只看文件是看不出来的。
+        //
+        // 内存那两条走的是同一个 `TimeFormat.fileSize()`，所以同一条规矩：
+        // 两句话都带一个容量，把它们分成两组断言只会让下一句新文案漏掉检查。
         listOf("values", "values-en", "values-b+zh+Hant").forEach { locale ->
-            val template = strings(locale).getValue("msp_llm_model_size")
+            val texts = strings(locale)
 
-            assertTrue("$locale 的体积占位符必须是 %1\$s，实际是：$template", template.contains("%1\$s"))
+            listOf("msp_llm_model_size", "msp_llm_model_memory", "msp_llm_model_memory_warning")
+                .forEach { key ->
+                    val template = texts.getValue(key)
+
+                    assertTrue("$locale 的 $key 占位符必须是 %1\$s，实际是：$template", template.contains("%1\$s"))
+                }
         }
     }
 
@@ -78,13 +86,40 @@ class LlmStringsTest {
         listOf("values", "values-en", "values-b+zh+Hant").forEach { locale ->
             val texts = strings(locale)
 
-            listOf("msp_llm_model_qwen3_name", "msp_llm_model_qwen3_desc").forEach { key ->
+            listOf(
+                "msp_llm_model_qwen3_name",
+                "msp_llm_model_qwen3_desc",
+                "msp_llm_model_hymt2_name",
+                "msp_llm_model_hymt2_desc",
+            ).forEach { key ->
                 val value = texts.getValue(key)
 
                 listOf("MB", "GB", "TB", "约 ", "about ").forEach { needle ->
                     Assert.assertFalse("$locale 的 $key 里不该出现「$needle」：$value", value.contains(needle))
                 }
             }
+        }
+    }
+
+    @Test
+    fun `内存不足的说法不能与体积那句共用一套模板`() {
+        // 两句长得很像（都带一个 `%1$s` 的容量），但一个是**关于模型的事实**、
+        // 一个是**关于这台机器的结论**，且后者在正常机型上**完全不出现**。
+        // 合并成一句的后果是：要么把「可能跑不起来」写在能跑的机器上（吓人），
+        // 要么把两种容量弄混（把模型要 2.7 GB 说成本机有 2.7 GB）。
+        listOf("values", "values-en", "values-b+zh+Hant").forEach { locale ->
+            val texts = strings(locale)
+
+            Assert.assertNotEquals(
+                "$locale 的内存警告与体积那句不能同文",
+                texts.getValue("msp_llm_model_size"),
+                texts.getValue("msp_llm_model_memory"),
+            )
+            Assert.assertNotEquals(
+                "$locale 的内存警告与模型内存需求不能同文",
+                texts.getValue("msp_llm_model_memory"),
+                texts.getValue("msp_llm_model_memory_warning"),
+            )
         }
     }
 
@@ -120,6 +155,17 @@ class LlmStringsTest {
 
         assertTrue("要提到不联网", desc.contains("不联网"))
         assertTrue("也要提到译文质量的差别", desc.contains("不如"))
+    }
+
+    @Test
+    fun `高质量那条也要在下载前说清代价`() {
+        // 它比 0.6B 那条贵 5 倍体积、贵 8 倍内存。体积与内存由界面现算，
+        // 说明里要管的是两件算不出来的事：「质量更好」与「要等更久」。
+        // 缺了「更好」，1.8B 看起来就是「同样免费、只是更大」——没有理由选。
+        val desc = strings("values").getValue("msp_llm_model_hymt2_desc")
+
+        assertTrue("要说明质量比 0.6B 那条好", desc.contains("好于"))
+        assertTrue("要说清仍然是本机运行", desc.contains("本机"))
     }
 
     private fun Char.isCjk(): Boolean =

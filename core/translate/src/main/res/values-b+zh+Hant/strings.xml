@@ -64,6 +64,16 @@
     <string name="msp_translate_lang_en">英語</string>
     <string name="msp_translate_lang_ja">日語</string>
     <string name="msp_translate_lang_ko">韓語</string>
+    <string name="msp_translate_lang_ru">俄語</string>
+    <string name="msp_translate_lang_es">西班牙語</string>
+    <string name="msp_translate_lang_fr">法語</string>
+    <string name="msp_translate_lang_de">德語</string>
+    <string name="msp_translate_lang_pt">葡萄牙語</string>
+    <string name="msp_translate_lang_it">義大利語</string>
+    <string name="msp_translate_lang_ar">阿拉伯語</string>
+    <string name="msp_translate_lang_th">泰語</string>
+    <string name="msp_translate_lang_vi">越南語</string>
+    <string name="msp_translate_lang_id">印尼語</string>
 
     <string name="msp_translate_join_list">%1$s、%2$s</string>
     <string name="msp_translate_join_comma">%1$s，%2$s</string>
@@ -89,7 +99,7 @@
     <string name="msp_translate_svc_moonshot_name">Kimi（月之暗面）</string>
     <string name="msp_translate_svc_moonshot_note">官方文件寫明 thinking 預設開啟，因此必須攜帶關閉參數，否則長字幕會消耗大量 token。</string>
     <string name="msp_translate_svc_ollama_name">Ollama（本機）</string>
-    <string name="msp_translate_svc_ollama_note">本機執行的 Ollama 填 http://localhost:11434/v1 即可。區域網路位址的明文 HTTP 會被系統安全策略攔截，只有 localhost 與 10.0.2.2 被放行。</string>
+    <string name="msp_translate_svc_ollama_note">本機執行的 Ollama：先在電腦上執行 ollama pull demonbyron/HY-MT1.5-1.8B。預設位址是模擬器映射到宿主機的 http://10.0.2.2:11434/v1，真機改成電腦的區域網路位址。預設模型是騰訊混元的翻譯專用模型（33 種語言），也可以換成你已拉取的任何模型。</string>
     <string name="msp_translate_svc_ollama_key_hint">本機服務可任意填寫，也可留空</string>
     <string name="msp_translate_svc_local_name">本機（裝置上執行）</string>
     <string name="msp_translate_svc_local_note">完全在這台裝置上執行：不連網、不需要帳號，字幕內容不會離開本機。第一次要先在下面的「本機模型」裡把模型下載下來。</string>

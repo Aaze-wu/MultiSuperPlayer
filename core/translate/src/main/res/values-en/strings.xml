@@ -70,6 +70,16 @@
     <string name="msp_translate_lang_en">English</string>
     <string name="msp_translate_lang_ja">Japanese</string>
     <string name="msp_translate_lang_ko">Korean</string>
+    <string name="msp_translate_lang_ru">Russian</string>
+    <string name="msp_translate_lang_es">Spanish</string>
+    <string name="msp_translate_lang_fr">French</string>
+    <string name="msp_translate_lang_de">German</string>
+    <string name="msp_translate_lang_pt">Portuguese</string>
+    <string name="msp_translate_lang_it">Italian</string>
+    <string name="msp_translate_lang_ar">Arabic</string>
+    <string name="msp_translate_lang_th">Thai</string>
+    <string name="msp_translate_lang_vi">Vietnamese</string>
+    <string name="msp_translate_lang_id">Indonesian</string>
 
     <string name="msp_translate_join_list">%1$s, %2$s</string>
     <string name="msp_translate_join_comma">%1$s, %2$s</string>
@@ -95,7 +105,7 @@
     <string name="msp_translate_svc_moonshot_name">Kimi (Moonshot AI)</string>
     <string name="msp_translate_svc_moonshot_note">The official docs state that thinking is on by default, so the disable parameter must always be sent; otherwise long subtitles consume a large amount of tokens.</string>
     <string name="msp_translate_svc_ollama_name">Ollama (local)</string>
-    <string name="msp_translate_svc_ollama_note">For an Ollama running on this machine, use http://localhost:11434/v1. Plain HTTP on the LAN is blocked by the system policy; only localhost and 10.0.2.2 are allowed.</string>
+    <string name="msp_translate_svc_ollama_note">For an Ollama running on your computer, run ollama pull demonbyron/HY-MT1.5-1.8B first. The default address (http://10.0.2.2:11434/v1) is the emulator\'s mapping to the host machine; on a real device use your computer\'s LAN address. The default model is Tencent\'s Hunyuan translation-specialised model (33 languages), but you can switch to any model you already have.</string>
     <string name="msp_translate_svc_ollama_key_hint">Any value works for a local service, or leave it empty</string>
     <string name="msp_translate_svc_local_name">On-device</string>
     <string name="msp_translate_svc_local_note">Runs entirely on this device: no network, no account, and no subtitle text ever leaves it. The model has to be downloaded once under "On-device model" below.</string>

@@ -7,6 +7,12 @@
     <string name="msp_llm_model_qwen3_name">Qwen3 0.6B（本機）</string>
     <string name="msp_llm_model_qwen3_desc">參數只有 0.6B 的輕量中英模型（int4 量化）。完全在本機執行：不連網、不消耗介面額度。長句的譯文品質不如雲端大模型。</string>
 
+    <string name="msp_llm_model_hymt2_name">混元 HY-MT2 1.8B（本機）</string>
+    <string name="msp_llm_model_hymt2_desc">騰訊混元翻譯專用模型（1.8B，int8 量化，支援 33 種語言）。譯文品質明顯好於 0.6B 那條，同樣完全在本機執行。代價是下載檔案大得多、執行時需要較大記憶體、首次載入要等幾秒。</string>
+
+    <string name="msp_llm_model_memory">執行需約 %1$s 記憶體</string>
+    <string name="msp_llm_model_memory_warning">本機總記憶體約 %1$s，這條模型可能跑不起來</string>
+
     <string name="msp_llm_error_network">網路連線中斷：%1$s</string>
     <string name="msp_llm_error_http">伺服器回傳 %1$d</string>
     <string name="msp_llm_error_source">下載源位址無效：%1$s</string>

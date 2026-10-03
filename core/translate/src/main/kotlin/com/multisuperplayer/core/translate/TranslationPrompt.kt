@@ -77,8 +77,8 @@ private class PromptExample(val input: String, val output: String)
 /**
  * 默认的示例输入：两行英语，第二行是两个人在对话（带「- 」分段）。
  *
- * 抽成常量而不是在五个分支里各写一遍：这串东西在源码里的写法（`\"` `\\n`）
- * 和它在提示词里真正的样子差得远，复制五次早晚会有一处不一样。
+ * 抽成常量而不是在各个分支里各写一遍：这串东西在源码里的写法（`\"` `\\n`）
+ * 和它在提示词里真正的样子差得远，复制十几次早晚会有一处不一样。
  */
 private const val EXAMPLE_INPUT_ENGLISH = "{\"lines\": [\"Where are you going?\", \"- Home.\\n- Wait!\"]}"
 
@@ -131,6 +131,71 @@ private fun exampleFor(target: TranslationTarget): PromptExample = when (target)
     TranslationTarget.KOREAN -> PromptExample(
         input = EXAMPLE_INPUT_ENGLISH,
         output = "{\"translations\": [\"어디 가는 거야?\", \"- 집에 가.\\n- 잠깐만!\"]}",
+    )
+
+    // 以下 10 门是 v0.6.6 补上的。每一门都刻意保留一个**该语言特有的书写习惯**，
+    // 而不是把英文示例逐字换成目标语言：这些细节（法语问号前的空格、阿拉伯语的 ？、
+    // 泰语不用句号也不分词、西语的倒问号）是模型最容易「顺手改成英文习惯」的地方，
+    // 而那一改不报错、不崩溃，只是字幕看起来像机翻。
+    TranslationTarget.RUSSIAN -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 西里尔字母：源文是拉丁字母，译文必须是西里尔——分词用空格，保持英文的句号。
+        output = "{\"translations\": [\"Куда ты идёшь?\", \"- Домой.\\n- Подожди!\"]}",
+    )
+
+    TranslationTarget.SPANISH -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 西语的问句要带**倒问号**开头的 ¿，这是最容易被漏掉的一处。
+        output = "{\"translations\": [\"¿A dónde vas?\", \"- A casa.\\n- ¡Espera!\"]}",
+    )
+
+    TranslationTarget.FRENCH -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 法语在 ? ! 前要留一个空格（英文不留）——这一格是对齐错误时最好认的信号。
+        output = "{\"translations\": [\"Où vas-tu ?\", \"- À la maison.\\n- Attends !\"]}",
+    )
+
+    TranslationTarget.GERMAN -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 德语名词首字母大写，句子结构与英语相反（疑问句不倒装）。
+        output = "{\"translations\": [\"Wohin gehst du?\", \"- Nach Hause.\\n- Warte!\"]}",
+    )
+
+    TranslationTarget.PORTUGUESE -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"Aonde você vai?\", \"- Para casa.\\n- Espera!\"]}",
+    )
+
+    TranslationTarget.ITALIAN -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"Dove vai?\", \"- A casa.\\n- Aspetta!\"]}",
+    )
+
+    TranslationTarget.ARABIC -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 阿拉伯语用 ؟（U+061F）当问号，而且整句从右往左。
+        // 字幕渲染那一层不管方向（Compose 自己按字符集判断），所以示例里
+        // 写成逻辑顺序即可，切勿为了看着顺手把词序反过来。
+        output = "{\"translations\": [\"إلى أين تذهب؟\", \"- إلى المنزل.\\n- انتظر!\"]}",
+    )
+
+    TranslationTarget.THAI -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 泰语不用句号，词与词之间也不加空格：译文里出现「。」或「 .」
+        // 就是模型在把英文标点搬过来。
+        output = "{\"translations\": [\"คุณจะไปไหน\", \"- กลับบ้าน\\n- เดี๋ยวก่อน\"]}",
+    )
+
+    TranslationTarget.VIETNAMESE -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        // 越南语用拉丁字母加声调符：没有声调符的译文看着像英语，
+        // 而那种「缺声调」的错法在所有语言里都是最普遍的一种。
+        output = "{\"translations\": [\"Bạn đi đâu đấy?\", \"- Về nhà.\\n- Đợi đã!\"]}",
+    )
+
+    TranslationTarget.INDONESIAN -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"Kamu mau ke mana?\", \"- Pulang.\\n- Tunggu!\"]}",
     )
 }
 

@@ -78,6 +78,21 @@
     <string name="msp_translate_lang_en">英语</string>
     <string name="msp_translate_lang_ja">日语</string>
     <string name="msp_translate_lang_ko">韩语</string>
+    <!--
+      v0.6.6 补上的 10 门。这里的名称**跟着界面语言走**（不是模型的能力声明），
+      而真正写进提示词的是 `promptName`（固定中文、写在 Kotlin 里）。
+      顺序与 `TranslationTarget` 的声明顺序一致。
+    -->
+    <string name="msp_translate_lang_ru">俄语</string>
+    <string name="msp_translate_lang_es">西班牙语</string>
+    <string name="msp_translate_lang_fr">法语</string>
+    <string name="msp_translate_lang_de">德语</string>
+    <string name="msp_translate_lang_pt">葡萄牙语</string>
+    <string name="msp_translate_lang_it">意大利语</string>
+    <string name="msp_translate_lang_ar">阿拉伯语</string>
+    <string name="msp_translate_lang_th">泰语</string>
+    <string name="msp_translate_lang_vi">越南语</string>
+    <string name="msp_translate_lang_id">印尼语</string>
 
     <!-- 清单拼接。分隔符跟着语言走，所以不能用 joinToString。 -->
     <string name="msp_translate_join_list">%1$s、%2$s</string>
@@ -116,7 +131,7 @@
     <string name="msp_translate_svc_moonshot_name">Kimi（月之暗面）</string>
     <string name="msp_translate_svc_moonshot_note">官方文档写明 thinking 默认开启，因此必须携带关闭参数，否则长字幕会消耗大量 token。</string>
     <string name="msp_translate_svc_ollama_name">Ollama（本地）</string>
-    <string name="msp_translate_svc_ollama_note">本机运行的 Ollama 填 http://localhost:11434/v1 即可。局域网地址的明文 HTTP 会被系统安全策略拦截，只有 localhost 与 10.0.2.2 被放行。</string>
+    <string name="msp_translate_svc_ollama_note">本机运行的 Ollama：先在电脑上执行 ollama pull demonbyron/HY-MT1.5-1.8B。默认地址是模拟器映射到宿主机的 http://10.0.2.2:11434/v1，真机改成电脑的局域网地址。默认模型是腾讯混元的翻译专用模型（33 种语言），也可以换成你已拉取的任何模型。</string>
     <string name="msp_translate_svc_ollama_key_hint">本地服务可任意填写，也可留空</string>
     <string name="msp_translate_svc_local_name">本地（设备上运行）</string>
     <string name="msp_translate_svc_local_note">完全在这台设备上运行：不联网、不需要账号，字幕内容不会离开本机。第一次要先在下面的「本地模型」里把模型下载下来。</string>

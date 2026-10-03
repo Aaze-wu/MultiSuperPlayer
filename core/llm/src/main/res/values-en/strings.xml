@@ -7,6 +7,12 @@
     <string name="msp_llm_model_qwen3_name">Qwen3 0.6B (on-device)</string>
     <string name="msp_llm_model_qwen3_desc">A lightweight Chinese–English model with only 0.6B parameters (int4 quantized). Runs entirely on this device: no network, no API quota. Long sentences are translated less accurately than by a cloud model.</string>
 
+    <string name="msp_llm_model_hymt2_name">Hunyuan HY-MT2 1.8B (on-device)</string>
+    <string name="msp_llm_model_hymt2_desc">Tencent\'s Hunyuan translation-specialised model (1.8B, int8 quantized, 33 languages). Clearly better translations than the 0.6B one, and it also runs entirely on this device. The trade-offs are a much larger download, a much higher memory requirement, and a few seconds of loading on first use.</string>
+
+    <string name="msp_llm_model_memory">Needs about %1$s of memory</string>
+    <string name="msp_llm_model_memory_warning">This device has about %1$s of memory in total, so this model may fail to run</string>
+
     <!-- One message per failure: the next step differs (wait / change mirror / free space). -->
     <string name="msp_llm_error_network">Network connection interrupted: %1$s</string>
     <string name="msp_llm_error_http">The server returned %1$d</string>

@@ -126,6 +126,43 @@ class LlmModelCatalogTest {
     }
 
     @Test
+    fun `高质量档的 id 也指向清单里的一条`() {
+        // `byId` 认不出来时静默回落到默认那条，所以这个常量写错一个字符不会报任何错，
+        // 只会让用户选好的混元模型下一次打开设置时变回 0.6B——一个「我的设置自己变了」
+        // 且完全无从下手的问题。
+        assertTrue(
+            "HY_MT2_18B_ID 必须指向清单里的一条",
+            LlmModelCatalog.models.any { it.id == LlmModelCatalog.HY_MT2_18B_ID },
+        )
+        assertFalse("轻量那条与高质量那条不能是同一个 id", LlmModelCatalog.HY_MT2_18B_ID == LlmModelCatalog.QWEN3_06B_ID)
+    }
+
+    @Test
+    fun `两条模型不能共用同一个下载文件`() {
+        // 复制一条模型条目最容易漏的就是这几行：repo / fileName / sha256 还是上一条的。
+        // 症状是「下完第一条之后第二条直接显示已下载」（磁盘上那个文件体积与哈希都对得上），
+        // 于是用户点下载什么也不会发生，而界面看起来一切正常。
+        fun distinctCount(field: (LlmModelInfo) -> String): Int =
+            LlmModelCatalog.models.map(field).toSet().size
+
+        assertEquals("repo 重复", LlmModelCatalog.models.size, distinctCount { it.repo })
+        assertEquals("fileName 重复", LlmModelCatalog.models.size, distinctCount { it.fileName })
+        assertEquals("sha256 重复", LlmModelCatalog.models.size, distinctCount { it.sha256 })
+    }
+
+    @Test
+    fun `内存需求要么不写，要么是个正数`() {
+        // `0` 是这里最危险的取值：`LlmMemoryAdvice.isRisky` 会把它当成「需要零内存」，
+        // 于是「本机内存可能不够」这句提示永远不会出现——一个假的安全结论，
+        // 而代价是用户白下 1.82 GB。
+        LlmModelCatalog.models.forEach { model ->
+            val peak = model.peakMemoryBytes
+
+            assertTrue("${model.id} 的 peakMemoryBytes 是 $peak", peak == null || peak > 0L)
+        }
+    }
+
+    @Test
     fun `id 是目录名，所以不能含路径分隔符或空白`() {
         LlmModelCatalog.models.forEach { model ->
             assertFalse("${model.id} 含路径分隔符", model.id.contains('/') || model.id.contains('\\'))

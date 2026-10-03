@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.5-alpha.2** (pre-release)
+- Current version: **0.6.6-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -130,6 +130,15 @@ Release notes: [docs/release-notes](docs/release-notes/)
 
 - **Any OpenAI-compatible endpoint**: fill in base URL, model name and API key. Presets for common
   providers are included, and a fully custom configuration is supported.
+  The **Ollama preset points at Tencent's translation-specialised `demonbyron/HY-MT1.5-1.8B`** (33
+  languages): subtitle translation needs no world knowledge, only line-by-line fidelity, and handing the
+  job to a general 8B model makes the user pay 5x the VRAM and 5x the waiting time for none of it.
+- **15 target languages**: Simplified Chinese / Traditional Chinese / English / Japanese / Korean /
+  Russian / Spanish / French / German / Portuguese / Italian / Arabic / Thai / Vietnamese / Indonesian.
+  Not 33 and not 5 — an optional list is not the model's capability ceiling, and every language costs 3
+  translated UI strings plus 1 prompt example, so this is the intersection of "frequently used" and
+  "easy to verify". The example follows the language: French demonstrates `Où vas-tu ?` (French keeps a
+  space before `?`), Arabic demonstrates `؟`, Thai demonstrates "no full stop and no spaces".
 - **It can also run entirely offline**: the provider list has an extra entry, *Local (runs on this
 device)*, where the model runs on the phone and the subtitle text never leaves it (see section 1.9).
 - **Batching and caching** with context lines and a glossary. Results are cached by a hash of
@@ -335,14 +344,26 @@ Settings → Subtitles and translation → the provider list has an extra entry,
 device)"**. It sits next to the cloud providers, but it **never goes online**: no base URL, no API key,
 and the subtitle text never leaves the phone.
 
-- **The model is downloaded on demand**: **Qwen3-0.6B (int4 quantized, about 345 MB)**, defaulting to the
+- **The model is downloaded on demand**: the default tier is **Qwen3-0.6B (int4 quantized, about 345 MB)**, defaulting to the
   `hf-mirror.com` mirror. After the download the file is **verified against sha256**, and a mismatch
   deletes the partial file — there is no "looks downloaded but will not install" model left behind.
   The download source is **a separate key** from the speech recognition one (pointing one source somewhere
   is no reason to silently change the other); leaving it blank restores the default. The download can be
   stopped mid-way, and resuming is not supported, so a half-finished download **says how much was
   received** and states that it will start over rather than pretending to resume.
-- **Why it is not bundled into the APK**: the model is 345 MB while the whole installer is about 135 MiB.
+- **Two tiers to choose from**: the light one is Qwen3-0.6B (about 345 MB); the other is **Tencent
+  Hunyuan HY-MT2-1.8B (int8, about 1.7 GB)**, a translation-*specialised* model (33 languages) that is
+  visibly better. 0.6B stays the default because **a default is for everyone**, and the 1.8B one will
+  likely not run on anything below 8 GB of RAM. Those who pick it do pay 5x the size — and get back a
+  difference they can see.
+- **The memory requirement is stated before the download**: the model card says "needs about 2.7 GB of
+  memory". Without that, a user only finds out their device cannot cope after spending 1.7 GB of
+  traffic, and by then they have no way back. If the measured requirement exceeds 40% of the device's
+  total memory, one more line appears in red: "this device has about 3.8 GB of memory in total, so this
+  model may fail to run" — a **hint, never a block**: the threshold is only an estimate (missing a
+  warning costs 1.7 GB of wasted traffic, a false warning costs one grey line — the two mistakes are
+  nowhere near equal), so the decision stays with the user.
+- **Why it is not bundled into the APK**: the models start at 345 MB while the whole installer is about 135 MiB.
   On-device translation is a feature you need *when you use it*, so making every user pay nearly three
   times the size for it is a bad trade.
 - **The installer did grow anyway**: about 88.6 MiB in v0.6.3 → about 134.7 MiB now. What grew is the
@@ -486,8 +507,9 @@ directory, attached and selected automatically. Settings → Speech recognition 
 | **v0.6.2** | **Multi-language support (Japanese first): a dedicated Japanese offline model (ReazonSpeech) to download; automatic Shift-JIS (CP932) detection for subtitle files; prompt examples generated per target language; automatic collapsing of spaces between Japanese kana** | Done |
 | **v0.6.3** | **Reordering and transport fixes: playlists and the items inside them can be reordered by long-pressing a whole row (the order is saved, a new playlist goes last); multi-select in the library and file browser follows the order you tapped the items in; fixed the transport row overflowing on 360dp-wide screens (the last button was squeezed into a sliver); cleartext `http://` is allowed (a NAS on your LAN, a local LLM server)** | Done |
 | **v0.6.4** | **On-device offline translation: the provider list gains *Local (runs on this device)* (Qwen3-0.6B, about 345 MB, downloaded on demand with sha256 verification and a delete-that-model-only action); constrained decoding pins the output shape down (including the item count), fixing two "it can never work on a real device" bugs (a benchmark query that always throws was treated as a failed generation, and 0.6B merging a whole batch into one array element)** | Done |
-| **v0.6.5** | **Cloud speech recognition subtitle generation: *Recognition method* gains *Cloud* (OpenAI-compatible `/audio/transcriptions`, four presets plus custom); upload in fixed 5-minute chunks (about 9.6 MB each) with per-sentence timestamps when `segments` are returned and one cue per chunk otherwise; 20 failure classes split by "what to do next"; the address field shows the final request URL live and an unfinished address greys out the player button; two privacy notices** | **Current** |
-| Later | More translation models (broader language coverage / higher performance), a permissions page, requesting permissions on first launch, a background-playback keep-alive switch, audio translation, equalizer | Planned |
+| **v0.6.5** | **Cloud speech recognition subtitle generation: *Recognition method* gains *Cloud* (OpenAI-compatible `/audio/transcriptions`, four presets plus custom); upload in fixed 5-minute chunks (about 9.6 MB each) with per-sentence timestamps when `segments` are returned and one cue per chunk otherwise; 20 failure classes split by "what to do next"; the address field shows the final request URL live and an unfinished address greys out the player button; two privacy notices** | Done |
+| **v0.6.6** | **More translation models: on-device gains *Tencent Hunyuan HY-MT2-1.8B* (int8, about 1.7 GB, translation-specialised, offered as an optional high-quality tier while 0.6B stays the default); the memory requirement is stated before the download and one extra hint appears when it exceeds 40% of the device's total memory (a hint, never a block); the Ollama preset now defaults to Hunyuan HY-MT1.5-1.8B; target languages go 5 → 15 (Russian / Spanish / French / German / Portuguese / Italian / Arabic / Thai / Vietnamese / Indonesian added)** | **Current** |
+| Later | A permissions page, requesting permissions on first launch, a background-playback keep-alive switch, audio translation, equalizer | Planned |
 
 ---
 

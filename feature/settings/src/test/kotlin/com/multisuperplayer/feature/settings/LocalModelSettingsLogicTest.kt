@@ -122,12 +122,28 @@ class LocalModelSettingsLogicTest {
 
     @Test
     fun `状态是按 id 查的，不会把别的模型的状态拿过来`() {
-        // 现在清单里只有一条模型，但列表是照着「多条」写的（与语音识别页同构）。
-        // 按位置查（`statuses.values.first()`）在加第二条的那天就会串味。
+        // 清单里现在有两条模型（轻量 0.6B 与高质量混元 1.8B），列表本来就是照着
+        // 「多条」写的。按位置查（`statuses.values.first()`）会把另一条的状态显示过来：
+        // 明明没下过混元，界面上却写着「已下载」，用户点下载时什么都不发生。
         val state = LocalModelUiState(statuses = mapOf("other-model" to LlmModelStatus.Ready))
 
         assertEquals(LlmModelStatus.Absent, state.statusOf(qwen))
         assertEquals(LlmModelStatus.Absent, state.status)
+    }
+
+    @Test
+    fun `两条模型的状态互不影响`() {
+        // 同一个 id 在磁盘上对应同一个文件，所以两条真模型应当是彼此独立的键。
+        // 这里用真实的两条而不是编一个 "other-model"：编出来的 id 永远测不出
+        // 「两个常量其实是同一个字符串」或者「状态是按 `models.first()` 存的」。
+        val hunyuan = LlmModelCatalog.byId(LlmModelCatalog.HY_MT2_18B_ID)
+        val state = LocalModelUiState(statuses = mapOf(qwen.id to LlmModelStatus.Ready))
+
+        assertEquals(LlmModelStatus.Ready, state.statusOf(qwen))
+        assertEquals("混元那条没下过，不该显示成已下载", LlmModelStatus.Absent, state.statusOf(hunyuan))
+        // 两条的 id / 下载文件必须是两个不同的东西，否则上面这条会永远绿。
+        assertFalse(qwen.id == hunyuan.id)
+        assertFalse(qwen.fileName == hunyuan.fileName)
     }
 
     @Test
@@ -173,5 +189,17 @@ class LocalModelSettingsLogicTest {
 
         assertEquals(LlmModelCatalog.DEFAULT_ID, entry.model.id)
         assertEquals(LlmModelStatus.Absent, entry.status)
+    }
+
+    @Test
+    fun `选了高质量那条之后入口页显示的就是它`() {
+        // 用户挑完模型回到上一页，那一行是他唯一能确认「选没选上」的地方。
+        // 这里如果永远显示默认那条，他会以为自己的选择没生效，然后再进去选一次。
+        val entry = LocalModelEntryState(
+            settings = TranslationSettings(model = LlmModelCatalog.HY_MT2_18B_ID),
+        )
+
+        assertEquals(LlmModelCatalog.HY_MT2_18B_ID, entry.model.id)
+        assertFalse("入口行的名字要是混元那条，不是回落到的 0.6B", entry.model.id == LlmModelCatalog.DEFAULT_ID)
     }
 }

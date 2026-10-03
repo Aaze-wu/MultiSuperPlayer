@@ -117,9 +117,21 @@ object TranslationServices {
         displayName = MspText.Res(R.string.msp_translate_svc_ollama_name),
         // 模拟器里 10.0.2.2 就是宿主机；真机请看下面 note。
         baseUrl = "http://10.0.2.2:11434/v1",
-        model = "qwen3:8b",
+        // 腾讯混元 HY-MT1.5-1.8B（Q4_K_M，1.1 GB）：翻译专用、33 种语言，
+        // 而不是通用对话模型。
+        //
+        // 为什么拿它替掉原来的 `qwen3:8b`：两者体积差 5 倍，而字幕翻译用不上
+        // 「世界知识」——要的只是逐行忠实与多语种。用 8B 的通用模型去干这件事，
+        // 用户付出的是 5 倍显存、5 倍等待，换回来的没有一样是他需要的。
+        //
+        // ⚠️ 与设备上那条（`LlmModelCatalog.HY_MT2_18B_ID`）是**同一系列的不同版本**：
+        // 这里是可以自己搭的 Ollama 路线（HY-MT1.5，1.1 GB Q4_K_M），
+        // 那边是需下载到手机的 `.litertlm`（HY-MT2，1.82 GB int8）。
+        // 不要因为版号相近就把两串模型名互相拷贝——格式不同，拷过去两边都用不了。
+        model = "demonbyron/HY-MT1.5-1.8B",
         requiresApiKey = false,
         apiKeyHint = MspText.Res(R.string.msp_translate_svc_ollama_key_hint),
+        // 混元翻译模型没有思考模式，乱塞一个字段只会让严格的网关报 400。
         disableThinkingBody = "",
         note = MspText.Res(R.string.msp_translate_svc_ollama_note),
     )
