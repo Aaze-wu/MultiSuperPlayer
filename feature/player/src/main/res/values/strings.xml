@@ -166,11 +166,22 @@
 
     <!-- ===== 睡眠定时 ===== -->
     <string name="msp_player_sleep_timer">睡眠定时</string>
-    <string name="msp_player_sleep_timer_active">已开启</string>
     <string name="msp_player_sleep_timer_remaining">还有 %1$s</string>
     <string name="msp_player_sleep_timer_until_item_end_active">本集结束后暂停</string>
     <string name="msp_player_sleep_timer_clear">关掉定时</string>
     <string name="msp_player_sleep_timer_note">到期只会暂停：队列和播放位置都留着，下次点播放就从原处接着放。</string>
+
+    <!-- 自定义时长对话框 -->
+    <string name="msp_player_sleep_timer_custom_title">自定义时长</string>
+    <string name="msp_player_sleep_timer_custom_hours">小时</string>
+    <string name="msp_player_sleep_timer_custom_minutes">分钟</string>
+    <string name="msp_player_sleep_timer_custom_confirm">设定</string>
+    <string name="msp_player_sleep_timer_custom_cancel">取消</string>
+    <!-- 空了的时候显示的是规则，填错了则显示错因（同一行） -->
+    <string name="msp_player_sleep_timer_custom_hint">只填分钟也可以，最长 24 小时。</string>
+    <string name="msp_player_sleep_timer_custom_number">小时和分钟都只填数字。</string>
+    <string name="msp_player_sleep_timer_custom_min">至少 1 分钟。</string>
+    <string name="msp_player_sleep_timer_custom_max">最长 24 小时。</string>
 
     <!-- ===== 播放队列 ===== -->
     <string name="msp_player_queue">播放队列</string>

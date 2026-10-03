@@ -139,11 +139,22 @@
 
     <!-- ===== Sleep timer ===== -->
     <string name="msp_player_sleep_timer">Sleep timer</string>
-    <string name="msp_player_sleep_timer_active">On</string>
     <string name="msp_player_sleep_timer_remaining">%1$s left</string>
     <string name="msp_player_sleep_timer_until_item_end_active">Pause when this item ends</string>
     <string name="msp_player_sleep_timer_clear">Turn off timer</string>
     <string name="msp_player_sleep_timer_note">The timer only pauses playback: the queue and position are kept, so you can pick up where you left off.</string>
+
+    <!-- Custom duration dialog -->
+    <string name="msp_player_sleep_timer_custom_title">Custom duration</string>
+    <string name="msp_player_sleep_timer_custom_hours">Hours</string>
+    <string name="msp_player_sleep_timer_custom_minutes">Minutes</string>
+    <string name="msp_player_sleep_timer_custom_confirm">Set</string>
+    <string name="msp_player_sleep_timer_custom_cancel">Cancel</string>
+    <!-- Shown while the fields are empty (the rule); replaced by the error when they are not. -->
+    <string name="msp_player_sleep_timer_custom_hint">Minutes alone is fine. Maximum 24 hours.</string>
+    <string name="msp_player_sleep_timer_custom_number">Hours and minutes must be numbers.</string>
+    <string name="msp_player_sleep_timer_custom_min">At least 1 minute.</string>
+    <string name="msp_player_sleep_timer_custom_max">Maximum 24 hours.</string>
 
     <!-- ===== Queue ===== -->
     <string name="msp_player_queue">Queue</string>

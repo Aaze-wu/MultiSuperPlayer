@@ -15,6 +15,10 @@
     <!-- 唯一永遠正確的那一檔：不用猜自己幾分鐘能睡著。 -->
     <string name="msp_sleep_timer_until_item_end">本集結束</string>
 
+    <!-- 最後一格：手填時長。省略號是有意的——它表示「裡面還有一個步驟」
+         （彈一個輸入框），和別的檔位「點一下就生效」不是同一種動作。 -->
+    <string name="msp_sleep_timer_custom">自訂…</string>
+
     <!-- ===== 播放失敗文案 ===== -->
 
     <string name="msp_playback_error_with_code">%1$s（錯誤碼 %2$d）</string>

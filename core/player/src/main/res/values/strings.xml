@@ -18,6 +18,10 @@
     <!-- 唯一永远正确的那一档：不用猜自己几分钟能睡着。 -->
     <string name="msp_sleep_timer_until_item_end">本集结束</string>
 
+    <!-- 最后一格：手填时长。省略号是有意的——它表示「里面还有一步」
+         （弹一个输入框），和别的档位「点一下就生效」不是同一种动作。 -->
+    <string name="msp_sleep_timer_custom">自定义…</string>
+
     <!-- ===== 播放失败文案 ===== -->
 
     <!--

@@ -395,9 +395,13 @@ fun PlayerRoute(
 
     // 睡眠定时入口。
     //
-    // 芯片上的字分三种情况：没定时写功能名（「睡眠定时」）、定了时长写**档位**
-    // （「30 分钟」）、定在集末写「本集结束」。写档位而不是「已开启」，是因为
-    // 用户下次看这行时要回答的问题是「我设了多久」。
+    // 芯片上的字分三种情况：没定时写功能名（「睡眠定时」）、定了时长写**时长**
+    // （「30 分钟」/「3 小时 20 分」）、定在集末写「本集结束」。写时长而不是
+    // 「已开启」，是因为用户下次看这行时要回答的问题是「我设了多久」。
+    //
+    // 时长按**总时长**算（`durationLabel`）而不是去档位表里认：自定义出来的
+    // 200 分钟不在那张表里，认不出就只剩一句「已开启」可选——恰好没有回答
+    // 用户想问的那个问题。
     //
     // **不在这里算倒计时**：那是个每秒都在变的值，写在这里会让整个播放页
     // 每秒重组一次。倒计时的时钟在面板内部（见 `PlayerSleepTimerSheet`）。
@@ -405,9 +409,7 @@ fun PlayerRoute(
         label = when (val timer = sleepTimer) {
             is SleepTimerState.Off -> stringResource(R.string.msp_player_sleep_timer)
             is SleepTimerState.UntilItemEnd -> SleepTimerOptions.untilItemEndLabel().string()
-            is SleepTimerState.Countdown -> SleepTimerOptions.presetFor(timer)
-                ?.let { SleepTimerOptions.label(it).string() }
-                ?: stringResource(R.string.msp_player_sleep_timer_active)
+            is SleepTimerState.Countdown -> SleepTimerOptions.durationLabel(timer.totalMs).string()
         },
         // 只有定时真的开着才点亮。“没定时”是默认状态，把它也点亮的话
         // 这个芯片会永远是亮的，亮不亮就不再传递任何信息。

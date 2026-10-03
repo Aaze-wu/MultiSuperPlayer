@@ -205,4 +205,166 @@ class SleepTimerTest {
         assertNull(SleepTimerOptions.presetFor(SleepTimerState.Off))
         assertNull(SleepTimerOptions.presetFor(SleepTimerState.UntilItemEnd))
     }
+
+    // ------------------------------------------------------------ 自定义时长
+
+    @Test
+    fun `自定义时长的上下界都是闭区间`() {
+        // 界内必须放行、界外必须拦住，这两条各自独立：`<= max` 写成 `< max` 的差别
+        // 只有边界值那一个能发现，而它恰好是「24 小时整」这种会被真去填的值。
+        assertEquals(
+            SleepTimerCustomInput.Valid(SleepTimerOptions.CUSTOM_MAX_MINUTES),
+            SleepTimerOptions.parseCustomInput("24", "0"),
+            "正好到上限必须能开出来",
+        )
+        assertEquals(
+            SleepTimerCustomInput.Valid(SleepTimerOptions.CUSTOM_MIN_MINUTES),
+            SleepTimerOptions.parseCustomInput("", "1"),
+            "正好到下限必须能开出来",
+        )
+        assertEquals(
+            SleepTimerCustomInput.TooLong,
+            SleepTimerOptions.parseCustomInput("24", "1"),
+            "超出一分钟也算超",
+        )
+        assertEquals(
+            SleepTimerCustomInput.TooShort,
+            SleepTimerOptions.parseCustomInput("0", "0"),
+            "0 分钟是非法，不是「不设定时」",
+        )
+    }
+
+    @Test
+    fun `自定义时长小时那一格可以空着`() {
+        // 只填分钟是最常见的用法：手机上「30」两下就打完了，没人愿意多打一个
+        //「0 小时」。把空当成 0 和不把空当成 0，差别就只在这一格上。
+        assertEquals(SleepTimerCustomInput.Valid(30), SleepTimerOptions.parseCustomInput("", "30"))
+        assertEquals(SleepTimerCustomInput.Valid(120), SleepTimerOptions.parseCustomInput("2", ""))
+        assertEquals(SleepTimerCustomInput.Valid(90), SleepTimerOptions.parseCustomInput("1", "30"))
+    }
+
+    @Test
+    fun `自定义输入先把全角数字折成半角`() {
+        // 中文输入法在全角状态下打出来的「１」和半角「1」长得几乎一样。
+        // 不折的话，用户会对着一个明明填了「１０」的框读「只填数字」，
+        // 然后反复检查自己填的到底是不是数字。
+        assertEquals(
+            SleepTimerCustomInput.Valid(70),
+            SleepTimerOptions.parseCustomInput("１", "１０"),
+        )
+    }
+
+    @Test
+    fun `两格都空着不算出错而只是还没填`() {
+        // 对话框刚打开时就是这个状态。把它归进「只填数字」那一类，用户一打开
+        // 就被一句红字骂，而他根本还没动手。
+        assertEquals(SleepTimerCustomInput.Blank, SleepTimerOptions.parseCustomInput("", ""))
+        assertEquals(SleepTimerCustomInput.Blank, SleepTimerOptions.parseCustomInput("  ", " "))
+    }
+
+    @Test
+    fun `填了非数字和填了负数各有各的说法`() {
+        // 这两件事的下一步动作相反：一个是「改成数字」，一个是「改成正数」。
+        // 塌成同一个结果，用户就会按着错的提示去改。
+        assertEquals(
+            SleepTimerCustomInput.NotANumber,
+            SleepTimerOptions.parseCustomInput("1 小时", "0"),
+        )
+        assertEquals(SleepTimerCustomInput.NotANumber, SleepTimerOptions.parseCustomInput("", "3.5"))
+        assertEquals(SleepTimerCustomInput.TooShort, SleepTimerOptions.parseCustomInput("-1", "30"))
+    }
+
+    @Test
+    fun `超出上限的输入不会被悄悄夹到上限`() {
+        // 「2400」被静默改成 24 小时比报错更糟：用户填的是一个数，生效的是另一个，
+        // 而这两者看起来都很「正常」。这条保住的是「填的值要么原样生效、要么明确被拒」。
+        assertEquals(SleepTimerCustomInput.TooLong, SleepTimerOptions.parseCustomInput("2400", "0"))
+        assertEquals(SleepTimerCustomInput.TooLong, SleepTimerOptions.parseCustomInput("999999", "0"))
+    }
+
+    @Test
+    fun `自定义出来的时长认不出档位但认得出自己`() {
+        // 200 分钟不是档位。芯片应该亮在「自定义…」上，而不是亮在 90 分钟那档
+        // ——后者会让用户以为自己设的是 90 分钟。
+        val custom = SleepTimerRules.startCountdown(t0, 200 * SleepTimerOptions.MINUTE_MS)
+        assertNull(SleepTimerOptions.presetFor(custom))
+        assertTrue(SleepTimerOptions.isCustom(custom))
+
+        // 手填 30 分钟**就是** 30 分钟那一档：亮两个芯片会让「我到底设的是哪个」
+        // 变成一个需要回答的问题，而它本来有唯一答案。
+        val preset = SleepTimerRules.startCountdown(t0, 30 * SleepTimerOptions.MINUTE_MS)
+        assertTrue(!SleepTimerOptions.isCustom(preset))
+
+        assertTrue(!SleepTimerOptions.isCustom(SleepTimerState.Off))
+        assertTrue(!SleepTimerOptions.isCustom(SleepTimerState.UntilItemEnd))
+    }
+
+    @Test
+    fun `认不出档位的时长也要能写出具体多久`() {
+        // 芯片上写「已开启」恰好没回答用户想问的那个问题（「我设了多久」）。
+        // 这条守住的是：任意时长都有一句话能说出来。
+        assertEquals(
+            MspText.Res(R.string.msp_sleep_timer_hours_minutes, 3, 20),
+            SleepTimerOptions.durationLabel(200 * SleepTimerOptions.MINUTE_MS),
+        )
+        // 档位内的值走同一条路：分开写会慢慢长出两种风格，比如一个「1 小时」
+        // 一个「60 分钟」。
+        assertEquals(
+            SleepTimerOptions.label(5),
+            SleepTimerOptions.durationLabel(5 * SleepTimerOptions.MINUTE_MS),
+        )
+    }
+
+    @Test
+    fun `分钟数不足一分钟时向上取整而不是写成零`() {
+        // 「0 分钟」看起来像没设定时。这个换算只用来写字，多出来的几秒没人在意；
+        // 写成 0 却会让人以为设置丢了。
+        assertEquals(1, SleepTimerOptions.minutesOf(SleepTimerOptions.MINUTE_MS))
+        assertEquals(2, SleepTimerOptions.minutesOf(90_000L))
+        assertEquals(3, SleepTimerOptions.minutesOf(121_000L))
+        assertEquals(0, SleepTimerOptions.minutesOf(0L))
+        assertEquals(0, SleepTimerOptions.minutesOf(-1L))
+        // 极值不溢出：先加后除会在 Long 顶端翻成负数，那样一个「特别长」的时长
+        // 会被读成「没有定时」。
+        assertTrue(SleepTimerOptions.minutesOf(Long.MAX_VALUE) > 0)
+    }
+
+    @Test
+    fun `自定义输入框的初值就是当前定时`() {
+        // 预填是为了「改一下刚才那个数」这条路：不预填就得把两格重新打一遍。
+        val custom = SleepTimerRules.startCountdown(t0, 200 * SleepTimerOptions.MINUTE_MS)
+        assertEquals(SleepTimerDraft(hours = 3, minutes = 20), SleepTimerOptions.draftOf(custom))
+
+        val preset = SleepTimerRules.startCountdown(t0, 30 * SleepTimerOptions.MINUTE_MS)
+        assertEquals(SleepTimerDraft(hours = 0, minutes = 30), SleepTimerOptions.draftOf(preset))
+
+        // 没有定时时两格都空着：填一个 0 进去会让人以为自己填错过什么。
+        assertNull(SleepTimerOptions.draftOf(SleepTimerState.Off))
+        assertNull(SleepTimerOptions.draftOf(SleepTimerState.UntilItemEnd))
+    }
+
+    @Test
+    fun `解析出来的分钟数乘上毫秒才是内核要的时长`() {
+        // 面板说分钟、内核说毫秒，换算只发生在接线的那一行（`PlayerScreen` 里
+        // `minutes * MINUTE_MS`）。这条盯的是「解析结果真的是分钟」：若单位写成秒，
+        // 90 分钟会被设成 90 秒，而界面上从头到尾看不出区别。
+        val parsed = SleepTimerOptions.parseCustomInput("1", "30")
+        assertEquals(SleepTimerCustomInput.Valid(90), parsed)
+        val minutes = (parsed as SleepTimerCustomInput.Valid).minutes
+        assertEquals(
+            SleepTimerState.Countdown(
+                deadlineMs = t0 + 90 * SleepTimerOptions.MINUTE_MS,
+                totalMs = 90 * SleepTimerOptions.MINUTE_MS,
+            ),
+            SleepTimerRules.startCountdown(t0, minutes * SleepTimerOptions.MINUTE_MS),
+        )
+    }
+
+    @Test
+    fun `自定义的上界比最大的档位宽`() {
+        // 「自定义」如果只能填比档位更小的值，它就没有存在的意义。
+        // 这条守的是两边的数量级关系，不是某个具体数字。
+        assertTrue(SleepTimerOptions.CUSTOM_MAX_MINUTES > SleepTimerOptions.PRESETS_MINUTES.max())
+        assertTrue(SleepTimerOptions.CUSTOM_MIN_MINUTES >= 1)
+    }
 }

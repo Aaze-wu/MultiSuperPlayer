@@ -15,6 +15,10 @@
     <!-- The one preset that is always right: no need to guess when you fall asleep. -->
     <string name="msp_sleep_timer_until_item_end">End of this item</string>
 
+    <!-- The last chip: type your own duration. The ellipsis is deliberate - it
+         opens one more step (a dialog), unlike the other chips which apply at once. -->
+    <string name="msp_sleep_timer_custom">Custom…</string>
+
     <!-- ===== Playback failure messages ===== -->
 
     <!--
