@@ -14,24 +14,24 @@
     <string name="msp_player_scanning">Looking for subtitles…</string>
     <string name="msp_player_reading">Reading subtitles…</string>
     <string name="msp_player_cues">%1$s · %2$d line(s)</string>
-    <string name="msp_player_none_attached">No external subtitle file is attached.</string>
+    <string name="msp_player_none_attached">No external subtitle file loaded.</string>
     <string name="msp_player_translation_missing_shown_original">This subtitle has no translation; showing the original text.</string>
     <string name="msp_player_auto_select">Automatic</string>
     <string name="msp_player_auto_selected">Auto-selected “%1$s”</string>
-    <string name="msp_player_auto_pick_desc">Picks the closest match by file name</string>
-    <string name="msp_player_no_usable_subtitle">No usable subtitle file was found in this folder.</string>
+    <string name="msp_player_auto_pick_desc">Matches candidates by file name</string>
+    <string name="msp_player_no_usable_subtitle">No usable subtitle file in this folder.</string>
     <string name="msp_player_embedded_section">Subtitles in the file itself</string>
     <string name="msp_player_embedded_track">Embedded subtitle %1$d</string>
-    <string name="msp_player_embedded_no_cues_yet">This file has subtitle tracks; the first line has not been read yet.</string>
+    <string name="msp_player_embedded_no_cues_yet">This file contains subtitle tracks, but no line has been read yet.</string>
     <string name="msp_player_subtitle_sync">Subtitle timing</string>
     <string name="msp_player_subtitle_sync_step">%1$s s</string>
     <string name="msp_player_subtitle_sync_reset">Reset</string>
-    <string name="msp_player_subtitle_sync_hint">If the subtitles run ahead of the audio, adjust towards positive; if they lag behind, towards negative.</string>
+    <string name="msp_player_subtitle_sync_hint">Subtitles ahead of the audio: adjust positive. Behind the audio: adjust negative.</string>
     <string name="msp_player_audio_track">Audio track</string>
     <string name="msp_player_audio_track_n">Audio track %1$d</string>
     <string name="msp_player_channels">%1$d ch</string>
     <string name="msp_player_audio_auto">Auto</string>
-    <string name="msp_player_audio_track_hint">Applies to this file only; the next file starts from automatic.</string>
+    <string name="msp_player_audio_track_hint">Applies to this file only; switching files returns to Automatic.</string>
     <string name="msp_player_detail_sep">" · "</string>
     <string name="msp_player_detail_language_unknown">no language tag</string>
     <string name="msp_player_detail_forced">forced</string>
@@ -49,16 +49,16 @@
     <string name="msp_player_mode_bilingual">Bilingual</string>
 
     <!-- ===== Problems while loading ===== -->
-    <string name="msp_player_issue_no_directory">Could not determine this file’s folder, so same-name subtitles cannot be found automatically.</string>
-    <string name="msp_player_issue_directory_invisible">This file’s folder cannot be read, most likely because storage permission is missing.</string>
+    <string name="msp_player_issue_no_directory">Could not determine the file’s folder, so subtitles cannot be matched automatically.</string>
+    <string name="msp_player_issue_directory_invisible">The file’s folder cannot be read; storage permission may be missing.</string>
     <string name="msp_player_issue_scan_failed">Error while looking for subtitles: %1$s</string>
-    <string name="msp_player_issue_no_subtitles">There are no subtitle files in this folder.</string>
-    <string name="msp_player_issue_no_match">The folder has no subtitle named after this video. You can pick one below.</string>
+    <string name="msp_player_issue_no_subtitles">No subtitle files in this folder.</string>
+    <string name="msp_player_issue_no_match">No subtitle in this folder matches the file name. Pick one below.</string>
     <string name="msp_player_issue_load_failed">Could not read “%1$s”: %2$s</string>
 
     <!-- ===== Export ===== -->
     <string name="msp_player_export_done">Exported %1$s</string>
-    <string name="msp_player_export_failed">Export failed: %1$s could not be written (the file may have been deleted, or that location is read-only).</string>
+    <string name="msp_player_export_failed">Export failed: %1$s could not be written (the file may have been deleted, or the location is not writable).</string>
 
     <!-- ===== Translation panel ===== -->
     <string name="msp_player_translation">Translation</string>
@@ -69,7 +69,7 @@
     <string name="msp_player_failed_lines">%1$d line(s) were not translated.</string>
     <string name="msp_player_retry_only_failed">Retry only those lines</string>
     <string name="msp_player_got_it">Got it</string>
-    <string name="msp_player_not_configured">The translation service is not set up yet: missing %1$s.</string>
+    <string name="msp_player_not_configured">Translation is not ready: missing %1$s.</string>
     <string name="msp_player_missing_url_fallback">a valid service URL</string>
     <string name="msp_player_open_settings">Open settings</string>
     <string name="msp_player_translated_count">Translated %1$d/%2$d</string>
@@ -77,7 +77,7 @@
     <string name="msp_player_run_progress">This run: %1$d/%2$d</string>
     <string name="msp_player_with_cache">%1$s, %2$d from cache</string>
     <string name="msp_player_with_requests">%1$s, %2$d request(s)</string>
-    <string name="msp_player_translating">Translating… you can stop at any time; finished lines are kept.</string>
+    <string name="msp_player_translating">Translating… you can stop at any time; translated lines are kept.</string>
     <string name="msp_player_stop">Stop</string>
     <string name="msp_player_translate_all">Translate all</string>
     <string name="msp_player_translate_up_to">Translate up to here</string>
@@ -88,7 +88,7 @@
 
     <!-- ===== Speech recognition (subtitle generation) ===== -->
     <string name="msp_player_asr_title">Speech recognition</string>
-    <string name="msp_player_asr_hint">Turns speech into subtitles on this device; the audio is never uploaded. It takes roughly as long as the video.</string>
+    <string name="msp_player_asr_hint">Recognition runs entirely on this device; audio is never uploaded. Expect roughly the length of the video.</string>
     <string name="msp_player_asr_generate">Generate subtitles</string>
     <string name="msp_player_asr_need_model">This needs a speech model first (%1$s). Once downloaded, no network is required.</string>
     <string name="msp_player_asr_download_generate">Download model and generate (%1$s)</string>
@@ -130,7 +130,7 @@
     <string name="msp_player_track_sep">" · "</string>
 
     <!-- ===== Playback option sheets ===== -->
-    <string name="msp_player_speed_note">Speed only affects playback, never the file itself. Audio is pitch-corrected, so voices do not turn into fast-forward chatter.</string>
+    <string name="msp_player_speed_note">Speed affects playback only and never the file itself; audio is pitch-corrected, so voices do not turn into fast-forward chatter.</string>
     <string name="msp_player_source_line">Source: %1$s</string>
 
     <!-- ===== Player screen state ===== -->
@@ -141,7 +141,7 @@
     <string name="msp_player_offset_behind">-%1$d s</string>
     <string name="msp_player_offset_zero">0 s</string>
     <string name="msp_player_nothing_playing">Nothing is playing</string>
-    <string name="msp_player_nothing_playing_desc">Pick an audio or video file in Library to start playing.</string>
+    <string name="msp_player_nothing_playing_desc">Choose an audio or video in Library to start playing.</string>
 
     <!-- 字幕样式小节（见 values/strings.xml 的同一段说明）。 -->
     <string name="msp_player_subtitle_style">Subtitle style</string>
@@ -155,8 +155,8 @@
     <string name="msp_player_sleep_timer">Sleep timer</string>
     <string name="msp_player_sleep_timer_remaining">%1$s left</string>
     <string name="msp_player_sleep_timer_until_item_end_active">Pause when this item ends</string>
-    <string name="msp_player_sleep_timer_clear">Turn off timer</string>
-    <string name="msp_player_sleep_timer_note">The timer only pauses playback: the queue and position are kept, so you can pick up where you left off.</string>
+    <string name="msp_player_sleep_timer_clear">Clear the timer</string>
+    <string name="msp_player_sleep_timer_note">The timer only pauses playback: the queue and position are kept, so the next play resumes where you left off.</string>
 
     <!-- Custom duration dialog -->
     <string name="msp_player_sleep_timer_custom_title">Custom duration</string>
@@ -165,7 +165,7 @@
     <string name="msp_player_sleep_timer_custom_confirm">Set</string>
     <string name="msp_player_sleep_timer_custom_cancel">Cancel</string>
     <!-- Shown while the fields are empty (the rule); replaced by the error when they are not. -->
-    <string name="msp_player_sleep_timer_custom_hint">Minutes alone is fine. Maximum 24 hours.</string>
+    <string name="msp_player_sleep_timer_custom_hint">Minutes alone is allowed. Maximum 24 hours.</string>
     <string name="msp_player_sleep_timer_custom_number">Hours and minutes must be numbers.</string>
     <string name="msp_player_sleep_timer_custom_min">At least 1 minute.</string>
     <string name="msp_player_sleep_timer_custom_max">Maximum 24 hours.</string>
@@ -174,12 +174,12 @@
     <string name="msp_player_queue">Queue</string>
     <string name="msp_player_queue_chip">Queue %1$d</string>
     <string name="msp_player_queue_count">%1$d items</string>
-    <string name="msp_player_queue_empty">The queue is empty</string>
+    <string name="msp_player_queue_empty">Queue is empty</string>
     <string name="msp_player_queue_remove">Remove from queue</string>
     <string name="msp_player_queue_clear">Clear queue</string>
     <string name="msp_player_queue_playing">Now playing</string>
-    <string name="msp_player_queue_drag_hint">Drag the handle to reorder.</string>
-    <string name="msp_player_queue_shuffle_locked">Reordering is off while shuffle is on (the list no longer matches playback order).</string>
+    <string name="msp_player_queue_drag_hint">Drag the handle on the right to change the order.</string>
+    <string name="msp_player_queue_shuffle_locked">Reordering is unavailable while shuffle is on: the list no longer matches playback order.</string>
 
     <!-- ===== Picture in picture ===== -->
     <string name="msp_player_pip">PiP</string>

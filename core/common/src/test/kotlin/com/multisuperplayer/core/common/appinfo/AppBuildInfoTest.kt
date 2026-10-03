@@ -32,7 +32,16 @@ class AppBuildInfoTest {
         gitTag: String = "v0.5.3",
         gitDirty: Boolean = false,
         buildTimeText: String = "2026-10-02 15:30 +08:00",
-    ) = AppBuildInfo(versionName, versionCode, gitCommit, gitTag, gitDirty, buildTimeText)
+        versionChannel: String = "",
+    ) = AppBuildInfo(
+        versionName,
+        versionCode,
+        gitCommit,
+        gitTag,
+        gitDirty,
+        buildTimeText,
+        versionChannel,
+    )
 
     /** 「未知」这条文案在多个断言里出现，抽出来免得写错 id。 */
     private val unknown: MspText = MspText.Res(R.string.msp_value_unknown)
@@ -187,6 +196,35 @@ class AppBuildInfoTest {
     fun `摘要就是版本号`() {
         // 设置首页那一行只放得下一个版本号，点进去才看得到来源。
         assertEquals(info().versionText(), info().summaryText())
+    }
+
+    // ------------------------------------------------------------------ 预览标记
+
+    @Test
+    fun `带通道后缀的版本是预览版`() {
+        // 关于页靠这个标记决定要不要挂上「预览版」徽章。
+        // 正式包里通道号是空字符串，于是徽章整块不出现。
+        assertTrue(info(versionChannel = "alpha").isPreview)
+        assertTrue(info(versionChannel = "beta").isPreview)
+        assertTrue(info(versionChannel = "rc").isPreview)
+    }
+
+    @Test
+    fun `正式版不带预览标记`() {
+        assertFalse(info().isPreview)
+        assertFalse(info(versionChannel = "").isPreview)
+    }
+
+    @Test
+    fun `通道号是空白时不算预览版`() {
+        // 与其它字段同一套规矩：空白等于「没取到」，不能因为非空就当作有通道。
+        // 否则构建脚本注错一个空格，正式包就会自己挂上「预览版」徽章。
+        assertFalse(info(versionChannel = "   ").isPreview)
+    }
+
+    @Test
+    fun `兜底值不是预览版`() {
+        assertFalse(AppBuildInfo.Unknown.isPreview)
     }
 
     // ------------------------------------------------------------------ 兜底值

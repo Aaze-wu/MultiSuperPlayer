@@ -25,10 +25,40 @@ plugins {
 // 注意 **major 是 0**，所以现在这一串是三位数——别再照着「0.5.4 → 50400」去核对，
 // 那是我一开始写错的示例值（把 minor 当成了 major）。
 // 约束：必须严格递增（否则安装器拒绝覆盖），且小于 2100000000（Google Play 的硬上限）。
-val appVersionName: String = "0.6.0"
+//
+// 允许带预发行后缀（`0.6.1-alpha.1`）：**versionCode 只看数值三段**，
+// 后缀原样进入 versionName、tag 和界面。
+// 同数值段的 alpha/beta/正式版共用同一个 versionCode 是有意的——它们本来就是
+// 「同一个版本」，而 Android 只在**降级**时拒绝安装，同 code 覆盖安装是允许的。
+// 反过来说：升到下一个数值段（0.6.2）时 code 必须跟着涨，否则预发行版会变成
+// 用户永远装不上的「降级包」。
+val appVersionName: String = "0.6.1-alpha.1"
+
+/** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
+val appVersionCore: String = appVersionName.substringBefore('-').trim()
+
+/**
+ * 预发行通道（`alpha` / `beta` / `rc`），稳定版是空串。
+ *
+ * 单独拎出来是因为界面要说人话：「预览版」这三个字不该靠客户端去切 versionName
+ * ——切字符串的代码会在某个 `1.0.0-rc.1+build.7` 上悄悄失灵，而这里失败是看得见的。
+ */
+val appVersionChannel: String = run {
+    val suffix = appVersionName.substringAfter('-', "").trim()
+    if (suffix.isEmpty()) {
+        ""
+    } else {
+        val channel = suffix.substringBefore('.').trim()
+        require(channel.matches(Regex("[A-Za-z]+"))) {
+            "预发行后缀必须以字母通道名开头（如 alpha.1 / beta.2 / rc.1），当前是 \"$suffix\""
+        }
+        channel.lowercase()
+    }
+}
+
 val appVersionCode: Int = run {
-    val parts = appVersionName.split('.')
-    require(parts.size == 3) { "版本号必须是 x.y.z 三段，当前是 \"$appVersionName\"" }
+    val parts = appVersionCore.split('.')
+    require(parts.size == 3) { "版本号必须是 x.y.z 三段（可带 -预发行后缀），当前是 \"$appVersionName\"" }
     val numbers = parts.map { part ->
         part.toIntOrNull() ?: error("版本号里 \"$part\" 不是数字（$appVersionName）")
     }
@@ -113,6 +143,8 @@ android {
         buildConfigField("String", "GIT_TAG", quoted(gitTag))
         buildConfigField("boolean", "GIT_DIRTY", gitDirty.toString())
         buildConfigField("String", "BUILD_TIME", quoted(buildTime))
+        // 空串 = 正式版。界面据此决定要不要挂「预览版」标记。
+        buildConfigField("String", "VERSION_CHANNEL", quoted(appVersionChannel))
 
         // FFmpeg 软件解码扩展带四个 ABI 的原生库，全打进一个包会让 APK 无谓地大一倍：
         // 实测 arm64-v8a 7.5MB + x86_64 11.1MB（未压缩），而 armeabi-v7a/x86 这两个

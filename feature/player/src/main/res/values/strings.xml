@@ -29,27 +29,27 @@
       已经选好了——同一个面板上面说「什么都没挂上」、下面列着两条可选轨。
       片源里有字幕轨时改走 msp_player_embedded_no_cues_yet。
     -->
-    <string name="msp_player_none_attached">没有挂上外挂字幕文件。</string>
+    <string name="msp_player_none_attached">未加载外挂字幕文件。</string>
     <string name="msp_player_translation_missing_shown_original">这份字幕没有译文，已按原文显示。</string>
     <string name="msp_player_auto_select">自动选择</string>
     <string name="msp_player_auto_selected">已自动选中「%1$s」</string>
-    <string name="msp_player_auto_pick_desc">按片名从候选里挑一条最吻合的</string>
-    <string name="msp_player_no_usable_subtitle">这个文件夹里没有找到可用的字幕文件。</string>
+    <string name="msp_player_auto_pick_desc">按片名从候选字幕中匹配</string>
+    <string name="msp_player_no_usable_subtitle">文件夹中未找到可用的字幕文件。</string>
     <string name="msp_player_embedded_section">片源自带的字幕</string>
     <string name="msp_player_embedded_track">内嵌字幕 %1$d</string>
     <!-- 片源里有字幕轨、但一行还没读到（见 msp_player_none_attached 的注释）。 -->
-    <string name="msp_player_embedded_no_cues_yet">片源里有字幕轨，还没读到第一句台词。</string>
+    <string name="msp_player_embedded_no_cues_yet">片源包含字幕轨，尚未读取到第一句台词。</string>
     <!-- 时间轴微调：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
     <string name="msp_player_subtitle_sync">字幕时间轴</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
     <string name="msp_player_subtitle_sync_reset">归零</string>
-    <string name="msp_player_subtitle_sync_hint">字幕比声音早出现就往正数调，晚了就往负数调。</string>
+    <string name="msp_player_subtitle_sync_hint">字幕早于声音出现调整为正值，晚于声音调整为负值。</string>
     <!-- 音轨选择。只在片源里真的有多条音轨时才会出现入口。 -->
     <string name="msp_player_audio_track">音轨</string>
     <string name="msp_player_audio_track_n">音轨 %1$d</string>
     <string name="msp_player_channels">%1$d 声道</string>
     <string name="msp_player_audio_auto">自动</string>
-    <string name="msp_player_audio_track_hint">只对当前这个文件有效，换一个文件会回到自动。</string>
+    <string name="msp_player_audio_track_hint">仅对当前文件有效，切换文件后恢复自动。</string>
     <!-- 引号不是内容：aapt2 会裁掉首尾空白，包上引号才能保住两侧的空格。 -->
     <string name="msp_player_detail_sep">" · "</string>
     <string name="msp_player_detail_language_unknown">未标语言</string>
@@ -68,16 +68,16 @@
     <string name="msp_player_mode_bilingual">双语</string>
 
     <!-- ===== 加载过程中的问题 ===== -->
-    <string name="msp_player_issue_no_directory">无法确定这个文件所在的文件夹，没法自动找同名字幕。</string>
-    <string name="msp_player_issue_directory_invisible">读不到这个文件所在的文件夹，可能是没有存储权限。</string>
+    <string name="msp_player_issue_no_directory">无法确定文件所在文件夹，不能自动查找同名字幕。</string>
+    <string name="msp_player_issue_directory_invisible">无法读取文件所在文件夹，可能缺少存储权限。</string>
     <string name="msp_player_issue_scan_failed">查找字幕时出错：%1$s</string>
-    <string name="msp_player_issue_no_subtitles">这个文件夹里没有字幕文件。</string>
-    <string name="msp_player_issue_no_match">文件夹里没有和片名同名的字幕。可以在下面手动选一条。</string>
+    <string name="msp_player_issue_no_subtitles">文件夹中没有字幕文件。</string>
+    <string name="msp_player_issue_no_match">文件夹中没有与片名同名的字幕，可在下方手动选择。</string>
     <string name="msp_player_issue_load_failed">「%1$s」读取失败：%2$s</string>
 
     <!-- ===== 导出 ===== -->
     <string name="msp_player_export_done">已导出 %1$s</string>
-    <string name="msp_player_export_failed">导出失败：%1$s 没能写入（文件可能已被删除，或者那个位置不允许写入）。</string>
+    <string name="msp_player_export_failed">导出失败：无法写入 %1$s（文件可能已被删除，或该位置不可写）。</string>
 
     <!-- ===== 翻译面板 ===== -->
     <string name="msp_player_translation">翻译</string>
@@ -88,7 +88,7 @@
     <string name="msp_player_failed_lines">有 %1$d 行没翻出来。</string>
     <string name="msp_player_retry_only_failed">只重试这些行</string>
     <string name="msp_player_got_it">知道了</string>
-    <string name="msp_player_not_configured">还没有配置翻译服务：还差 %1$s。</string>
+    <string name="msp_player_not_configured">翻译服务尚未就绪：缺少 %1$s。</string>
     <string name="msp_player_missing_url_fallback">完好的服务地址</string>
     <string name="msp_player_open_settings">去设置</string>
     <string name="msp_player_translated_count">已译 %1$d/%2$d</string>
@@ -96,7 +96,7 @@
     <string name="msp_player_run_progress">本次：%1$d/%2$d</string>
     <string name="msp_player_with_cache">%1$s，缓存命中 %2$d</string>
     <string name="msp_player_with_requests">%1$s，实际请求 %2$d 次</string>
-    <string name="msp_player_translating">正在翻译…可以随时停，已经翻好的会留下。</string>
+    <string name="msp_player_translating">正在翻译…可随时停止，已翻译的内容会保留。</string>
     <string name="msp_player_stop">停止</string>
     <string name="msp_player_translate_all">翻译全文</string>
     <string name="msp_player_translate_up_to">翻译到当前位置</string>
@@ -107,7 +107,7 @@
 
     <!-- ===== 语音识别（生成字幕） ===== -->
     <string name="msp_player_asr_title">语音识别</string>
-    <string name="msp_player_asr_hint">在这台设备上把语音识别成字幕，音频不会上传。识别需要的时间大致与片长相当。</string>
+    <string name="msp_player_asr_hint">语音识别在本机完成，音频不会上传。所需时间大致与片长相当。</string>
     <string name="msp_player_asr_generate">生成字幕</string>
     <string name="msp_player_asr_need_model">需要先下载识别模型（%1$s），下好之后就不需要联网了。</string>
     <string name="msp_player_asr_download_generate">下载模型并生成（%1$s）</string>
@@ -153,7 +153,7 @@
     <string name="msp_player_track_sep">"　·　"</string>
 
     <!-- ===== 播放选项面板 ===== -->
-    <string name="msp_player_speed_note">倍速只影响播放，不会改变文件本身。音频会做音高补偿，人声不会变成快进声。</string>
+    <string name="msp_player_speed_note">倍速仅影响播放，不会改动文件本身；音频已做音高补偿，人声不会变成快进声。</string>
     <string name="msp_player_source_line">当前片源：%1$s</string>
 
     <!-- ===== 播放页状态 ===== -->
@@ -164,7 +164,7 @@
     <string name="msp_player_offset_behind">-%1$d 秒</string>
     <string name="msp_player_offset_zero">0 秒</string>
     <string name="msp_player_nothing_playing">没有正在播放的内容</string>
-    <string name="msp_player_nothing_playing_desc">到「媒体库」里选一条音频或视频即可开始播放。</string>
+    <string name="msp_player_nothing_playing_desc">在「媒体库」中选择音频或视频即可开始播放。</string>
 
     <!--
       字幕样式小节。
@@ -182,8 +182,8 @@
     <string name="msp_player_sleep_timer">睡眠定时</string>
     <string name="msp_player_sleep_timer_remaining">还有 %1$s</string>
     <string name="msp_player_sleep_timer_until_item_end_active">本集结束后暂停</string>
-    <string name="msp_player_sleep_timer_clear">关掉定时</string>
-    <string name="msp_player_sleep_timer_note">到期只会暂停：队列和播放位置都留着，下次点播放就从原处接着放。</string>
+    <string name="msp_player_sleep_timer_clear">关闭定时</string>
+    <string name="msp_player_sleep_timer_note">到期后仅暂停：队列与播放位置都会保留，下次播放从原处继续。</string>
 
     <!-- 自定义时长对话框 -->
     <string name="msp_player_sleep_timer_custom_title">自定义时长</string>
@@ -192,7 +192,7 @@
     <string name="msp_player_sleep_timer_custom_confirm">设定</string>
     <string name="msp_player_sleep_timer_custom_cancel">取消</string>
     <!-- 空了的时候显示的是规则，填错了则显示错因（同一行） -->
-    <string name="msp_player_sleep_timer_custom_hint">只填分钟也可以，最长 24 小时。</string>
+    <string name="msp_player_sleep_timer_custom_hint">可只填分钟，最长 24 小时。</string>
     <string name="msp_player_sleep_timer_custom_number">小时和分钟都只填数字。</string>
     <string name="msp_player_sleep_timer_custom_min">至少 1 分钟。</string>
     <string name="msp_player_sleep_timer_custom_max">最长 24 小时。</string>
@@ -201,12 +201,12 @@
     <string name="msp_player_queue">播放队列</string>
     <string name="msp_player_queue_chip">队列 %1$d</string>
     <string name="msp_player_queue_count">共 %1$d 项</string>
-    <string name="msp_player_queue_empty">队列是空的</string>
+    <string name="msp_player_queue_empty">队列为空</string>
     <string name="msp_player_queue_remove">从队列中移除</string>
     <string name="msp_player_queue_clear">清空队列</string>
     <string name="msp_player_queue_playing">正在播放</string>
-    <string name="msp_player_queue_drag_hint">按住右侧把手上下拖动可以排序。</string>
-    <string name="msp_player_queue_shuffle_locked">随机播放开着时不能手动排序（列表顺序已经不是播放顺序了）。</string>
+    <string name="msp_player_queue_drag_hint">按住右侧把手上下拖动可调整顺序。</string>
+    <string name="msp_player_queue_shuffle_locked">随机播放开启时不能手动排序：列表顺序已不是播放顺序。</string>
 
     <!-- ===== 画中画 ===== -->
     <!-- 控制条上的入口。英文用 PiP 缩写：写成 “Picture in picture” 会把芯片撑得比别的都长。 -->

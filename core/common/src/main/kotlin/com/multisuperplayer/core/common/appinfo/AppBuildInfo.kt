@@ -24,7 +24,18 @@ data class AppBuildInfo(
     val gitTag: String,
     val gitDirty: Boolean,
     val buildTimeText: String,
+    /**
+     * 预发行通道（`alpha` / `beta` / `rc`）。**正式版是空串**。
+     *
+     * 由构建脚本从 `versionName` 的后缀里切出来，而不是让界面自己去 `versionName`
+     * 上做字符串处理：切字符串的代码写错了不会报错，只会某天在一个
+     * `1.0.0-rc.1+build.7` 上安静地失灵，而这里是一个显式字段，缺了就是空。
+     */
+    val versionChannel: String = "",
 ) {
+
+    /** 是不是预发行版。界面据此在标题区挂「预览版」标记。 */
+    val isPreview: Boolean get() = versionChannel.isNotBlank()
 
     /** 形如 `0.5.4 (50500)`；拿不到版本号时返回「未知」。 */
     fun versionText(): MspText {

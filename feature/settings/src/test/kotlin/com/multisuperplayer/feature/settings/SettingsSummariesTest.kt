@@ -235,7 +235,7 @@ class SettingsSummariesTest {
     fun `翻译 - 什么都没填时逐项列出缺什么`() {
         // 「还不够」必须写清楚差什么：这一行是用户在播放页翻不出字幕时唯一会看的地方。
         assertText(
-            "DeepSeek · 还不能翻译（缺：服务地址、模型名、API 密钥）",
+            "DeepSeek · 翻译未就绪（缺少：服务地址、模型名、API 密钥）",
             SettingsSummaries.translation(TranslationSettings()),
         )
     }
@@ -260,7 +260,7 @@ class SettingsSummariesTest {
         )
 
         assertText(
-            "DeepSeek · 还不能翻译（缺：服务地址（需要以 http:// 或 https:// 开头））",
+            "DeepSeek · 翻译未就绪（缺少：服务地址（需要以 http:// 或 https:// 开头））",
             SettingsSummaries.translation(settings),
         )
     }

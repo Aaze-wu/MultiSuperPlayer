@@ -126,6 +126,7 @@ fun PlaybackSettingsScreen(
                     checked = force && softwareDecodingAvailable,
                     enabled = softwareDecodingAvailable,
                     onCheckedChange = onSetForceSoftwareDecoding,
+                    help = stringResource(R.string.msp_settings_force_software_help),
                 )
             }
 
@@ -140,6 +141,7 @@ fun PlaybackSettingsScreen(
                     value = aspect.label.string(),
                     subtitle = stringResource(R.string.msp_settings_default_aspect_desc),
                     onClick = { openDialog = PlaybackDialog.ASPECT_RATIO },
+                    help = stringResource(R.string.msp_settings_default_aspect_help),
                 )
             }
 
@@ -153,6 +155,7 @@ fun PlaybackSettingsScreen(
                     value = PlaybackSpeedOptions.format(speed),
                     subtitle = stringResource(R.string.msp_settings_default_speed_desc),
                     onClick = { openDialog = PlaybackDialog.SPEED },
+                    help = stringResource(R.string.msp_settings_default_speed_help),
                 )
             }
 
@@ -185,6 +188,7 @@ fun PlaybackSettingsScreen(
                     checked = remember,
                     enabled = true,
                     onCheckedChange = onSetRememberPosition,
+                    help = stringResource(R.string.msp_settings_remember_position_help),
                 )
             }
 
@@ -203,6 +207,7 @@ fun PlaybackSettingsScreen(
                     checked = recordRecent,
                     enabled = true,
                     onCheckedChange = onSetRecordRecentPlays,
+                    help = stringResource(R.string.msp_settings_record_recent_help),
                 )
             }
         }

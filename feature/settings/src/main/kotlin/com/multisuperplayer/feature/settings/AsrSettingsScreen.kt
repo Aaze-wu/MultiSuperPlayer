@@ -183,6 +183,7 @@ fun AsrSettingsScreen(
                     // 下载中不改地址：正在跑的那个任务已经按旧地址在下了，
                     // 而这一栏改的是「下一次」——两件事同时发生会让用户以为改一下就换源续传了。
                     enabled = !state.installing,
+                    help = stringResource(R.string.msp_settings_asr_source_help),
                 )
             }
 

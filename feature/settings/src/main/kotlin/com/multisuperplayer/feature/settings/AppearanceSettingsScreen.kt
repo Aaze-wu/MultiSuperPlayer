@@ -128,15 +128,11 @@ fun AppearanceSettingsScreen(
     // 正是「点强调色没反应」的成因。
     val artworkColorEnabled = theme.colorFromArtwork ?: MspThemeDefaults.COLOR_FROM_ARTWORK
     val dynamicColorPreferred = theme.useDynamicColor ?: MspThemeDefaults.USE_DYNAMIC_COLOR
-    // 系统取色的两个前置条件。算在这里而不是下面那个 item 里，是因为
-    // 「关于主题」那段文案也要用——只在本系统取色真的生效时才能说「配色来自系统取色」。
-    // 纯黑模式下系统取色给的是一堆深灰，正好把「省像素」这件事毁掉，
-    // 所以那套基底下面即使系统支持也不走系统取色。
+    // 系统取色的两个前置条件。纯黑模式下系统取色给的是一堆深灰，正好把「省像素」
+    // 这件事毁掉，所以那套基底下面即使系统支持也不走系统取色。
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val dynamicColorBlockedByOled = baseTheme == MspBaseTheme.BLACK
     val dynamicColorUsable = dynamicColorSupported && !dynamicColorBlockedByOled
-    // 真正生效的那个取色来源：两者都开着时封面取色赢。
-    val dynamicColorActive = dynamicColorUsable && dynamicColorPreferred && !artworkColorEnabled
 
     Scaffold(
         modifier = modifier,
@@ -172,6 +168,7 @@ fun AppearanceSettingsScreen(
                 AccentPicker(
                     selected = accent,
                     onSelect = onSelectAccent,
+                    help = stringResource(R.string.msp_settings_theme_note_accent),
                 )
             }
 
@@ -184,6 +181,7 @@ fun AppearanceSettingsScreen(
                     checked = artworkColorEnabled,
                     enabled = true,
                     onCheckedChange = onSetColorFromArtwork,
+                    help = stringResource(R.string.msp_settings_theme_note_artwork),
                 )
             }
 
@@ -205,20 +203,7 @@ fun AppearanceSettingsScreen(
                     checked = checked,
                     enabled = enabled,
                     onCheckedChange = onSetDynamicColor,
-                )
-            }
-
-            item { SectionHeader(stringResource(R.string.msp_settings_section_about_theme)) }
-            item {
-                // 说清楚「为什么我选的颜色没生效」——这是本页最容易让人困惑的一点。
-                // 但光描述现象没用：选强调色**会自动**关掉盖住它的那两个开关，
-                // 所以每条文案都要给出下一步动作。
-                InfoNote(
-                    text = when {
-                        artworkColorEnabled -> stringResource(R.string.msp_settings_theme_note_artwork)
-                        dynamicColorActive -> stringResource(R.string.msp_settings_theme_note_dynamic)
-                        else -> stringResource(R.string.msp_settings_theme_note_accent)
-                    },
+                    help = stringResource(R.string.msp_settings_theme_note_dynamic),
                 )
             }
 
@@ -311,13 +296,24 @@ private fun BaseThemeRow(
 private fun AccentPicker(
     selected: MspAccent,
     onSelect: (MspAccent) -> Unit,
+    help: String,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Text(
-            text = stringResource(R.string.msp_settings_accent_label),
-            style = MaterialTheme.typography.bodyLarge,
+        // 强调色是这一页唯一「选一个颜色」的控件，也是唯一没有副标题的控件，
+        // 所以它的说明只能挂在标签旁边的问号上。
+        Row(
             modifier = Modifier.padding(vertical = 8.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.msp_settings_accent_label),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            SettingHelpIcon(
+                title = stringResource(R.string.msp_settings_accent_label),
+                text = help,
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth().selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(14.dp),

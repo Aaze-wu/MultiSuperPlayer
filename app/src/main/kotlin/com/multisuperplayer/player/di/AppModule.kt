@@ -20,6 +20,7 @@ fun buildAppInfo(): AppBuildInfo = AppBuildInfo(
     gitTag = BuildConfig.GIT_TAG,
     gitDirty = BuildConfig.GIT_DIRTY,
     buildTimeText = BuildConfig.BUILD_TIME,
+    versionChannel = BuildConfig.VERSION_CHANNEL,
 )
 
 /**

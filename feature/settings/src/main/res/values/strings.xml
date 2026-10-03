@@ -61,8 +61,8 @@
     <!-- 例：`译成中文`。`%1$s` 是目标语言名 -->
     <string name="msp_settings_summary_translate_to">译成%1$s</string>
 
-    <!-- 还没配好。`%1$s` 是缺项清单（逗号分隔）。写清缺什么比「请检查设置」有用 -->
-    <string name="msp_settings_summary_translation_incomplete">还不能翻译（缺：%1$s）</string>
+    <!-- 还没配好。`%1$s` 是缺项清单（分隔符见 msp_settings_list_separator）。写清缺什么比「请检查设置」有用 -->
+    <string name="msp_settings_summary_translation_incomplete">翻译未就绪（缺少：%1$s）</string>
 
     <!--
       ASR 的三种状态，同样**必须分开**：它们对应的下一步是「下载 / 继续下载 / 已经能用」。
@@ -94,24 +94,28 @@
 
     <string name="msp_settings_section_base_theme">主题基底</string>
     <string name="msp_settings_section_color_source">取色来源</string>
-    <string name="msp_settings_section_about_theme">关于主题</string>
     <string name="msp_settings_section_language">语言</string>
 
     <string name="msp_settings_artwork_color">封面取色</string>
-    <string name="msp_settings_artwork_color_desc">用正在播放的封面生成主题色</string>
+    <!-- 副标题只说「是什么」，详细解释在帮助问号里（msp_settings_theme_note_artwork） -->
+    <string name="msp_settings_artwork_color_desc">用封面图片生成主题色</string>
 
     <string name="msp_settings_dynamic_color">跟随系统取色</string>
-    <string name="msp_settings_dynamic_color_desc">使用系统壁纸生成的主题色（选强调色时会自动关掉）</string>
+    <string name="msp_settings_dynamic_color_desc">使用系统壁纸生成主题色</string>
 
     <!-- 被另一个开关盖住时必须说清是「被盖住」而不是「被系统关了」 -->
     <string name="msp_settings_dynamic_color_covered">已被封面取色覆盖</string>
     <string name="msp_settings_dynamic_color_needs_api31">需要 Android 12 及以上</string>
 
     <!-- 纯黑基底 + 系统取色会给出一堆深灰，正好毁掉「省像素」，所以那条路是自己关掉的 -->
-    <string name="msp_settings_dynamic_color_blocked">纯黑模式下不可用（系统取色会给出一堆深灰）</string>
+    <string name="msp_settings_dynamic_color_blocked">纯黑模式下不可用</string>
 
-    <string name="msp_settings_theme_note_artwork">现在的配色来自封面取色。它盖住了强调色，但选一个强调色就可以切回来（那会自动关掉封面取色）；封面里没有可用颜色时（比如黑白封面）会回退到强调色，所以强调色仍然有用。</string>
-    <string name="msp_settings_theme_note_dynamic">现在的配色来自系统取色。选一个强调色就会自动关掉系统取色，配色立刻跟随强调色。</string>
+    <!--
+      下面三条现在**只在帮助问号里**出现，所以写成静态说明。
+      以前它们是常驻在页面上的提示块，占三行而且随状态变；现在挂到对应的设置行上。
+    -->
+    <string name="msp_settings_theme_note_artwork">用正在播放的封面图片生成主题色。它会盖住强调色；选一个强调色即可切回（那会自动关掉封面取色）。封面里没有可用颜色时（例如黑白封面）会回退到强调色，所以强调色仍然有用。</string>
+    <string name="msp_settings_theme_note_dynamic">使用系统壁纸生成主题色。选一个强调色会自动关掉系统取色，配色立刻跟随强调色。</string>
     <string name="msp_settings_theme_note_accent">强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。</string>
 
     <string name="msp_settings_accent_label">强调色</string>
@@ -131,25 +135,28 @@
     <string name="msp_settings_section_decoding">解码</string>
     <string name="msp_settings_force_software">强制软件解码</string>
 
-    <!-- 三个分支的说明：这是一个「开关在但不管用」的开关，三个状态必须说清 -->
-    <string name="msp_settings_force_software_no_ffmpeg">本安装包不含 FFmpeg（CPU 架构不受支持），打开也不会生效</string>
-    <string name="msp_settings_force_software_on">已用 FFmpeg 解码。画面异常时用它排查；代价是耗电和发热明显变高。</string>
-    <string name="msp_settings_force_software_off">默认不勾：系统解码器放不了或放错时，内核会自动改用内置的 FFmpeg。只有当画面花屏/变色/音画不同步（硬件解码器出错）时才需要勾上。</string>
+    <!--
+      三个分支的说明：这是一个「开关在但不管用」的开关，三个状态必须说清。
+      副标题只留状态与结论，「为什么需要软解」在 msp_settings_force_software_help 里。
+    -->
+    <string name="msp_settings_force_software_no_ffmpeg">本安装包不含 FFmpeg，打开也不会生效</string>
+    <string name="msp_settings_force_software_on">正在使用 FFmpeg 解码（耗电与发热明显增加）</string>
+    <string name="msp_settings_force_software_off">由内核自动选择解码方式，异常时回退到内置 FFmpeg</string>
 
     <string name="msp_settings_section_picture_speed">画面与速度</string>
 
     <string name="msp_settings_default_aspect">默认画面比例</string>
-    <string name="msp_settings_default_aspect_desc">只影响之后打开的文件。在播放页里临时改的比例不会写到这里。</string>
+    <string name="msp_settings_default_aspect_desc">只影响之后打开的文件</string>
 
     <string name="msp_settings_default_speed">默认倍速</string>
-    <string name="msp_settings_default_speed_desc">跨文件保留：播放页里改了倍速，这里也会跟着变。</string>
+    <string name="msp_settings_default_speed_desc">跨文件保留</string>
 
     <string name="msp_settings_boost_speed">长按倍速</string>
     <string name="msp_settings_boost_speed_desc">按住画面时用这个速度，松手回到原来的速度。</string>
 
     <string name="msp_settings_remember_position">记住播放位置</string>
     <string name="msp_settings_remember_position_on">下次打开同一个文件时接着上次的位置播</string>
-    <string name="msp_settings_remember_position_off">每次都从头播。已经记住的位置不会被删掉，重新打开这个开关就能继续用。</string>
+    <string name="msp_settings_remember_position_off">每次都从头播放</string>
 
     <!--
       和上面那一条相邻，两句副标题必须把区别说透：两个开关的名字很像，
@@ -157,7 +164,7 @@
     -->
     <string name="msp_settings_record_recent">记录最近播放</string>
 <string name="msp_settings_record_recent_on">播放过的内容会出现在「最近播放」页，点进去能接着上次的位置</string>
-<string name="msp_settings_record_recent_off">不再记录新的播放历史（续播位置另算）。已经记下的不会删掉，重新打开就能看到。</string>
+<string name="msp_settings_record_recent_off">不再记录新的播放历史</string>
 
     <!-- 选择对话框里的档位说明，两处都是「等同于默认」的意思 -->
     <string name="msp_settings_speed_normal">正常速度</string>
@@ -165,21 +172,35 @@
 
     <!-- ===== 关于 ===== -->
 
-    <string name="msp_settings_section_version">版本</string>
-    <string name="msp_settings_section_update">更新</string>
     <string name="msp_settings_section_device">设备</string>
     <string name="msp_settings_section_license">开源许可</string>
     <string name="msp_settings_section_logs">日志</string>
 
-    <string name="msp_settings_check_update">检查更新</string>
-    <string name="msp_settings_check">检查</string>
+    <!-- ===== 关于：标题区与入口 ===== -->
+
+    <!-- 标题区里的标记，只在预发行包里出现（构建脚本从 versionName 后缀推出 channel） -->
+    <string name="msp_settings_about_preview">预览版</string>
+    <string name="msp_settings_about_preview_note">预发行测试版，功能与文案可能还会改动。</string>
+
+    <string name="msp_settings_section_links">使用与反馈</string>
+
+    <string name="msp_settings_about_homepage">项目主页</string>
+    <string name="msp_settings_about_homepage_desc">在 GitHub 上查看项目</string>
+    <string name="msp_settings_about_feedback">问题反馈</string>
+    <string name="msp_settings_about_feedback_desc">报告问题或提出建议</string>
+    <string name="msp_settings_about_whats_new">本版更新说明</string>
+    <string name="msp_settings_about_whats_new_desc">这一版改了什么</string>
+
+    <!-- 打开浏览器失败时把地址写出来，用户可以自己复制 -->
+    <string name="msp_settings_about_link_failed">无法打开浏览器：%1$s</string>
+
+    <!--
+      本版更新说明的正文。**每次发版都要改这一条，三份语言文件一起改**。
+      `\n` 是换行；以「· 」开头的行在界面上按条目排版。
+    -->
+    <string name="msp_settings_about_whats_new_body">首个对外发布的预览版。\n\n· 音视频播放：主流容器与编码，内置 FFmpeg 软件解码兜底\n· 字幕：自动匹配外挂字幕、样式自定义、逐句翻译（本地术语表 + 云端 API）\n· 语音识别：本机离线生成字幕，音频不上传\n· 主题：系统取色、封面取色、自定义强调色，支持深色与纯黑\n· 媒体库、浏览、最近播放与播放列表\n\n已知限制：不含 32 位原生库；语音识别模型需首次使用时联网下载。</string>
+
     <string name="msp_settings_view">查看</string>
-
-    <!-- 还没接更新源就说清楚「不是坏了，是没这个渠道」 -->
-    <string name="msp_settings_update_no_source">还没有接入更新源：本版本没有发布渠道，这个包是本机自己构建的。</string>
-
-    <!-- 更新说明。`%1$s` 是版本号，`%2$s` 是构建来源 -->
-    <string name="msp_settings_update_dialog_text">还没有接入更新源，所以无法检查。\n\n当前版本 %1$s，构建来源 %2$s。\n\n以后接上发布渠道后，这里会显示是否有新版本以及更新说明。</string>
 
     <!-- 设备信息读不到时的值。左边标签就是上面的「设备」 -->
     <string name="msp_settings_device_unavailable">读不到</string>
@@ -198,7 +219,7 @@
     <string name="msp_settings_log_range">覆盖日期</string>
     <string name="msp_settings_export_logs">导出日志</string>
 
-    <string name="msp_settings_export_hint_idle">导出的是一个纯文本文件，包含本机保留的全部日志和上方的版本/设备信息。出了问题把它发出来就能定位。</string>
+    <string name="msp_settings_export_hint_idle">导出的是包含本机日志与上方版本、设备信息的纯文本文件，反馈问题时附上即可。</string>
     <string name="msp_settings_export_running">正在写入…</string>
 
     <!-- 例：`已保存：msp-20260101.log（含 12 个日志文件）` -->
@@ -229,16 +250,16 @@
     <string name="msp_settings_model_name">模型名</string>
     <string name="msp_settings_fetch_models">拉取列表</string>
     <string name="msp_settings_fetching">拉取中…</string>
-    <string name="msp_settings_fetch_failed_prefix">拉不到模型列表</string>
+    <string name="msp_settings_fetch_failed_prefix">获取模型列表失败</string>
 
-    <!-- 地址、模型名、密钥三类的补充说明 -->
-    <string name="msp_settings_base_url_support">以 /v1 结尾的地址会被自动补上 /chat/completions；改这里可以指向你自己的中转。</string>
-    <string name="msp_settings_model_support">必须和厂商文档里的名字完全一致，别凭记忆写。</string>
+    <!-- 地址、模型名、密钥三类的补充说明。详细解释在帮助问号里 -->
+    <string name="msp_settings_base_url_support">以 /v1 结尾的地址会自动补全请求路径</string>
+    <string name="msp_settings_model_support">需与厂商文档中的名称完全一致</string>
 
     <string name="msp_settings_auto_translate">自动翻译后续字幕</string>
     <string name="msp_settings_auto_translate_desc">播放到哪就翻到哪，已经翻好的会留在字幕里。关掉也可以随时手动翻。</string>
 
-    <string name="msp_settings_test_desc">会真的翻一句样板文本。它同时验证地址、密钥、模型名，以及这家厂商收不收我们的请求形状。会消耗一次极少的 token。</string>
+    <string name="msp_settings_test_desc">发送一句样板文本，验证当前配置是否可用</string>
     <string name="msp_settings_test_button">测试连接</string>
     <string name="msp_settings_test_running">测试中…</string>
     <string name="msp_settings_connection_failed_prefix">连接失败</string>
@@ -251,7 +272,7 @@
 
     <string name="msp_settings_switch">切换</string>
 
-    <string name="msp_settings_model_count">这家厂商报了 %1$d 个模型，点一下就用它：</string>
+    <string name="msp_settings_model_count">已从服务商获取 %1$d 个模型，点选即可使用：</string>
 
     <string name="msp_settings_api_key_label">API 密钥</string>
     <string name="msp_settings_api_key_placeholder">粘贴密钥后点「保存」</string>
@@ -281,7 +302,7 @@
       术语表语法说明。例子里的反引号是故意写的：它们就是用户该输入的符号，
       所以不能换成引号。
     -->
-    <string name="msp_settings_glossary_desc">一行一条。`桐人` = 保持原样，`Guild = 公会` = 固定译法。# 开头是注释。</string>
+    <string name="msp_settings_glossary_desc">一行一条。「桐人」= 保持原样，「Guild = 公会」= 固定译法。# 开头是注释。</string>
 
     <string name="msp_settings_glossary_collapse">收起</string>
     <string name="msp_settings_glossary_edit">编辑</string>
@@ -323,7 +344,7 @@
 
     <string name="msp_settings_section_asr_model">识别模型</string>
     <!-- 「不上传」是这条功能的卖点，也是用户第一个会怀疑的事，所以放在最前面 -->
-    <string name="msp_settings_asr_model_hint">识别只在这台手机上跑，音频不会上传。片长多长，识别大概就要多久。</string>
+    <string name="msp_settings_asr_model_hint">识别全程在本机完成，音频不会上传。耗时约等于音频时长。</string>
 
     <string name="msp_settings_asr_download">下载模型</string>
     <string name="msp_settings_asr_resume">继续下载</string>
@@ -348,10 +369,24 @@
 
     <string name="msp_settings_section_asr_source">下载源</string>
     <string name="msp_settings_asr_source">模型下载地址</string>
-    <string name="msp_settings_asr_source_support">默认走国内镜像 hf-mirror.com。填 https://huggingface.co 则是官方源（国内常常慢到像卡住）。</string>
+    <string name="msp_settings_asr_source_support">默认使用国内镜像源</string>
     <!-- 输入框下的提示，只有一个要求：少写协议头是这一栏唯一常见的错法 -->
     <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 开头。</string>
 
     <string name="msp_settings_asr_dismiss">知道了</string>
+
+    <!-- ===== 设置项帮助（问号） ===== -->
+
+    <!-- 帮助图标的无障碍名称。`%1$s` 是那一行的标题 -->
+    <string name="msp_settings_help_icon_desc">%1$s：查看说明</string>
+
+    <string name="msp_settings_force_software_help">默认由内核自动选择解码方式：系统解码器放不了或放错时，会自动改用内置的 FFmpeg。只有出现花屏、变色、音画不同步（硬件解码器出错）时才需要强制软解；代价是耗电和发热明显增加。</string>
+    <string name="msp_settings_default_aspect_help">只影响之后打开的文件。在播放页里临时改的比例只作用于那一次播放，不会写到这里。</string>
+    <string name="msp_settings_default_speed_help">跨文件保留：在播放页里改了倍速，这里也会跟着变。「长按倍速」是另一个开关，不受这里影响。</string>
+    <string name="msp_settings_remember_position_help">关掉后每次从头播放。已经记住的位置不会被删除，重新打开这个开关就能继续用。</string>
+    <string name="msp_settings_record_recent_help">关掉后不再记录新的播放历史。续播位置由「记住播放位置」单独控制，不受这里影响。已经记下的不会被删除，重新打开就能看到。</string>
+    <string name="msp_settings_base_url_help">以 /v1 结尾的地址会被自动补上 /chat/completions。改这里可以指向自己的中转服务，只要它的接口与 OpenAI 兼容。</string>
+    <string name="msp_settings_test_help">测试会真的翻一句样板文本，同时验证地址、密钥、模型名，以及这家厂商是否接受本应用发送的请求格式。会消耗极少的 token。</string>
+    <string name="msp_settings_asr_source_help">默认使用 hf-mirror.com 国内镜像。填 https://huggingface.co 则改用官方源，国内访问通常很慢。</string>
 
 </resources>

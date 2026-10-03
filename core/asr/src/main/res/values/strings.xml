@@ -20,26 +20,26 @@
     <string name="msp_asr_detail_sep">" · "</string>
 
     <string name="msp_asr_model_paraformer_name">中文离线（Paraformer 小模型）</string>
-    <string name="msp_asr_model_paraformer_desc">纯中文识别，速度快、错字少。只有两个模型文件，只想给中文视频配字幕选它。</string>
+    <string name="msp_asr_model_paraformer_desc">纯中文识别，速度快、错字少，适合为中文视频生成字幕。</string>
 
     <!-- 失败提示。每种失败一句话，因为「下一步该做什么」不同：网络等一等、
          源不对换一个、空间不够清理一下。合成一句「生成失败」会让人反复重试
          一个必然失败的操作。 -->
-    <string name="msp_asr_error_network">网络中断：%1$s</string>
+    <string name="msp_asr_error_network">网络连接中断：%1$s</string>
     <string name="msp_asr_error_http">服务器返回 %1$d</string>
-    <string name="msp_asr_error_source">下载源地址不对：%1$s</string>
-    <string name="msp_asr_error_size">文件不完整（应为 %1$s，实际 %2$s）</string>
+    <string name="msp_asr_error_source">下载源地址无效：%1$s</string>
+    <string name="msp_asr_error_size">文件不完整（预期 %1$s，实际 %2$s）</string>
     <string name="msp_asr_error_hash">文件校验不通过</string>
     <string name="msp_asr_error_write">写入失败：%1$s</string>
-    <string name="msp_asr_error_model_missing">%1$s 还没下载完（%2$s）</string>
-    <string name="msp_asr_error_no_audio">这个文件里没有可用的音轨</string>
+    <string name="msp_asr_error_model_missing">%1$s 尚未下载完成（%2$s）</string>
+    <string name="msp_asr_error_no_audio">该文件不包含可用的音轨</string>
     <string name="msp_asr_error_decode">音频解码失败：%1$s</string>
-    <string name="msp_asr_error_no_speech">没有识别到人声</string>
+    <string name="msp_asr_error_no_speech">未识别到人声</string>
     <string name="msp_asr_error_engine">识别引擎出错：%1$s</string>
-    <string name="msp_asr_error_storage">字幕已识别出来，但没能保存（存储空间可能不足）</string>
+    <string name="msp_asr_error_storage">字幕已生成，但保存失败（存储空间可能不足）</string>
     <string name="msp_asr_error_unknown">识别失败：%1$s</string>
 
     <string name="msp_asr_model_zipformer_name">中英双语流式（Zipformer）</string>
-    <string name="msp_asr_model_zipformer_desc">中英混说也能识别（「这个 function 要加个 try-catch」里的英文会照原样出来）。模型大得多，速度也慢一些。</string>
+    <string name="msp_asr_model_zipformer_desc">支持中英混说，句中的英文会原样保留。模型体积更大，识别速度较慢。</string>
 
 </resources>

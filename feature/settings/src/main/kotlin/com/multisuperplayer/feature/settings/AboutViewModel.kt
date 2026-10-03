@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -76,6 +77,16 @@ class AboutViewModel(
 
     val export: StateFlow<LogExportState> = _export.asStateFlow()
 
+    private val _linkFailure = MutableStateFlow<MspText?>(null)
+
+    /**
+     * 上一次「打开链接」的失败原因。null = 没失败过（或用户已关掉提示）。
+     *
+     * 做成一个可观察的状态而不是「吐一下 toast」：要展示的不是「失败了」，
+     * 而是**哪个地址**失败了——用户下一步多半是把它手动抄进浏览器。
+     */
+    val linkFailure: StateFlow<MspText?> = _linkFailure.asStateFlow()
+
     init {
         refreshLogs()
     }
@@ -92,6 +103,33 @@ class AboutViewModel(
 
     /** SAF 对话框要的建议文件名。纯计算，不碰磁盘。 */
     fun suggestedFileName(): String = logs.suggestedFileName()
+
+    /**
+     * 用系统浏览器打开 [url]。
+     *
+     * 失败**不抛也不静默**：设备上没有浏览器、或者 ROM 直接关掉了 `ACTION_VIEW` 时，
+     * `startActivity` 会抛 [android.content.ActivityNotFoundException]，
+     * 放出去就是闪退——而这一页唯一会做的事就是「打开一个网页」。
+     * 失败时把地址本身带进提示里，用户至少能手动复制。
+     *
+     * 用 `applicationContext` 起 Activity 必须带 `FLAG_ACTIVITY_NEW_TASK`，
+     * 否则会抛 `AndroidRuntimeException`（看起来像「没装浏览器」）。
+     * 这个逻辑放在 ViewModel 而不是 Composable 里，是为了能单测。
+     */
+    fun openLink(url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val failure = runCatching { appContext.startActivity(intent) }.exceptionOrNull()
+        if (failure != null) {
+            MspLog.w(TAG, failure) { "打开链接失败：$url" }
+        }
+        _linkFailure.value = linkFailureText(failure, url)
+    }
+
+    /** 用户看过、关掉了提示。 */
+    fun dismissLinkFailure() {
+        _linkFailure.value = null
+    }
 
     /**
      * 把报告写进用户选定的位置。
@@ -153,3 +191,16 @@ class AboutViewModel(
         const val TAG = "AboutViewModel"
     }
 }
+
+/**
+ * 「打开外链失败」该给用户看什么。成功返回 null（不留提示）。
+ *
+ * 抽成顶层纯函数，是因为它是这一页唯一的分支逻辑，而 [AboutViewModel] 本身在
+ * 纯 JVM 单测里构造不出来：它的构造要 `Context`，而本模块没开
+ * `unitTests.isReturnDefaultValues`，`Intent` 一构造就会抛「not mocked」。
+ * 这个函数不碰任何 Android 类，所以能被 [com.multisuperplayer.feature.settings]
+ * 的单测直接钉住——「失败提示里必须带地址」这条约定，光靠真机上戳一次是守不住的：
+ * 它错的后果是用户拿着「打开失败」四个字、无路可走。
+ */
+internal fun linkFailureText(failure: Throwable?, url: String): MspText? =
+    if (failure == null) null else MspText.Res(R.string.msp_settings_about_link_failed, url)

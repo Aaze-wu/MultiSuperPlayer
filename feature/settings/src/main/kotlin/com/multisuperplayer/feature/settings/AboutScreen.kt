@@ -2,7 +2,9 @@ package com.multisuperplayer.feature.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,14 +12,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.SaveAlt
-import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,9 +46,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
@@ -51,6 +64,18 @@ import org.koin.androidx.compose.koinViewModel
 
 /** 导出日志的 MIME。`.txt` 最方便用户直接查看和粘贴。 */
 private const val LOG_MIME_TYPE = "text/plain"
+
+/** 应用名。品牌名三语相同，所以不建资源（和 `app_name` 一致）。 */
+private const val APP_NAME = "MultiSuperPlayer"
+
+/**
+ * 项目主页与问题反馈。
+ *
+ * 写死常量而不是从构建配置推：这两个地址在调试包里也应该能用，
+ * 而它们与仓库地址（`git remote`）没有任何运行时关系。"
+ */
+private const val PROJECT_HOME_URL = "https://github.com/Aaze-wu/MultiSuperPlayer"
+private const val PROJECT_ISSUES_URL = "https://github.com/Aaze-wu/MultiSuperPlayer/issues"
 
 /**
  * 关于。从设置入口页推上来。
@@ -67,6 +92,7 @@ fun AboutRoute(
 ) {
     val logSummary by viewModel.logSummary.collectAsStateWithLifecycle()
     val export by viewModel.export.collectAsStateWithLifecycle()
+    val linkFailure by viewModel.linkFailure.collectAsStateWithLifecycle()
 
     // SAF 的「保存到…」。用系统文件选择器而不是自己写外部私有目录：
     // Android 11 起 `Android/data` 在文件管理器里不可见，写进去用户根本找不到，
@@ -85,6 +111,9 @@ fun AboutRoute(
         export = export,
         onBack = onBack,
         onExportLogs = { saverLauncher.launch(viewModel.suggestedFileName()) },
+        linkFailure = linkFailure,
+        onOpenLink = viewModel::openLink,
+        onDismissLinkFailure = viewModel::dismissLinkFailure,
         modifier = modifier,
     )
 }
@@ -99,8 +128,11 @@ fun AboutScreen(
     logSummary: LogSummary = LogSummary.Empty,
     export: LogExportState = LogExportState.Idle,
     onExportLogs: () -> Unit = {},
+    linkFailure: MspText? = null,
+    onOpenLink: (String) -> Unit = {},
+    onDismissLinkFailure: () -> Unit = {},
 ) {
-    var showUpdateDialog by remember { mutableStateOf(false) }
+    var showWhatsNew by remember { mutableStateOf(false) }
     var showLicenseDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -123,28 +155,7 @@ fun AboutScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            item { SectionHeader(stringResource(R.string.msp_settings_section_version)) }
-            item { InfoRowList(buildInfo.rows()) }
-
-            item { SectionHeader(stringResource(R.string.msp_settings_section_update)) }
-            item {
-                ListItem(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    leadingContent = {
-                        Icon(Icons.Outlined.SystemUpdate, contentDescription = null)
-                    },
-                    headlineContent = { Text(stringResource(R.string.msp_settings_check_update)) },
-                    supportingContent = {
-                        Text(stringResource(R.string.msp_settings_update_no_source))
-                    },
-                    trailingContent = {
-                        TextButton(onClick = { showUpdateDialog = true }) {
-                            Text(stringResource(R.string.msp_settings_check))
-                        }
-                    },
-                )
-            }
+            item { AboutHeader(buildInfo) }
 
             item { SectionHeader(stringResource(R.string.msp_settings_section_device)) }
             item {
@@ -165,6 +176,37 @@ fun AboutScreen(
                 }
             }
 
+            item { SectionHeader(stringResource(R.string.msp_settings_section_links)) }
+            item {
+                SettingActionRow(
+                    icon = Icons.Outlined.Language,
+                    title = stringResource(R.string.msp_settings_about_homepage),
+                    subtitle = stringResource(R.string.msp_settings_about_homepage_desc),
+                    onClick = { onOpenLink(PROJECT_HOME_URL) },
+                )
+            }
+            item {
+                SettingActionRow(
+                    icon = Icons.Outlined.BugReport,
+                    title = stringResource(R.string.msp_settings_about_feedback),
+                    subtitle = stringResource(R.string.msp_settings_about_feedback_desc),
+                    onClick = { onOpenLink(PROJECT_ISSUES_URL) },
+                )
+            }
+            item {
+                SettingActionRow(
+                    icon = Icons.Outlined.Article,
+                    title = stringResource(R.string.msp_settings_about_whats_new),
+                    subtitle = stringResource(R.string.msp_settings_about_whats_new_desc),
+                    onClick = { showWhatsNew = true },
+                )
+            }
+            // 失败提示挂在链接小节正下方，而不是页面底部：它说的是上面那三行里
+            // 「哪一下没成」，离得远就成了另一件事。
+            linkFailure?.let { failure ->
+                item { LinkFailureNote(failure = failure, onDismiss = onDismissLinkFailure) }
+            }
+
             item { SectionHeader(stringResource(R.string.msp_settings_section_license)) }
             item {
                 ListItem(
@@ -180,8 +222,6 @@ fun AboutScreen(
                     },
                 )
             }
-
-            item { SectionHeader(stringResource(R.string.msp_settings_section_logs)) }
             item {
                 InfoRowList(
                     listOf(
@@ -216,22 +256,28 @@ fun AboutScreen(
         }
     }
 
-    if (showUpdateDialog) {
+    if (showWhatsNew) {
         AlertDialog(
-            onDismissRequest = { showUpdateDialog = false },
-            title = { Text(stringResource(R.string.msp_settings_check_update)) },
+            onDismissRequest = { showWhatsNew = false },
+            title = { Text(stringResource(R.string.msp_settings_about_whats_new)) },
             text = {
-                Text(
-                    stringResource(
-                        R.string.msp_settings_update_dialog_text,
-                        buildInfo.versionText().string(),
-                        buildInfo.sourceText().string(),
-                    ),
-                )
+                // 正文十来行，小屏横屏会顶出对话框：内容区必须能滚，
+                // 否则底部的「关闭」会被推到屏幕外，用户只能按返回键。
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        text = stringResource(R.string.msp_settings_about_whats_new_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             },
             confirmButton = {
-                TextButton(onClick = { showUpdateDialog = false }) {
-                    Text(stringResource(R.string.msp_settings_got_it))
+                TextButton(onClick = { showWhatsNew = false }) {
+                    Text(stringResource(R.string.msp_settings_close))
                 }
             },
         )
@@ -247,7 +293,7 @@ fun AboutScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     LicenseEntry(
-                        name = "MultiSuperPlayer",
+                        name = APP_NAME,
                         license = "GPL-3.0",
                         detail = stringResource(R.string.msp_settings_license_app_detail),
                     )
@@ -283,6 +329,93 @@ fun AboutScreen(
 }
 
 // --------------------------------------------------------------------- 小件
+
+/**
+ * 页头：应用图标 + 名称 + 版本号（+ 预发行标记）。
+ *
+ * 版本信息从原来的「版本」小节搬到这里，那一整节也就不再存在：它原本有三行，
+ * 其中「构建来源（git commit）」和「构建时间」对普通用户没有任何意义——
+ * 它们是给「把日志发给我们看」用的，而那份抬头由 `AboutViewModel.reportHeader()`
+ * 单独拼出来，不依赖这一页显示了几行。
+ */
+@Composable
+private fun AboutHeader(buildInfo: AppBuildInfo) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // 用系统自带的 PlayArrow 配一个圆形底色，而不是引用 `ic_launcher`：
+        // 图标属于 app 模块的资源，feature 模块在编译期根本引不到它。
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PlayArrow,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Text(text = APP_NAME, style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = buildInfo.versionText().string(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (buildInfo.isPreview) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.msp_settings_about_preview),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.msp_settings_about_preview_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
+ * 打不开链接时的行内提示。
+ *
+ * **不做成弹窗**：失败信息里唯一有用的是那个地址，弹窗一关就没了，
+ * 而用户下一步多半是「手动把地址抄到浏览器里」。留在页面上可以直接长按复制。
+ */
+@Composable
+private fun LinkFailureNote(failure: MspText, onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = failure.string(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            // weight：长地址要换行，不能把「知道了」按钮挤出屏幕。
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onDismiss) {
+            Text(stringResource(R.string.msp_settings_got_it))
+        }
+    }
+}
 
 /** 键值对表格。左列固定宽度，让「版本/设备/屏幕」几行的值在同一个 x 上起头。 */
 @Composable

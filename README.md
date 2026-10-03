@@ -5,8 +5,10 @@
 - 语言：Kotlin + Jetpack Compose（Material 3）
 - 播放内核：AndroidX Media3 (ExoPlayer) + NextLib FFmpeg 软件解码扩展
 - 最低支持：Android 8.0（API 26）
-- 当前版本：**0.6.0**
+- 当前版本：**0.6.1-alpha.1**（预发行测试版）
 - 许可证：[GPL-3.0](LICENSE)
+
+发行说明：[docs/release-notes](docs/release-notes/)
 
 English documentation: [README.en.md](README.en.md)
 

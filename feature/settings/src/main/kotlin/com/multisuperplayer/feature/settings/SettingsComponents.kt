@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -33,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -87,13 +91,100 @@ internal fun InfoNote(text: String) {
     }
 }
 
+// --------------------------------------------------------------------- 帮助
+
+/**
+ * 行标题右边的帮助问号。点开是一个说明对话框。
+ *
+ * ## 为什么把这个当默认做法，而不是把长句写在副标题里
+ *
+ * 副标题的位置只有一行（超了就换行、就把行高拉高），于是「说明这个开关是干什么的」
+ * 和「解释为什么默认关着」会挤在一起，最后两个都说不完。分开之后：副标题只说
+ * **现在是什么状态**（扫一眼就能读），为什么、什么时候需要改放在这里。
+ *
+ * ## 两个容易写错的地方
+ *
+ * 1. **点击不会冒泡给整行**。这三个行组件里，大行自己挂着 `clickable`/`selectable`，
+ *    而这里是它的子节点，子节点会先消费点击事件，所以点问号不会顺手把开关翻了。
+ *    （反过来——把问号放在行的**外面**——就会变成另一个故事了。）
+ * 2. **`title` 要的是那一行的名字，不是对话框的抬头**。它会同时作为对话框的标题
+ *    和读屏时那句「XXX：查看说明」里的 XXX，所以两处用同一个字符串，不会对不上。
+ */
+@Composable
+internal fun SettingHelpIcon(title: String, text: String) {
+    var show by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .padding(start = 4.dp)
+            .size(28.dp)
+            .clip(CircleShape)
+            .clickable { show = true },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+            contentDescription = stringResource(R.string.msp_settings_help_icon_desc, title),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+
+    if (show) {
+        AlertDialog(
+            onDismissRequest = { show = false },
+            title = { Text(title) },
+            text = {
+                // 说明可能很长（有的能占满一屏），所以这里必须能滚：AlertDialog
+                // 的内容区不会自己滚，长文会把两个按钮顶出屏幕。
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { show = false }) {
+                    Text(stringResource(R.string.msp_settings_got_it))
+                }
+            },
+        )
+    }
+}
+
+/**
+ * 行标题 + 可选的帮助问号。三个行组件共用，省得三处各写一遍 [Row] 的对齐方式。
+ *
+ * [titleColor] 只由 [SettingActionRow] 用到（禁用时整行变灰）。
+ */
+@Composable
+private fun TitleWithHelp(
+    title: String,
+    help: String?,
+    titleColor: Color = Color.Unspecified,
+) {
+    if (help == null) {
+        Text(text = title, color = titleColor)
+        return
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text = title, color = titleColor)
+        SettingHelpIcon(title = title, text = help)
+    }
+}
+
 // --------------------------------------------------------------------- 各种行
 
 /**
  * 「当前值 + 点开选择」的一行。
  *
- * 右侧把当前值直接写出来，而不是只画一个箭头：用户扫一眼设置页就能知道
+ * [value] 右侧把当前值直接写出来，而不是只画一个箭头：用户扫一眼设置页就能知道
  * 「默认画面比例是裁剪」，不用逐个点进去确认。
+ *
+ * [help] 非空时在标题右边挂一个问号（见 [SettingHelpIcon]）。
  */
 @Composable
 internal fun SettingChoiceRow(
@@ -102,12 +193,13 @@ internal fun SettingChoiceRow(
     value: String,
     subtitle: String,
     onClick: () -> Unit,
+    help: String? = null,
 ) {
     ListItem(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = { Icon(icon, contentDescription = null) },
-        headlineContent = { Text(title) },
+        headlineContent = { TitleWithHelp(title = title, help = help) },
         supportingContent = { Text(subtitle) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -150,6 +242,7 @@ internal fun SettingActionRow(
     subtitle: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    help: String? = null,
 ) {
     ListItem(
         modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
@@ -166,9 +259,10 @@ internal fun SettingActionRow(
             )
         },
         headlineContent = {
-            Text(
-                text = title,
-                color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
+            TitleWithHelp(
+                title = title,
+                help = help,
+                titleColor = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
         supportingContent = { Text(subtitle) },
@@ -192,6 +286,7 @@ internal fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     icon: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    help: String? = null,
 ) {
     ListItem(
         // 整行可点，不只是那个开关：小屏上点 32dp 的开关很容易失手。
@@ -203,7 +298,7 @@ internal fun SettingsSwitchRow(
         ),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = icon,
-        headlineContent = { Text(title) },
+        headlineContent = { TitleWithHelp(title = title, help = help) },
         supportingContent = { Text(subtitle) },
         trailingContent = {
             // onClick = null：整行的 selectable 已经负责切换。
@@ -306,6 +401,10 @@ internal fun <T> ChoiceDialog(
  * [enabled] 为 false 时连输入都不收：用于「有一个长任务正在跑，改这一栏会让用户
  * 以为改动已经作用到那次运行上了」的场合（下载中的下载源、下载中的模型列表）。
  * 这种时候正确的动作是停止，所以整栏禁用比允许编辑、再悄悄忽略更清楚。
+ *
+ * [help] 非空时在下方提示行末尾挂一个问号。输入框没有「标题行」可用
+ * （`label` 是浮在框里的，点它等于聚焦输入框），所以这里把问号放到
+ * [supportingText] 那一行上——那一行本来就在解释这个框，位置最对。
  */
 @Composable
 internal fun DraftTextField(
@@ -319,6 +418,7 @@ internal fun DraftTextField(
     trailing: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
     enabled: Boolean = true,
+    help: String? = null,
 ) {
     var draft by remember(key) { mutableStateOf<String?>(null) }
 
@@ -330,7 +430,20 @@ internal fun DraftTextField(
         },
         label = { Text(label) },
         placeholder = { Text(placeholder) },
-        supportingText = supportingText?.let { { Text(it) } },
+        supportingText = if (supportingText == null && help == null) {
+            null
+        } else {
+            {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (supportingText != null) {
+                        // 没有 weight：提示文字该有多长就多长，问号跟着它走，
+                        // 而不是被推到框的另一头。
+                        Text(supportingText)
+                    }
+                    if (help != null) SettingHelpIcon(title = label, text = help)
+                }
+            }
+        },
         isError = isError,
         enabled = enabled,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),

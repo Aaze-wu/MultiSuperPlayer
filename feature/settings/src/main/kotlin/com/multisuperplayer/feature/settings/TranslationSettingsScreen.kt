@@ -180,6 +180,7 @@ fun TranslationSettingsScreen(
                     placeholder = "https://api.deepseek.com",
                     keyboardType = KeyboardType.Uri,
                     supportingText = stringResource(R.string.msp_settings_base_url_support),
+                    help = stringResource(R.string.msp_settings_base_url_help),
                 )
             }
             item {
@@ -244,6 +245,10 @@ fun TranslationSettingsScreen(
                         text = stringResource(R.string.msp_settings_test_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SettingHelpIcon(
+                        title = stringResource(R.string.msp_settings_test_button),
+                        text = stringResource(R.string.msp_settings_test_help),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

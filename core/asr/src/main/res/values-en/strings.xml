@@ -5,25 +5,25 @@
     <string name="msp_asr_detail_sep">" · "</string>
 
     <string name="msp_asr_model_paraformer_name">Chinese only (small Paraformer)</string>
-    <string name="msp_asr_model_paraformer_desc">Chinese-only recognition; fast, with few wrong characters. Just two files — pick this when you only need subtitles for Chinese audio.</string>
+    <string name="msp_asr_model_paraformer_desc">Chinese-only recognition; fast and accurate. The right choice when you only need subtitles for Chinese audio.</string>
 
     <string name="msp_asr_model_zipformer_name">Chinese + English streaming (Zipformer)</string>
-    <string name="msp_asr_model_zipformer_desc">Understands sentences that mix Chinese and English ("this function needs a try-catch" keeps its English words). A much bigger model, and slower.</string>
+    <string name="msp_asr_model_zipformer_desc">Handles sentences that mix Chinese and English; English words are kept as they are. A larger model, and slower to run.</string>
 
     <!-- One message per failure: the next step differs (wait / change mirror / free space).
          A single "generation failed" makes users retry an operation that cannot succeed. -->
-    <string name="msp_asr_error_network">Network interrupted: %1$s</string>
+    <string name="msp_asr_error_network">Network connection interrupted: %1$s</string>
     <string name="msp_asr_error_http">The server returned %1$d</string>
     <string name="msp_asr_error_source">The download source URL is invalid: %1$s</string>
     <string name="msp_asr_error_size">The file is incomplete (expected %1$s, got %2$s)</string>
     <string name="msp_asr_error_hash">The file failed verification</string>
     <string name="msp_asr_error_write">Couldn\'t write the file: %1$s</string>
-    <string name="msp_asr_error_model_missing">%1$s is not downloaded yet (%2$s)</string>
+    <string name="msp_asr_error_model_missing">%1$s has not finished downloading (%2$s)</string>
     <string name="msp_asr_error_no_audio">This file has no usable audio track</string>
     <string name="msp_asr_error_decode">Audio decoding failed: %1$s</string>
-    <string name="msp_asr_error_no_speech">No speech was detected</string>
+    <string name="msp_asr_error_no_speech">No speech detected</string>
     <string name="msp_asr_error_engine">Recognition engine failed: %1$s</string>
-    <string name="msp_asr_error_storage">Subtitles were recognized but could not be saved (storage may be full)</string>
+    <string name="msp_asr_error_storage">The subtitles were generated but could not be saved (storage may be full)</string>
     <string name="msp_asr_error_unknown">Recognition failed: %1$s</string>
 
 </resources>

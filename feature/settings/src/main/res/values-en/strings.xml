@@ -28,7 +28,7 @@
     <string name="msp_settings_summary_long_press">Long-press %1$s</string>
     <string name="msp_settings_summary_model_unset">Model not set</string>
     <string name="msp_settings_summary_translate_to">Translating to %1$s</string>
-    <string name="msp_settings_summary_translation_incomplete">Not ready to translate (missing: %1$s)</string>
+    <string name="msp_settings_summary_translation_incomplete">Translation not set up (missing: %1$s)</string>
 
     <!--
       The three ASR states, kept separate for the same reason as file access: they mean
@@ -56,20 +56,19 @@
 
     <string name="msp_settings_section_base_theme">Base theme</string>
     <string name="msp_settings_section_color_source">Colour source</string>
-    <string name="msp_settings_section_about_theme">About theming</string>
     <string name="msp_settings_section_language">Language</string>
 
     <string name="msp_settings_artwork_color">Artwork colour</string>
-    <string name="msp_settings_artwork_color_desc">Build the theme from the currently playing artwork</string>
+    <string name="msp_settings_artwork_color_desc">Build the theme from the cover art</string>
 
     <string name="msp_settings_dynamic_color">Follow system colours</string>
-    <string name="msp_settings_dynamic_color_desc">Theme colours from the system wallpaper (turns off when you pick an accent)</string>
+    <string name="msp_settings_dynamic_color_desc">Theme colours from the system wallpaper</string>
     <string name="msp_settings_dynamic_color_covered">Overridden by artwork colour</string>
     <string name="msp_settings_dynamic_color_needs_api31">Needs Android 12 or newer</string>
-    <string name="msp_settings_dynamic_color_blocked">Unavailable in pure black (system colours would be a pile of dark greys)</string>
+    <string name="msp_settings_dynamic_color_blocked">Unavailable in pure black mode</string>
 
-    <string name="msp_settings_theme_note_artwork">The current colours come from artwork colour. It overrides the accent, but picking an accent switches back (that turns artwork colour off); when the artwork has no usable colour (a black-and-white cover, say) it falls back to the accent, so the accent still matters.</string>
-    <string name="msp_settings_theme_note_dynamic">The current colours come from system colours. Picking an accent turns system colours off and the colours follow the accent right away.</string>
+    <string name="msp_settings_theme_note_artwork">Builds the theme from the cover art of what is playing. It overrides the accent; picking an accent switches back (that turns artwork colour off). When the cover has no usable colour (a black-and-white cover, say) it falls back to the accent, so the accent still matters.</string>
+    <string name="msp_settings_theme_note_dynamic">Builds the theme from the system wallpaper. Picking an accent turns system colours off and the palette follows the accent right away.</string>
     <string name="msp_settings_theme_note_accent">The accent colour applies to the whole app immediately: titles, buttons, progress bars and lyric highlighting all follow it.</string>
 
     <string name="msp_settings_accent_label">Accent colour</string>
@@ -80,24 +79,24 @@
 
     <string name="msp_settings_section_decoding">Decoding</string>
     <string name="msp_settings_force_software">Force software decoding</string>
-    <string name="msp_settings_force_software_no_ffmpeg">This build has no FFmpeg (CPU architecture unsupported), so turning this on has no effect</string>
-    <string name="msp_settings_force_software_on">Decoding with FFmpeg. Use it to narrow down picture problems; the cost is noticeably higher battery drain and heat.</string>
-    <string name="msp_settings_force_software_off">Off by default: when the system decoder cannot play a file or decodes it wrongly, the core switches to the built-in FFmpeg on its own. Turn this on only for a garbled picture, wrong colours or out-of-sync audio and video (a faulty hardware decoder).</string>
+    <string name="msp_settings_force_software_no_ffmpeg">This build has no FFmpeg, so turning this on has no effect</string>
+    <string name="msp_settings_force_software_on">Decoding with FFmpeg (noticeably higher battery drain and heat)</string>
+    <string name="msp_settings_force_software_off">The core picks the decoder and falls back to the built-in FFmpeg</string>
 
     <string name="msp_settings_section_picture_speed">Picture and speed</string>
 
     <string name="msp_settings_default_aspect">Default aspect ratio</string>
-    <string name="msp_settings_default_aspect_desc">Only affects files opened later. A ratio picked for one file in the player is not saved here.</string>
+    <string name="msp_settings_default_aspect_desc">Only affects files opened later</string>
 
     <string name="msp_settings_default_speed">Default speed</string>
-    <string name="msp_settings_default_speed_desc">Kept across files: changing the speed in the player changes this too.</string>
+    <string name="msp_settings_default_speed_desc">Kept across files</string>
 
     <string name="msp_settings_boost_speed">Long-press speed</string>
     <string name="msp_settings_boost_speed_desc">Hold the picture to use this speed; releasing returns to the previous one.</string>
 
     <string name="msp_settings_remember_position">Remember playback position</string>
     <string name="msp_settings_remember_position_on">Resume from where you left off next time the same file is opened</string>
-    <string name="msp_settings_remember_position_off">Always start from the beginning. Positions already remembered are not deleted; turning this back on makes them available again.</string>
+    <string name="msp_settings_remember_position_off">Always start from the beginning</string>
 
     <!--
       Sits right above/below the row above, so both subtitles must make the difference
@@ -106,24 +105,37 @@
     -->
     <string name="msp_settings_record_recent">Record recent plays</string>
 <string name="msp_settings_record_recent_on">What you play shows up on the Recent page, and opening it continues from where you stopped</string>
-<string name="msp_settings_record_recent_off">Stops recording new play history (resume positions are separate). What is already recorded is not deleted; turning this back on brings it back.</string>
+<string name="msp_settings_record_recent_off">Stops recording new play history</string>
 
     <string name="msp_settings_speed_normal">Normal speed</string>
     <string name="msp_settings_speed_default">Default</string>
 
-    <string name="msp_settings_section_version">Version</string>
-    <string name="msp_settings_section_update">Updates</string>
     <string name="msp_settings_section_device">Device</string>
     <string name="msp_settings_section_license">Open source licences</string>
     <string name="msp_settings_section_logs">Logs</string>
 
-    <string name="msp_settings_check_update">Check for updates</string>
-    <string name="msp_settings_check">Check</string>
+    <!-- Shown in the header area only for pre-release builds. -->
+    <string name="msp_settings_about_preview">Preview</string>
+    <string name="msp_settings_about_preview_note">Pre-release test build; features and wording may still change.</string>
+
+    <string name="msp_settings_section_links">Using and feedback</string>
+
+    <string name="msp_settings_about_homepage">Project home</string>
+    <string name="msp_settings_about_homepage_desc">View the project on GitHub</string>
+    <string name="msp_settings_about_feedback">Report an issue</string>
+    <string name="msp_settings_about_feedback_desc">Report a problem or suggest a change</string>
+    <string name="msp_settings_about_whats_new">What\'s new</string>
+    <string name="msp_settings_about_whats_new_desc">What changed in this version</string>
+
+    <string name="msp_settings_about_link_failed">Could not open a browser: %1$s</string>
+
+    <!--
+      Body of the \"what's new\" dialog. **Update this on every release, in all three
+      language files.** `\n` is a line break; lines starting with a bullet are laid out as items.
+    -->
+    <string name="msp_settings_about_whats_new_body">The first public preview build.\n\n· Playback: common containers and codecs, with built-in FFmpeg software decoding as a fallback\n· Subtitles: automatic matching of sidecar files, custom styling, line-by-line translation (local glossary + cloud API)\n· Speech recognition: subtitles generated on device, no audio is uploaded\n· Theming: system colours, artwork colours, custom accent, dark and pure black\n· Library, browse, recent and playlists\n\nKnown limits: no 32-bit native libraries; speech models are downloaded on first use.</string>
+
     <string name="msp_settings_view">View</string>
-
-    <string name="msp_settings_update_no_source">No update source is set up yet: this build has no release channel — it was compiled on this machine.</string>
-
-    <string name="msp_settings_update_dialog_text">There is no update source yet, so updates cannot be checked.\n\nCurrent version %1$s, build source %2$s.\n\nOnce a release channel exists, this dialog will show whether a newer version is available and what changed.</string>
 
     <string name="msp_settings_device_unavailable">Unavailable</string>
 
@@ -141,7 +153,7 @@
     <string name="msp_settings_log_range">Date range</string>
     <string name="msp_settings_export_logs">Export logs</string>
 
-    <string name="msp_settings_export_hint_idle">The export is a plain text file containing every log kept on this device plus the version and device information above. Send it along and the problem can be pinpointed.</string>
+    <string name="msp_settings_export_hint_idle">The export is a plain text file with every log kept on this device plus the version and device information above. Attach it when reporting a problem.</string>
     <string name="msp_settings_export_running">Writing…</string>
     <string name="msp_settings_export_saved">Saved: %1$s (%2$d log file(s))</string>
     <string name="msp_settings_export_skipped">%1$d file(s) could not be read and were skipped: %2$s</string>
@@ -162,15 +174,15 @@
     <string name="msp_settings_model_name">Model name</string>
     <string name="msp_settings_fetch_models">Fetch list</string>
     <string name="msp_settings_fetching">Fetching…</string>
-    <string name="msp_settings_fetch_failed_prefix">Could not fetch the model list</string>
+    <string name="msp_settings_fetch_failed_prefix">Failed to fetch the model list</string>
 
-    <string name="msp_settings_base_url_support">A URL ending in /v1 gets /chat/completions appended automatically; point this at your own proxy if you use one.</string>
-    <string name="msp_settings_model_support">It must match the vendor documentation exactly — never type it from memory.</string>
+    <string name="msp_settings_base_url_support">A URL ending in /v1 gets the request path appended for you</string>
+    <string name="msp_settings_model_support">Must match the vendor documentation exactly</string>
 
     <string name="msp_settings_auto_translate">Translate following subtitles automatically</string>
     <string name="msp_settings_auto_translate_desc">Translate as playback goes; lines already translated stay in the subtitles. With this off you can still translate manually at any time.</string>
 
-    <string name="msp_settings_test_desc">This really translates one sample line. It verifies the URL, the key, the model name and whether the vendor accepts our request shape, at the cost of a tiny number of tokens.</string>
+    <string name="msp_settings_test_desc">Sends one sample line to verify the current configuration</string>
     <string name="msp_settings_test_button">Test connection</string>
     <string name="msp_settings_test_running">Testing…</string>
     <string name="msp_settings_connection_failed_prefix">Connection failed</string>
@@ -181,7 +193,7 @@
 
     <string name="msp_settings_switch">Switch</string>
 
-    <string name="msp_settings_model_count">The vendor reported %1$d model(s) — tap one to use it:</string>
+    <string name="msp_settings_model_count">%1$d models retrieved from the provider — tap one to use it:</string>
 
     <string name="msp_settings_api_key_label">API key</string>
     <string name="msp_settings_api_key_placeholder">Paste the key, then tap Save</string>
@@ -206,7 +218,7 @@
 
     <string name="msp_settings_glossary">Glossary</string>
 
-    <string name="msp_settings_glossary_desc">One entry per line. `Kirito` = leave as is, `Guild = guild` = fixed wording. Lines starting with # are comments.</string>
+    <string name="msp_settings_glossary_desc">One entry per line. “Kirito” = leave as is, “Guild = guild” = fixed wording. Lines starting with # are comments.</string>
 
     <string name="msp_settings_glossary_collapse">Collapse</string>
     <string name="msp_settings_glossary_edit">Edit</string>
@@ -239,7 +251,7 @@
 
     <string name="msp_settings_section_asr_model">Recognition model</string>
     <!-- Nothing is uploaded — that is both the selling point and the first thing users doubt, so it comes first. -->
-    <string name="msp_settings_asr_model_hint">Recognition runs entirely on this phone; your audio is never uploaded. Expect roughly as long as the video itself.</string>
+    <string name="msp_settings_asr_model_hint">Recognition runs entirely on this device; audio is never uploaded. Expect roughly the length of the audio.</string>
 
     <string name="msp_settings_asr_download">Download model</string>
     <string name="msp_settings_asr_resume">Resume download</string>
@@ -264,10 +276,23 @@
 
     <string name="msp_settings_section_asr_source">Download source</string>
     <string name="msp_settings_asr_source">Model download URL</string>
-    <string name="msp_settings_asr_source_support">Defaults to the hf-mirror.com mirror. Enter https://huggingface.co for the official source; it is often so slow here that it looks stuck.</string>
+    <string name="msp_settings_asr_source_support">Uses the hf-mirror.com mirror by default</string>
     <!-- The only common mistake in this field: leaving out the scheme. -->
     <string name="msp_settings_asr_source_invalid">Must start with http:// or https://</string>
 
     <string name="msp_settings_asr_dismiss">Got it</string>
+
+    <!-- ===== Per-setting help ===== -->
+
+    <string name="msp_settings_help_icon_desc">%1$s: view help</string>
+
+    <string name="msp_settings_force_software_help">By default the playback core picks the decoder: when the system decoder cannot play a file or decodes it wrongly, it switches to the built-in FFmpeg on its own. Turn this on only for a garbled picture, wrong colours or out-of-sync audio and video (a faulty hardware decoder); the cost is noticeably higher battery drain and heat.</string>
+    <string name="msp_settings_default_aspect_help">Only affects files opened later. A ratio picked for one file in the player applies to that playthrough only and is not saved here.</string>
+    <string name="msp_settings_default_speed_help">Kept across files: changing the speed in the player changes this too. Long-press speed is a separate setting and is not affected.</string>
+    <string name="msp_settings_remember_position_help">With this off, every file starts from the beginning. Positions already remembered are not deleted; turning it back on makes them available again.</string>
+    <string name="msp_settings_record_recent_help">With this off, no new play history is recorded. Resume positions are controlled separately by Remember playback position. What is already recorded is not deleted and reappears when you turn this back on.</string>
+    <string name="msp_settings_base_url_help">A URL ending in /v1 gets /chat/completions appended automatically. Point this at your own proxy if you use one, as long as its API is OpenAI-compatible.</string>
+    <string name="msp_settings_test_help">The test really translates one sample line. It verifies the URL, the key, the model name and whether the vendor accepts the request format this app sends, at the cost of a tiny number of tokens.</string>
+    <string name="msp_settings_asr_source_help">hf-mirror.com is used by default. Enter https://huggingface.co for the official source; it is usually very slow from mainland China.</string>
 
 </resources>

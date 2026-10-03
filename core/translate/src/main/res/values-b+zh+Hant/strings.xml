@@ -2,14 +2,14 @@
 
     <!-- ===== 翻譯失敗話術 ===== -->
 
-    <string name="msp_translate_fail_not_configured">翻譯設定還沒填完：缺%1$s。</string>
-    <string name="msp_translate_fail_not_configured_hint">到「設定 → 字幕翻譯」裡補上再回來。</string>
+    <string name="msp_translate_fail_not_configured">翻譯設定尚未填完：缺少 %1$s。</string>
+    <string name="msp_translate_fail_not_configured_hint">請到「設定 → 字幕翻譯」中補全後重試。</string>
 
     <string name="msp_translate_fail_unauthorized">驗證失敗（HTTP %1$d）。</string>
-    <string name="msp_translate_fail_unauthorized_hint">金鑰可能填錯了、過期了，或者和所選地區不匹配（阿里雲百鍊的 key 與地域綁定，跨地域用會回報 invalid_api_key）。</string>
+    <string name="msp_translate_fail_unauthorized_hint">金鑰可能填錯或已過期；部分服務商的金鑰與地域綁定，跨地域使用會驗證失敗。</string>
 
     <string name="msp_translate_fail_quota">帳戶餘額或額度不足（HTTP %1$d）。</string>
-    <string name="msp_translate_fail_quota_hint">先去服務商後台儲值；重試只會更快把額度燒完。</string>
+    <string name="msp_translate_fail_quota_hint">請先到服務商後台儲值；反覆重試只會更快耗盡額度。</string>
 
     <string name="msp_translate_fail_rate_limited">請求太頻繁（HTTP %1$d）。</string>
     <string name="msp_translate_fail_rate_limited_wait">服務商要求等 %1$d 秒。稍後重試即可。</string>
@@ -19,20 +19,20 @@
     <string name="msp_translate_fail_rejected_hint">多半是模型名稱不存在，或者該模型不支援這種請求格式。</string>
 
     <string name="msp_translate_fail_server">服務商內部錯誤（HTTP %1$d）。</string>
-    <string name="msp_translate_fail_server_hint">這不是你的設定問題，可以重試；連續出現就去服務商狀態頁看看。</string>
+    <string name="msp_translate_fail_server_hint">與本機設定無關，可稍後重試；若持續出現，請查看服務商狀態頁。</string>
 
     <string name="msp_translate_fail_network">連不上服務商。</string>
 
     <string name="msp_translate_fail_bad_response">回傳內容的結構不對（不是額度問題）。</string>
-    <string name="msp_translate_fail_bad_response_hint">重試會得到同樣的結果：換一個更聽指令的模型，或換一家服務商再試。</string>
+    <string name="msp_translate_fail_bad_response_hint">重試通常得到相同結果：請更換更穩定的模型，或改用其他服務商。</string>
 
     <string name="msp_translate_fail_empty">模型這次一個字都沒輸出%1$s。</string>
-    <string name="msp_translate_fail_reason">（finish_reason=%1$s）</string>
+    <string name="msp_translate_fail_reason">（結束原因：%1$s）</string>
     <string name="msp_translate_fail_reasoning_tokens">（本次思考用了 %1$d tokens）</string>
-    <string name="msp_translate_fail_empty_hint">這類情況幾乎都是推理模式把輸出預算吃光了%1$s：換一個不做推理（思考）的模型就能正常翻譯。</string>
+    <string name="msp_translate_fail_empty_hint">此類情況多為推理模式耗盡了輸出預算%1$s：改用不進行推理的模型即可正常翻譯。</string>
 
-    <string name="msp_translate_fail_truncated">這一批太長，輸出被截斷了。%1$s</string>
-    <string name="msp_translate_fail_truncated_hint">本次上限 %1$d tokens，%2$s自動拆分後仍然裝不下：換一個單次輸出上限更高的模型再重試。</string>
+    <string name="msp_translate_fail_truncated">本批次過長，輸出已被截斷。%1$s</string>
+    <string name="msp_translate_fail_truncated_hint">本次上限 %1$d tokens，%2$s自動拆分後仍超出：請改用單次輸出上限更高的模型。</string>
     <string name="msp_translate_fail_truncated_estimate">這一批估算需要約 %1$d tokens，</string>
 
     <!-- ===== 設定缺項 ===== -->
@@ -60,25 +60,25 @@
     <!-- ===== 網路失敗的補充說明 ===== -->
 
     <string name="msp_translate_network_detail">%1$s%2$s</string>
-    <string name="msp_translate_network_timeout">（逾時。長字幕請求很慢，可以在設定裡調大讀取逾時）</string>
-    <string name="msp_translate_network_unresolved">（網域名稱解析不了：檢查位址拼寫與網路）</string>
-    <string name="msp_translate_network_cleartext">（明文 HTTP 被系統安全策略攔下了。只有 localhost / 10.0.2.2 在放行名單裡；實機連區域網路服務請用 adb reverse tcp:&lt;連接埠&gt; tcp:&lt;連接埠&gt; 再填 localhost）</string>
+    <string name="msp_translate_network_timeout">（請求逾時。長字幕耗時較長，可在設定中調大讀取逾時）</string>
+    <string name="msp_translate_network_unresolved">（網域名稱無法解析：請檢查位址拼寫與網路）</string>
+    <string name="msp_translate_network_cleartext">（明文 HTTP 被系統安全策略攔截，只有 localhost 與 10.0.2.2 被放行）</string>
 
     <!-- ===== 服務商預設 ===== -->
 
     <string name="msp_translate_svc_dashscope_name">阿里雲百鍊（通義千問）</string>
-    <string name="msp_translate_svc_dashscope_note">百鍊的 key 與地域綁定：跨地域用會回報 401 invalid_api_key。開了工作空間的使用者，位址要換成 https://&lt;WorkspaceId&gt;.cn-beijing.maas.aliyuncs.com/compatible-mode/v1。</string>
-    <string name="msp_translate_svc_deepseek_note">官方文件 api-docs.deepseek.com。base 只寫網域即可，程式會補上 /chat/completions。</string>
+    <string name="msp_translate_svc_dashscope_note">百鍊的金鑰與地域綁定，跨地域使用會驗證失敗。已開通工作空間的使用者需使用帶工作空間 ID 的專屬網域，形如 https://&lt;WorkspaceId&gt;.cn-beijing.maas.aliyuncs.com/compatible-mode/v1。</string>
+    <string name="msp_translate_svc_deepseek_note">只填網域即可，請求路徑會自動補全。</string>
     <string name="msp_translate_svc_zhipu_name">智譜 GLM</string>
-    <string name="msp_translate_svc_zhipu_note">base 結尾的 /v4 不能省。</string>
+    <string name="msp_translate_svc_zhipu_note">結尾的 /v4 不能省。</string>
     <string name="msp_translate_svc_moonshot_name">Kimi（月之暗面）</string>
-    <string name="msp_translate_svc_moonshot_note">官方文件寫明 thinking **預設開啟**，所以一定要帶著關閉參數，否則長字幕會白花一大筆 token。</string>
+    <string name="msp_translate_svc_moonshot_note">官方文件寫明 thinking 預設開啟，因此必須攜帶關閉參數，否則長字幕會消耗大量 token。</string>
     <string name="msp_translate_svc_ollama_name">Ollama（本機）</string>
-    <string name="msp_translate_svc_ollama_note">模擬器用 10.0.2.2 指主機。實機推薦 `adb reverse tcp:11434 tcp:11434`，然後把位址填成 http://localhost:11434/v1——區域網路的明文 HTTP 會被系統安全策略攔掉，只有 localhost / 10.0.2.2 在放行名單裡。</string>
-    <string name="msp_translate_svc_ollama_key_hint">本機服務隨便填，留空也行</string>
-    <string name="msp_translate_svc_openai_note">在中國大陸的網路通常需要自建代理，可以把 baseUrl 改成自己的中轉位址。</string>
+    <string name="msp_translate_svc_ollama_note">本機執行的 Ollama 填 http://localhost:11434/v1 即可。區域網路位址的明文 HTTP 會被系統安全策略攔截，只有 localhost 與 10.0.2.2 被放行。</string>
+    <string name="msp_translate_svc_ollama_key_hint">本機服務可任意填寫，也可留空</string>
+    <string name="msp_translate_svc_openai_note">中國大陸的網路通常需要自建代理，可將位址改為自己的中轉服務。</string>
     <string name="msp_translate_svc_custom_name">自訂（任何 OpenAI 相容服務）</string>
-    <string name="msp_translate_svc_custom_note">只要支援 POST {baseUrl}/chat/completions 就能用：OpenAI、DeepSeek、通義、GLM、Kimi、Ollama、vLLM、LM Studio、one-api 中轉都可以。</string>
+    <string name="msp_translate_svc_custom_note">相容 OpenAI 的 /chat/completions 介面即可使用：OpenAI、DeepSeek、通義、GLM、Kimi、Ollama、vLLM、LM Studio、one-api 中轉均可。</string>
     <string name="msp_translate_svc_custom_key_hint">按服務商要求填</string>
 
     <!-- ===== 匯出選項 ===== -->
