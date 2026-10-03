@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.7.0-alpha.2** (pre-release)
+- Current version: **0.8.0-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -46,11 +46,21 @@ Release notes: [docs/release-notes](docs/release-notes/)
   one shared write could never express it.
 - **Fullscreen, landscape, screen lock** to avoid accidental touches.
 - **Landscape audio gets a layout of its own**: artwork and track info on the left, lyrics on the
-  right, and the control strip pinned under the lyrics. Audio has no picture to protect, so the
+  right. When the window is wide enough (≥ 711dp) the feature chips and the transport controls move
+  into the left column under the artwork, leaving the whole right column to the lyrics (only the
+  progress bar stays); narrower windows (split screen, small older devices) fall back to the
+  controls pinned under the lyrics. Audio has no picture to protect, so the
   constraint is the opposite of video — the controls are **permanent**, not a fading overlay, which
   also means there is no "it faded out and can never be brought back" (landscape audio has no gesture
   layer, so a faded overlay really is gone). When there are no lyrics that column says which case it
   is — loading / turned off / none found / failed — and offers a way to pick a subtitle file.
+- **Portrait keeps room for the lyrics**: every other band on the audio page (artwork / title /
+  progress bar / feature chips / transport controls / session chips) is **fixed-height**, so only the
+  lyrics take what is left — on a short screen the lyrics are what gets squeezed. The rule is now
+  written as "**who gives way**": the artwork shrinks first (max 112dp; below 32dp it is not drawn at
+  all, and the gap above it goes with it), the lyrics keep a 200dp floor, and once the lyrics viewport
+  drops below 260dp its own padding tightens from 24dp to 16dp / 8dp (about half a line back) — the
+  font size never changes.
 - **A visible way out**: a labelled *Collapse* button at the top-left of the portrait player —
   an exit you can see, instead of having to guess the system back gesture (landscape keeps its
   own *Exit fullscreen* arrow and gets no second button). Collapsing pops the player page only:
@@ -114,6 +124,19 @@ Release notes: [docs/release-notes](docs/release-notes/)
 - **Subtitle timeline offset**: ±0.1 s and ±0.5 s steps that accumulate, plus a *Reset* button. A positive
   value means the subtitle appears **later** (if it shows up before the sound, tune positive). The offset
   only shifts the timeline as a whole; it never changes how long a line stays on screen.
+- **Subtitle rate (proportional correction)**: five presets (0.96x / 0.98x / 1.00x / 1.02x / 1.04x) plus
+  fine adjustments of ±0.01 / ±0.10, covering 0.90x–1.10x. It is **not** the same thing as the timeline
+  offset: that one is a **shift** (every line moves by the same amount for the whole file), this one is a
+  **scale** — use it when the drift grows towards the end (a source whose frame rate does not match its
+  subtitles). Fixing the beginning with a shift is guaranteed to break the ending; only a rate can fix
+  that kind of drift. Like the offset, it applies to this playback only: switching files returns it to 1.00x.
+- **Embedded subtitle tracks can be pre-read in full**: the text track inside the container is read
+  end-to-end in the background, so the app ends up with the **whole** cue table instead of "whatever has
+  played so far". Subtitles are therefore there the moment you open a file, and the rate has a complete
+  table to work from. When the pre-read cannot be done (network stream, bitmap subtitles, unrecognised
+  container) it **silently falls back** to the streaming table — pre-reading is the better path, not the
+  only one. The panel says which state it is in: `Pre-reading subtitles…` while it runs, and
+  `Could not pre-read subtitles, rate adjustment may be off` if it failed.
 - **Subtitle style**: presets for text size (Small / Normal / Large / Huge), line spacing (Tight / Normal /
   Loose), outline (None / Thin / Normal / Thick) and bottom margin (Edge / Normal / Raised / High). Both the
   **subtitle panel on the player** and the **"Subtitles & translation" settings page** can edit them; the
@@ -618,8 +641,9 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.6.7** | **Permissions: a new *Permissions* page in Settings lists the four things the app can ask for (media read / all files access / notifications / Bluetooth) with their state and action, plus a collapsible note for the six permissions granted at install time; the first launch after install asks once for notifications and media read (not for all files access or Bluetooth); the library re-scans itself when a permission was granted elsewhere and the app comes back to the foreground** | Done |
 | **v0.6.8** | **Background keep-alive: a new *Background keep-alive* page in Settings requests the battery-optimisation exemption with one tap (the switch re-reads the system state every time the page is resumed instead of keeping a local copy) and opens the vendor's own background-management page (Xiaomi / Huawei / Honor / OPPO / vivo / Meizu / Samsung / OnePlus, falling back to the app info page for unknown vendors); the permissions page's collapsible section gains *ignore battery optimizations*** | Done |
 | **v0.7.0-alpha.1** | **App updates: a new *Check for updates* page in Settings checks, downloads and installs new versions from GitHub Releases (the source sits behind an interface so more channels can be added); sha256 plus package-name and signature verification; the APK is handed to the installer through a `FileProvider`; an optional GitHub token stored on-device and encrypted; eight failure classes reported separately** | Done |
-| **v0.7.0-alpha.2** | **Embedded-subtitle wording fixes: the title slot now reads *Embedded subtitle 1* instead of a bare language tag, a *No line read yet* hint covers the window before the first cue arrives, and *This file has subtitle tracks; pick one above.* replaces the blanket *nothing is attached* claim; a selected embedded text track is now claimed as soon as the track list arrives instead of waiting for its first cue** | **Current** |
-| Later | **0.7.0-alpha.3** subtitle rate (proportional nudging) and a full read-ahead of the embedded subtitle track -> **0.8.0** drag-to-reorder auto-scroll / equalizer -> **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
+| **v0.7.0-alpha.2** | **Embedded-subtitle wording fixes: the title slot now reads *Embedded subtitle 1* instead of a bare language tag, a *No line read yet* hint covers the window before the first cue arrives, and *This file has subtitle tracks; pick one above.* replaces the blanket *nothing is attached* claim; a selected embedded text track is now claimed as soon as the track list arrives instead of waiting for its first cue** | Done |
+| **v0.8.0-alpha.1** | **Subtitle rate (proportional nudging: five presets plus ±0.01 / ±0.10, the counterpart to the timeline offset's *shift*) + a full read-ahead of the embedded subtitle track (the prerequisite for the rate to work in both directions, and for subtitles to be there the moment you open a file) + a rework of the lyrics space on the audio page (the portrait artwork gives way to the lyrics, and the chips and transport controls move into the left column in landscape)** | **Current** |
+| Later | drag-to-reorder auto-scroll / equalizer (**not scheduled yet**) -> **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
 
 ---
 
@@ -987,6 +1011,17 @@ These are deliberate for this release, not oversights:
     the app **does not** degrade into "send the whole thing as one chunk" (a two-hour video would first
     produce a 230 MB temporary WAV and most likely fill the phone's storage) — it reports the problem and
     suggests switching to on-device recognition instead.
+20. **Pre-reading an embedded subtitle track walks the whole file in order, and only works for local
+    files.** Subtitle samples are interleaved with the audio and video in the container, so "read the
+    whole text track" means reading the file from end to end. A network stream cannot be downloaded for
+    the sake of its subtitles, so it is reported as not applicable, and a very large file takes a while.
+    Playback **never waits for it** (the streaming table is used until the read finishes), but the panel
+    says `Pre-reading subtitles…` while it runs; on failure there is no error, only
+    `Could not pre-read subtitles, rate adjustment may be off`, and the **specific reason (unrecognised
+    container / track not found / no cues / read error) only ever reaches the log**. The pre-read table
+    also **replaces** the streaming one wholesale rather than being published progressively (swapping the
+    table mid-playback would shift cue indices, and hand-edited translations are keyed on *index + source
+    text*).
 
 ---
 
