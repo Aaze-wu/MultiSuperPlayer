@@ -2,6 +2,19 @@
 
     <string name="msp_playback_channel_name">播放控制</string>
 
+    <!-- ===== 睡眠定時檔位 ===== -->
+
+    <!--
+      三條按「時長怎麼唸更自然」分流：低於一小時報分鐘、整小時報小時、
+      其餘報「x 小時 y 分」。
+    -->
+    <string name="msp_sleep_timer_minutes">%1$d 分鐘</string>
+    <string name="msp_sleep_timer_hours">%1$d 小時</string>
+    <string name="msp_sleep_timer_hours_minutes">%1$d 小時 %2$d 分</string>
+
+    <!-- 唯一永遠正確的那一檔：不用猜自己幾分鐘能睡著。 -->
+    <string name="msp_sleep_timer_until_item_end">本集結束</string>
+
     <!-- ===== 播放失敗文案 ===== -->
 
     <string name="msp_playback_error_with_code">%1$s（錯誤碼 %2$d）</string>

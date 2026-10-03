@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +61,8 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.player.MspDecoderKind
 import com.multisuperplayer.core.player.MspPlaybackState
+import com.multisuperplayer.core.player.SleepTimerOptions
+import com.multisuperplayer.core.player.SleepTimerState
 import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
@@ -129,6 +132,11 @@ fun PlayerRoute(
     val artworkAccent by viewModel.artworkAccent.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val audioTracks by viewModel.audioTracks.collectAsStateWithLifecycle()
+    // 睡眠定时与队列。两个都是「不常变」的值（用户点一下才变一次，定时到点变一次），
+    // 所以订在这一层不会把播放页拖进频繁重组。
+    val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
+    val queue by viewModel.queue.collectAsStateWithLifecycle()
+    val currentIndex by viewModel.currentIndex.collectAsStateWithLifecycle()
 
     val subtitleViewModel: SubtitleViewModel = koinViewModel()
     val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
@@ -223,14 +231,71 @@ fun PlayerRoute(
     val ui = rememberPlayerUiState(initialFullscreen = isLandscape)
     val windowController = rememberPlayerWindowController()
 
+    // 「横过来」的条件里必须带上「窗口够不够大」。
+    //
+    // 只看窗口方向是不够的：**画中画小窗自己就是横窗口**（16:9 的小窗在系统
+    // 配置里就是 `land`），于是这条规则在整个画中画期间都成立——先在小窗里把
+    // `fullscreen` 打开（在那一两百 dp 的窗口里看不出任何问题），退出小窗时那个
+    // `true` 就变成一次真的 `SENSOR_LANDSCAPE` 请求：用户手里竖着的手机被锁成
+    // 横屏，而他只是把小窗点开又点掉。判定条件与边界见 [PlayerFullscreenRules]。
+    val smallestScreenWidthDp = LocalConfiguration.current.smallestScreenWidthDp
+
     // 横过来 = 进全屏。反向不成立：横屏按返回键退出全屏之后设备仍是横屏，
     // 布局不该跳回竖屏那一套（那正是 `isLandscape` 只用来选布局、不用来判断
     // 「是不是全屏」的原因）。
-    LaunchedEffect(isLandscape) {
-        if (isLandscape) ui.applyFullscreen(true)
+    LaunchedEffect(isLandscape, smallestScreenWidthDp) {
+        if (
+            PlayerFullscreenRules.shouldEnterFullscreen(
+                windowLandscape = isLandscape,
+                smallestScreenWidthDp = smallestScreenWidthDp,
+            )
+        ) {
+            ui.applyFullscreen(true)
+        }
     }
 
-    PlayerFullscreenEffect(fullscreen = ui.fullscreen)
+    PlayerFullscreenEffect(fullscreen = ui.fullscreen, inPip = ui.inPip)
+
+    // ------------------------------------------------------------------ 画中画
+
+    // 控制器把状态接管在 Activity 上（`PictureInPictureParams` 挂在 Activity 上，
+    // 不是挂在组合上）。它在离开播放页时会自己清场（见 `rememberPlayerPipController`），
+    // 这是必须的：留下来的 `setAutoEnterEnabled(true)` 会把**整个媒体库**
+    // 在用户下一次按 Home 时塞进小窗口。
+    val pip = rememberPlayerPipController()
+
+    // 小窗口的进出由系统推过来，不是我们猜的。订阅的是 `ComponentActivity` 上的
+    // `addOnPictureInPictureModeChangedListener`，所以不必为了「播放页想知道自己
+    // 在不在画中画里」去改 `MainActivity`（播放功能模块也不该认识那个类）。
+    DisposableEffect(pip) {
+        pip.observeModeChanges(ui::applyPipMode)
+        onDispose { pip.stopObservingModeChanges() }
+    }
+
+    // 进画中画时把字幕面板收掉。
+    //
+    // 面板是 `ModalBottomSheet`，在两百 dp 宽的小窗里它会把画面整个盖住；
+    // 而小窗里我们不画控制条，用户没有任何地方能点到关闭。
+    LaunchedEffect(ui.inPip) {
+        if (ui.inPip) showSubtitleSheet = false
+    }
+
+    // 画面尺寸与「划走自动进小窗」都顺着这条线推给控制器。
+    //
+    // `autoEnter` 只在**视频 + 正在播**时为真：音频没有画面，滑回桌面时弹出一个
+    // 纯黑小窗口是最没有意义的一种自动行为；暂停时也不自动进（用户暂停多半
+    // 是要走了，把暂停的画面缩成小窗只会让他多关一次）。低于 API 31 时这个
+    // 参数被控制器忽略（那里没有「自动进入」这回事）。
+    LaunchedEffect(state.videoSize, state.isPlaying, entry?.kind, pip) {
+        pip.update(
+            video = state.videoSize,
+            isPlaying = state.isPlaying,
+            autoEnter = state.isPlaying && PlayerPipRules.shouldOfferEntry(
+                kind = entry?.kind,
+                supported = true,
+            ),
+        )
+    }
 
     PlayerBackHandler(
         locked = ui.locked,
@@ -241,9 +306,16 @@ fun PlayerRoute(
 
     // 底部导航栏让位。`onDispose` 里一定要还回来：不还的话，用户从全屏播放页
     // 切到设置页，底部导航栏就永远消失了——他会以为应用坏了，而且再也切不回媒体库。
+    //
+    // 画中画也算让位（看 [PlayerFullscreenRules.shouldShowBottomBar]）：小窗实测
+    // w379dp h213dp，而 NavigationBar 固定 80dp——不藏它，小窗就变成「上面一小条
+    // 画面 + 下面一条导航」。注意这个 `DisposableEffect` 是**没有旁路**的：
+    // 小窗里那条底部栏属于应用外壳，播放页里那句「只画画面」的提前返回管不到它。
     val chrome = LocalAppChrome
-    DisposableEffect(ui.fullscreen) {
-        chrome.updateBottomBarVisible(!ui.fullscreen)
+    DisposableEffect(ui.fullscreen, ui.inPip) {
+        chrome.updateBottomBarVisible(
+            PlayerFullscreenRules.shouldShowBottomBar(fullscreen = ui.fullscreen, inPip = ui.inPip),
+        )
         onDispose { chrome.updateBottomBarVisible(true) }
     }
 
@@ -321,12 +393,71 @@ fun PlayerRoute(
         )
     }
 
+    // 睡眠定时入口。
+    //
+    // 芯片上的字分三种情况：没定时写功能名（「睡眠定时」）、定了时长写**档位**
+    // （「30 分钟」）、定在集末写「本集结束」。写档位而不是「已开启」，是因为
+    // 用户下次看这行时要回答的问题是「我设了多久」。
+    //
+    // **不在这里算倒计时**：那是个每秒都在变的值，写在这里会让整个播放页
+    // 每秒重组一次。倒计时的时钟在面板内部（见 `PlayerSleepTimerSheet`）。
+    val sleepTimerChip = PlayerBarChip(
+        label = when (val timer = sleepTimer) {
+            is SleepTimerState.Off -> stringResource(R.string.msp_player_sleep_timer)
+            is SleepTimerState.UntilItemEnd -> SleepTimerOptions.untilItemEndLabel().string()
+            is SleepTimerState.Countdown -> SleepTimerOptions.presetFor(timer)
+                ?.let { SleepTimerOptions.label(it).string() }
+                ?: stringResource(R.string.msp_player_sleep_timer_active)
+        },
+        // 只有定时真的开着才点亮。“没定时”是默认状态，把它也点亮的话
+        // 这个芯片会永远是亮的，亮不亮就不再传递任何信息。
+        active = sleepTimer !is SleepTimerState.Off,
+        onClick = { ui.openSheet(PlayerSheet.SLEEP_TIMER) },
+    )
+
+    // 队列入口。只有一条（或空）时不出现：那时点开来只能看到一个自己和
+    // 一个被禁用的「清空队列」，白跑一趟。
+    val queueChip = if (queue.size < 2) {
+        null
+    } else {
+        PlayerBarChip(
+            label = stringResource(R.string.msp_player_queue_chip, queue.size),
+            // 和音轨芯片同一条理由：字已经把信息说全了，不需要再点一个颜色。
+            onClick = { ui.openSheet(PlayerSheet.QUEUE) },
+        )
+    }
+
+    // 画中画入口。
+    //
+    // 两件事同时成立才给入口：设备支持（有些 ROM 根本没有这个特性）、当前放的是
+    // **视频**（音频没有画面可缩）。不需要再判「现在是不是已经在小窗里」——
+    // 小窗里这一整行根本不画（见 `PlayerScreen` 里那个 `if (ui.inPip)` 分支）。
+    //
+    // 判断放在 `PlayerPipRules` 里而不是写在这里，是为了让它能被纯 JVM 单测覆盖
+    // ——`PackageManager.hasSystemFeature` 在单测里拿不到。
+    val pipChip = if (PlayerPipRules.shouldOfferEntry(entry?.kind, pip.isSupported)) {
+        PlayerBarChip(
+            label = stringResource(R.string.msp_player_pip),
+            // 不点亮：「画中画」是一个**动作**（把画面缩成小窗），不是一个状态。
+            // 真要说状态，那是「现在就在小窗里」——可那时这一行根本看不见。
+            onClick = { pip.enter(video = state.videoSize, isPlaying = state.isPlaying) },
+        )
+    } else {
+        null
+    }
+
+    // 三个会话级入口打包成一个对象再往下穿（见 `PlayerSessionChipSet` 的 KDoc：
+    // 平铺三个参数要穿过五层，以后加第四个入口就得改十处）。
+    val sessionChips = PlayerSessionChipSet(
+        sleepTimer = sleepTimerChip,
+        queue = queueChip,
+        pip = pipChip,
+    )
+
     // 离开播放页时把加速收掉。
     //
-    // 手势层里的 `finally` 已经覆盖了绝大多数情况（协程被取消时会跑），但那是
-    // 「手势协程生命周期」的保证，而页面被换掉时还可能有别的顺序（比如这页的
-    // 组合先被丢掉、ViewModel 后清）。速度是全局的播放状态，漏收的后果是
-    // 「回到媒体库还在 2 倍速放着」——用户只会把它描述成「播放器抽风了」。
+    // 睡眠定时**有意不在这里收**：它是内核状态，用户是在睡觉前设的它，
+    // 这一页被摘掉（比如转到媒体库去挑下一首）之后它还要继续生效。
     DisposableEffect(Unit) {
         onDispose { viewModel.setSpeedBoost(false) }
     }
@@ -345,6 +476,7 @@ fun PlayerRoute(
         onSpeedBoost = viewModel::setSpeedBoost,
         subtitleState = subtitleState,
         audioTrackChip = audioTrackChip,
+        sessionChips = sessionChips,
         modifier = modifier,
         onTogglePlayPause = viewModel::togglePlayPause,
         onSkipNext = viewModel::skipToNext,
@@ -424,6 +556,30 @@ fun PlayerRoute(
             onDismiss = ui::closeSheet,
         )
 
+        PlayerSheet.SLEEP_TIMER -> PlayerSleepTimerSheet(
+            state = sleepTimer,
+            // 面板说「分钟」，内核说「毫秒」：换算放在接线的这一行。
+            // 让面板自己乘 60000 会把单位知识拆到两个地方（档位表在内核里），
+            // 两边一旦不一致就是「选了 30 分钟，实际 30 秒」这种看不出来的错。
+            onSelectMinutes = { minutes -> viewModel.setSleepTimer(minutes * SleepTimerOptions.MINUTE_MS) },
+            onSelectUntilItemEnd = viewModel::setSleepTimerUntilItemEnd,
+            onClear = viewModel::cancelSleepTimer,
+            onDismiss = ui::closeSheet,
+        )
+
+        // 队列面板**不**在点条目后自己关：这个面板的存在意义就是「看着队列
+        // 挑一条」，关掉就回到了「盲选」——而挑歌本来就是一件会反复的事。
+        PlayerSheet.QUEUE -> PlayerQueueSheet(
+            queue = queue,
+            currentIndex = currentIndex,
+            shuffleEnabled = state.shuffleEnabled,
+            onPlay = viewModel::playQueueItem,
+            onRemove = viewModel::removeQueueItem,
+            onMove = viewModel::moveQueueItem,
+            onClear = viewModel::clearQueue,
+            onDismiss = ui::closeSheet,
+        )
+
         null -> Unit
     }
 }
@@ -463,6 +619,8 @@ fun PlayerScreen(
     subtitleState: SubtitleUiState = SubtitleUiState(),
     /** 音轨入口的芯片配置，`null` = 这个片源没有多条音轨。 */
     audioTrackChip: PlayerBarChip? = null,
+    /** 睡眠定时 / 队列 / 画中画三个会话级入口。默认空集 = 一个都不画。 */
+    sessionChips: PlayerSessionChipSet = PlayerSessionChipSet(),
     onTogglePlayPause: () -> Unit = {},
     onSkipNext: () -> Unit = {},
     onSkipPrevious: () -> Unit = {},
@@ -476,7 +634,10 @@ fun PlayerScreen(
 ) {
     // 手势只在视频上挂。音频页中间是可滚动的歌词/封面，一层吃掉全部触摸的
     // 手势层会和滚动直接抢事件——那种「歌词划不动」的 bug 极难归因。
-    val gesturesEnabled = entry?.kind == MediaKind.VIDEO && !ui.locked
+    //
+    // 画中画里也不挂：那类小窗口上的一次误拖就是一次跳转，而进度条在那里根本
+    // 看不见（那正是把状态写进 `PlayerUiState` 而不是留在这里的原因）。
+    val gesturesEnabled = entry?.kind == MediaKind.VIDEO && !ui.locked && !ui.inPip
     val gestureModifier = Modifier.playerGestures(
         enabled = gesturesEnabled,
         controller = windowController,
@@ -534,6 +695,26 @@ fun PlayerScreen(
         }
     }
 
+    // ---- 画中画里只画画面 ----
+    //
+    // 系统给的小窗口只有一两百 dp 宽，这一页的常设内容（标题、进度条、两排芯片、
+    // 传输控制）在那里既放不下也没法点，排版出来是一团互相压住的碎片。所以那类
+    // 窗口里只画**画面那一层**：视频 + 字幕。
+    //
+    // 字幕留着：窝在小窗里看片时字幕恰恰是最需要的东西。控制条/芯片/面板都不画，
+    // 面板尤其不能画（`PlayerRoute` 里那个 `LaunchedEffect(ui.inPip)` 就是为此
+    // 把字幕面板收掉的）。
+    //
+    // 这里复用同一个 `videoLayer`，而不是另写一个只有画面的版本：字幕样式的
+    // 挂载点、画面比例的算法、播放器绑定都只有一份，不会再一次出现
+    // 「竖屏写了、小窗忘了」的偏差。
+    if (ui.inPip) {
+        Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+            videoLayer(Modifier.fillMaxSize())
+        }
+        return
+    }
+
     if (isLandscape) {
         LandscapeLayout(
             state = state,
@@ -544,6 +725,7 @@ fun PlayerScreen(
             aspectRatio = aspectRatio,
             subtitleState = subtitleState,
             audioTrackChip = audioTrackChip,
+            sessionChips = sessionChips,
             videoLayer = videoLayer,
             modifier = modifier,
             onTogglePlayPause = onTogglePlayPause,
@@ -565,6 +747,7 @@ fun PlayerScreen(
             aspectRatio = aspectRatio,
             subtitleState = subtitleState,
             audioTrackChip = audioTrackChip,
+            sessionChips = sessionChips,
             videoLayer = videoLayer,
             modifier = modifier,
             onTogglePlayPause = onTogglePlayPause,
@@ -599,6 +782,7 @@ private fun PortraitLayout(
     aspectRatio: AspectRatioMode,
     subtitleState: SubtitleUiState,
     audioTrackChip: PlayerBarChip?,
+    sessionChips: PlayerSessionChipSet,
     videoLayer: @Composable (Modifier) -> Unit,
     modifier: Modifier,
     onTogglePlayPause: () -> Unit,
@@ -679,6 +863,14 @@ private fun PortraitLayout(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        // 睡眠定时 / 队列 / 画中画。单独一行（不是并进上面那排芯片）：那一排在
+        // 竖屏下已经把宽度用完了，而且这三个是「管这次播放会话」、
+        // 不是「调这条媒体」。
+        PlayerSessionChips(
+            session = sessionChips,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         PlayerTransportControls(
             state = state,
             subtitlesActive = subtitleState.isRendering,
@@ -715,6 +907,7 @@ private fun LandscapeLayout(
     aspectRatio: AspectRatioMode,
     subtitleState: SubtitleUiState,
     audioTrackChip: PlayerBarChip?,
+    sessionChips: PlayerSessionChipSet,
     videoLayer: @Composable (Modifier) -> Unit,
     modifier: Modifier,
     onTogglePlayPause: () -> Unit,
@@ -743,6 +936,7 @@ private fun LandscapeLayout(
                 ui = ui,
                 subtitleState = subtitleState,
                 audioTrackChip = audioTrackChip,
+                sessionChips = sessionChips,
                 onTogglePlayPause = onTogglePlayPause,
                 onSkipNext = onSkipNext,
                 onSkipPrevious = onSkipPrevious,
@@ -792,6 +986,7 @@ private fun LandscapeLayout(
                 aspectRatioLabel = aspectRatio.label.string(),
                 subtitlesActive = subtitleState.isRendering,
                 audioTrackChip = audioTrackChip,
+                sessionChips = sessionChips,
                 onExitFullscreen = { ui.applyFullscreen(false) },
                 onOpenSpeed = { ui.openSheet(PlayerSheet.SPEED) },
                 onOpenAspectRatio = { ui.openSheet(PlayerSheet.ASPECT_RATIO) },
@@ -842,6 +1037,7 @@ private fun AudioLandscapeLayout(
     ui: PlayerUiState,
     subtitleState: SubtitleUiState,
     audioTrackChip: PlayerBarChip?,
+    sessionChips: PlayerSessionChipSet,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -926,6 +1122,7 @@ private fun AudioLandscapeLayout(
                 ui = ui,
                 subtitleState = subtitleState,
                 audioTrackChip = audioTrackChip,
+                sessionChips = sessionChips,
                 positionMs = positionMs,
                 bufferedMs = bufferedMs,
                 onTogglePlayPause = onTogglePlayPause,
@@ -984,6 +1181,7 @@ private fun AudioLandscapeControls(
     ui: PlayerUiState,
     subtitleState: SubtitleUiState,
     audioTrackChip: PlayerBarChip?,
+    sessionChips: PlayerSessionChipSet,
     positionMs: Long,
     bufferedMs: Long,
     onTogglePlayPause: () -> Unit,
@@ -1029,6 +1227,12 @@ private fun AudioLandscapeControls(
                 fullscreen = null,
                 onToggleFullscreen = {},
                 compact = true,
+            )
+            // 音频横屏的控制条是常驻的（不淡出），所以这几行不担心「隐藏时看不见」：
+            // 用户随时能看到定时还开着没有、队列里还有多少首。
+            PlayerSessionChips(
+                session = sessionChips,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

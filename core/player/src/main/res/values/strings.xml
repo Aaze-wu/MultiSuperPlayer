@@ -4,6 +4,20 @@
          改这里的文案只影响新安装的用户，不会修正已存在的渠道。 -->
     <string name="msp_playback_channel_name">播放控制</string>
 
+    <!-- ===== 睡眠定时档位 ===== -->
+
+    <!--
+      三条按「时长怎么念更自然」分流：低于一小时报分钟、整小时报小时、
+      其余报「x 小时 y 分」。合并成一条（比如一律报分钟）会让 90 显示成
+      「90 分钟」，和旁边那档「1 小时」不成对比。
+    -->
+    <string name="msp_sleep_timer_minutes">%1$d 分钟</string>
+    <string name="msp_sleep_timer_hours">%1$d 小时</string>
+    <string name="msp_sleep_timer_hours_minutes">%1$d 小时 %2$d 分</string>
+
+    <!-- 唯一永远正确的那一档：不用猜自己几分钟能睡着。 -->
+    <string name="msp_sleep_timer_until_item_end">本集结束</string>
+
     <!-- ===== 播放失败文案 ===== -->
 
     <!--

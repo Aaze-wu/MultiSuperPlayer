@@ -2,6 +2,19 @@
 
     <string name="msp_playback_channel_name">Playback controls</string>
 
+    <!-- ===== Sleep timer presets ===== -->
+
+    <!--
+      Three branches so each duration reads the way it is spoken:
+      under an hour in minutes, whole hours in hours, the rest as "x hr y min".
+    -->
+    <string name="msp_sleep_timer_minutes">%1$d min</string>
+    <string name="msp_sleep_timer_hours">%1$d hr</string>
+    <string name="msp_sleep_timer_hours_minutes">%1$d hr %2$d min</string>
+
+    <!-- The one preset that is always right: no need to guess when you fall asleep. -->
+    <string name="msp_sleep_timer_until_item_end">End of this item</string>
+
     <!-- ===== Playback failure messages ===== -->
 
     <!--

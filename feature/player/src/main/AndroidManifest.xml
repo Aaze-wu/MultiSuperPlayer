@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  本模块自己的清单。
+
+  只有一件事必须写在这里：画中画小窗口上那个播放/暂停按钮的接收方。
+  它必须是**组件**（`PendingIntent` 只能指向组件），而组件必须声明在清单里，
+  所以这个文件是为那一个 `<receiver>` 存在的，没有别的内容。
+
+  `exported="false"`：这个广播只由我们自己的 `PendingIntent` 发出，
+  从外面能触发的入口一个都不该有（一个谁都能发的播放/暂停广播没有意义，
+  但一个谁都能发的「切换播放状态」广播就是一个可以被用来做拒绝服务的把柄）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <receiver
+            android:name="com.multisuperplayer.feature.player.PlayerPipActionReceiver"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

@@ -163,4 +163,27 @@
     <string name="msp_player_subtitle_style_outline">描边</string>
     <string name="msp_player_subtitle_style_bottom_margin">底部距离</string>
     <string name="msp_player_subtitle_style_reset">恢复默认样式</string>
+
+    <!-- ===== 睡眠定时 ===== -->
+    <string name="msp_player_sleep_timer">睡眠定时</string>
+    <string name="msp_player_sleep_timer_active">已开启</string>
+    <string name="msp_player_sleep_timer_remaining">还有 %1$s</string>
+    <string name="msp_player_sleep_timer_until_item_end_active">本集结束后暂停</string>
+    <string name="msp_player_sleep_timer_clear">关掉定时</string>
+    <string name="msp_player_sleep_timer_note">到期只会暂停：队列和播放位置都留着，下次点播放就从原处接着放。</string>
+
+    <!-- ===== 播放队列 ===== -->
+    <string name="msp_player_queue">播放队列</string>
+    <string name="msp_player_queue_chip">队列 %1$d</string>
+    <string name="msp_player_queue_count">共 %1$d 项</string>
+    <string name="msp_player_queue_empty">队列是空的</string>
+    <string name="msp_player_queue_remove">从队列中移除</string>
+    <string name="msp_player_queue_clear">清空队列</string>
+    <string name="msp_player_queue_playing">正在播放</string>
+    <string name="msp_player_queue_drag_hint">按住右侧把手上下拖动可以排序。</string>
+    <string name="msp_player_queue_shuffle_locked">随机播放开着时不能手动排序（列表顺序已经不是播放顺序了）。</string>
+
+    <!-- ===== 画中画 ===== -->
+    <!-- 控制条上的入口。英文用 PiP 缩写：写成 “Picture in picture” 会把芯片撑得比别的都长。 -->
+    <string name="msp_player_pip">画中画</string>
 </resources>

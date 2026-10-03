@@ -48,9 +48,17 @@ fun rememberIsLandscape(): Boolean =
  * 两个设置都是**粘性**的：不还回去，用户从播放页退到媒体库，得到的是一个
  * 没有状态栏/导航栏的媒体库；而 `requestedOrientation` 更糟——它会一直
  * 锁着整个 Activity，之后每个页面都只能是横屏。
+ *
+ * ## 画中画里不锁方向（[inPip]）
+ *
+ * 画中画窗口的大小是用户自己拖的，锁方向在那里没有任何意义；更现实的是它会
+ * 直接惹事：带着 `SENSOR_LANDSCAPE` 进画中画，部分 ROM 会拒绝进入，另一部分
+ * 会画出一个比例不对的窗口。所以进画中画期间只把方向放开、不重新锁。
+ *
+ * @param inPip 现在是不是在画中画里。
  */
 @Composable
-fun PlayerFullscreenEffect(fullscreen: Boolean) {
+fun PlayerFullscreenEffect(fullscreen: Boolean, inPip: Boolean = false) {
     val activity = LocalContext.current.findActivity()
     val view = LocalView.current
 
@@ -69,11 +77,15 @@ fun PlayerFullscreenEffect(fullscreen: Boolean) {
         onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    DisposableEffect(fullscreen) {
-        activity?.requestedOrientation = if (fullscreen) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    // 键里带上 inPip：进/出画中画两类都会重跑一次。进入时 `onDispose`（上一次的）
+    // 先把方向放开，然后新的一次因为 inPip 为 true 而什么都不做——正是要的效果。
+    DisposableEffect(fullscreen, inPip) {
+        if (!inPip) {
+            activity?.requestedOrientation = if (fullscreen) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
         }
         onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }

@@ -257,6 +257,10 @@ class ExoPlayerController(
     private val _bufferedPositionMs = MutableStateFlow(0L)
     override val bufferedPositionMs: StateFlow<Long> = _bufferedPositionMs.asStateFlow()
 
+    /** 睡眠定时。存的是**绝对截止时刻**（见 [SleepTimerState]），所以这里不需要每秒改它。 */
+    private val _sleepTimer = MutableStateFlow<SleepTimerState>(SleepTimerState.Off)
+    override val sleepTimer: StateFlow<SleepTimerState> = _sleepTimer.asStateFlow()
+
     /**
      * 错误文案要先记下来再 publish。
      *
@@ -315,6 +319,10 @@ class ExoPlayerController(
                     // 真正开始播放（或恢复）就清掉上一次的错误提示。
                     // 这里只改缓存，实际写进 Flow 由紧随其后的 onEvents 完成。
                     if (playbackState == Player.STATE_READY) pendingErrorMessage = null
+                    // 循环模式关掉时，一集放完停在这里（不会切条目，也就没有
+                    // onMediaItemTransition 可挂）。那时「本集结束」这一档只需要
+                    // 把定时收掉——播放本来就已经不在走了，不需要再暂停一次。
+                    if (playbackState == Player.STATE_ENDED) consumeSleepTimerAtItemEnd()
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
@@ -353,6 +361,19 @@ class ExoPlayerController(
                     // 音频没有自动挑选那一步，只能显式清。
                     clearAudioOverride()
                     _embeddedSubtitle.value = EmbeddedSubtitleState()
+
+                    // 「本集结束」那一档必须在这里拦，而不是等 STATE_ENDED：
+                    // 循环模式是「列表循环/单曲循环」时，内核**直接切到下一条**，
+                    // STATE_ENDED 根本不会发生（实测：设了「本集结束」却整夜放完
+                    // 整个队列）。只认 AUTO/REPEAT —— SEEK 是用户在队列面板里手点的
+                    // 跳转，PLAYLIST_CHANGED 是队列编辑，那两种情况用户并没有
+                    // 「让这一集放完」。
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+                        reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
+                    ) {
+                        consumeSleepTimerAtItemEnd()
+                    }
+
                     publish()
                 }
 
@@ -405,6 +426,10 @@ class ExoPlayerController(
                     enforceAbRepeat()
                     savePositionIfDue()
                 }
+                // 睡眠定时的到期判定放在**外面**：它按墙钟算，暂停期间时间照走
+                // （用户按下暂停时他仍然打算 30 分钟后停）。放在里面就得为
+                // 「暂停着到期」再写一套逻辑，而两套迟早会不一致。
+                enforceSleepTimer()
                 // A-B 循环生效时把节拍提到 50ms：200ms 的粒度意味着一秒的循环区间
                 // 会被拉长两成，听感上是一个明显的「拖拍」。只在用它时才付这个代价。
                 delay(if (abRepeat.isActive) AB_TICK_INTERVAL_MS else TICK_INTERVAL_MS)
@@ -1028,6 +1053,107 @@ class ExoPlayerController(
         }
     }
 
+    override fun playQueueItem(index: Int) {
+        onMain {
+            val entries = _queue.value
+            if (index !in entries.indices) {
+                MspLog.d(TAG) { "跳到队列第 $index 条：越界（当前 ${entries.size} 条），忽略" }
+                return@onMain
+            }
+            // 一条命令跳到目标条目，而不是 `skipToNext()` 连按 N 次：后者会把中间
+            // 每一首都真的播一下，每个都触发 onMediaItemTransition（清 A-B、
+            // 清手选轨道、写一条续播记录）。点的是当前这一条时同样走 seek，
+            // 于是它自然成了「重播」（列表里那一行看起来「点不动」时最合理的反应）。
+            player.seekToDefaultPosition(index)
+            ensureServiceStarted()
+            player.play()
+            publish()
+        }
+    }
+
+    override fun removeQueueItem(index: Int) {
+        onMain {
+            val entries = _queue.value
+            if (index !in entries.indices) {
+                MspLog.d(TAG) { "删队列第 $index 条：越界（当前 ${entries.size} 条），忽略" }
+                return@onMain
+            }
+            if (entries.size == 1) {
+                // 删掉唯一一条 = 没有东西可播了。走 stopAndClear 而不是留下一个空队列：
+                // 空队列会让界面画出「队列里 0 条」，而内核那边其实还挂着一条已停止的媒体，
+                // 两边的 "当前条目" 就会不一致。
+                stopAndClear()
+                return@onMain
+            }
+            // 编辑之前先落盘：删掉的如果正是当前项，换完之后 currentPosition 就归零了。
+            persistTrackedPosition()
+            preservingCurrentItemState {
+                _queue.value = QueueRules.removeAt(entries, index)
+                // 走 Media3 的增量接口，而不是把整个列表重新 setMediaItems 一遍：
+                // 后者是一次「重开播放会话」（画面闪一下、缓冲重来、手选的音轨和字幕
+                // 回到自动）。用户删掉队列里第 5 首，不该等于把当前这一集重新开一次。
+                player.removeMediaItem(index)
+            }
+            publish()
+            MspLog.d(TAG) { "从队列里删掉第 $index 条，现在 ${_queue.value.size} 条" }
+        }
+    }
+
+    override fun moveQueueItem(from: Int, to: Int) {
+        onMain {
+            val entries = _queue.value
+            if (from == to || from !in entries.indices || to !in entries.indices) {
+                MspLog.d(TAG) { "移动队列条目 $from → $to：无效（当前 ${entries.size} 条），忽略" }
+                return@onMain
+            }
+            persistTrackedPosition()
+            preservingCurrentItemState {
+                _queue.value = QueueRules.move(entries, from, to)
+                player.moveMediaItem(from, to)
+            }
+            publish()
+            MspLog.d(TAG) { "队列条目 $from → $to" }
+        }
+    }
+
+    override fun clearQueue() = stopAndClear()
+
+    /**
+     * 执行一次队列编辑，并保住「属于当前这一条媒体」的状态。
+     *
+     * ## 为什么需要它
+     *
+     * Media3 在播放列表变化时会回调 `onMediaItemTransition(PLAYLIST_CHANGED)`，
+     * 而那个回调会清掉 A-B 循环、手选的字幕轨、音轨覆盖和内嵌字幕行。
+     * 那些清理对「切到另一条媒体」是对的，对「用户删掉队列里的第 5 首」就完全错了
+     * ——当前这一条根本没换。症状是「删了别的歌，我手选的中文字幕自己变回英文了」，
+     * 而且下次切条目时的手选还会继承上一部的选择。
+     *
+     * ## 为什么按 mediaId 判断「当前条目有没有换」
+     *
+     * 编辑前记下当前条目的 id，编辑后再看一眼：
+     * - 一样 ⇒ 当前条目没换（删/移的是别人），把状态原样写回去；
+     * - 不一样 ⇒ 当前条目真的被删掉了，内核往前走了一格。这时**不能**恢复：
+     *   那些状态属于一条已经不在播的媒体，写回去正是 `onMediaItemTransition`
+     *   要防的那个 bug（下一部片子静默地用上这一部手选的音轨）。
+     *
+     * 用 id 而不是下标判断，是因为下标在编辑中必然平移（删掉当前项**之前**的一条
+     * 就会让下标减一），拿它比较得不到「条目有没有换」这个答案。
+     */
+    private inline fun preservingCurrentItemState(block: () -> Unit) {
+        val mediaIdBefore = player.currentMediaItem?.mediaId
+        val textChoiceBefore = textTrackChoice
+        val paramsBefore = player.trackSelectionParameters
+        val embeddedBefore = _embeddedSubtitle.value
+        val abRepeatBefore = abRepeat
+        block()
+        if (player.currentMediaItem?.mediaId != mediaIdBefore) return
+        textTrackChoice = textChoiceBefore
+        player.trackSelectionParameters = paramsBefore
+        _embeddedSubtitle.value = embeddedBefore
+        abRepeat = abRepeatBefore
+    }
+
     override fun pause() {
         onMain {
             player.pause()
@@ -1121,6 +1247,81 @@ class ExoPlayerController(
         }
     }
 
+    override fun setSleepTimer(durationMs: Long?) {
+        onMain {
+            // 时钟在**这里**读、并且只读一次：把「现在几点」交给 [SleepTimerRules]
+            // 当参数，那个函数才是纯的、才能被逐条钉死（见它的 KDoc）。
+            applySleepTimer(
+                SleepTimerRules.startCountdown(SystemClock.elapsedRealtime(), durationMs),
+                why = "时长 $durationMs",
+            )
+        }
+    }
+
+    override fun setSleepTimerUntilItemEnd() {
+        onMain { applySleepTimer(SleepTimerState.UntilItemEnd, why = "本集结束") }
+    }
+
+    override fun cancelSleepTimer() {
+        onMain { applySleepTimer(SleepTimerState.Off, why = "取消") }
+    }
+
+    /**
+     * 换一个睡眠定时状态，并记一条日志。
+     *
+     * 相同状态直接返回：界面上的「本集结束」被点两下时，第二下不该再改一次状态
+     * （状态是 `data object`，比较是等值比较，所以这一条真的会生效）。
+     * 日志里带上原因（档位还是取消）是因为**「定时为什么没了」这个问题在事后
+     * 只能靠日志回答**：到期、被切队列、用户取消，三种都会变成 [SleepTimerState.Off]。
+     */
+    private fun applySleepTimer(next: SleepTimerState, why: String) {
+        if (_sleepTimer.value == next) return
+        _sleepTimer.value = next
+        MspLog.i(TAG) { "睡眠定时 → ${describeSleepTimer(next)}（$why）" }
+    }
+
+    /**
+     * 每个节拍检查倒计时到点了没有。
+     *
+     * 判定用**绝对时刻比较**（[SleepTimerRules.isExpired]），不是「每 tick 减 200ms」：
+     * tick 会被跳过（暂停、主线程忙、GC），累加出来的剩余时间只会越走越慢，
+     * 用户设了 30 分钟可能放了一小时。
+     */
+    private fun enforceSleepTimer() {
+        if (!SleepTimerRules.isExpired(_sleepTimer.value, SystemClock.elapsedRealtime())) return
+        _sleepTimer.value = SleepTimerState.Off
+        MspLog.i(TAG) { "睡眠定时到期，暂停播放" }
+        // 只暂停，**不** stopAndClear：停止会清空队列，用户睡醒后点播放等于
+        // 从头开一条新会话；暂停停在原处，第二天点一下接着看。而且 pause 不会触发
+        // onMediaItemTransition，A-B、手选的音轨/字幕轨、正在显示的那句字幕都还在。
+        pause()
+    }
+
+    /**
+     * 「本集结束」这一档到期。返回 true 表示确实处理了（免得调用方再判一次）。
+     *
+     * 只有 [SleepTimerState.UntilItemEnd] 会命中：倒计时那一档到点是个**时间事件**，
+     * 由 [enforceSleepTimer] 负责，和这里没有交集（两种状态互斥，见
+     * [PlaybackController.setSleepTimerUntilItemEnd] 的 KDoc）。
+     */
+    private fun consumeSleepTimerAtItemEnd(): Boolean {
+        if (_sleepTimer.value != SleepTimerState.UntilItemEnd) return false
+        _sleepTimer.value = SleepTimerState.Off
+        MspLog.i(TAG) { "睡眠定时（本集结束）到期，暂停播放" }
+        // 循环模式下这一条已经被内核切过来了，pause 之后停在**下一条的开头**；
+        // 循环模式关掉时播放已经停了，pause 是空操作。两种情况都只要「停住」，
+        // 所以这里不区分。
+        pause()
+        return true
+    }
+
+    /** 日志用的短描述：档位时长还是「本集结束」还是「关」。 */
+    private fun describeSleepTimer(state: SleepTimerState): String = when (state) {
+        is SleepTimerState.Off -> "关"
+        is SleepTimerState.UntilItemEnd -> "本集结束"
+        is SleepTimerState.Countdown -> "${state.totalMs / 1000L} 秒后"
+    }
+
     override fun setRememberPosition(enabled: Boolean) {
         onMain {
             if (rememberPosition == enabled) return@onMain
@@ -1151,6 +1352,9 @@ class ExoPlayerController(
             _positionMs.value = 0L
             _bufferedPositionMs.value = 0L
             pendingErrorMessage = null
+            // 队列都没了，睡眠定时也就没有意义了（倒计时停在一个没有东西可放的地方，
+            // 下次开播时会莫名地在半途停下）。
+            _sleepTimer.value = SleepTimerState.Off
             // 队列都空了，通知栏上的播放控制就没有意义——主动停服务，
             // 否则会留下一个既停不下来、点了也没反应的幽灵通知。
             stopServiceIfRunning()

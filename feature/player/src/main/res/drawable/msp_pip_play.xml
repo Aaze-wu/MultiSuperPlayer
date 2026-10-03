@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  画中画小窗口里「播放」按钮的图标（当前处于暂停状态时会画它）。
+
+  为什么用矢量 XML 而不是 `material-icons-extended` 里那个同名的 Compose 图标：
+  `RemoteAction` 要的是 `android.graphics.drawable.Icon`，它只接受 Drawable 资源、
+  位图或者 URI，吃不了 Compose 的 `ImageVector`——那套图标在 Compose 画布外面
+  根本画不出来。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,5v14l11,-7z" />
+</vector>

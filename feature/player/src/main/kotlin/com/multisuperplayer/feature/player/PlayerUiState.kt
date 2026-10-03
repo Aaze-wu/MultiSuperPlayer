@@ -46,11 +46,15 @@ data class PlayerSeekHint(
  * 播放页上会弹出的选择面板。
  *
  * 一个面板只改一个维度：`SPEED` 改倍速、`ASPECT_RATIO` 改画面比例、`AUDIO_TRACK`
- * 改音轨。字幕不在这张表里——它是单独一个 `ModalBottomSheet`（见 `PlayerRoute` 里
- * 的 `showSubtitleSheet`），因为它下面挂着一整棵状态机（扫描、翻译、导出），
- * 和这三个「选一个值就关掉」的面板不是一类东西。
+ * 改音轨、`SLEEP_TIMER` 设定时、`QUEUE` 看/改队列。字幕不在这张表里——它是单独一个
+ * `ModalBottomSheet`（见 `PlayerRoute` 里的 `showSubtitleSheet`），因为它下面挂着
+ * 一整棵状态机（扫描、翻译、导出），和这几个「选一个值就关掉」的面板不是一类东西。
+ *
+ * [QUEUE] 是这里唯一**不是「选一个值」**的面板（它能拖能删），但仍然属于这张表：
+ * 它和其他几个共享同一套「同一时刻只开一个、开面板就点亮控制条、控制条自动淡化时
+ * 要停下」的规矩，而那套规矩是写在 [PlayerUiState.openSheet] 里的。
  */
-enum class PlayerSheet { SPEED, ASPECT_RATIO, AUDIO_TRACK }
+enum class PlayerSheet { SPEED, ASPECT_RATIO, AUDIO_TRACK, SLEEP_TIMER, QUEUE }
 
 /**
  * 播放页的**界面**状态：全屏、锁定、控制条显隐、提示泡、当前面板。
@@ -155,6 +159,23 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
         private set
 
     /**
+     * 现在是不是在画中画小窗口里。
+     *
+     * ## 为什么这一页必须知道这件事
+     *
+     * 画中画里那块画布只有一两百 dp 宽，而这一页的常设内容是「视频画面 + 一层
+     * 控制条 + 一堆提示泡 + 可能还开着一个面板」。整套东西按小窗口的尺寸去布局，
+     * 得到的是一团互相压住的碎片。知道在画中画里，就可以只画画面那一个层。
+     *
+     * ## 值从哪来
+     *
+     * 由 `androidx.activity` 的 `addOnPictureInPictureModeChangedListener` 推过来
+     * （见 `PlayerPipController.observeModeChanges`），不是我们自己猜的。
+     */
+    var inPip: Boolean by mutableStateOf(false)
+        private set
+
+    /**
      * 进/出全屏。
      *
      * 进入时强制把控制条翻开：全屏是一个明确的动作，如果进去之后控制条是隐藏的，
@@ -167,6 +188,34 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
     fun applyFullscreen(value: Boolean) {
         fullscreen = value
         if (value) controlsVisible = true
+    }
+
+    /**
+     * 进/出画中画。
+     *
+     * 进画中画时把「临时性的东西」全收掉：提示泡、控制条、面板。理由不是「不好看」，
+     * 而是它们在画中画里**无法收场**——
+     *
+     * - 控制条自动淡出的计时器还在跑，但它现在已经没有意义（画中画里我们不画控制条）；
+     * - 提示泡的消失靠一个 `LaunchedEffect` 延时；而弹出一个 `ModalBottomSheet`
+     *   在两百 dp 宽的窗口里会把整个窗口盖住，用户在小窗口里也点不到关闭。
+     *
+     * 锁定状态**不动**：进来之前锁着，出去之后应该还锁着。「锁定」是用户明确表达的
+     * 意图，而画中画不是解除它的理由。
+     *
+     * 叫 `applyXxx` 而不是 `setInPip`：属性自己就会生成 `setInPip(Z)V`，
+     * 同名函数和它撞 JVM 签名（「Platform declaration clash」，编辑器常常不报，
+     * 只有真编译才报）。
+     */
+    fun applyPipMode(value: Boolean) {
+        inPip = value
+        if (!value) return
+        controlsVisible = false
+        levelHint = null
+        seekHint = null
+        playPauseHint = null
+        speedBoost = null
+        openSheet = null
     }
 
     /**

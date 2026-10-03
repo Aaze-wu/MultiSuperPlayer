@@ -61,11 +61,23 @@
         android:theme="@style/Theme.MultiSuperPlayer"
         tools:targetApi="34">
 
+        <!-- `supportsPictureInPicture` = 这个 Activity 允许进画中画小窗。播放页的
+             「画中画」按钮，以及 API 31+ 的「划回桌面自动进小窗」，都靠它；缺了会在
+             运行时抛 IllegalStateException（不是忘记加权限——**画中画不需要任何权限**）。
+             `resizeableActivity` 一起写出来：targetSdk 24+ 本来默认就是 true，写在这
+             是为了让「这个 Activity 可以被系统改尺寸（小窗就是一种改尺寸）」在清单里
+             看得见，而不是靠 SDK 版本的默认值推断。
+
+             顺带一问：上面的 `configChanges` 已经包含 `orientation|screenSize|
+             smallestScreenSize`，所以进/出小窗引起的配置变化不会重建 Activity——
+             这正是我们要的（不重建就不会闪白、不会丢掉播放页的状态）。 -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|smallestScreenSize|density"
             android:exported="true"
             android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
             android:theme="@style/Theme.MultiSuperPlayer"
             android:windowSoftInputMode="adjustResize">
 

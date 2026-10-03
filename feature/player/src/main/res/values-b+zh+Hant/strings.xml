@@ -141,4 +141,26 @@
     <string name="msp_player_subtitle_style_outline">描邊</string>
     <string name="msp_player_subtitle_style_bottom_margin">底部距離</string>
     <string name="msp_player_subtitle_style_reset">恢復預設樣式</string>
+
+    <!-- ===== 睡眠定時 ===== -->
+    <string name="msp_player_sleep_timer">睡眠定時</string>
+    <string name="msp_player_sleep_timer_active">已開啟</string>
+    <string name="msp_player_sleep_timer_remaining">還有 %1$s</string>
+    <string name="msp_player_sleep_timer_until_item_end_active">本集結束後暫停</string>
+    <string name="msp_player_sleep_timer_clear">關掉定時</string>
+    <string name="msp_player_sleep_timer_note">到期只會暫停：佇列與播放位置都留著，下次點播放就從原處接著放。</string>
+
+    <!-- ===== 播放佇列 ===== -->
+    <string name="msp_player_queue">播放佇列</string>
+    <string name="msp_player_queue_chip">佇列 %1$d</string>
+    <string name="msp_player_queue_count">共 %1$d 項</string>
+    <string name="msp_player_queue_empty">佇列是空的</string>
+    <string name="msp_player_queue_remove">從佇列中移除</string>
+    <string name="msp_player_queue_clear">清空佇列</string>
+    <string name="msp_player_queue_playing">正在播放</string>
+    <string name="msp_player_queue_drag_hint">按住右側把手上下拖動可以排序。</string>
+    <string name="msp_player_queue_shuffle_locked">隨機播放開著時不能手動排序（清單順序已經不是播放順序了）。</string>
+
+    <!-- ===== 子母畫面 ===== -->
+    <string name="msp_player_pip">子母畫面</string>
 </resources>

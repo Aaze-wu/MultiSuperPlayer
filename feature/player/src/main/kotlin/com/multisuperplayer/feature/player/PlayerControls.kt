@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -450,6 +453,71 @@ internal fun PlayerActionChips(
 }
 
 /**
+ * 「睡眠定时 / 播放队列 / 画中画」三个会话级入口。
+ *
+ * ## 为什么单独一行，而不是并进 [PlayerActionChips]
+ *
+ * 那一行在竖屏下已经把宽度用完了（四个芯片加上内边距差不多就是一块屏宽），
+ * 再塞两个进去，英文界面上必然有一个被挤掉。这两件事的性质也不同：
+ * [PlayerActionChips] 是「调当前这条媒体怎么放」，这两个是「管这一次播放会话」。
+ *
+ * ## 为什么用 `FlowRow`
+ *
+ * 芯片上的文字长度不完全由我们决定（「本集结束」/「End of this item」差一倍），
+ * 等分的 `Row` 会在英文下把文字裁掉（倍速芯片上实测踩过一次）。`FlowRow`
+ * 让它真放不下时自己折到第二行，而不是裁掉。
+ *
+ * ## 为什么不在这里显示「还剩多久」
+ *
+ * 倒计时是个**每秒都在变**的值，摆在控制条上意味着这一行（以及它所在的那层
+ * 控制层）每秒重组一次。而控制条在播放中是会自动淡出的——用户想看倒计时的时候
+ * （睡前盯着时间）恰好是这个值根本不在屏幕上的时候。真正需要它的地方是定时面板内部，
+ * 那里的倒计时有自己的时钟（见 `PlayerSleepTimerSheet`）。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun PlayerSessionChips(
+    session: PlayerSessionChipSet,
+    modifier: Modifier = Modifier,
+) {
+    // 一个都没有就不占位置：留一行空白会把下面的控制条往下推，而那一行什么都说明不了。
+    if (session.isEmpty) return
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        session.sleepTimer?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_sleep_timer),
+            )
+        }
+        session.queue?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_queue),
+                // 队列芯片上的字是「队列 12」，长度不受控，和音轨芯片同样处理。
+                modifier = Modifier.widthIn(max = CHIP_MAX_WIDTH),
+            )
+        }
+        // 画中画排最后：它和上面两个的区别是**点了会离开这个界面**（画面缩成一个小
+        // 窗口），摆在最靠后/最靠边的位置，误触的代价最小。
+        session.pip?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_pip),
+            )
+        }
+    }
+}
+
+/**
  * 控制条上「一个可选值」的按钮配置（画面比例、音轨）。
  *
  * `null`（不给）表示这一处没有这件事——音频页就是「没有画面比例」那种情况：
@@ -468,6 +536,43 @@ data class PlayerBarChip(
     val active: Boolean = false,
     val onClick: () -> Unit,
 )
+
+/**
+ * 会话级入口的一整组（睡眠定时 / 队列 / 画中画）。
+ *
+ * ## 为什么不写成三个平铺的参数
+ *
+ * 这一组要穿过 `PlayerScreen` → `PortraitLayout` / `LandscapeLayout` →
+ * `AudioLandscapeLayout` → `AudioLandscapeControls`（以及 `PlayerControlsOverlay`）
+ * 好几层。每加一个入口，那几层签名各加一行、各处转发各加一行——十几个几乎相同的
+ * 改动点，漏掉任意一处就是「这个按钮在某些版面上不出现」（横屏有、竖屏没有），
+ * 而那种偏差在代码里看不出来，只有把两种方向都试一遍才发现得了。
+ *
+ * 打包成一个对象之后，加入口变成「加一个字段 + 一处渲染」，穿参的那几层不用动。
+ *
+ * ## 字段的空值含义各不相同
+ *
+ * [sleepTimer] 为 null 是「预览/单测里没给」，[queue] 为 null 是「队列里没东西可看」，
+ * [pip] 为 null 是「这台设备不支持画中画，或者当前放的是音频」。它们只是恰好都用
+ * 可空表示「这个入口不画」。
+ *
+ * 公开（而不是 internal）是因为它出现在 `PlayerScreen` 的参数表上，而那个组合
+ * 函数是公开的——公开函数不能暴露 internal 类型。
+ */
+@Immutable
+data class PlayerSessionChipSet(
+    val sleepTimer: PlayerBarChip? = null,
+    val queue: PlayerBarChip? = null,
+    val pip: PlayerBarChip? = null,
+) {
+    /**
+     * 三个入口都没有。
+     *
+     * 「要不要占位置」的判断点和「要不要画」的渲染点必须是同一个集合：分开写的话，
+     * 以后加第四个入口时只改了一边，就会得到一行空白的间距（或一个跑出边界的东西）。
+     */
+    val isEmpty: Boolean get() = sleepTimer == null && queue == null && pip == null
+}
 
 /**
  * 芯片上文字的最大宽度。
@@ -616,6 +721,8 @@ internal fun PlayerControlsOverlay(
     modifier: Modifier = Modifier,
     /** 音轨入口的配置。`null` = 这个片源只有一条音轨（或还没有轨道信息）。 */
     audioTrackChip: PlayerBarChip? = null,
+    /** 睡眠定时 / 队列 / 画中画三个会话级入口。默认空集 = 一个都不画。 */
+    sessionChips: PlayerSessionChipSet = PlayerSessionChipSet(),
 ) {
     Box(modifier = modifier.fillMaxSize()) {
 
@@ -745,6 +852,12 @@ internal fun PlayerControlsOverlay(
                         onToggleShuffle = onToggleShuffle,
                         onOpenSubtitles = onOpenSubtitles,
                         compact = true,
+                    )
+                    // 摆在传输控制**下面**（而不是上面）：下面那一条是屏幕最下缘，
+                    // 越靠下的东西越不容易被手指挡住，而这三个入口是需要点准的。
+                    PlayerSessionChips(
+                        session = sessionChips,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     )
                 }
             }

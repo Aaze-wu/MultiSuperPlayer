@@ -16,6 +16,7 @@ import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import com.multisuperplayer.core.player.PlaybackController
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
+import com.multisuperplayer.core.player.SleepTimerState
 import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.player.TrackSelectionController
 import com.multisuperplayer.core.player.audioTracks
@@ -70,6 +71,20 @@ class PlayerViewModel(
     val bufferedPositionMs: StateFlow<Long> = controller.bufferedPositionMs
     val queue: StateFlow<List<MediaEntry>> = controller.queue
     val currentIndex: StateFlow<Int> = controller.currentIndex
+
+    /**
+     * 睡眠定时状态。
+     *
+     * ## 为什么它在内核里，而不是在这个 ViewModel 里
+     *
+     * 这一页**会被整个摘掉**：切到「我的」标签、或者从播放条回到列表再进来，
+     * `PlayerViewModel` 就没了。定时器如果活在这里，「切个标签回来定时就没了」，
+     * 而用户是在睡觉前设的它——那时候根本不会有人看着屏幕。
+     *
+     * 同理，它也不能只活在这个页面的 Compose 状态里（`PlayerUiState` 那种）：
+     * 那连转屏都活不过去。
+     */
+    val sleepTimer: StateFlow<SleepTimerState> = controller.sleepTimer
 
     /**
      * 当前片源里的音频轨。没有媒体（或者只有一条）时界面不画音轨入口。
@@ -214,6 +229,33 @@ class PlayerViewModel(
     fun useAutomaticAudioTrack() {
         tracks.useAutomaticAudioTrack()
     }
+
+    /**
+     * 设一个「再过 N 毫秒暂停」的睡眠定时。传 `null` 等于取消。
+     *
+     * 档位表（5/10/15/30/45/60/90 分钟）属于界面：见
+     * [com.multisuperplayer.core.player.SleepTimerOptions]。这里只认毫秒，
+     * 免得把一份可调的展示产物钉进这一层。
+     */
+    fun setSleepTimer(durationMs: Long?) = controller.setSleepTimer(durationMs)
+
+    /** 设「本集结束就暂停」。 */
+    fun setSleepTimerUntilItemEnd() = controller.setSleepTimerUntilItemEnd()
+
+    /** 取消睡眠定时。 */
+    fun cancelSleepTimer() = controller.cancelSleepTimer()
+
+    /** 跳到队列里的第 [index] 项并开始播放（越界时内核忽略）。 */
+    fun playQueueItem(index: Int) = controller.playQueueItem(index)
+
+    /** 从队列里删掉第 [index] 项（删的是当前项时播放继续往前走一格）。 */
+    fun removeQueueItem(index: Int) = controller.removeQueueItem(index)
+
+    /** 把第 [from] 项移到第 [to] 项。 */
+    fun moveQueueItem(from: Int, to: Int) = controller.moveQueueItem(from, to)
+
+    /** 清空队列并停止播放。 */
+    fun clearQueue() = controller.clearQueue()
 
     private companion object {
         const val TAG = "PlayerViewModel"

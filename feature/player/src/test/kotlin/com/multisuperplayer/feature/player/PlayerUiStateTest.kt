@@ -271,4 +271,65 @@ class PlayerUiStateTest {
         // 关掉面板不重新收控制条：收它的计时器会接着算，不需要这里再插一手。
         assertTrue(state.controlsVisible)
     }
+
+    @Test
+    fun `进画中画时控制条收起来`() {
+        // 画中画那一两百 dp 宽的小窗口里不画控制条（只画画面），但状态也要跟着走：
+        // 否则退出画中画回到竖屏时，控制条会以一个「本来就可见」的状态出现，
+        // 而用户上一次看到它是在进画中画之前。
+        val state = PlayerUiState()
+        assertTrue(state.controlsVisible)
+
+        state.applyPipMode(true)
+        assertTrue(state.inPip)
+        assertFalse(state.controlsVisible)
+    }
+
+    @Test
+    fun `进画中画时把所有提示泡和面板都收掉`() {
+        // 面板尤其要收：`ModalBottomSheet` 在两百 dp 宽的窗口里会把画面整个盖住，
+        // 而画中画里我们不画控制条，用户没有任何地方能点到「关闭」。
+        val state = PlayerUiState()
+        state.applyLevelHint(PlayerLevelHint(isVolume = true, percent = 50))
+        state.applySeekHint(PlayerSeekHint(deltaMs = 5_000, targetMs = 60_000, durationMs = 300_000))
+        state.applyPlayPauseHint(playing = true)
+        state.applySpeedBoost(speed = 2f)
+        state.openSheet(PlayerSheet.QUEUE)
+
+        state.applyPipMode(true)
+
+        assertNull(state.levelHint)
+        assertNull(state.seekHint)
+        assertNull(state.playPauseHint)
+        assertNull(state.speedBoost)
+        assertNull(state.openSheet)
+    }
+
+    @Test
+    fun `画中画不动锁定状态`() {
+        // 「锁屏」是用户明确表达的意图，画中画不是解除它的理由：进去之前锁着，
+        // 出来之后应该还锁着。反过来，进画中画如果顺手解锁，用户一回到全屏
+        // 就会发现口袋防误触的锁没了，而他并没有解锁过。
+        val state = PlayerUiState()
+        state.applyLocked(true)
+        state.applyPipMode(true)
+        assertTrue(state.locked)
+
+        state.applyPipMode(false)
+        assertFalse(state.inPip)
+        assertTrue(state.locked)
+    }
+
+    @Test
+    fun `出画中画不自动把控制条翻开`() {
+        // 退出画中画之后用户看到的是「刚才那一页」，而那一页本来就不该由这里
+        // 替他决定控制条显不显示：竖屏下控制条永远可见，横屏下点一下画面就出来。
+        // 这里硬翻开会让横屏退出画中画时突然多出一层控件。
+        val state = PlayerUiState(initialFullscreen = true)
+        state.applyPipMode(true)
+        state.applyPipMode(false)
+
+        assertFalse(state.inPip)
+        assertFalse(state.controlsVisible)
+    }
 }
