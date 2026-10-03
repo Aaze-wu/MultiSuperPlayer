@@ -5,6 +5,7 @@ import com.multisuperplayer.core.asr.AsrModelInstaller
 import com.multisuperplayer.core.asr.AsrModelLocator
 import com.multisuperplayer.core.asr.AsrTranscriber
 import com.multisuperplayer.core.asr.CloudAsrTranscriber
+import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.browser.BrowserRepository
 import com.multisuperplayer.core.data.browser.StorageAccess
@@ -31,6 +32,16 @@ import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
+import com.multisuperplayer.core.data.update.GitHubReleasesSource
+import com.multisuperplayer.core.data.update.UpdateApkVerifier
+import com.multisuperplayer.core.data.update.UpdateChannel
+import com.multisuperplayer.core.data.update.UpdateDownloader
+import com.multisuperplayer.core.data.update.UpdateInstaller
+import com.multisuperplayer.core.data.update.UpdateManager
+import com.multisuperplayer.core.data.update.UpdateSettingsRepository
+import com.multisuperplayer.core.data.update.UpdateSource
+import com.multisuperplayer.core.data.update.UpdateSourceConfig
+import com.multisuperplayer.core.data.update.UpdateVersion
 import com.multisuperplayer.core.llm.LiteRtLmTextGenerator
 import com.multisuperplayer.core.llm.LlmModelDownloader
 import com.multisuperplayer.core.llm.LlmModelInstaller
@@ -198,6 +209,60 @@ val dataModule = module {
             locator = get(),
             cacheDir = File(androidContext().cacheDir, "llm"),
             dispatchers = get(),
+        )
+    }
+
+    // ------------------------------------------------------------------ 应用更新
+
+    // 通道的默认值跟着「当前装的是不是预发行版」走。反过来的默认值（一律正式版）
+    // 看起来更稳，但它会让装预发行版的人**永远收不到后续的预发行版**，而且
+    // 界面上显示的还是「已是最新版本」——一个静默失效的开关。
+    single {
+        UpdateSettingsRepository(
+            context = androidContext(),
+            dispatchers = get(),
+            defaultChannel = if (get<AppBuildInfo>().isPreview) {
+                UpdateChannel.PRERELEASE
+            } else {
+                UpdateChannel.STABLE
+            },
+        )
+    }
+
+    // 配置在**每次请求前**重新取，而不是构造时取一次：用户刚把令牌填进去，
+    // 下一次检查就得用它。否则他会看到「填了令牌还是被限流」，然后认定令牌无效。
+    //
+    // 注册成 `UpdateSource` 接口而不是具体类：`UpdateManager` 要的是接口，
+    // 而 Koin 按**类型**解析——只登记 `GitHubReleasesSource` 时接口没人认领，
+    // 进更新页就是一句 `NoDefinitionFoundException`（编译期一点提示都没有）。
+    // 这也正是「后续会加其他渠道」的接缝：换渠道只改这一行。
+    single<UpdateSource> {
+        GitHubReleasesSource(
+            dispatchers = get(),
+            configProvider = {
+                UpdateSourceConfig(
+                    repository = UpdateSourceConfig.DEFAULT_REPOSITORY,
+                    token = get<UpdateSettingsRepository>().currentToken(),
+                )
+            },
+        )
+    }
+
+    single { UpdateDownloader(context = androidContext(), dispatchers = get()) }
+    single { UpdateApkVerifier(context = androidContext()) }
+    single { UpdateInstaller(context = androidContext()) }
+
+    single {
+        UpdateManager(
+            source = get(),
+            settingsRepository = get(),
+            downloader = get(),
+            verifier = get(),
+            // 解析不出来就传 `null`，而 `null` 在 `UpdateRules.decide` 里是
+            // 「不知道当前版本」⇒ 什么都不报，而不是「所有发布都比当前新」⇒
+            // 每次都提示有更新。后者的症状（天天提示更新）比前者（不提示）
+            // 更难查，因为用户会当成真的。
+            currentVersion = UpdateVersion.parse(get<AppBuildInfo>().versionName),
         )
     }
 }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider 的可见目录：只有 `cacheDir/updates/` 这一个。
+
+    ## 为什么必须走 FileProvider
+
+    `file://` 形式的 Uri 从 API 24 起会直接抛 `FileUriExposedException`（targetSdk ≥ 24），
+    所以下载到应用私有目录的 APK 想要交给系统安装器，只能通过 content:// 共享。
+    这个文件的作用正是**告诉 FileProvider 哪些目录允许共享**——没写在这里的路径，
+    `getUriForFile` 会抛 `IllegalArgumentException`。
+
+    ## 为什么只有这一个目录、而且不导出
+
+    `cache-path` 而不是 `files-path`：升级包有 140 MB 左右，装完就没用了。
+    放在 cacheDir 里，用户装完之后系统在空间吃紧时能自己回收掉；
+    就算不回收，`UpdateDownloader` 下次检查更新时也会清掉旧文件。
+
+    `path="updates/"` 精确到子目录，而不是 `.`（整个 cacheDir）：
+    可见范围越大，某天某处不小心把一个含用户数据的文件放进 cacheDir 时，
+    它就已经处在一个可以被别的应用读到的位置上了。
+
+    `exported="false"` + `grantUriPermissions="true"`：别人不能主动来读，
+    我们只能一次性地把某一个 Uri 的读权限借给安装器（`FLAG_GRANT_READ_URI_PERMISSION`）。
+-->
+<paths>
+    <cache-path
+        name="update_apk"
+        path="updates/" />
+</paths>

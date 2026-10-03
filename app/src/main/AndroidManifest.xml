@@ -61,6 +61,20 @@
         android:name="android.permission.BLUETOOTH_CONNECT"
         tools:ignore="ProtectedPermissions" />
 
+    <!--
+        应用内更新：下载完 APK 后把自己交给系统安装器。
+
+        这是普通权限、安装即授予，但它**不是**「装 APK 需要的那道门」：
+        真正要开的是「安装未知应用」（每个应用一份的 special access，从 API 26 起），
+        那个开关只能由用户在系统页里放给本应用。所以：这里声明它 → 权限页把它列进
+        「安装时已授予」的折叠区 → 真正需要用户动手的那一步由更新页跳
+        `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 完成（见 `UpdateInstaller`）。
+
+        缺了这条权限，`Intent.ACTION_VIEW` 加 APK 的 intent 会被系统直接拒绝，
+        而用户看到的是「点安装没反应」。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- 播放器不建议强制要求硬件特性，缺失时软件解码兜底 -->
     <uses-feature
         android:name="android.hardware.touchscreen"
@@ -129,5 +143,24 @@
                 <data android:mimeType="video/*" />
             </intent-filter>
         </activity>
+
+        <!--
+            应用内更新：把下载到 cacheDir/updates/ 的 APK 交给系统安装器。
+
+            共享目录的白名单在 `@xml/update_apk_paths` 里，那里写了为什么必须走
+            FileProvider 以及为什么只放开一个子目录。这里只强调一点：
+            `authorities` 带 `${applicationId}` 前缀，而不是写死包名——
+            调试版与正式版包名不同，写死会让其中一个在运行时抛
+            `IllegalArgumentException: Failed to find configured root`。
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.update.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_apk_paths" />
+        </provider>
     </application>
 </manifest>

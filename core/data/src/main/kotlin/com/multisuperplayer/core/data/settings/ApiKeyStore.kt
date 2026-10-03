@@ -125,8 +125,14 @@ internal fun normalizeApiKeyInput(raw: String): String? = raw.trim().takeIf { it
  * Keystore 里那把 AES 密钥，加解密都在它上面做。
  *
  * 密钥**不进**这个文件，也不进 DataStore；DataStore 里只有密文。
+ *
+ * `internal` 而不是 `private`：应用内更新要存一个可选的 GitHub 令牌，它和翻译
+ * 密钥是同一类东西（可选填、留空 = 不修改、应当加密存），所以复用这里的加解密，
+ * 而不是在那边再抄一份 Keystore 代码。抄两份的后果不是「多写了 40 行」，
+ * 而是某天只给其中一份打了补丁（换 KEY_ALIAS、改 IV 校验），
+ * 另一份继续用着旧规则——而两边读的又都是自己那份密文，谁都不会报错。
  */
-private object ApiKeyCiphertext {
+internal object ApiKeyCiphertext {
 
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val KEY_ALIAS = "msp.translation.api_key"

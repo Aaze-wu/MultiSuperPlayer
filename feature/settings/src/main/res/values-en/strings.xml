@@ -223,7 +223,7 @@
       Body of the \"what's new\" dialog. **Update this on every release, in all three
       language files.** `\n` is a line break; lines starting with a bullet are laid out as items.
     -->
-    <string name="msp_settings_about_whats_new_body">This release adds \"background keep-alive\", so long background playback is harder for the system to interrupt.\n\n· Background keep-alive page: a new 7th row in Settings that asks to join the battery-optimisation whitelist in one tap; the switch re-reads the real system state every time the page is resumed instead of keeping a local copy\n· Turning it off does not leave the whitelist: the platform only lets an app ask to join, so flipping the switch back takes you to the system\'s battery settings to remove it yourself\n· Vendor background management: opens the vendor\'s own background-management page (Xiaomi / Huawei / Honor / OPPO / vivo / Meizu / Samsung / OnePlus), falling back to the app info page for unknown vendors\n· Permissions page: the collapsible section gains \"ignore battery optimizations\"\n· Earlier: 0.6.7 permissions page and the first-launch permission request, 0.6.6 more translation models (Hunyuan HY-MT2-1.8B added), 0.6.5 cloud speech-to-subtitle, 0.6.4 on-device offline translation (Qwen3-0.6B)\n\nKnown limits: a mismatched model language is only reported, never switched automatically; no 32-bit native libraries.</string>
+    <string name="msp_settings_about_whats_new_body">This release adds \"Check for updates\", row 8 of the Settings hub (just above \"About\").\n\n· Three sections: Current version (a Check button, plus one automatic check when you open the page) / Update available (tag, publish time, the full release notes, Download and install, Ignore this version) / Update settings (update channel, check automatically, GitHub token)\n· The source is GitHub Releases and works anonymously; the token is optional, stored on this device only and encrypted with the system keystore, and only raises the limit from 60 to 5000 requests per hour\n· Downloading an upgrade package has four layers: write a .part file and rename only after it verifies, always delete the .part on failure or cancel, verify the content with sha256, and check the package name and signature before the installer runs\n· \"Not checked yet\" and \"up to date\" are not the same sentence: the automatic check on entering the page is throttled to 12 hours, and when it is skipped the page changes nothing\n· Earlier: 0.6.8 background keep-alive, 0.6.7 permissions page and the first-launch permission request, 0.6.6 more translation models (Hunyuan HY-MT2-1.8B added), 0.6.5 cloud speech-to-subtitle, 0.6.4 on-device offline translation (Qwen3-0.6B)\n\nKnown limits: GitHub is currently the only update channel (the check layer is already an interface, so adding one does not touch anything above it); no 32-bit native libraries.</string>
 
     <string name="msp_settings_view">View</string>
 
@@ -447,4 +447,52 @@
     <string name="msp_settings_test_help">The test really translates one sample line. It verifies the URL, the key, the model name and whether the vendor accepts the request format this app sends, at the cost of a tiny number of tokens.</string>
     <string name="msp_settings_asr_source_help">hf-mirror.com is used by default. Enter https://huggingface.co for the official source; it is usually very slow from mainland China.</string>
 
+    <!-- Update checks (v0.7.0-alpha.1) -->
+    <string name="msp_settings_update">Check for updates</string>
+    <string name="msp_update_current_version_value">Current version %1$s</string>
+    <string name="msp_update_status_not_checked">Not checked yet</string>
+    <string name="msp_update_status_up_to_date">Up to date</string>
+    <string name="msp_update_status_available">Version %1$s available</string>
+    <string name="msp_update_status_ignored">Ignored %1$s</string>
+    <string name="msp_update_channel">Update channel</string>
+    <string name="msp_update_channel_stable">Stable</string>
+    <string name="msp_update_channel_prerelease">Pre-release</string>
+    <string name="msp_update_channel_stable_desc">Stable releases only</string>
+    <string name="msp_update_channel_prerelease_desc">Stable and pre-release releases</string>
+    <string name="msp_update_auto_check">Check automatically</string>
+    <string name="msp_update_auto_check_desc">Check once when you open this page, at most every 12 hours</string>
+    <string name="msp_update_token">GitHub token</string>
+    <string name="msp_update_token_set">Provided</string>
+    <string name="msp_update_token_unset">Not provided, checks work anyway</string>
+    <string name="msp_update_token_note">A read-only GitHub token raises how often checks are allowed. It stays on this device, encrypted with the system keystore, and is never uploaded anywhere.</string>
+    <string name="msp_update_token_label">Paste token</string>
+    <string name="msp_update_token_add">Add</string>
+    <string name="msp_update_token_change">Change</string>
+    <string name="msp_update_token_clear">Clear</string>
+    <string name="msp_update_failure_network">Network unreachable. Check your connection and try again.</string>
+    <string name="msp_update_failure_rate_limited">GitHub is rate-limiting this app. Wait a while, or add a token above.</string>
+    <string name="msp_update_failure_not_found">Release information not found. If the repository was renamed or made private, checking will keep failing.</string>
+    <string name="msp_update_failure_server_error">The server returned an error. Try again later.</string>
+    <string name="msp_update_failure_no_asset">This release has no installable package.</string>
+    <string name="msp_update_failure_corrupted">The downloaded package is incomplete. Please download it again.</string>
+    <string name="msp_update_failure_signature">The package is not signed with the same key as this app, so it was rejected. If someone gave you this file, don\'t install it.</string>
+    <string name="msp_update_failure_no_installer">No installer is available on this device. Open the downloaded file from a file manager instead.</string>
+    <string name="msp_update_failure_dismiss">Got it</string>
+    <string name="msp_update_section_current">Current version</string>
+    <string name="msp_update_section_available">Update available</string>
+    <string name="msp_update_section_settings">Update settings</string>
+    <string name="msp_update_check_now">Check for updates</string>
+    <string name="msp_update_check_action">Check</string>
+    <string name="msp_update_checking">Checking…</string>
+    <string name="msp_update_available_version">Version %1$s</string>
+    <string name="msp_update_notes_empty">This release has no release notes.</string>
+    <string name="msp_update_notes_expand">Show all</string>
+    <string name="msp_update_notes_collapse">Show less</string>
+    <string name="msp_update_download_and_install">Download and install</string>
+    <string name="msp_update_download_progress">Downloading %1$d%% (%2$s / %3$s)</string>
+    <string name="msp_update_download_unknown_total">Downloading %1$s</string>
+    <string name="msp_update_ignore">Ignore this version</string>
+    <string name="msp_update_undo_ignore">Undo ignore</string>
+    <string name="msp_update_need_unknown_source">Android hasn\'t allowed this app to install apps yet. Allow it to install the update.</string>
+    <string name="msp_update_open_unknown_source">Allow</string>
 </resources>

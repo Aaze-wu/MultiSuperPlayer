@@ -54,6 +54,7 @@ import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
 import com.multisuperplayer.feature.settings.AsrSettingsRoute
 import com.multisuperplayer.feature.settings.KeepAliveRoute
+import com.multisuperplayer.feature.settings.UpdateRoute
 import com.multisuperplayer.feature.settings.LocalModelSettingsRoute
 import com.multisuperplayer.feature.settings.PermissionsRoute
 import com.multisuperplayer.feature.settings.PermissionsViewModel
@@ -226,6 +227,15 @@ private const val PERMISSIONS_ROUTE = "settings/permissions"
  * 合成一页会让用户以为「权限都给了就不会被杀」。
  */
 private const val KEEP_ALIVE_ROUTE = "settings/keep-alive"
+
+/**
+ * 检查更新页：现在的数据源是 GitHub Releases，但页面上看到的只有「有没有新版本」。
+ *
+ * 它是**真目的地**而不是一个对话框：下载要能离开页面继续跑（任务活在
+ * `UpdateViewModel` 的 `viewModelScope` 里），而且用户可以在下载期间去看
+ * 版本说明、改通道、填令牌。对话框一关就把这些全掐了。
+ */
+private const val UPDATE_ROUTE = "settings/update"
 
 /**
  * 首次启动申请权限前先等多久（毫秒）。
@@ -430,6 +440,7 @@ private fun MspAppScaffold() {
                     onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
                     onOpenPermissions = { navController.navigate(PERMISSIONS_ROUTE) },
                     onOpenKeepAlive = { navController.navigate(KEEP_ALIVE_ROUTE) },
+                    onOpenUpdate = { navController.navigate(UPDATE_ROUTE) },
                 )
             }
             composable(TRANSLATION_SETTINGS_ROUTE) {
@@ -451,6 +462,10 @@ private fun MspAppScaffold() {
             }
             composable(KEEP_ALIVE_ROUTE) {
                 KeepAliveRoute(onBack = { navController.popBackStack() })
+            }
+
+            composable(UPDATE_ROUTE) {
+                UpdateRoute(onBack = { navController.popBackStack() })
             }
             composable(APPEARANCE_SETTINGS_ROUTE) {
                 AppearanceSettingsRoute(onBack = { navController.popBackStack() })

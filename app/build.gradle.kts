@@ -32,7 +32,7 @@ plugins {
 // 「同一个版本」，而 Android 只在**降级**时拒绝安装，同 code 覆盖安装是允许的。
 // 反过来说：升到下一个数值段（0.6.2）时 code 必须跟着涨，否则预发行版会变成
 // 用户永远装不上的「降级包」。
-val appVersionName: String = "0.6.8-alpha.1"
+val appVersionName: String = "0.7.0-alpha.1"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

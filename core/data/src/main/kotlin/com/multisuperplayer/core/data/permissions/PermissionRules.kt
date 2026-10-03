@@ -203,6 +203,7 @@ object PermissionRules {
         Manifest.permission.WAKE_LOCK,
         Manifest.permission.MODIFY_AUDIO_SETTINGS,
         Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+        Manifest.permission.REQUEST_INSTALL_PACKAGES,
     )
 
     /**

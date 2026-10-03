@@ -6,6 +6,7 @@ import com.multisuperplayer.feature.settings.KeepAliveViewModel
 import com.multisuperplayer.feature.settings.LocalModelSettingsViewModel
 import com.multisuperplayer.feature.settings.PermissionsViewModel
 import com.multisuperplayer.feature.settings.SettingsViewModel
+import com.multisuperplayer.feature.settings.UpdateViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -38,4 +39,6 @@ val settingsFeatureModule = module {
     // 「后台保活」子页。它只服务这一页（拨开关弹的是它自己的系统框，
     // 没有第二个观察者），所以状态跟着页面走就够，不需要像权限那样住单例。
     viewModelOf(::KeepAliveViewModel)
+
+    viewModelOf(::UpdateViewModel)
 }

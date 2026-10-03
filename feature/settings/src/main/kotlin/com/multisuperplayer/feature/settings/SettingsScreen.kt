@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -62,6 +63,7 @@ fun SettingsRoute(
     onOpenAbout: () -> Unit = {},
     onOpenPermissions: () -> Unit = {},
     onOpenKeepAlive: () -> Unit = {},
+    onOpenUpdate: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
@@ -117,6 +119,7 @@ fun SettingsRoute(
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
         onOpenKeepAlive = onOpenKeepAlive,
+        onOpenUpdate = onOpenUpdate,
     )
 }
 
@@ -154,6 +157,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {},
     onOpenPermissions: () -> Unit = {},
     onOpenKeepAlive: () -> Unit = {},
+    onOpenUpdate: () -> Unit = {},
 ) {
     // 系统取色要 Android 12。判断放这里而不是塞进 [SettingsSummaries]：
     // `Build.VERSION.SDK_INT` 在 JVM 单测里恒为 0，进了纯函数就测不了「支持」那条分支。
@@ -239,6 +243,19 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_keep_alive),
                     subtitle = KeepAliveSummaries.entry(keepAliveState).string(),
                     onClick = onOpenKeepAlive,
+                )
+            }
+            item {
+                SettingActionRow(
+                    // 排在「关于」之前而不是放进去：「检查更新」是个**动作**
+                    // （按下去要去下载、要跳系统安装器），而「关于」里全是
+                    // 看一眼就走的只读信息。把它放进关于页会把一个动作藏在
+                    // 一个信息页的后面，而这一行本身给的信息（当前版本）
+                    // 和关于页里那行重复，但用户找「更新」时看的是入口页。
+                    icon = Icons.Outlined.SystemUpdate,
+                    title = stringResource(R.string.msp_settings_update),
+                    subtitle = UpdateSummaries.entry(buildInfo).string(),
+                    onClick = onOpenUpdate,
                 )
             }
             item {

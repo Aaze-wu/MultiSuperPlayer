@@ -1,0 +1,196 @@
+package com.multisuperplayer.core.data.update
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.multisuperplayer.core.common.coroutines.DispatcherProvider
+import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.data.settings.ApiKeyCiphertext
+import com.multisuperplayer.core.data.settings.mspSettingsStore
+import com.multisuperplayer.core.data.settings.normalizeApiKeyInput
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+
+/**
+ * 「检查更新」用到的全部持久化设置。
+ *
+ * [channel] / [autoCheck] / [ignoredTag] 是**状态**，[lastCheckAtEpochMs] 是**节流的依据**，
+ * [hasToken] 是**有没有填令牌**。
+ *
+ * [hasToken] 放在这里而不是「要不要把令牌解密出来」：设置页只需要说「已设置」，
+ * 每次读设置都去解一次密（要访问 Keystore，在低端机上要几十毫秒）毫无必要，
+ * 而且解密失败时会打一行警告日志——那行日志会变成「每次进设置页都刷一条」。
+ */
+data class UpdateSettings(
+    val channel: UpdateChannel,
+    val autoCheck: Boolean,
+    /** 用户点过「忽略这一版」的那个 tag。null = 没有忽略任何版本。 */
+    val ignoredTag: String?,
+    val lastCheckAtEpochMs: Long?,
+    val hasToken: Boolean,
+)
+
+/**
+ * 更新相关的设置，共用 `msp_settings` 这一个 DataStore 文件。
+ *
+ * **不要**在这里新建 `preferencesDataStore`：同一个 name 建第二个实例会让
+ * DataStore 直接抛 `There are multiple DataStores active for the same file`
+ * （理由写在 `MspSettingsStore` 的注释里）。所以这里只 define 自己的 key。
+ *
+ * ## 令牌为什么不放 [com.multisuperplayer.core.data.settings.ApiKeyStore]
+ *
+ * 走得通（那个类的 providerId 是任意字符串），但它的 key 前缀写死成
+ * `translation.api_key.<providerId>`，用它存令牌会得到
+ * `translation.api_key.github_update` 这样一个名字——半年后有人来清理设置项时，
+ * 从名字上完全看不出它属于「应用内更新」。所以这里单独定义 key，
+ * 只复用加解密那一层（[ApiKeyCiphertext]）。
+ *
+ * @param defaultChannel 用户还没选过通道时用的那一个。由调用方（app 层）按
+ *   **当前安装的是不是预发行版**算好传进来——`core:data` 读不到 `BuildConfig`，
+ *   在这里硬编一个默认值就是替调用方做决定。
+ */
+class UpdateSettingsRepository(
+    context: Context,
+    private val dispatchers: DispatcherProvider,
+    private val defaultChannel: UpdateChannel,
+) {
+
+    private val appContext = context.applicationContext
+
+    /**
+     * 还没读到 DataStore 时界面该拿什么开局。
+     *
+     * 存在的理由很实际：`store.data` 的第一个值要等一次磁盘读取，界面若用 `null`
+     * 开局，开关会先画成关、再跳成开——用户看到的是「我的设置被重置了」。
+     * 默认值的来源必须和 [settings] 里 `?:` 的兜底**完全一致**，所以它只写在这里。
+     */
+    val defaultSettings: UpdateSettings = UpdateSettings(
+        channel = defaultChannel,
+        autoCheck = DEFAULT_AUTO_CHECK,
+        ignoredTag = null,
+        lastCheckAtEpochMs = null,
+        hasToken = false,
+    )
+
+    // 与其它设置共用一个文件。每次读都经过这里，保证「只有一个 store」。
+    private val store: DataStore<Preferences> get() = appContext.mspSettingsStore
+
+    val settings: Flow<UpdateSettings> = store.data
+        .map { prefs ->
+            UpdateSettings(
+                channel = prefs[KEY_CHANNEL].toChannelOrNull() ?: defaultChannel,
+                autoCheck = prefs[KEY_AUTO_CHECK] ?: DEFAULT_AUTO_CHECK,
+                ignoredTag = prefs[KEY_IGNORED_TAG]?.takeIf { it.isNotBlank() },
+                lastCheckAtEpochMs = prefs[KEY_LAST_CHECK]?.takeIf { it > 0 },
+                hasToken = prefs[KEY_TOKEN]?.isNotBlank() == true,
+            )
+        }
+        .flowOn(dispatchers.io)
+
+    suspend fun setChannel(channel: UpdateChannel) {
+        withContext(dispatchers.io) { store.edit { it[KEY_CHANNEL] = channel.name } }
+    }
+
+    suspend fun setAutoCheck(enabled: Boolean) {
+        withContext(dispatchers.io) { store.edit { it[KEY_AUTO_CHECK] = enabled } }
+    }
+
+    /**
+     * 记住「这一版我跳过了」。[tag] 为 null 表示**撤销**忽略。
+     *
+     * `remove` 而不是写一个空串：读的那一侧要把空串当成「没有忽略」，
+     * 于是存储里存在两种都表示「没有」的值，而它们只有一个是真值。
+     */
+    suspend fun setIgnoredTag(tag: String?) {
+        withContext(dispatchers.io) {
+            store.edit { prefs ->
+                if (tag.isNullOrBlank()) prefs.remove(KEY_IGNORED_TAG) else prefs[KEY_IGNORED_TAG] = tag
+            }
+        }
+    }
+
+    /**
+     * 记下这次检查的时刻。
+     *
+     * 无论成功还是失败都要写：节流要挡的是「同一分钟内点十次检查更新」，
+     * 而失败之后狂点是最常见的反应。只在成功时写，节流就挡不住这种情况。
+     */
+    suspend fun markChecked(atEpochMs: Long) {
+        withContext(dispatchers.io) { store.edit { it[KEY_LAST_CHECK] = atEpochMs } }
+    }
+
+    /** 读出明文令牌；没填过或解不开都返回 null。 */
+    suspend fun currentToken(): String? {
+        val raw = withContext(dispatchers.io) { store.data.first()[KEY_TOKEN] } ?: return null
+        val plain = ApiKeyCiphertext.decrypt(raw)
+        if (plain == null) {
+            // 解不开（换机、Keystore 被重置）时按「没填」处理：未认证也能用，只是额度低。
+            // 日志是必须的——否则这个状态和「从没填过」在界面上完全一样，无从排查。
+            MspLog.w(TAG) { "更新令牌解密失败（Keystore 可能已被重置），按未设置处理" }
+        }
+        return plain
+    }
+
+    /**
+     * 保存令牌。
+     *
+     * @return true = 已写入；false = 输入是空白（或加密失败），**没有动旧值**。
+     *
+     * 与 `ApiKeyStore.put` 同一条规矩：设置页里那个输入框平时是空的（只显示「已设置」），
+     * 所以「空输入」代表用户没动这一栏，而不是「我要删掉它」。删除必须走 [clearToken]。
+     * 把空串当删除的后果是：用户点一次保存，令牌就没了，而界面上看起来一切正常——
+     * 下一次检查更新被限流时才会发现问题，而且看起来像是 GitHub 的错。
+     */
+    suspend fun putToken(input: String): Boolean {
+        val token = normalizeApiKeyInput(input)
+        if (token == null) {
+            MspLog.d(TAG) { "令牌输入为空，按「未修改」处理（清除请调用 clearToken）" }
+            return false
+        }
+        val encrypted = ApiKeyCiphertext.encrypt(token)
+        if (encrypted == null) {
+            // 加密路径失败时**不能**退回明文存储：那等于静默降低安全等级。
+            MspLog.w(TAG) { "令牌加密失败，未保存" }
+            return false
+        }
+        withContext(dispatchers.io) { store.edit { it[KEY_TOKEN] = encrypted } }
+        return true
+    }
+
+    /** 删除令牌。这是唯一的删除入口，必须由用户的明确动作触发。 */
+    suspend fun clearToken() {
+        withContext(dispatchers.io) { store.edit { it.remove(KEY_TOKEN) } }
+    }
+
+    private companion object {
+        const val TAG = "UpdateSettings"
+
+        /** 默认开着：更新系统不开，用户就永远得自己去商店看。 */
+        const val DEFAULT_AUTO_CHECK = true
+
+        val KEY_CHANNEL = stringPreferencesKey("update.channel")
+        val KEY_AUTO_CHECK = booleanPreferencesKey("update.auto_check")
+        val KEY_IGNORED_TAG = stringPreferencesKey("update.ignored_tag")
+        val KEY_LAST_CHECK = longPreferencesKey("update.last_check_at")
+        val KEY_TOKEN = stringPreferencesKey("update.github_token")
+    }
+}
+
+/**
+ * 通道名 → 枚举。
+ *
+ * 用「按名字找」而不是 `valueOf`：那个会抛 `IllegalArgumentException`，
+ * 于是某天有人把枚举项改名之后，**所有已经装了旧版的应用**在下次启动读设置时崩掉。
+ * 读不出来就退回默认通道，那是一个用户能自己改回来的状态。
+ */
+private fun String?.toChannelOrNull(): UpdateChannel? = when (this) {
+    null -> null
+    else -> UpdateChannel.entries.firstOrNull { it.name == this }
+}

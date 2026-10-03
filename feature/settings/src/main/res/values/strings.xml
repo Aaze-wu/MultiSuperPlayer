@@ -304,7 +304,7 @@
       本版更新说明的正文。**每次发版都要改这一条，三份语言文件一起改**。
       `\n` 是换行；以「· 」开头的行在界面上按条目排版。
     -->
-    <string name="msp_settings_about_whats_new_body">本版新增「后台保活」，让长时间后台播放不容易被系统打断。\n\n· 后台保活页：设置入口页新增第 7 行，进去可以一键申请加入电池优化白名单；开关状态每次回到页面都重读系统，不存本地副本\n· 关掉开关不会退出白名单：系统只允许应用申请加入，拨回去会带你到系统的电池设置里自己移出\n· 厂商后台管理：按本机厂商跳系统的后台管理页（小米 / 华为 / 荣耀 / OPPO / vivo / 魅族 / 三星 / 一加），认不出厂商时退到应用信息页\n· 权限页：折叠区新增「忽略电池优化」\n· 此前几版：0.6.7 权限管理页与首次启动申请权限、0.6.6 翻译模型扩充（新增混元 HY-MT2-1.8B）、0.6.5 云端语音识别生成字幕、0.6.4 本机离线翻译（Qwen3-0.6B）\n\n已知限制：模型语言不匹配时只提示、不会自动切换模型；不含 32 位原生库。</string>
+    <string name="msp_settings_about_whats_new_body">本版新增「检查更新」，放在设置入口页第 8 行（在「关于」之前）。\n\n· 三段式：当前版本（一个「检查」按钮，进页面也会自动查一次）/ 发现新版本（tag、发布时间、完整发行说明、下载并安装、忽略此版本）/ 更新设置（更新通道、自动检查、GitHub 令牌）\n· 更新源是 GitHub Releases，匿名可用；令牌可选填，只存本机并用系统密钥库加密，填了只是把每小时 60 次提到 5000 次\n· 下载升级包有四道防线：先写 .part、校验通过才改名，失败或取消必删 .part，用 sha256 校验内容，安装前校验包名与签名\n· 「还没有检查过」和「已是最新」不是同一句话：进页面自动查受 12 小时节流，被跳过时界面什么都不改\n· 此前几版：0.6.8 后台保活、0.6.7 权限管理页与首次启动申请权限、0.6.6 翻译模型扩充（新增混元 HY-MT2-1.8B）、0.6.5 云端语音识别生成字幕、0.6.4 本机离线翻译（Qwen3-0.6B）\n\n已知限制：更新渠道目前只有 GitHub 这一个（检查那层已经是接口，加渠道不用动上层）；不含 32 位原生库。</string>
 
     <string name="msp_settings_view">查看</string>
 
@@ -564,4 +564,52 @@
     <string name="msp_settings_test_help">测试会真的翻一句样板文本，同时验证地址、密钥、模型名，以及这家厂商是否接受本应用发送的请求格式。会消耗极少的 token。</string>
     <string name="msp_settings_asr_source_help">默认使用 hf-mirror.com 国内镜像。填 https://huggingface.co 则改用官方源，国内访问通常很慢。</string>
 
+    <!-- 检查更新（v0.7.0-alpha.1）-->
+    <string name="msp_settings_update">检查更新</string>
+    <string name="msp_update_current_version_value">当前版本 %1$s</string>
+    <string name="msp_update_status_not_checked">还没有检查过</string>
+    <string name="msp_update_status_up_to_date">已是最新版本</string>
+    <string name="msp_update_status_available">有新版本 %1$s</string>
+    <string name="msp_update_status_ignored">已忽略 %1$s</string>
+    <string name="msp_update_channel">更新通道</string>
+    <string name="msp_update_channel_stable">正式版</string>
+    <string name="msp_update_channel_prerelease">预发行版</string>
+    <string name="msp_update_channel_stable_desc">只接收正式版，最稳</string>
+    <string name="msp_update_channel_prerelease_desc">正式版和测试版都接收</string>
+    <string name="msp_update_auto_check">自动检查更新</string>
+    <string name="msp_update_auto_check_desc">打开这一页时顺手查一次，最快 12 小时一次</string>
+    <string name="msp_update_token">GitHub 令牌</string>
+    <string name="msp_update_token_set">已填写</string>
+    <string name="msp_update_token_unset">未填写，也能检查</string>
+    <string name="msp_update_token_note">填一个只有只读权限的 GitHub 令牌可以提高每小时可用的检查次数。令牌只存在本机，用系统的密钥库加密，不会上传到任何地方。</string>
+    <string name="msp_update_token_label">粘贴令牌</string>
+    <string name="msp_update_token_add">填写</string>
+    <string name="msp_update_token_change">更换</string>
+    <string name="msp_update_token_clear">清除</string>
+    <string name="msp_update_failure_network">网络不可达，请检查网络连接后重试。</string>
+    <string name="msp_update_failure_rate_limited">请求太频繁，被 GitHub 限流了。等一会儿再试，或者在上面填一个令牌。</string>
+    <string name="msp_update_failure_not_found">找不到发布信息。如果这个仓库改名或转成私有，检查更新会一直失败。</string>
+    <string name="msp_update_failure_server_error">服务器出错了，等一会儿再试。</string>
+    <string name="msp_update_failure_no_asset">这一版没有可下载的安装包。</string>
+    <string name="msp_update_failure_corrupted">下载的安装包不完整，请重新下载。</string>
+    <string name="msp_update_failure_signature">安装包的签名与本机应用不符，已拒绝安装。如果这个文件是别人给你的，请不要安装它。</string>
+    <string name="msp_update_failure_no_installer">这台设备上没有可用的安装器，请改用系统文件管理器打开下载好的安装包。</string>
+    <string name="msp_update_failure_dismiss">知道了</string>
+    <string name="msp_update_section_current">当前版本</string>
+    <string name="msp_update_section_available">发现新版本</string>
+    <string name="msp_update_section_settings">更新设置</string>
+    <string name="msp_update_check_now">检查更新</string>
+    <string name="msp_update_check_action">检查</string>
+    <string name="msp_update_checking">正在检查…</string>
+    <string name="msp_update_available_version">新版本 %1$s</string>
+    <string name="msp_update_notes_empty">这一版没有写更新说明。</string>
+    <string name="msp_update_notes_expand">展开全部</string>
+    <string name="msp_update_notes_collapse">收起</string>
+    <string name="msp_update_download_and_install">下载并安装</string>
+    <string name="msp_update_download_progress">正在下载 %1$d%%（%2$s / %3$s）</string>
+    <string name="msp_update_download_unknown_total">正在下载 %1$s</string>
+    <string name="msp_update_ignore">忽略此版本</string>
+    <string name="msp_update_undo_ignore">撤销忽略</string>
+    <string name="msp_update_need_unknown_source">系统还没有允许本应用安装应用。允许之后才能装上更新。</string>
+    <string name="msp_update_open_unknown_source">去允许</string>
 </resources>

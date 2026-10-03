@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.8-alpha.1** (pre-release)
+- Current version: **0.7.0-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -487,7 +487,104 @@ directory, attached and selected automatically. Settings → Speech recognition 
   **not** written out, so what remains on disk is the last complete subtitle rather than a partial one
   covering only the first 7 minutes.
 
-### 1.11 Roadmap
+### 1.11 App updates
+
+Row 8 of the Settings hub is *Check for updates*, which opens a page with three sections:
+**Current version** (a *Check* button on the right, and it also checks once when you enter the page),
+**Update available** (only shown when one is really found: tag, publish time, the full release notes,
+*Download and install* / *Ignore this version*), and **Update settings**
+(update channel / check automatically / GitHub token).
+
+- **Source:** GitHub Releases (`Aaze-wu/MultiSuperPlayer`) over the anonymous API.
+- **The token is optional.** It works without one; supplying one only raises the limit from
+  60 to 5000 requests per hour. It is stored on this device only, encrypted with the system
+  keystore, and never uploaded — the page says so right next to the field.
+
+#### The check layer does not know about GitHub
+
+Other channels are planned, so there is **no GitHub anywhere** in the check logic:
+
+```
+UpdateSource (interface)   <- only listReleases(): List<UpdateRelease>
+    ^
+GitHubReleasesSource       <- the only place that knows GitHub's JSON shape
+    ^
+UpdateManager              <- comparison, throttling, ignore, settings, all live here
+```
+
+`UpdateRelease` is channel-neutral: tag, version, whether it is a pre-release, publish time,
+notes, and **one (or zero) APK asset** (url / size / sha256). A new channel means a new
+`UpdateSource` implementation and nothing above it changes.
+
+#### Four states, four different sentences
+
+`UpdateRules.decide(current, releases, channel, ignoredTag)` is a **pure function with zero
+Android dependencies**:
+
+| State | What the page says |
+| --- | --- |
+| `NotChecked` | Not checked yet · Current version x.y.z |
+| `UpToDate` | Up to date · Current version x.y.z |
+| `Available(release)` | vX is available · Current version x.y.z |
+| `Ignored(release)` | This version is ignored · Current version x.y.z |
+
+Two of these are not arbitrary:
+
+- **"Not checked yet" and "up to date" are not the same thing.** The automatic check is
+  throttled to **12 hours**; when it is skipped it returns `null` and the page **changes nothing**.
+  Treating a skip as "up to date" would wipe out the "an update is available" you found last
+  time every time you open this page — and that is the single most important line on it.
+- **When the current version will not parse, do not guess.** `UpdateVersion.parse` failing means
+  `NotChecked` outright, rather than comparing a made-up `0.0.0` (which would make every single
+  release look like an update).
+
+#### Download and install: four layers
+
+An upgrade package is something you are about to **hand to the system installer**, so the risk
+profile is not the same as downloading a model:
+
+1. **Write `<name>.part` first and only rename once verification passes.** Writing straight to the
+   final name means one interruption leaves a "right size, wrong content" APK that the next visit
+   mistakes for a completed download — and the failure only surfaces later as "there was a problem
+   parsing the package" in the system installer, by which point nobody suspects the download.
+   A rename within the same directory is atomic, so **the final name exists iff the content is whole**.
+2. **A failure or a cancel must delete the `.part`**, otherwise the user sees "tens of MB occupied
+   by nothing", taps download again, and occupies tens of MB more. The cleanup lives in one
+   `catch (Throwable)` so **any failure path added later inherits the rule automatically**.
+3. **Verification is sha256**, not "does it open" and not "is the size right". If the release
+   publishes a sha256 we compare it; if it does not, the log says the check was skipped —
+   layer 4 still backstops it.
+4. **Package name and signature are checked before the installer is ever started**: only an APK
+   whose package name *and* signing certificate match what is already installed is allowed through.
+   A different package name installs a different app; a different signature would be rejected by
+   the system anyway, but only after the user has tapped *Install* and got
+   `INSTALL_FAILED_UPDATE_INCOMPATIBLE` — better to stop it ourselves and say why.
+
+Also: when the server reports a length, the release reports a length, and **they disagree**, it
+fails immediately instead of reading 140 MB and then failing the digest — and the message becomes
+something that points at the real cause instead of "checksum mismatch".
+
+#### Two system gates
+
+- **The "install unknown apps" grant.** Since Android 8 an app must first flip that switch in the
+  system settings before it can launch the installer. When it is not granted the page shows a
+  notice plus *Allow*, which jumps straight to this app's grant screen. The state is **re-read from
+  the system every time the page resumes** instead of being cached locally.
+- **`FileProvider`.** The installer cannot read our private directory, so the APK has to be handed
+  over as a `content://` URI. `update_apk_paths.xml` exposes **only the `cache/updates/` directory** —
+  exposing another directory, or all of `cache/`, makes the installer call throw
+  `Failed to find configured root`. It lives under `cacheDir` rather than `filesDir` because an
+  upgrade package is useless once installed, so the system may reclaim it when space runs low.
+
+#### Failures are reported separately
+
+`UpdateFailureText` has eight values: network / rate limited / not found / server error /
+no asset / download corrupted / signature mismatch / no installer. **Collapsing them into one
+"update failed" has a very concrete cost**: "GitHub rate limited" and "no network" become the same
+sentence, while the first wants "wait a bit, or add a token" and the second wants "check your
+connection" — send the user the wrong way and it never gets fixed.
+
+### 1.12 Roadmap
 
 | Version | Content | Status |
 | --- | --- | --- |
@@ -519,8 +616,9 @@ directory, attached and selected automatically. Settings → Speech recognition 
 | **v0.6.5** | **Cloud speech recognition subtitle generation: *Recognition method* gains *Cloud* (OpenAI-compatible `/audio/transcriptions`, four presets plus custom); upload in fixed 5-minute chunks (about 9.6 MB each) with per-sentence timestamps when `segments` are returned and one cue per chunk otherwise; 20 failure classes split by "what to do next"; the address field shows the final request URL live and an unfinished address greys out the player button; two privacy notices** | Done |
 | **v0.6.6** | **More translation models: on-device gains *Tencent Hunyuan HY-MT2-1.8B* (int8, about 1.7 GB, translation-specialised, offered as an optional high-quality tier while 0.6B stays the default); the memory requirement is stated before the download and one extra hint appears when it exceeds 40% of the device's total memory (a hint, never a block); the Ollama preset now defaults to Hunyuan HY-MT1.5-1.8B; target languages go 5 → 15 (Russian / Spanish / French / German / Portuguese / Italian / Arabic / Thai / Vietnamese / Indonesian added)** | Done |
 | **v0.6.7** | **Permissions: a new *Permissions* page in Settings lists the four things the app can ask for (media read / all files access / notifications / Bluetooth) with their state and action, plus a collapsible note for the six permissions granted at install time; the first launch after install asks once for notifications and media read (not for all files access or Bluetooth); the library re-scans itself when a permission was granted elsewhere and the app comes back to the foreground** | Done |
-| **v0.6.8** | **Background keep-alive: a new *Background keep-alive* page in Settings requests the battery-optimisation exemption with one tap (the switch re-reads the system state every time the page is resumed instead of keeping a local copy) and opens the vendor's own background-management page (Xiaomi / Huawei / Honor / OPPO / vivo / Meizu / Samsung / OnePlus, falling back to the app info page for unknown vendors); the permissions page's collapsible section gains *ignore battery optimizations*** | **Current** |
-| Later | Audio translation, equalizer | Planned |
+| **v0.6.8** | **Background keep-alive: a new *Background keep-alive* page in Settings requests the battery-optimisation exemption with one tap (the switch re-reads the system state every time the page is resumed instead of keeping a local copy) and opens the vendor's own background-management page (Xiaomi / Huawei / Honor / OPPO / vivo / Meizu / Samsung / OnePlus, falling back to the app info page for unknown vendors); the permissions page's collapsible section gains *ignore battery optimizations*** | Done |
+| **v0.7.0-alpha.1** | **App updates: a new *Check for updates* page in Settings checks, downloads and installs new versions from GitHub Releases (the source sits behind an interface so more channels can be added); sha256 plus package-name and signature verification; the APK is handed to the installer through a `FileProvider`; an optional GitHub token stored on-device and encrypted; eight failure classes reported separately** | **Current** |
+| Later | **0.7.0-alpha.2** subtitle fixes (the mutually-exclusive wording, subtitle rate nudging) -> **0.8.0** drag-to-reorder auto-scroll / equalizer -> **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
 
 ---
 
