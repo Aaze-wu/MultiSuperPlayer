@@ -8,10 +8,14 @@ import com.multisuperplayer.core.asr.AsrModelInstaller
 import com.multisuperplayer.core.asr.AsrModelLocator
 import com.multisuperplayer.core.asr.AsrModelProgress
 import com.multisuperplayer.core.asr.AsrModelStatus
+import com.multisuperplayer.core.asr.AsrRoute
+import com.multisuperplayer.core.asr.AsrServices
 import com.multisuperplayer.core.asr.describeAsrFailure
+import com.multisuperplayer.core.asr.transcriptionsUrl
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import kotlinx.coroutines.CancellationException
@@ -79,6 +83,18 @@ data class AsrSettingsUiState(
      * 而域名拼错这种事只有下的时候才知道。
      */
     val sourceLooksValid: Boolean get() = looksLikeHttpUrl(settings.storedBaseUrl)
+
+    /** 走云端时那栏地址能不能拿去发请求（空 = 还没填）。见 [AsrSettings.cloudAddressLooksValid]。 */
+    val cloudAddressLooksValid: Boolean get() = settings.cloudAddressLooksValid
+
+    /**
+     * 云端那一栏地址里**实际要请求**的完整端点。
+     *
+     * 直接拿 `transcriptionsUrl` 算（与 `CloudAsrClient` 用的是同一个函数），不在这里
+     * 再拼一次：多一份拼接就会多一份不一致，而地址错一位的后果是 404，
+     * 而 404 在界面上和「模型名写错了」长得一模一样。
+     */
+    val cloudEndpoint: String get() = transcriptionsUrl(settings.cloudBaseUrl)
 }
 
 /** 某个状态下这条模型实际占了磁盘多少。见 [AsrSettingsUiState.occupiedBytes]。 */
@@ -115,11 +131,26 @@ internal fun looksLikeHttpUrl(raw: String?): Boolean {
  *    掐掉）。把它做成一个可填的地址，是唯一一种「下不动时还能自救」的办法。
  *
  * 这一页**不做**识别本身：那件事依赖「用户正在播哪条片子」，属于播放页。
+ *
+ * ## 两条路各自要填的东西不一样
+ *
+ * 「本机」要选模型 + 下载源（一个磁盘和流量的选择），「云端」要选服务商 + 地址 +
+ * 模型名 + 密钥（一个「把东西发给谁」的选择）。两种设置集合并排摆在一页上会让用户
+ * 看到一半与自己无关的项，所以界面按 [AsrRoute] 分叉（见 [AsrSettingsScreen]），
+ * 这里只负责两边的读写。
+ *
+ * ## 密钥为什么不经过 `AsrSettingsRepository`
+ *
+ * 密钥不是一项设置，而是一份凭证：它存在 `ApiKeyStore` 里（Keystore 加密），
+ * 与设置分开。owner id 由 [AsrSettings.cloudApiKeyOwner] 算出来——它是**唯一**一处
+ * 定义那个前缀的地方，这里只引用不重写；而「存了没有」这个布尔值由设置流程带出来
+ * （[AsrSettings.cloudApiKeyStored]），所以界面看到的与实际要用的必然是同一把。
  */
 class AsrSettingsViewModel(
     private val asrSettings: AsrSettingsRepository,
     private val asrModels: AsrModelLocator,
     private val asrInstaller: AsrModelInstaller,
+    private val apiKeys: ApiKeyStore,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -170,6 +201,69 @@ class AsrSettingsViewModel(
      */
     fun setBaseUrl(raw: String) {
         viewModelScope.launch { asrSettings.setBaseUrl(raw) }
+    }
+
+    /**
+     * 换识别路线。
+     *
+     * 不做任何「发现当前路线不可用就帮你换一条」的事：两条路都能成功、代价不同，
+     * 这是用户的选择（见 [AsrRoute] 的 KDoc）。界面上选云端后紧跟一段说明，
+     * 把「会有什么代价」说在明处，而不是替他决定。
+     */
+    fun selectRoute(route: AsrRoute) {
+        if (route == _state.value.settings.route) return
+        viewModelScope.launch { asrSettings.setRoute(route) }
+    }
+
+    /**
+     * 换服务商。
+     *
+     * 界面传上来的是预设列表里的 id，仓库会再过一遍 [AsrServices.byId] 并（在真的换了
+     * 一家时）清掉上一家的地址与模型——这里再判一次「是不是同一家」只是为了让
+     * 「点中已选中的那一行」变成一个无损动作。
+     */
+    fun selectCloudService(id: String) {
+        if (AsrServices.byId(id).id == _state.value.settings.cloudService.id) return
+        viewModelScope.launch { asrSettings.setCloudServiceId(id) }
+    }
+
+    /** 改云端地址。**空白 = 回到预设自带的**（与下载源同一套语义）。 */
+    fun setCloudBaseUrl(raw: String) {
+        viewModelScope.launch { asrSettings.setCloudBaseUrl(raw) }
+    }
+
+    /** 改云端模型名。**空白 = 回到预设自带的**。 */
+    fun setCloudModel(raw: String) {
+        viewModelScope.launch { asrSettings.setCloudModel(raw) }
+    }
+
+    /**
+     * 保存云端密钥。
+     *
+     * 空输入**不调**仓库（[ApiKeyStore.put] 对空值的语义就是「不动」），也不会破坏
+     * 已有密钥：要删密钥只有下面那个显式动作。
+     *
+     * `onDone` 回到主线程才调：那一头写的是 Compose 状态（见密钥那一块里那条提示），
+     * 在 IO 线程上写一次就会随机崩在「保存密钥」这个看起来完全无关的动作上。
+     */
+    fun saveCloudApiKey(raw: String, onDone: (Boolean) -> Unit = {}) {
+        val owner = _state.value.settings.cloudApiKeyOwner
+        viewModelScope.launch {
+            val stored = withContext(dispatchers.io) {
+                runCatching { apiKeys.put(owner, raw) }
+                    .onFailure { error -> MspLog.w(TAG, error) { "保存云端识别密钥失败" } }
+                    .getOrDefault(false)
+            }
+            onDone(stored)
+        }
+    }
+
+    /** 删除云端密钥。界面上必须是一个独立的、写明后果的按钮。 */
+    fun clearCloudApiKey() {
+        val owner = _state.value.settings.cloudApiKeyOwner
+        viewModelScope.launch {
+            withContext(dispatchers.io) { apiKeys.clear(owner) }
+        }
     }
 
     /** 下全当前模型缺的文件。已经下好的不会重下。 */

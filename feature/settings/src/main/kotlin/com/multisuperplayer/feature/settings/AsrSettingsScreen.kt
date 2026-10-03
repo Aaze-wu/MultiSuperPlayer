@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +46,9 @@ import com.multisuperplayer.core.asr.AsrModelCatalog
 import com.multisuperplayer.core.asr.AsrModelInfo
 import com.multisuperplayer.core.asr.AsrModelProgress
 import com.multisuperplayer.core.asr.AsrModelStatus
+import com.multisuperplayer.core.asr.AsrRoute
+import com.multisuperplayer.core.asr.AsrService
+import com.multisuperplayer.core.asr.AsrServices
 import com.multisuperplayer.core.asr.DEFAULT_MODEL_BASE_URL
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.ui.text.string
@@ -58,6 +62,16 @@ import org.koin.androidx.compose.koinViewModel
  * 将来真出现「多套下载源」时，改这一行就能让草稿跟着换。
  */
 private const val SOURCE_FIELD_KEY = "asr-model-base-url"
+
+/**
+ * 云端那两栏（地址 / 模型）的记忆键前缀。
+ *
+ * 与 [SOURCE_FIELD_KEY] 不同，这一份草稿**属于某一家服务商**：换家就是换了一份存储值，
+ * 草稿必须跟着作废。键里带上服务商 id，就是上面那句「这个键是这一栏属于哪份记录的
+ * 标识」的具体做法——如果只用一个常量，用户在 A 家的框里打了一半、又去切到 B 家，
+ * 框里还会留下 A 家的半截地址，而请求已经发去 B 家。
+ */
+private const val CLOUD_FIELD_KEY_PREFIX = "asr-cloud-"
 
 /**
  * 语音识别设置。从设置页进来。
@@ -89,6 +103,12 @@ fun AsrSettingsRoute(
     AsrSettingsScreen(
         state = state,
         onBack = onBack,
+        onSelectRoute = viewModel::selectRoute,
+        onSelectCloudService = viewModel::selectCloudService,
+        onSetCloudBaseUrl = viewModel::setCloudBaseUrl,
+        onSetCloudModel = viewModel::setCloudModel,
+        onSaveCloudApiKey = viewModel::saveCloudApiKey,
+        onClearCloudApiKey = viewModel::clearCloudApiKey,
         onSelectModel = viewModel::selectModel,
         onSetBaseUrl = viewModel::setBaseUrl,
         onInstall = viewModel::install,
@@ -107,6 +127,12 @@ fun AsrSettingsRoute(
 fun AsrSettingsScreen(
     state: AsrSettingsUiState,
     onBack: () -> Unit,
+    onSelectRoute: (AsrRoute) -> Unit,
+    onSelectCloudService: (String) -> Unit,
+    onSetCloudBaseUrl: (String) -> Unit,
+    onSetCloudModel: (String) -> Unit,
+    onSaveCloudApiKey: (String, (Boolean) -> Unit) -> Unit,
+    onClearCloudApiKey: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSetBaseUrl: (String) -> Unit,
     onInstall: () -> Unit,
@@ -119,6 +145,9 @@ fun AsrSettingsScreen(
     // （见 `AsrModelLocator.remove`）。确认放在这一层而不是 ViewModel 里：
     // 「用户点过确认」是界面的事实，ViewModel 不该再猜一次。
     var confirmRemove by remember { mutableStateOf(false) }
+
+    // 当前是不是开着「选服务商」的对话框。与 `confirmRemove` 同一个理由留在这里。
+    var pickingService by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -140,57 +169,125 @@ fun AsrSettingsScreen(
             modifier = Modifier.fillMaxWidth().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
-            item { SectionHeader(stringResource(R.string.msp_settings_section_asr_model)) }
-            // 「音频不上传」是这条功能的卖点，也是用户第一个会怀疑的事，所以放在最前面。
-            item { InfoNote(stringResource(R.string.msp_settings_asr_model_hint)) }
-            items(AsrModelCatalog.models, key = { model -> model.id }) { model ->
-                AsrModelRow(
-                    model = model,
-                    status = state.statusOf(model),
-                    selected = model.id == state.model.id,
-                    // 下载中不许换模型：换模型会把正在下的任务掐掉，而「点另一行」
-                    // 这个动作看起来完全不像「停止下载」。
+            // 识别方式排在最前面：它决定的不是「哪个更好」，而是下面半页要填什么。
+            // 反过来把模型列表放前面的话，一个打算用云端的用户要先把两行本机模型读完
+            // （连同 190 MB 的体积）才看到那个真正属于他的选项。
+            item { SectionHeader(stringResource(R.string.msp_settings_section_asr_route)) }
+            items(AsrRoute.entries, key = { route -> route.id }) { route ->
+                AsrRouteRow(
+                    route = route,
+                    selected = route == state.settings.route,
+                    // 下载中不许换路：换到云端会把正在下的那个任务的进度条从屏幕上拿掉，
+                    // 而后台还在下——「看不见的 190 MB」比一个点不动的选项更难查。
                     enabled = !state.installing,
-                    onSelect = { onSelectModel(model.id) },
+                    onSelect = { onSelectRoute(route) },
                 )
             }
             item {
-                AsrActions(
-                    state = state,
-                    onInstall = onInstall,
-                    onCancelInstall = onCancelInstall,
-                    onRemove = { confirmRemove = true },
+                // 两条路各说各的代价，**没有**一句共用的免责声明：一句「音频不会上传」
+                // 在云端那条路上是假话（见 `AsrSection` 里同一条取舍）。
+                InfoNote(
+                    stringResource(
+                        if (state.settings.usesCloud) {
+                            R.string.msp_settings_asr_route_cloud_note
+                        } else {
+                            R.string.msp_settings_asr_model_hint
+                        },
+                    ),
                 )
             }
 
-            item { SectionHeader(stringResource(R.string.msp_settings_section_asr_source)) }
-            item {
-                DraftTextField(
-                    key = SOURCE_FIELD_KEY,
-                    stored = state.settings.baseUrl,
-                    onCommit = onSetBaseUrl,
-                    label = stringResource(R.string.msp_settings_asr_source),
-                    placeholder = DEFAULT_MODEL_BASE_URL,
-                    keyboardType = KeyboardType.Uri,
-                    supportingText = stringResource(
-                        if (state.sourceLooksValid) {
-                            R.string.msp_settings_asr_source_support
-                        } else {
-                            R.string.msp_settings_asr_source_invalid
-                        },
-                    ),
-                    isError = !state.sourceLooksValid,
-                    // 下载中不改地址：正在跑的那个任务已经按旧地址在下了，
-                    // 而这一栏改的是「下一次」——两件事同时发生会让用户以为改一下就换源续传了。
-                    enabled = !state.installing,
-                    help = stringResource(R.string.msp_settings_asr_source_help),
-                )
+            if (state.settings.usesCloud) {
+                item { SectionHeader(stringResource(R.string.msp_settings_section_asr_cloud)) }
+                item {
+                    CloudServiceRow(
+                        service = state.settings.cloudService,
+                        onClick = { pickingService = true },
+                    )
+                }
+                item { CloudEndpointField(state = state, onSetCloudBaseUrl = onSetCloudBaseUrl) }
+                item { CloudModelField(state = state, onSetCloudModel = onSetCloudModel) }
+
+                item { SectionHeader(stringResource(R.string.msp_settings_section_asr_cloud_key)) }
+                item {
+                    SecretKeyBlock(
+                        // 换家就换一份凭证：草稿和刚才那条提示必须跟着作废（见 `SecretKeyBlock`）。
+                        resetKey = state.settings.cloudApiKeyOwner,
+                        ownerLabel = state.settings.cloudService.displayName.string(),
+                        stored = state.settings.cloudApiKeyStored,
+                        required = state.settings.cloudNeedsApiKey,
+                        clearConfirm = stringResource(R.string.msp_settings_asr_delete_key_confirm),
+                        onSave = onSaveCloudApiKey,
+                        onClear = onClearCloudApiKey,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            } else {
+                item { SectionHeader(stringResource(R.string.msp_settings_section_asr_model)) }
+                items(AsrModelCatalog.models, key = { model -> model.id }) { model ->
+                    AsrModelRow(
+                        model = model,
+                        status = state.statusOf(model),
+                        selected = model.id == state.model.id,
+                        // 下载中不许换模型：换模型会把正在下的任务掐掉，而「点另一行」
+                        // 这个动作看起来完全不像「停止下载」。
+                        enabled = !state.installing,
+                        onSelect = { onSelectModel(model.id) },
+                    )
+                }
+                item {
+                    AsrActions(
+                        state = state,
+                        onInstall = onInstall,
+                        onCancelInstall = onCancelInstall,
+                        onRemove = { confirmRemove = true },
+                    )
+                }
+
+                item { SectionHeader(stringResource(R.string.msp_settings_section_asr_source)) }
+                item {
+                    DraftTextField(
+                        key = SOURCE_FIELD_KEY,
+                        stored = state.settings.baseUrl,
+                        onCommit = onSetBaseUrl,
+                        label = stringResource(R.string.msp_settings_asr_source),
+                        placeholder = DEFAULT_MODEL_BASE_URL,
+                        keyboardType = KeyboardType.Uri,
+                        supportingText = stringResource(
+                            if (state.sourceLooksValid) {
+                                R.string.msp_settings_asr_source_support
+                            } else {
+                                R.string.msp_settings_asr_source_invalid
+                            },
+                        ),
+                        isError = !state.sourceLooksValid,
+                        // 下载中不改地址：正在跑的那个任务已经按旧地址在下了，
+                        // 而这一栏改的是「下一次」——两件事同时发生会让用户以为改一下就换源续传了。
+                        enabled = !state.installing,
+                        help = stringResource(R.string.msp_settings_asr_source_help),
+                    )
+                }
             }
 
             state.message?.let { message ->
                 item { AsrMessageBlock(message = message, onDismiss = onDismissMessage) }
             }
         }
+    }
+
+    if (pickingService) {
+        ChoiceDialog(
+            title = stringResource(R.string.msp_settings_asr_cloud_service),
+            options = AsrServices.all,
+            selected = state.settings.cloudService,
+            label = { service -> service.displayName.string() },
+            description = { service -> service.note.string() },
+            onSelect = { service ->
+                pickingService = false
+                onSelectCloudService(service.id)
+            },
+            onDismiss = { pickingService = false },
+        )
     }
 
     if (confirmRemove) {
@@ -385,5 +482,135 @@ private fun downloadText(progress: AsrModelProgress?): String = if (progress == 
         R.string.msp_settings_asr_download_bytes,
         TimeFormat.fileSize(progress.downloadedBytes),
         TimeFormat.fileSize(progress.totalBytes),
+    )
+}
+
+// --------------------------------------------------------------- 识别方式
+
+/**
+ * 「本机 / 云端」两行。
+ *
+ * 每行都带自己那句代价说明：本机是「音频不会上传 + 大概要等多久」，云端是「5 分钟一块
+ * 上传、传完才开始」。两条路的代价**不能合并成一句**——这正是播放页那条 hint 被下移
+ * 到各自块里的同一个理由，也是这个功能里最容易写错的一句话。
+ *
+ * 名字用 [AsrRoute.displayName]（core:asr 里那份，三语齐全），不在这一层再抄一份：
+ * 抄一份之后「本机识别」在设置页和播放页就可能叫两个名字。
+ */
+@Composable
+private fun AsrRouteRow(
+    route: AsrRoute,
+    selected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onSelect,
+            ),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        // onClick = null：整行的 selectable 已经负责选择，再挂一次会点一下触发两次。
+        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
+        headlineContent = {
+            Text(
+                text = route.displayName.string(),
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    Color.Unspecified
+                },
+            )
+        },
+    )
+}
+
+// --------------------------------------------------------------- 云端
+
+/**
+ * 服务商那一行：右边是当前这家（不出时间轴时带一个短徽标），下面是这家的说明。
+ *
+ * 说明直接铺在行上，而不是只藏在选择对话框里：默认服务商就是不出时间轴的那家，
+ * 也就是说「用户什么都没点」的状态下，这条信息必须已经在屏幕上。
+ */
+@Composable
+private fun CloudServiceRow(
+    service: AsrService,
+    onClick: () -> Unit,
+) {
+    SettingChoiceRow(
+        icon = Icons.Outlined.Cloud,
+        title = stringResource(R.string.msp_settings_asr_cloud_service),
+        value = if (service.supportsSegments) {
+            service.displayName.string()
+        } else {
+            // 徽标由 `supportsSegments` 算出来，不是把各家的说明抄一遍：
+            // 抄的那一份会在我们改预设数据之后继续撒谎。
+            stringResource(
+                R.string.msp_settings_asr_cloud_no_timeline,
+                service.displayName.string(),
+            )
+        },
+        subtitle = service.note.string(),
+        onClick = onClick,
+        help = null,
+    )
+}
+
+/**
+ * 云端服务地址。
+ *
+ * 两处与下载源那一栏**刻意相反**：
+ * - 空串 = 错（那边空 = 用默认镜像）。两个极性各由一个 `isError` 来源给出，
+ *   所以这里用 [AsrSettingsUiState.cloudAddressLooksValid] 而不是 `looksLikeHttpUrl`；
+ * - 下面那行写的是**真正会请求的完整地址**，因为用户填的是 base，而 404 与
+ *   「模型名写错了」在错误提示里长得一模一样，只有把拼好的结果摆出来才分得清。
+ */
+@Composable
+private fun CloudEndpointField(
+    state: AsrSettingsUiState,
+    onSetCloudBaseUrl: (String) -> Unit,
+) {
+    DraftTextField(
+        // 换家就丢掉草稿：地址是跟着服务商走的一份值。
+        key = CLOUD_FIELD_KEY_PREFIX + "base-url-" + state.settings.cloudService.id,
+        stored = state.settings.cloudBaseUrl,
+        onCommit = onSetCloudBaseUrl,
+        label = stringResource(R.string.msp_settings_asr_cloud_address),
+        placeholder = stringResource(R.string.msp_settings_asr_cloud_address_placeholder),
+        keyboardType = KeyboardType.Uri,
+        supportingText = if (state.cloudAddressLooksValid) {
+            stringResource(R.string.msp_settings_asr_cloud_endpoint, state.cloudEndpoint)
+        } else {
+            stringResource(R.string.msp_settings_asr_cloud_address_invalid)
+        },
+        isError = !state.cloudAddressLooksValid,
+    )
+}
+
+/**
+ * 云端模型名。留空 = 回到预设自带的那个（与下载源同一套语义）。
+ *
+ * 框里显示的是**解析后**的值（留空时就是预设名），所以「留空」这件事不能用空框
+ * 表达；下面那行把它写出来，用户才知道自己看到的是预设还是自己填的。
+ */
+@Composable
+private fun CloudModelField(
+    state: AsrSettingsUiState,
+    onSetCloudModel: (String) -> Unit,
+) {
+    val preset = state.settings.cloudService.model
+    DraftTextField(
+        key = CLOUD_FIELD_KEY_PREFIX + "model-" + state.settings.cloudService.id,
+        stored = state.settings.cloudModel,
+        onCommit = onSetCloudModel,
+        label = stringResource(R.string.msp_settings_asr_cloud_model),
+        placeholder = preset,
+        keyboardType = KeyboardType.Text,
+        supportingText = stringResource(R.string.msp_settings_asr_cloud_model_support, preset),
     )
 }

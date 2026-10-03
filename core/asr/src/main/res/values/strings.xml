@@ -39,10 +39,46 @@
     <string name="msp_asr_error_write">写入失败：%1$s</string>
     <string name="msp_asr_error_model_missing">%1$s 尚未下载完成（%2$s）</string>
     <string name="msp_asr_error_no_audio">该文件不包含可用的音轨</string>
+    <string name="msp_asr_error_unknown_duration">这个文件（或这一段流）没有写时长，没法按 5 分钟切块上传。改用本机识别：本机是一边解码一边识别，不需要提前知道时长。</string>
     <string name="msp_asr_error_decode">音频解码失败：%1$s</string>
     <string name="msp_asr_error_no_speech">未识别到人声</string>
     <string name="msp_asr_error_engine">识别引擎出错：%1$s</string>
     <string name="msp_asr_error_storage">字幕已生成，但保存失败（存储空间可能不足）</string>
     <string name="msp_asr_error_unknown">识别失败：%1$s</string>
+
+    <!--
+      ===== 云端识别 =====
+
+      品牌名（OpenAI / Groq）不翻译，所以它们写在 `AsrServices` 里用 MspText.Plain；
+      这里只有需要解释的中文说明。
+    -->
+    <string name="msp_asr_svc_siliconflow_name">硅基流动</string>
+    <string name="msp_asr_svc_custom_name">自定义（中转 / 自建）</string>
+    <string name="msp_asr_svc_openai_note">官方 OpenAI。默认的 whisper-1 是这里唯一稳定支持「返回每句时间轴」的模型；换成 gpt-4o-transcribe 会变成整块一条字幕。</string>
+    <string name="msp_asr_svc_groq_note">地址里那段 /openai/v1 不要删——官方 SDK 打的就是这个路径，删掉会 404。模型名只有 whisper-large-v3 和 whisper-large-v3-turbo 两个。</string>
+    <string name="msp_asr_svc_siliconflow_note">这家不返回时间轴：整段音频会识别成一整块文字，字幕只有一条。国内直连、价格低，适合「只要一份文字稿」的场合。</string>
+    <string name="msp_asr_svc_custom_note">填 OpenAI 兼容的 base（例如 https://example.com/v1），下面会显示最终请求的完整地址。默认按「支持返回时间轴」发请求；若服务商不接受，会提示你换模型或预设。</string>
+    <string name="msp_asr_svc_custom_key_hint">服务商要求就填</string>
+
+    <!-- 两条识别路线。本机是缺省（隐私口径，见 AsrRoute 的注释）。 -->
+    <string name="msp_asr_route_on_device">本机识别</string>
+    <string name="msp_asr_route_cloud">云端识别</string>
+
+    <!--
+      云端失败提示。和上面那批一样，一种失败一句话：401 要用户改密钥（改完立刻能好），
+      403 改密钥没用（是账户策略挡的），413 要换本机识别，429 是额度、5xx 是等一等。
+      合并成一句「云端识别失败」，用户就会去反复重填密钥，而其中两种根本不是密钥问题。
+    -->
+    <string name="msp_asr_error_cloud_network">连不上识别服务：%1$s</string>
+    <string name="msp_asr_error_cloud_auth">%1$s 拒绝了这次请求——API Key 没填或不对。到「设置 → 语音识别」里改一下再试。</string>
+    <string name="msp_asr_error_cloud_blocked">服务商按账户策略拒绝了这次请求：%1$s（换密钥没用，多半得换一家服务商）</string>
+    <string name="msp_asr_error_cloud_request">服务商不接受这次请求：%1$s。常见原因是这个模型不支持返回时间轴，换一个模型或预设试试。</string>
+    <string name="msp_asr_error_cloud_too_large">这一块音频（%1$s）超过服务商的体积上限。可以改用本机识别：不上传，也没有体积限制。</string>
+    <string name="msp_asr_error_cloud_quota">额度用完或被限流：%1$s</string>
+    <string name="msp_asr_error_cloud_server">服务商侧故障（HTTP %1$d）：%2$s</string>
+    <string name="msp_asr_error_cloud_response">服务商返回的内容读不出来：%1$s</string>
+    <string name="msp_asr_error_cloud_endpoint">这个地址上没有识别接口（HTTP %1$d）。到「设置 → 语音识别」里看看服务地址——多数 OpenAI 兼容服务要把路径写到 /v1。</string>
+    <string name="msp_asr_error_cloud_address">云端识别的服务地址还没填好（要以 http:// 或 https:// 开头）。到「设置 → 语音识别」→「云端识别」里补上，或者改用本机识别。</string>
+    <string name="msp_asr_error_cloud_no_detail">服务商没有说明原因</string>
 
 </resources>

@@ -39,6 +39,12 @@
     <string name="msp_settings_summary_asr_partial">%1$d%% downloaded</string>
     <string name="msp_settings_summary_asr_ready">Downloaded</string>
 
+    <!-- Shown instead of the on-device model summary once the cloud route is selected. -->
+    <string name="msp_settings_summary_asr_cloud">Cloud · %1$s</string>
+    <!-- The two prerequisites of the cloud route; whichever is missing is named. -->
+    <string name="msp_settings_summary_asr_missing_address">No endpoint set</string>
+    <string name="msp_settings_summary_asr_missing_key">No API key set</string>
+
     <!--
       The three on-device translation model states. Unlike the ASR one, this download
       cannot be resumed, so the unfinished state must not say "resume".
@@ -258,8 +264,16 @@
 
     <!-- ===== Speech recognition (on-device ASR) ===== -->
 
+    <string name="msp_settings_section_asr_route">How to recognize</string>
+    <!--
+      Shown right under the two choices when Cloud is picked. The privacy notice belongs on the page
+      where the choice is made, not only on the player's button: this is where the user has time to read it.
+    -->
+    <string name="msp_settings_asr_route_cloud_note">Cloud recognition uploads the audio to the address you enter, five minutes per chunk, before anything is recognized. Uploading is outward-facing and cannot be undone; results are written on this device only.</string>
+
     <string name="msp_settings_section_asr_model">Recognition model</string>
-    <!-- Nothing is uploaded — that is both the selling point and the first thing users doubt, so it comes first. -->
+    <!-- Nothing is uploaded — that is both the selling point and the first thing users doubt, so it comes first;
+         it describes the on-device route, so it sits with that choice rather than with the model list. -->
     <string name="msp_settings_asr_model_hint">Recognition runs entirely on this device; audio is never uploaded. Expect roughly the length of the audio.</string>
 
     <string name="msp_settings_asr_download">Download model</string>
@@ -290,6 +304,26 @@
     <string name="msp_settings_asr_source_invalid">Must start with http:// or https://</string>
 
     <string name="msp_settings_asr_dismiss">Got it</string>
+
+    <!-- ===== Speech recognition (cloud) + API key ===== -->
+
+    <string name="msp_settings_section_asr_cloud">Cloud service</string>
+    <string name="msp_settings_asr_cloud_service">Provider</string>
+    <string name="msp_settings_asr_cloud_address">Endpoint</string>
+    <string name="msp_settings_asr_cloud_address_placeholder">https://api.example.com/v1</string>
+    <!-- The full endpoint that actually gets requested, so the user can tell whether their `/v1` was right. -->
+    <string name="msp_settings_asr_cloud_endpoint">Will request: %1$s</string>
+    <!-- Opposite of the download-source field: blank here means "nothing to connect to", not "use the default". -->
+    <string name="msp_settings_asr_cloud_address_invalid">Enter an address starting with http:// or https://</string>
+    <string name="msp_settings_asr_cloud_model">Model name</string>
+    <!-- Example: `Preset used when blank: whisper-1` -->
+    <string name="msp_settings_asr_cloud_model_support">Preset used when blank: %1$s</string>
+    <!-- This has to be on the settings page: the default provider returns no timestamps at all.
+         A structural badge driven by `supportsSegments`; the detail lives in the provider row's subtitle. -->
+    <string name="msp_settings_asr_cloud_no_timeline">%1$s (no timestamps)</string>
+    <string name="msp_settings_section_asr_cloud_key">API key</string>
+    <!-- Must differ from the translation page's wording: "translation stops working" would suggest recognition is unaffected. -->
+    <string name="msp_settings_asr_delete_key_confirm">After deleting it, this provider can no longer be used for recognition — you will need to paste the key again.</string>
 
     <!-- ===== On-device translation model ===== -->
 

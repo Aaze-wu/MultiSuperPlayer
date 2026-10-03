@@ -73,6 +73,12 @@
     <string name="msp_settings_summary_asr_partial">已下载 %1$d%%</string>
     <string name="msp_settings_summary_asr_ready">已下载</string>
 
+    <!-- 走了云端时入口行不再提本机模型（例：`云端识别 · 硅基流动`）。名字用短横排出，与上面的 ` · ` 一致 -->
+    <string name="msp_settings_summary_asr_cloud">云端识别 · %1$s</string>
+    <!-- 云端那条路的两个前置条件，缺哪个写哪个（与本机那条路的「未下载」并列同一个位置） -->
+    <string name="msp_settings_summary_asr_missing_address">未填服务地址</string>
+    <string name="msp_settings_summary_asr_missing_key">未填密钥</string>
+
     <!--
       本地翻译模型的三种状态。与 ASR 那把不同：这一条**不支持断点续传**，
       所以「未下完」不能被说成「继续下载」（那是在界面上承诺一件做不到的事）。
@@ -352,8 +358,16 @@
 
     <!-- ===== 语音识别（本机 ASR） ===== -->
 
+    <string name="msp_settings_section_asr_route">识别方式</string>
+    <!--
+      选云端时紧跟在这两行下面。隐私告知放在**选择的那一页**（而不是只在播放页按按钮时），
+      因为用户在这个位置才有时间读，而那一刻他正在做一个会把音频发出去的决定。
+    -->
+    <string name="msp_settings_asr_route_cloud_note">云端识别会按 5 分钟一块把音频上传到你填的地址，传完才开始识别。上传是向外的，删不回来；识别结果只写在本机。</string>
+
     <string name="msp_settings_section_asr_model">识别模型</string>
-    <!-- 「不上传」是这条功能的卖点，也是用户第一个会怀疑的事，所以放在最前面 -->
+    <!-- 「不上传」是这条功能的卖点，也是用户第一个会怀疑的事，所以放在最前面；
+         它是对**本机这条路**的描述，所以跟着本机那一行，而不是跟着模型列表 -->
     <string name="msp_settings_asr_model_hint">识别全程在本机完成，音频不会上传。耗时约等于音频时长。</string>
 
     <string name="msp_settings_asr_download">下载模型</string>
@@ -384,6 +398,26 @@
     <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 开头。</string>
 
     <string name="msp_settings_asr_dismiss">知道了</string>
+
+    <!-- ===== 语音识别（云端）+ 密钥 ===== -->
+
+    <string name="msp_settings_section_asr_cloud">云端服务</string>
+    <string name="msp_settings_asr_cloud_service">服务商</string>
+    <string name="msp_settings_asr_cloud_address">服务地址</string>
+    <string name="msp_settings_asr_cloud_address_placeholder">https://api.example.com/v1</string>
+    <!-- 真正发出去的那个完整端点。少了它，用户对「我填的 `/v1` 到底对不对」没有任何反馈 -->
+    <string name="msp_settings_asr_cloud_endpoint">将请求：%1$s</string>
+    <!-- 与下载源那一栏**相反**：这里空 = 没得可连，不是「用默认值」 -->
+    <string name="msp_settings_asr_cloud_address_invalid">要填一个以 http:// 或 https:// 开头的地址。</string>
+    <string name="msp_settings_asr_cloud_model">模型名</string>
+    <!-- 例：`留空则用预设：whisper-1` -->
+    <string name="msp_settings_asr_cloud_model_support">留空则用预设：%1$s</string>
+    <!-- 必须写在设置页：默认服务商就不出时间轴。这是**结构性**的短徽标（由 supportsSegments 驱动），
+         具体理由在服务商那一行的副标题（各家预设的 note）里讲。生成完才发现「只有一条字幕」是白跑一趟 -->
+    <string name="msp_settings_asr_cloud_no_timeline">%1$s（不出时间轴）</string>
+    <string name="msp_settings_section_asr_cloud_key">密钥</string>
+    <!-- 这句话必须与翻译页那一句不同：写着「就不能翻译了」的提示放在这里会让人以为不影响识别 -->
+    <string name="msp_settings_asr_delete_key_confirm">删除后就不能用这家服务识别了，需要重新粘贴一次密钥。</string>
 
     <!-- ===== 本地翻译模型（跑在设备上） ===== -->
 

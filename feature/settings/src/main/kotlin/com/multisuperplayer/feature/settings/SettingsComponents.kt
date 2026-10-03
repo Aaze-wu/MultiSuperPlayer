@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,10 +21,12 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -43,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 
@@ -453,4 +457,133 @@ internal fun DraftTextField(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
     )
+}
+
+// --------------------------------------------------------------- 密钥
+
+/**
+ * 密钥的三态。翻译页和识别页共用同一份实现——两处各写一遍的话，一定会有一处
+ * 先改：而这类控件的错误后果不是「显示难看」，是**用户以为保存了、其实没有**。
+ *
+ * 「留空」和「删除」必须分开：一个输入框的空值如果等于「把密钥删掉」，
+ * 那么用户只是点进去、什么都没输、退回上一页（或其他任何触发保存的路径），
+ * 密钥就没了。所以这里的规则是：
+ *
+ * - 输入框永远是空的，**不会**把已存的密钥读回来显示（读回来就等于把它明文摊在屏幕上）；
+ * - 点「保存」且输入非空 ⇒ 覆盖；
+ * - 点「删除」且**只有**这个按钮 ⇒ 删除（带一次确认）。
+ *
+ * @param resetKey 草稿归属谁。换一家服务商就是换了一份凭证，草稿与刚才那条提示
+ *   必须跟着作废——否则框里还留着上一家的密钥（而它会被发给新那家）。这个 key
+ *   是「这一栏属于哪一份记录」的标识，不是「值空不空」的判断：后者在第一次载入时
+ *   会把用户的输入当成脏数据丢掉。
+ * @param clearConfirm 删除确认里的那句话。**必须按用途分别给**：写着「就不能翻译了」
+ *   的那段话被搬到识别页上，用户的结论会是「删了不影响识别」。
+ */
+@Composable
+internal fun SecretKeyBlock(
+    resetKey: Any?,
+    ownerLabel: String,
+    stored: Boolean,
+    required: Boolean,
+    clearConfirm: String,
+    onSave: (String, (Boolean) -> Unit) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var input by remember(resetKey) { mutableStateOf("") }
+    // 提示文案的「说哪一句」就发生在这一层（不经过 `MspText`），所以这里存的是资源 id：
+    // 存 `MspText` 的话反而要再引入一个只有在 Compose 里才存在的 `string()` 才能显示。
+    var message by remember(resetKey) { mutableStateOf<Int?>(null) }
+    var confirmClear by remember(resetKey) { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = if (stored) {
+                stringResource(R.string.msp_settings_key_stored, ownerLabel)
+            } else {
+                stringResource(R.string.msp_settings_key_missing)
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (!required) {
+            Text(
+                text = stringResource(R.string.msp_settings_key_not_required),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedTextField(
+            value = input,
+            onValueChange = {
+                input = it
+                message = null
+            },
+            label = { Text(stringResource(R.string.msp_settings_api_key_label)) },
+            placeholder = { Text(stringResource(R.string.msp_settings_api_key_placeholder)) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                // 空输入不给点：仓库对空值本来就是「不动」，给一个按下去没反应的按钮
+                // 只会让人以为保存成功了。
+                onClick = {
+                    onSave(input) { saved ->
+                        message = if (saved) {
+                            R.string.msp_settings_key_saved
+                        } else {
+                            R.string.msp_settings_key_not_saved
+                        }
+                        if (saved) input = ""
+                    }
+                },
+                enabled = input.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.msp_settings_save))
+            }
+            if (stored) {
+                OutlinedButton(onClick = { confirmClear = true }) {
+                    Text(stringResource(R.string.msp_settings_delete_key))
+                }
+            }
+        }
+        message?.let {
+            Text(
+                text = stringResource(it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = stringResource(R.string.msp_settings_key_storage_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(stringResource(R.string.msp_settings_delete_key_title)) },
+            text = { Text(clearConfirm) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClear = false
+                    onClear()
+                    message = R.string.msp_settings_key_deleted
+                }) { Text(stringResource(R.string.msp_settings_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) {
+                    Text(stringResource(R.string.msp_settings_cancel))
+                }
+            },
+        )
+    }
 }

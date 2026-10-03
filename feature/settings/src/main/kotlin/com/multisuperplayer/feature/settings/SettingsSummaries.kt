@@ -7,6 +7,7 @@ import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.log.LogSummary
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -194,16 +195,56 @@ internal object SettingsSummaries {
     }
 
     /**
-     * 语音识别：`中文离线（小模型） · 已下载`。
+     * 语音识别入口行：按**当前路线**分叉到 [asrOnDevice] 或 [asrCloud]。
+     *
+     * 这一行以前只认 `model + status`，于是在云端那条路上会显示成
+     * `中文离线（小模型） · 未下载 · 约 78.1 MB`——每一个字都是真的，整句话却是假的：
+     * 云端根本不下载模型，用户会照这句话去点「下载」再等一场空。
+     *
+     * 分叉只写在这一处。两个分支各自是纯函数，也各自能被喂脏数据（见 [asrOnDevice]）。
+     */
+    fun asr(settings: AsrSettings, status: AsrModelStatus): MspText = if (settings.usesCloud) {
+        asrCloud(settings)
+    } else {
+        asrOnDevice(settings.model, status)
+    }
+
+    /**
+     * 本机那条路：`中文离线（小模型） · 已下载`。
      *
      * 没下过的时候把体积也接在后面（`中文离线（小模型） · 未下载 · 约 78.1 MB`）：
      * 入口页这一行是用户决定要不要点进去看的**唯一**依据，而「这条要花 78 MB 还是 190 MB」
      * 正是那个决定要看的东西。已经下了一部分时不接体积：那时那个数字已经在「42%」里了。
+     *
+     * 参数是模型本身而不是 `AsrSettings`：这条路上的全部输入就是「哪条模型 + 磁盘上什么状态」，
+     * 而体积写错（`totalBytes = 0`）的那类脏数据只能在单测里手工构造出来——
+     * `AsrModelCatalog.byId` 会把认不出来的 id 换成默认模型，从设置那一头永远喂不进来。
      */
-    fun asr(model: AsrModelInfo, status: AsrModelStatus): MspText = join(
+    fun asrOnDevice(model: AsrModelInfo, status: AsrModelStatus): MspText = join(
         model.name,
         asrStatus(model, status),
         if (status == AsrModelStatus.Absent) model.sizeText() else null,
+    )
+
+    /**
+     * 云端那条路：`云端识别 · 硅基流动`，后面按需挂上缺什么。
+     *
+     * 云端的两个前置条件（地址、密钥）**缺哪个说哪个**，和本机那条路上的「未下载」
+     * 占的是同一个位置：播放页那个按钮在这两种情况下都点不动，入口行不写出来，
+     * 用户只能点进去一个一个看。都不缺时这条尾巴整个不出现。
+     */
+    fun asrCloud(settings: AsrSettings): MspText = join(
+        MspText.Res(R.string.msp_settings_summary_asr_cloud, settings.cloudService.displayName),
+        if (settings.cloudAddressLooksValid) {
+            null
+        } else {
+            MspText.Res(R.string.msp_settings_summary_asr_missing_address)
+        },
+        if (settings.cloudNeedsApiKey && !settings.cloudApiKeyStored) {
+            MspText.Res(R.string.msp_settings_summary_asr_missing_key)
+        } else {
+            null
+        },
     )
 
     /**

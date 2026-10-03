@@ -39,6 +39,12 @@
     <string name="msp_settings_summary_asr_partial">已下載 %1$d%%</string>
     <string name="msp_settings_summary_asr_ready">已下載</string>
 
+    <!-- 走了雲端時入口行不再提本機模型（例：`雲端辨識 · 硅基流動`）。 -->
+    <string name="msp_settings_summary_asr_cloud">雲端辨識 · %1$s</string>
+    <!-- 雲端那條路的兩個前置條件，缺哪個寫哪個 -->
+    <string name="msp_settings_summary_asr_missing_address">未填服務位址</string>
+    <string name="msp_settings_summary_asr_missing_key">未填金鑰</string>
+
     <!--
       本機翻譯模型的三種狀態。與 ASR 那把不同：這條**不支援斷點續傳**，
       所以「未下完」不能說成「繼續下載」（那是在介面上承諾一件做不到的事）。
@@ -251,8 +257,14 @@
 
     <!-- ===== 語音辨識（本機 ASR） ===== -->
 
+    <string name="msp_settings_section_asr_route">辨識方式</string>
+    <!-- 選雲端時緊跟在這兩行下面。隱私告知放在**做選擇的那一頁**（而不是只在播放頁按鈕時）：
+         使用者只有在這裡才有時間讀，而那一刻他正在做一個會把音訊送出門的決定 -->
+    <string name="msp_settings_asr_route_cloud_note">雲端辨識會以 5 分鐘一塊把音訊上傳到你填的位址，傳完才開始辨識。上傳是向外的，刪不回來；辨識結果只寫在本機。</string>
+
     <string name="msp_settings_section_asr_model">辨識模型</string>
-    <!-- 「不上傳」是這條功能的賣點，也是使用者第一個會懷疑的事，所以放在最前面 -->
+    <!-- 「不上傳」是這條功能的賣點，也是使用者第一個會懷疑的事，所以放在最前面；
+         它描述的是**本機那條路**，所以跟著本機那一行，而不是跟著模型清單 -->
     <string name="msp_settings_asr_model_hint">辨識全程在本機完成，音訊不會上傳。耗時約等於音訊長度。</string>
 
     <string name="msp_settings_asr_download">下載模型</string>
@@ -283,6 +295,26 @@
     <string name="msp_settings_asr_source_invalid">要以 http:// 或 https:// 開頭。</string>
 
     <string name="msp_settings_asr_dismiss">知道了</string>
+
+    <!-- ===== 語音辨識（雲端）+ 金鑰 ===== -->
+
+    <string name="msp_settings_section_asr_cloud">雲端服務</string>
+    <string name="msp_settings_asr_cloud_service">服務商</string>
+    <string name="msp_settings_asr_cloud_address">服務位址</string>
+    <string name="msp_settings_asr_cloud_address_placeholder">https://api.example.com/v1</string>
+    <!-- 真正發出去的那個完整端點。少了它，使用者對「我填的 `/v1` 到底對不對」沒有任何回饋 -->
+    <string name="msp_settings_asr_cloud_endpoint">將請求：%1$s</string>
+    <!-- 與下載來源那一欄**相反**：這裡空 = 沒得可連，不是「用預設值」 -->
+    <string name="msp_settings_asr_cloud_address_invalid">要填一個以 http:// 或 https:// 開頭的位址。</string>
+    <string name="msp_settings_asr_cloud_model">模型名稱</string>
+    <!-- 例：`留空則用預設：whisper-1` -->
+    <string name="msp_settings_asr_cloud_model_support">留空則用預設：%1$s</string>
+    <!-- 必須寫在設定頁：預設服務商就不出時間軸。這是**結構性**的短徽標（由 supportsSegments 驅動），
+         具體理由在服務商那一行的副標題（各家預設的 note）裡講 -->
+    <string name="msp_settings_asr_cloud_no_timeline">%1$s（不出時間軸）</string>
+    <string name="msp_settings_section_asr_cloud_key">金鑰</string>
+    <!-- 這句話必須與翻譯頁那一句不同：寫著「就不能翻譯了」的提示放在這裡會讓人以為不影響辨識 -->
+    <string name="msp_settings_asr_delete_key_confirm">刪除後就不能用這家服務辨識了，需要重新貼上一次金鑰。</string>
 
     <!-- ===== 本機翻譯模型（跑在裝置上） ===== -->
 

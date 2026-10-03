@@ -235,10 +235,16 @@ class PcmExtractor(private val context: Context, private val dispatchers: Dispat
 
 private const val TAG = "AsrPcm"
 
-/** `dequeue*Buffer` 的超时。10 ms 足够让解码器把活干完，又不会让取消等太久。 */
-private const val DEQUEUE_TIMEOUT_US = 10_000L
+/**
+ * `dequeue*Buffer` 的超时。10 ms 足够让解码器把活干完，又不会让取消等太久。
+ *
+ * `internal` 而不是 `private`：[AudioSliceWriter] 也跑同一个解码循环，
+ * 两处必须用**同一个**超时——各写一个数字的结果是一处调了、另一处没调，
+ * 而症状只是「切片比整段慢一点」，没人看得出来。
+ */
+internal const val DEQUEUE_TIMEOUT_US = 10_000L
 
-private fun MediaFormat.intOrNull(key: String): Int? =
+internal fun MediaFormat.intOrNull(key: String): Int? =
     if (containsKey(key)) getInteger(key) else null
 
 /**
@@ -247,6 +253,9 @@ private fun MediaFormat.intOrNull(key: String): Int? =
  * 同一个 4 字节可能是 16 bit 立体声的一帧，也可能是浮点单声道的一个样本，
  * 猜错的结果不是「声音小一点」而是彻底噪声。**没有** `pcm-encoding` 字段时
  * 按 16 bit 处理（绝大多数解码器如此）。
+ *
+ * `internal` 而同上面的理由：[AudioSliceWriter] 必须用**同一套**判据，
+ * 否则同一台手机上「整段识别」和「云端切片」会对同一个音轨得到不同的字节布局。
  */
-private fun MediaFormat.isFloatPcm(): Boolean =
+internal fun MediaFormat.isFloatPcm(): Boolean =
     intOrNull(MediaFormat.KEY_PCM_ENCODING) == AudioFormat.ENCODING_PCM_FLOAT

@@ -93,6 +93,9 @@
     <string name="msp_player_asr_using_model">Using “%1$s”: it only recognizes the language it was trained on.</string>
     <string name="msp_player_asr_need_model">This needs a speech model first (%1$s). Once downloaded, no network is required.</string>
     <string name="msp_player_asr_download_generate">Download model and generate (%1$s)</string>
+    <string name="msp_player_asr_cloud_privacy">Cloud recognition: the whole audio track is uploaded to “%1$s” before anything is recognized.</string>
+    <string name="msp_player_asr_cloud_generate">Upload and generate</string>
+    <string name="msp_player_asr_cloud_no_address">The cloud endpoint is not set yet — fill it in under Settings → Speech recognition.</string>
     <string name="msp_player_asr_downloading">Downloading model…</string>
     <string name="msp_player_asr_download_bytes">%1$s of %2$s downloaded</string>
     <string name="msp_player_asr_recognizing">Recognizing…</string>

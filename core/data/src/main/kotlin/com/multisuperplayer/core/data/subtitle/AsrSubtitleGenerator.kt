@@ -2,10 +2,11 @@ package com.multisuperplayer.core.data.subtitle
 
 import android.net.Uri
 import com.multisuperplayer.core.asr.AsrException
-import com.multisuperplayer.core.asr.AsrModelInfo
 import com.multisuperplayer.core.asr.AsrProgress
 import com.multisuperplayer.core.asr.AsrSegment
 import com.multisuperplayer.core.asr.AsrTranscriber
+import com.multisuperplayer.core.asr.CloudAsrTranscriber
+import com.multisuperplayer.core.data.settings.AsrJob
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
@@ -49,25 +50,39 @@ data class GeneratedSubtitleRef(
  * 「识别出来了但没存下」和「识别失败」对用户的下一步动作完全不同：前者该去清
  * 存储空间（识别已经付过算力的代价，重跑一遍还是存不下），后者才是重试识别。
  * 混成一句话会让用户反复重跑几分钟的识别。
+ *
+ * ## 一部片子只有一条生成字幕，换引擎重跑会覆盖上一条
+ *
+ * 文件名是「媒体哈希」，与路线无关（[GeneratedSubtitleStore.uriFor]）。两路各存
+ * 一份会在字幕面板里出现两条名字一模一样的候选——而它们的内容只有时间轴切分
+ * 不一样，用户没法从界面上分出哪条是哪条。而生成的字幕本来就是**可以再跑一遍**的
+ * 东西（不是用户一个字一个字敲出来的），覆盖它不丢用户劳动。
  */
 class AsrSubtitleGenerator(
     private val transcriber: AsrTranscriber,
+    private val cloud: CloudAsrTranscriber,
     private val store: GeneratedSubtitleStore,
 ) {
 
     /**
-     * 识别 [mediaUri] 并落盘。返回新字幕的身份，供调用方在重新扫描后指认它。
+     * 认识 [job] 说的那条路，把结果落盘。返回新字幕的身份，供调用方在重新扫描后指认它。
      *
      * 识别中途失败不会动旧文件：上一版生成的字幕仍然可用（重跑失败不该让用户
-     * 连原来那份也失去）。
+     * 连原来那份也失去）。云端那块也是：第 3 块传失败时前两块的结果**不会**被写出去
+     * （要等到全部块都拿到才会存），所以失败后盘上还是上一次那份完整的字幕，
+     * 而不是一份只有前 7 分钟的残缺字幕。
      */
     suspend fun generate(
         mediaUri: String,
-        model: AsrModelInfo,
+        job: AsrJob,
         onProgress: (AsrProgress) -> Unit = {},
     ): GeneratedSubtitleRef {
         val generatedUri = store.uriFor(mediaUri)
-        val segments = transcriber.transcribe(Uri.parse(mediaUri), model, onProgress)
+        val media = Uri.parse(mediaUri)
+        val segments = when (job) {
+            is AsrJob.OnDevice -> transcriber.transcribe(media, job.model, onProgress)
+            is AsrJob.Cloud -> cloud.transcribe(media, job.config, onProgress)
+        }
         val text = srtTextOf(generatedUri, segments)
         if (!store.save(generatedUri, text)) {
             throw AsrException.StorageFailed

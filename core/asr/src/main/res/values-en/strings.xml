@@ -23,10 +23,48 @@
     <string name="msp_asr_error_write">Couldn\'t write the file: %1$s</string>
     <string name="msp_asr_error_model_missing">%1$s has not finished downloading (%2$s)</string>
     <string name="msp_asr_error_no_audio">This file has no usable audio track</string>
+    <string name="msp_asr_error_unknown_duration">This file (or stream) declares no duration, so it cannot be split into 5-minute chunks for upload. Use on-device recognition instead — it decodes and recognizes as it goes and does not need the duration up front.</string>
     <string name="msp_asr_error_decode">Audio decoding failed: %1$s</string>
     <string name="msp_asr_error_no_speech">No speech detected</string>
     <string name="msp_asr_error_engine">Recognition engine failed: %1$s</string>
     <string name="msp_asr_error_storage">The subtitles were generated but could not be saved (storage may be full)</string>
     <string name="msp_asr_error_unknown">Recognition failed: %1$s</string>
+
+    <!--
+      ===== Cloud recognition =====
+
+      Brand names (OpenAI / Groq) are not translated; they live in `AsrServices` as
+      MspText.Plain. Only the explanatory lines need a translation here.
+    -->
+    <string name="msp_asr_svc_siliconflow_name">SiliconFlow</string>
+    <string name="msp_asr_svc_custom_name">Custom (proxy / self-hosted)</string>
+    <string name="msp_asr_svc_openai_note">Official OpenAI. The default whisper-1 is the only model here that reliably returns per-sentence timestamps; switching to gpt-4o-transcribe collapses the subtitles into one block.</string>
+    <string name="msp_asr_svc_groq_note">Keep the /openai/v1 segment in the address — that is the path the official SDK uses, and removing it returns 404. The only model names are whisper-large-v3 and whisper-large-v3-turbo.</string>
+    <string name="msp_asr_svc_siliconflow_note">This provider does not return timestamps: the whole audio becomes one block of text, i.e. a single subtitle line. Directly reachable in mainland China and cheap — good when all you want is a transcript.</string>
+    <string name="msp_asr_svc_custom_note">Enter an OpenAI-compatible base (e.g. https://example.com/v1); the resolved request URL is shown below. It requests timestamps by default — if the provider rejects that, you will be told to switch model or preset.</string>
+    <string name="msp_asr_svc_custom_key_hint">Fill in only if the provider requires it</string>
+
+    <!-- The two recognition routes. On-device is the default (a privacy choice, see AsrRoute). -->
+    <string name="msp_asr_route_on_device">On-device recognition</string>
+    <string name="msp_asr_route_cloud">Cloud recognition</string>
+
+    <!--
+      Cloud failure messages. One line per failure: a 401 wants the user to fix the
+      key (that works immediately), a 403 is blocked by account policy (retyping the
+      key never helps), a 413 should fall back to on-device recognition, a 429 is
+      quota and a 5xx just needs waiting. Collapsing them into "cloud recognition
+      failed" sends users off to retype keys when that cannot possibly fix it.
+    -->
+    <string name="msp_asr_error_cloud_network">Cannot reach the recognition service: %1$s</string>
+    <string name="msp_asr_error_cloud_auth">%1$s rejected the request — the API key is missing or wrong. Fix it in Settings → Speech recognition and try again.</string>
+    <string name="msp_asr_error_cloud_blocked">The provider rejected the request by account policy: %1$s (retyping the key will not help — you likely need a different provider)</string>
+    <string name="msp_asr_error_cloud_request">The provider will not accept this request: %1$s. The usual cause is that the model does not support returning timestamps — try another model or preset.</string>
+    <string name="msp_asr_error_cloud_too_large">This audio chunk (%1$s) exceeds the provider size limit. On-device recognition uploads nothing and has no such limit.</string>
+    <string name="msp_asr_error_cloud_quota">Quota exhausted or rate limited: %1$s</string>
+    <string name="msp_asr_error_cloud_server">Provider-side failure (HTTP %1$d): %2$s</string>
+    <string name="msp_asr_error_cloud_response">Could not read what the provider returned: %1$s</string>
+    <string name="msp_asr_error_cloud_endpoint">There is no transcription endpoint at this address (HTTP %1$d). Check the service address in Settings → Speech recognition — most OpenAI-compatible services need the path to include /v1.</string>
+    <string name="msp_asr_error_cloud_address">The cloud recognition service address is not filled in properly — it must start with http:// or https://. Complete it in Settings → Speech recognition → Cloud recognition, or switch back to on-device recognition.</string>
+    <string name="msp_asr_error_cloud_no_detail">the provider gave no reason</string>
 
 </resources>

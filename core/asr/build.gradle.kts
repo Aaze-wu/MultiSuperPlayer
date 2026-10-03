@@ -67,6 +67,14 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.koin.android)
 
+    // 云端识别的响应是 JSON（`verbose_json` 的 segments / 纯 json 的 text）。
+    // 用 kotlinx-serialization-json 而不是 android 自带的 `org.json`：后者的
+    // 单元测试实现是**空的**（`testOptions.unitTests.isReturnDefaultValues = true`
+    // 会让每个方法返回 null/0），也就是解析器一测就「全部读不出来」——
+    // 那不是在测解析器，那是在测一个什么都不做的桩。
+    // 只用到 `Json.parseToJsonElement`，所以**不需要** kotlin 的序列化编译器插件。
+    implementation(libs.kotlinx.serialization.json)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

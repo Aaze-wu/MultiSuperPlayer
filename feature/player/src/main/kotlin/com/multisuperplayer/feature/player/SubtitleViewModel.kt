@@ -6,9 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.asr.AsrModelCatalog
 import com.multisuperplayer.core.asr.AsrModelInstaller
 import com.multisuperplayer.core.asr.AsrModelLocator
+import com.multisuperplayer.core.asr.AsrRoute
 import com.multisuperplayer.core.asr.describeAsrFailure
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.data.settings.ApiKeyStore
+import com.multisuperplayer.core.data.settings.AsrJob
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
@@ -19,6 +22,7 @@ import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleStyle
 import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
+import com.multisuperplayer.core.data.settings.assembleJob
 import com.multisuperplayer.core.data.subtitle.AsrSubtitleGenerator
 import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleLoadResult
@@ -100,8 +104,10 @@ class SubtitleViewModel(
     translationCache: TranslationCacheStore,
     translationEdits: TranslationEditsStore,
     private val exportWriter: SubtitleExportWriter,
-    /** 语音识别的偏好（用哪条模型、从哪个源下载）。 */
+    /** 语音识别的偏好（走哪条路、用哪条模型/服务商、从哪个源下载）。 */
     private val asrSettings: AsrSettingsRepository,
+    /** 云端识别要的密钥。键名带 `asr-` 前缀，不会与翻译那边共用同一把钥匙。 */
+    private val apiKeys: ApiKeyStore,
     /** 模型装好了没有。按钮文案（「生成字幕」/「下载模型并生成」）与「先下再识别」都要它。 */
     private val asrModels: AsrModelLocator,
     private val asrInstaller: AsrModelInstaller,
@@ -163,9 +169,9 @@ class SubtitleViewModel(
      * 上千行的候选列表。
      */
     private val _asrState = MutableStateFlow<AsrUiState>(
-        // 设置还没读到时先按默认模型显示「未安装」。这个初值只活到第一次读到设置，
+        // 设置还没读到时先按「本机 + 未安装」显示。这个初值只活到第一次读到设置，
         // 而按钮按下去时的实际判断在 generateSubtitles 里重做一遍，不依赖它。
-        AsrUiState.Idle(model = AsrModelCatalog.byId(null), installed = false),
+        AsrUiState.Idle.OnDevice(model = AsrModelCatalog.byId(null), installed = false),
     )
 
     /** 生成字幕的状态，供选择面板显示进度 / 失败。 */
@@ -302,10 +308,24 @@ class SubtitleViewModel(
         }
     }
 
-    /** 「没在跑」的状态。模型没装时界面据此把按钮换成「下载模型并生成（体积）」。 */
+    /**
+     * 「没在跑」的状态。模型没装时界面据此把按钮换成「下载模型并生成（体积）」。
+     *
+     * 云端那条路不看模型：它没有「要下多少」这回事，但要把**服务商名字**交给界面，
+     * 因为那段隐私提示不能只写「会上传」，得写上传给谁。
+     */
     private fun idleAsrState(): AsrUiState.Idle {
-        val model = lastAsrSettings?.model ?: AsrModelCatalog.byId(null)
-        return AsrUiState.Idle(model = model, installed = asrModels.isReady(model))
+        // 设置还没读到（第一帧）：按本机显示。不能拿 `lastAsrSettings` 的缺省值当
+        // 真相——它可能已经把云端配好了，只是还没读上来。
+        val settings = lastAsrSettings
+            ?: return AsrUiState.Idle.OnDevice(model = AsrModelCatalog.byId(null), installed = false)
+        return when (settings.route) {
+            AsrRoute.ON_DEVICE ->
+                AsrUiState.Idle.OnDevice(settings.model, installed = asrModels.isReady(settings.model))
+
+            AsrRoute.CLOUD ->
+                AsrUiState.Idle.Cloud(settings.cloudService, addressReady = settings.cloudAddressLooksValid)
+        }
     }
 
     /** 播放页在「当前条目」变化时调用。条目为 null 表示队列空了。 */
@@ -375,6 +395,10 @@ class SubtitleViewModel(
      * 不能用，但你不知道该去哪」。代价是必须在按下之前把体积写清楚（按钮文案带模型
      * 大小），否则就是在用户没同意的情况下用流量下几十上百 MB。
      *
+     * 云端那条路不适用上面这段（没有模型可下），它的代价换成另一条：**整段音频离开
+     * 这台设备**。所以隐私提示必须在按下去之前就出现在按钮旁边（见 [AsrSection]），
+     * 而不是等传完了再说，也不是等用户自己去设置页发现。
+     *
      * ## 为什么生成完不直接切到新字幕
      *
      * 自动挑选会按排序规则决定（匹配分、来源优先级，见 `SubtitleSource`）：已经有
@@ -393,17 +417,21 @@ class SubtitleViewModel(
             try {
                 val settings = lastAsrSettings
                     ?: asrSettings.settings.first().also { lastAsrSettings = it }
-                val model = settings.model
+                // 先把「这一次用哪条路」冻成参数（见 AsrJob 的 KDoc）：中途改设置
+                // 不能把同一份结果交给两个引擎算。密钥没填时也会在这里就失败。
+                val job = assembleJob(settings, apiKeys)
 
-                if (!asrModels.isReady(model)) {
-                    _asrState.value = AsrUiState.Downloading(model)
-                    asrInstaller.install(model, settings.baseUrl) { progress ->
-                        if (scope.isActive) _asrState.value = AsrUiState.Downloading(model, progress)
+                // 下模型只对本机有意义：云端没有模型可下，也就不该让用户看到
+                // 「正在下载 78.1 MB」。
+                if (job is AsrJob.OnDevice && !asrModels.isReady(job.model)) {
+                    _asrState.value = AsrUiState.Downloading(job.model)
+                    asrInstaller.install(job.model, settings.baseUrl) { progress ->
+                        if (scope.isActive) _asrState.value = AsrUiState.Downloading(job.model, progress)
                     }
                 }
 
                 _asrState.value = AsrUiState.Transcribing()
-                val generated = subtitleGenerator.generate(media.uri, model) { progress ->
+                val generated = subtitleGenerator.generate(media.uri, job) { progress ->
                     if (scope.isActive) _asrState.value = AsrUiState.Transcribing(progress)
                 }
                 MspLog.i(TAG) { "生成字幕完成：${generated.cueCount} 条" }

@@ -4,6 +4,7 @@ import com.multisuperplayer.core.asr.AsrModelDownloader
 import com.multisuperplayer.core.asr.AsrModelInstaller
 import com.multisuperplayer.core.asr.AsrModelLocator
 import com.multisuperplayer.core.asr.AsrTranscriber
+import com.multisuperplayer.core.asr.CloudAsrTranscriber
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.browser.BrowserRepository
 import com.multisuperplayer.core.data.browser.StorageAccess
@@ -154,8 +155,15 @@ val dataModule = module {
     // 这里只认生产入口。
     single { AsrTranscriber.create(androidContext(), get()) }
 
-    // 识别 → 序列化 → 落盘，界面层只能经它生成字幕。
-    single { AsrSubtitleGenerator(transcriber = get(), store = get()) }
+    // 云端识别：切片 + 上传 + 解析。与 AsrTranscriber.create 同一个理由——
+    // 内部的 PcmExtractor / AudioSliceWriter / CloudAsrClient 都不该被界面层直接拿。
+    // cacheDir 而不是 filesDir：切出来的 wav 是同一次识别用完就删的中间产物，
+    // 放 cache 下才能被系统在空间紧张时回收（中途被杀留下的残片也由它自己清）。
+    single { CloudAsrTranscriber.create(androidContext(), get()) }
+
+    // 识别 → 序列化 → 落盘，界面层只能经它生成字幕。两条路（本机 / 云端）
+    // 都从这一个入口出去，所以「存哪儿、怎么序列化、失败怎么报」只有一份实现。
+    single { AsrSubtitleGenerator(transcriber = get(), cloud = get(), store = get()) }
 
     // ----------------------------------------------------------- 本地翻译（设备上跑的大模型）
 

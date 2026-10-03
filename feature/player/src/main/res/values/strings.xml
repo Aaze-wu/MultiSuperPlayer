@@ -112,6 +112,9 @@
     <string name="msp_player_asr_using_model">将使用「%1$s」识别，它只认自己训练过的语言。</string>
     <string name="msp_player_asr_need_model">需要先下载识别模型（%1$s），下好之后就不需要联网了。</string>
     <string name="msp_player_asr_download_generate">下载模型并生成（%1$s）</string>
+    <string name="msp_player_asr_cloud_privacy">云端识别：整段音频会上传到「%1$s」，传完才开始识别。</string>
+    <string name="msp_player_asr_cloud_generate">上传并生成字幕</string>
+    <string name="msp_player_asr_cloud_no_address">云端地址还没填好，先到「设置 → 语音识别」补上。</string>
     <string name="msp_player_asr_downloading">正在下载模型…</string>
     <string name="msp_player_asr_download_bytes">已下载 %1$s / %2$s</string>
     <string name="msp_player_asr_recognizing">正在识别…</string>

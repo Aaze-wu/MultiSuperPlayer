@@ -186,11 +186,14 @@ fun SettingsScreen(
             item {
                 SettingActionRow(
                     icon = Icons.Outlined.RecordVoiceOver,
-                    // 排在「字幕与翻译」后面：它是另一条**产出字幕**的路（本机识别），
+                    // 排在「字幕与翻译」后面：它是另一条**产出字幕**的路（本机或云端识别），
                     // 与上面那条「把字幕翻成另一种语言」是两件事，但用户找它们时
                     // 脑子里是同一句话（「我要给这部片子配字幕」），所以挨着。
+                    //
+                    // 摘要传的是整份设置而不是 `model + status`：走云端时那一行必须换个说法，
+                    // 而这个判断只有 `SettingsSummaries.asr` 能做（见它的 KDoc）。
                     title = stringResource(R.string.msp_settings_asr),
-                    subtitle = SettingsSummaries.asr(asrEntry.model, asrEntry.status).string(),
+                    subtitle = SettingsSummaries.asr(asrEntry.settings, asrEntry.status).string(),
                     onClick = onOpenAsrSettings,
                 )
             }

@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.4-alpha.1** (pre-release)
+- Current version: **0.6.5-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -385,7 +385,79 @@ and the subtitle text never leaves the phone.
   translated correctly, so this is not an alignment problem. Fixing it touches the whole prompt
   calibration, so it is left for a later release.
 
-### 1.10 Roadmap
+### 1.10 Cloud speech recognition subtitle generation
+
+The mirror image of section 1.8: the audio **no longer stays on the phone**. It is cut into chunks and
+uploaded to a provider, and the product is the same kind of thing — a `.srt` stored in the private
+directory, attached and selected automatically. Settings → Speech recognition now starts with a
+**Recognition method** section.
+
+- **The default is still *On-device*.** That is not arbitrary: the cost of the on-device path (downloading
+  a model, waiting) is visible on screen and can be abandoned at any moment, while the cost of the cloud
+  path is that **the whole audio leaves this device, irreversibly**. Whether to pay that is a decision the
+  user makes once.
+- **Four provider presets plus *Custom***: OpenAI (`whisper-1`), Groq (`whisper-large-v3-turbo`),
+  SiliconFlow (`FunAudioLLM/SenseVoiceSmall`, **no timestamps** — stated right on the option), and
+  *Custom* (a relay service or a self-hosted compatibility layer). The default provider is SiliconFlow:
+  reachable from mainland China, lowest key barrier.
+- **The address field shows the final request URL live**: whatever *Base URL* holds, the line below reads
+  `Will request: https://…/v1/audio/transcriptions`. That line is the most useful thing in this release —
+  almost every cloud misconfiguration is **a missing path segment** (usually `/v1`), and this is the only
+  place that shows it **before** the button is pressed. An address that is not an address is highlighted
+  and explained, and it **also greys out the button on the player page**: the verdict here is the same one
+  the client reaches just before opening a connection, so there is no state where "the button is live and
+  pressing it must fail".
+- **Switching providers clears the address and model fields** — otherwise the previous provider's address
+  would be sent to the next one. Keys are different: **one key per provider**, stored and deleted
+  separately, encrypted with the system keystore, never written to logs, never exported with settings.
+- **Upload in fixed 5-minute chunks (about 9.6 MB each).** Why fixed length rather than silence:
+  silence-based splitting (VAD) has to decode the whole track on the phone first, which is exactly what
+  *On-device* already does — the cloud path would save no time at all. Why 5 minutes: 16000 Hz × 2 bytes ×
+  300 s = 9.6 MB, which stays under the common 10 MB per-request limit; one oversized chunk fails the
+  **whole** recognition, so the number is chosen so as never to touch the line. The chunks are WAV files
+  assembled by hand (16 kHz mono, so no dependency on the device having an AAC encoder, one less
+  device-specific failure mode), written to the cache directory and deleted when the run finishes.
+- **Timestamps: per sentence when the provider offers them, one block otherwise.** The request asks for
+  `verbose_json` when possible: with `segments` each sentence becomes its own cue, and with only `text`
+  the whole chunk becomes **one** cue — **neither is a failure**, these providers simply differ. Two
+  measured details: `start` / `end` are **floating-point seconds** (multiply by 1000, then add the chunk
+  offset; treating them as milliseconds squeezes every cue to the start of the clip), and each `text`
+  carries a **leading space** (cleaning goes through the same `AsrTextNormalizer` as the on-device path so
+  both produce the same style).
+- **Failure reasons are split by "what do I do next"** (10 of them):
+
+  | What the UI says | What to do next |
+  | --- | --- |
+  | Cannot reach the recognition service | Try another network / retry later (this chunk cost nothing) |
+  | "%s" rejected the request — API key missing or wrong | Fill it in or replace it on the settings page |
+  | The provider rejected it by **account policy** (403) | Switch provider — **a new key will not help** |
+  | There is **no** recognition endpoint at this address (404) | Fix the address — most compatible services need the path to include `/v1` |
+  | The base URL is not filled in yet | Finish it, or switch back to on-device |
+  | The provider does not accept this request (400) | Switch model or preset (a common cause: this model cannot return timestamps) |
+  | This chunk exceeds the size limit (413) | Switch to on-device (no upload, no size limit) |
+  | Quota exhausted or rate limited (429) | Top up / switch provider (`Retry-After` is surfaced) |
+  | The provider itself is failing (5xx) | Retry later — nothing local can help |
+  | The response could not be read (200 but no text) | Switch preset / file a bug (typically a relay that wrapped the body) |
+
+  Collapsing these into one "cloud recognition failed" has a very concrete cost: **401 and 403 become
+  the same sentence and the user keeps re-entering the key**, while a 403 is an account decision that no
+  key will ever fix. When the provider gives no reason the message does **not** end in a dangling colon
+  (it says "the provider did not explain why"), and the full body still goes to the log.
+- **Two privacy notices, both before the button is pressed**: one where cloud is selected in settings, and
+  **another right above the button on the player page** ("Cloud recognition: the whole audio will be
+  uploaded to “provider”; recognition starts only after the upload finishes."). The button wording also
+  changed from "Generate subtitles" to **"Upload and generate subtitles"** — that is the last place where
+  the user can change their mind.
+- **One generated subtitle per media file, re-running with another engine overwrites it.** The file name
+  is a hash of the media address, independent of the path taken. Keeping two would put two identically
+  named candidates in the panel (differing only in how the timeline was cut) with no way for the user to
+  tell them apart, and a generated subtitle is by nature something that can be produced again —
+  overwriting it destroys no user work.
+- **A failure never leaves half a result behind**: if chunk 3 fails to upload, the first two chunks are
+  **not** written out, so what remains on disk is the last complete subtitle rather than a partial one
+  covering only the first 7 minutes.
+
+### 1.11 Roadmap
 
 | Version | Content | Status |
 | --- | --- | --- |
@@ -413,8 +485,9 @@ and the subtitle text never leaves the phone.
 | **v0.6.1** | **"About" page rework, help question marks on settings entries, more professional wording; release signing wired up with a build-time signature self-check** | Done |
 | **v0.6.2** | **Multi-language support (Japanese first): a dedicated Japanese offline model (ReazonSpeech) to download; automatic Shift-JIS (CP932) detection for subtitle files; prompt examples generated per target language; automatic collapsing of spaces between Japanese kana** | Done |
 | **v0.6.3** | **Reordering and transport fixes: playlists and the items inside them can be reordered by long-pressing a whole row (the order is saved, a new playlist goes last); multi-select in the library and file browser follows the order you tapped the items in; fixed the transport row overflowing on 360dp-wide screens (the last button was squeezed into a sliver); cleartext `http://` is allowed (a NAS on your LAN, a local LLM server)** | Done |
-| **v0.6.4** | **On-device offline translation: the provider list gains *Local (runs on this device)* (Qwen3-0.6B, about 345 MB, downloaded on demand with sha256 verification and a delete-that-model-only action); constrained decoding pins the output shape down (including the item count), fixing two "it can never work on a real device" bugs (a benchmark query that always throws was treated as a failed generation, and 0.6B merging a whole batch into one array element)** | **Current** |
-| Later | Cloud ASR, audio translation, equalizer | Planned |
+| **v0.6.4** | **On-device offline translation: the provider list gains *Local (runs on this device)* (Qwen3-0.6B, about 345 MB, downloaded on demand with sha256 verification and a delete-that-model-only action); constrained decoding pins the output shape down (including the item count), fixing two "it can never work on a real device" bugs (a benchmark query that always throws was treated as a failed generation, and 0.6B merging a whole batch into one array element)** | Done |
+| **v0.6.5** | **Cloud speech recognition subtitle generation: *Recognition method* gains *Cloud* (OpenAI-compatible `/audio/transcriptions`, four presets plus custom); upload in fixed 5-minute chunks (about 9.6 MB each) with per-sentence timestamps when `segments` are returned and one cue per chunk otherwise; 20 failure classes split by "what to do next"; the address field shows the final request URL live and an unfinished address greys out the player button; two privacy notices** | **Current** |
+| Later | More translation models (broader language coverage / higher performance), a permissions page, requesting permissions on first launch, a background-playback keep-alive switch, audio translation, equalizer | Planned |
 
 ---
 
@@ -766,6 +839,22 @@ These are deliberate for this release, not oversights:
     Note that **"the model is not bundled" does not mean "the installer did not grow"**: to make the
     on-device inference run at all, the installer went from about 88.6 MiB in v0.6.3 to about 134.7 MiB
     (that is `liblitertlm_jni.so`, about 45.6 MiB across both ABIs, stored uncompressed).
+17. **Cloud recognition supports OpenAI-compatible `/audio/transcriptions` only.** Services such as
+    Alibaba Cloud Qwen-ASR, which push the audio through `…/compatible-mode/v1/chat/completions`, are
+    **not supported in this release**: the request shape is a different one and would need its own
+    request-building path. Any other service with the same interface shape can be hooked up through
+    *Custom*.
+18. **Chunking is by fixed length, so a chunk boundary can cut a sentence in half.** In practice that
+    means one truncated cue every five minutes. Overlapping chunks would fix it, but the overlap then has
+    to be de-duplicated (the same sentence recognised twice with timestamps half a character apart), which
+    this release does not do. There is also **no resumable upload** — cancelling mid-run loses the chunks
+    already sent (and the quota is spent), and there is no "stream the first half" partial output; the
+    result is assembled in one piece at the end.
+19. **A container that does not declare its duration cannot use the cloud path.** Chunking needs the
+    total length up front, and bare ADTS AAC and some streaming containers do not write one. In that case
+    the app **does not** degrade into "send the whole thing as one chunk" (a two-hour video would first
+    produce a 230 MB temporary WAV and most likely fill the phone's storage) — it reports the problem and
+    suggests switching to on-device recognition instead.
 
 ---
 

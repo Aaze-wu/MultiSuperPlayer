@@ -44,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -546,15 +545,10 @@ private fun ModelListBlock(models: List<String>, current: String, onPick: (Strin
 }
 
 /**
- * 密钥的三态。
+ * 翻译页的密钥块：壳子只负责把「这家服务」翻译成 [SecretKeyBlock] 要的那几个字。
  *
- * 「留空」和「删除」必须分开：一个输入框的空值如果等于「把密钥删掉」，
- * 那么用户只是点进去、什么都没输、退回上一页（或其他任何触发保存的路径），
- * 密钥就没了。所以这里的规则是：
- *
- * - 输入框永远是空的，**不会**把已存的密钥读回来显示（读回来就等于把它明文摊在屏幕上）；
- * - 点「保存」且输入非空 ⇒ 覆盖；
- * - 点「删除」且**只有**这个按钮 ⇒ 删除（带一次确认）。
+ * 三态规则（不读回、保存覆盖、删除要显式按）写在 `SecretKeyBlock` 里——识别页用的是
+ * 同一份实现，所以那条规则在两个地方**不可能**不一致。
  */
 @Composable
 private fun ApiKeyBlock(
@@ -562,100 +556,16 @@ private fun ApiKeyBlock(
     onSave: (String, (Boolean) -> Unit) -> Unit,
     onClear: () -> Unit,
 ) {
-    var input by remember(settings.providerId) { mutableStateOf("") }
-    var message by remember(settings.providerId) { mutableStateOf<MspText?>(null) }
-    var confirmClear by remember(settings.providerId) { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = if (settings.apiKeyStored) {
-                stringResource(R.string.msp_settings_key_stored, settings.provider.displayName.string())
-            } else {
-                stringResource(R.string.msp_settings_key_missing)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        if (!settings.apiKeyRequired) {
-            Text(
-                text = stringResource(R.string.msp_settings_key_not_required),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        OutlinedTextField(
-            value = input,
-            onValueChange = {
-                input = it
-                message = null
-            },
-            label = { Text(stringResource(R.string.msp_settings_api_key_label)) },
-            placeholder = { Text(stringResource(R.string.msp_settings_api_key_placeholder)) },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                // 空输入不给点：仓库对空值本来就是「不动」，给一个按下去没反应的按钮
-                // 只会让人以为保存成功了。
-                onClick = {
-                    onSave(input) { stored ->
-                        message = MspText.Res(
-                            if (stored) R.string.msp_settings_key_saved
-                            else R.string.msp_settings_key_not_saved,
-                        )
-                        if (stored) input = ""
-                    }
-                },
-                enabled = input.isNotBlank(),
-            ) {
-                Text(stringResource(R.string.msp_settings_save))
-            }
-            if (settings.apiKeyStored) {
-                OutlinedButton(onClick = { confirmClear = true }) {
-                    Text(stringResource(R.string.msp_settings_delete_key))
-                }
-            }
-        }
-        message?.let {
-            Text(
-                text = it.string(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Text(
-            text = stringResource(R.string.msp_settings_key_storage_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-
-    if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text(stringResource(R.string.msp_settings_delete_key_title)) },
-            text = { Text(stringResource(R.string.msp_settings_delete_key_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClear = false
-                    onClear()
-                    message = MspText.Res(R.string.msp_settings_key_deleted)
-                }) { Text(stringResource(R.string.msp_settings_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClear = false }) {
-                    Text(stringResource(R.string.msp_settings_cancel))
-                }
-            },
-        )
-    }
+    SecretKeyBlock(
+        resetKey = settings.providerId,
+        ownerLabel = settings.provider.displayName.string(),
+        stored = settings.apiKeyStored,
+        required = settings.apiKeyRequired,
+        clearConfirm = stringResource(R.string.msp_settings_delete_key_confirm),
+        onSave = onSave,
+        onClear = onClear,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
 }
 
 @Composable

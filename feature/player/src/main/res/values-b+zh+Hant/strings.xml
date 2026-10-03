@@ -96,6 +96,9 @@
     <string name="msp_player_asr_using_model">將使用「%1$s」辨識，它只認自己訓練過的語言。</string>
     <string name="msp_player_asr_need_model">需要先下載辨識模型（%1$s），下載後就不需要網路了。</string>
     <string name="msp_player_asr_download_generate">下載模型並產生（%1$s）</string>
+    <string name="msp_player_asr_cloud_privacy">雲端辨識：整段音訊會上傳到「%1$s」，傳完才開始辨識。</string>
+    <string name="msp_player_asr_cloud_generate">上傳並產生字幕</string>
+    <string name="msp_player_asr_cloud_no_address">雲端位址還沒填好，先到「設定 → 語音辨識」補上。</string>
     <string name="msp_player_asr_downloading">正在下載模型…</string>
     <string name="msp_player_asr_download_bytes">已下載 %1$s / %2$s</string>
     <string name="msp_player_asr_recognizing">正在辨識…</string>

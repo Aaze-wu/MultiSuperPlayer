@@ -21,7 +21,10 @@ import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.ui.text.string
 
 /**
- * 字幕面板里的「语音识别」一块：生成字幕（本机识别）。
+ * 字幕面板里的「语音识别」一块：生成字幕（本机识别 / 云端识别）。
+ *
+ * 两条路的形状不同（见 [AsrUiState.Idle]）：本机要说「要下多少」，云端要说
+ * 「会上传到哪儿」。合并成一句通用文案的话，其中一边必然是错的。
  *
  * ## 为什么这里只有一个按钮
  *
@@ -54,14 +57,13 @@ internal fun AsrSection(
             style = MaterialTheme.typography.titleMedium,
         )
 
-        Text(
-            text = stringResource(R.string.msp_player_asr_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
+        // 这里刻意**不**放那句共享的「音频不会上传」（msp_player_asr_hint）：
+        // 两条路的代价完全不同（一个下模型、一个上传音频），而「不会上传」这句话
+        // 在云端那条路上是假的。代价说明只在各自的块里、只在用户真要按下去之前出现。
         when (asr) {
-            is AsrUiState.Idle -> IdleBlock(asr, onGenerate)
+            is AsrUiState.Idle.OnDevice -> OnDeviceBlock(asr, onGenerate)
+
+            is AsrUiState.Idle.Cloud -> CloudBlock(asr, onGenerate)
 
             is AsrUiState.Downloading -> RunningBlock(
                 fraction = asr.progress?.fraction,
@@ -93,8 +95,13 @@ internal fun AsrSection(
 }
 
 @Composable
-private fun IdleBlock(state: AsrUiState.Idle, onGenerate: () -> Unit) {
+private fun OnDeviceBlock(state: AsrUiState.Idle.OnDevice, onGenerate: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(R.string.msp_player_asr_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
             // 模型是在设置页选的，按钮在这里。不把「这一条认什么语言」写到按钮旁边，
             // 用户就只能靠自己记得上次在设置里点了哪一行。选错的代价不是报错，而是
@@ -123,6 +130,44 @@ private fun IdleBlock(state: AsrUiState.Idle, onGenerate: () -> Unit) {
                     ).string(),
                 )
             }
+        }
+    }
+}
+
+/**
+ * 云端那条路：说清楚「会上传」和「传给谁」，地址没填好就把按钮变灰。
+ *
+ * ## 为什么这里必须多一句隐私提示
+ *
+ * 本机识别那一条路的成本是「下载几十 MB + 慢」，用户在按钮上看得见，也随时能反悔；
+ * 这一条路的成本是**整段音频离开这台设备**，而它是不可逆的。设置页选云端时已经说明过
+ * 一次，但真正按下按钮的地方是这里——选择发生在另一页、另一次会话，提示只出现
+ * 在设置页就等于没出现。
+ */
+@Composable
+private fun CloudBlock(state: AsrUiState.Idle.Cloud, onGenerate: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            // 一句话里同时给出「用哪家」和「会上传」：分开写会让服务商名在一行里
+            // 出现两次，而用户真正要看的就是这两件事的关系。
+            text = MspText.Res(
+                R.string.msp_player_asr_cloud_privacy,
+                state.service.displayName,
+            ).string(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!state.addressReady) {
+            Text(
+                // 与预警同一档的说明：地址都没填完的话，按下去只能得到一个“连不上”。
+                text = stringResource(R.string.msp_player_asr_cloud_no_address),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        TextButton(onClick = onGenerate, enabled = state.addressReady) {
+            // 动词写成「上传」而不是「生成」：这是用户最后一个能反悔的位置。
+            Text(stringResource(R.string.msp_player_asr_cloud_generate))
         }
     }
 }

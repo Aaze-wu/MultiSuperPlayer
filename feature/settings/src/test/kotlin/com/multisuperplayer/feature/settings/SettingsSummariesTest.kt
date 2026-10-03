@@ -9,6 +9,7 @@ import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.log.LogSummary
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
+import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -454,7 +455,7 @@ class SettingsSummariesTest {
         // **唯一**依据，而「这条要花 78 MB 还是 190 MB」正是那个决定要看的东西。
         assertText(
             "中文离线（Paraformer 小模型） · 未下载 · 约 78.1 MB",
-            SettingsSummaries.asr(model, AsrModelStatus.Absent),
+            SettingsSummaries.asrOnDevice(model, AsrModelStatus.Absent),
         )
     }
 
@@ -469,7 +470,7 @@ class SettingsSummariesTest {
 
         // 已经下了一部分时不再接体积：那个数已经在「99%」里了，两个一起说会让人
         // 以为还要再下 78 MB
-        assertText("中文离线（Paraformer 小模型） · 已下载 99%", SettingsSummaries.asr(model, partial))
+        assertText("中文离线（Paraformer 小模型） · 已下载 99%", SettingsSummaries.asrOnDevice(model, partial))
     }
 
     @Test
@@ -482,14 +483,17 @@ class SettingsSummariesTest {
             missing = listOf(model.file(AsrFileRole.TOKENS)),
         )
 
-        assertText("中文离线（Paraformer 小模型） · 已下载 99%", SettingsSummaries.asr(model, partial))
+        assertText("中文离线（Paraformer 小模型） · 已下载 99%", SettingsSummaries.asrOnDevice(model, partial))
     }
 
     @Test
     fun `语音识别 - 已经就绪时只说已下载`() {
         val model = AsrModelCatalog.byId(AsrModelCatalog.ZIPFORMER_ID)
 
-        assertText("中英双语流式（Zipformer） · 已下载", SettingsSummaries.asr(model, AsrModelStatus.Ready))
+        assertText(
+            "中英双语流式（Zipformer） · 已下载",
+            SettingsSummaries.asrOnDevice(model, AsrModelStatus.Ready),
+        )
     }
 
     @Test
@@ -508,7 +512,55 @@ class SettingsSummariesTest {
 
         assertText(
             "坏条目 · 已下载 0%",
-            SettingsSummaries.asr(broken, AsrModelStatus.Partial(presentBytes = 1_024L, missing = emptyList())),
+            SettingsSummaries.asrOnDevice(
+                broken,
+                AsrModelStatus.Partial(presentBytes = 1_024L, missing = emptyList()),
+            ),
+        )
+    }
+
+    @Test
+    fun `语音识别 - 走云端时不再提本机模型`() {
+        // 云端那条路根本不下载模型。以前这里会显示「中文离线（小模型） · 未下载 · 约 78.1 MB」
+        // ——每个字都是真的，整句话却是假的：用户会照它去点「下载」。
+        // 密钥已存，是为了把这一条只孤立在「模型那半句不该出现」上。
+        assertText(
+            "云端识别 · 硅基流动",
+            SettingsSummaries.asr(
+                AsrSettings(storedRouteId = "cloud", cloudApiKeyStored = true),
+                AsrModelStatus.Absent,
+            ),
+        )
+    }
+
+    @Test
+    fun `语音识别 - 云端缺什么就说缺什么`() {
+        val cloud = AsrSettings(
+            storedRouteId = "cloud",
+            storedCloudServiceId = "openai",
+        )
+
+        // 地址和密钥是这个按钮的两个前置条件，缺哪个写哪个。
+        // OpenAI 的地址由预设兜底（不填就是「用预设的」），所以这里只缺密钥。
+        assertText("云端识别 · OpenAI · 未填密钥", SettingsSummaries.asr(cloud, AsrModelStatus.Absent))
+        // 地址填错了（少了协议）与密钥一起缺：两个都写
+        assertText(
+            "云端识别 · OpenAI · 未填服务地址 · 未填密钥",
+            SettingsSummaries.asr(cloud.copy(storedCloudBaseUrl = "api.openai.com"), AsrModelStatus.Absent),
+        )
+        // 都不缺时那两条尾巴整个不出现。
+        assertText(
+            "云端识别 · OpenAI",
+            SettingsSummaries.asr(cloud.copy(cloudApiKeyStored = true), AsrModelStatus.Absent),
+        )
+        // 「自定义」这一家（中转 / 自建）不要求密钥，且预设地址是空串：
+        // 这是唯一会出现「只缺地址」的组合。
+        assertText(
+            "云端识别 · 自定义（中转 / 自建） · 未填服务地址",
+            SettingsSummaries.asr(
+                cloud.copy(storedCloudServiceId = "custom"),
+                AsrModelStatus.Absent,
+            ),
         )
     }
 

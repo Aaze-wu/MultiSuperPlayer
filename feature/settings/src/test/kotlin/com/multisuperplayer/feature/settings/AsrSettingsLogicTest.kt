@@ -128,6 +128,90 @@ class AsrSettingsLogicTest {
         assertFalse(AsrSettingsUiState(settings = AsrSettings(storedBaseUrl = "example.com")).sourceLooksValid)
     }
 
+    // ------------------------------------------------------------ 云端那几栏
+
+    @Test
+    fun `云端地址判的是解析出来的地址，不是用户填没填`() {
+        // 这一条的错法很具体：把判定写成「用户填没填」（空 = 不合法）会在两头上同时出错——
+        // 预设自带的地址本来就能发请求（不填就是「用预设的」），会被标成红字；
+        // 而「自定义」那一家预设地址是空串，不填时的「空」才是真的没得可连。
+        //
+        // 所以判定落在 `AsrSettings.cloudBaseUrl`（已经过预设兜底）上，极性是
+        // 「解析出来的那个地址是不是 http 开头」，不是「那一栏里有没有字」。
+        assertTrue(AsrSettingsUiState().cloudAddressLooksValid)
+        assertFalse(
+            AsrSettingsUiState(
+                settings = AsrSettings(storedRouteId = "cloud", storedCloudServiceId = "custom"),
+            ).cloudAddressLooksValid,
+        )
+        assertTrue(
+            AsrSettingsUiState(
+                settings = AsrSettings(
+                    storedRouteId = "cloud",
+                    storedCloudServiceId = "custom",
+                    storedCloudBaseUrl = "https://api.example.com/v1",
+                ),
+            ).cloudAddressLooksValid,
+        )
+        assertFalse(
+            AsrSettingsUiState(
+                settings = AsrSettings(
+                    storedRouteId = "cloud",
+                    storedCloudServiceId = "custom",
+                    storedCloudBaseUrl = "api.example.com",
+                ),
+            ).cloudAddressLooksValid,
+        )
+    }
+
+    @Test
+    fun `界面上显示的端点就是客户端会打的那个地址`() {
+        val state = AsrSettingsUiState(
+            settings = AsrSettings(
+                storedRouteId = "cloud",
+                storedCloudServiceId = "groq",
+            ),
+        )
+
+        // 预设地址里那段 `/openai` 必须原样留着（`transcriptionsUrl` 只往后面接一段），
+        // 而这一行是用户判断「我填的 base 到底对不对」的唯一反馈
+        assertEquals(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            state.cloudEndpoint,
+        )
+        // 自己填的 base 也一样：完整的端点才是发出去的那个（末尾多写一个 / 不该拼出双斜杠）
+        assertEquals(
+            "https://example.com/v1/audio/transcriptions",
+            AsrSettingsUiState(
+                settings = AsrSettings(
+                    storedRouteId = "cloud",
+                    storedCloudServiceId = "custom",
+                    storedCloudBaseUrl = "https://example.com/v1/",
+                ),
+            ).cloudEndpoint,
+        )
+    }
+
+    @Test
+    fun `云端那几栏的兜底值来自预设，用户填过就用用户的`() {
+        val preset = AsrSettingsUiState(
+            settings = AsrSettings(storedRouteId = "cloud"),
+        )
+
+        // 默认服务商是硅基流动：地址与模型名都从预设取，用户没填也一定有值可发
+        assertEquals("siliconflow", preset.settings.cloudService.id)
+        assertEquals("FunAudioLLM/SenseVoiceSmall", preset.settings.cloudModel)
+        assertTrue(preset.settings.cloudNeedsApiKey)
+
+        // 密钥的 owner id 只由 `cloudApiKeyOwner` 拼一次前缀。拼错或重写一遍前缀的
+        // 表现是「密钥明明填了，设置页说没填」（或反过来：识别时拿着 null 报 401）。
+        assertEquals("asr-siliconflow", preset.settings.cloudApiKeyOwner)
+        assertEquals(
+            "asr-groq",
+            preset.settings.copy(storedCloudServiceId = "groq").cloudApiKeyOwner,
+        )
+    }
+
     // ------------------------------------------------------------ 入口页那一行
 
     @Test
