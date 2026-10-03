@@ -135,6 +135,11 @@ internal object PermissionSummaries {
         Manifest.permission.MODIFY_AUDIO_SETTINGS ->
             MspText.Res(R.string.msp_permissions_other_modify_audio_settings)
 
+        // 标签用系统设置里那一项的名字（「忽略电池优化」）：用户要对照的是那个页面，
+        // 这里换个说法（「后台不受限」）他就找不到该关哪一条。
+        Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS ->
+            MspText.Res(R.string.msp_permissions_other_ignore_battery_optimizations)
+
         else -> MspText.Plain(permission)
     }
 }

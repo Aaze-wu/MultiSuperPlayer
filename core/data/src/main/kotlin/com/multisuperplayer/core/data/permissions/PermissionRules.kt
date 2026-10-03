@@ -184,11 +184,16 @@ object PermissionRules {
     }
 
     /**
-     * 「安装时就已授予、应用改不了」的那几条。
+     * 「安装时就已授予、在权限页里没有单独动作」的那几条。
      *
      * 顺序 = 权限页折叠区里列出来的顺序。**必须和 `AndroidManifest.xml` 对得上**
      * （`PermissionManifestCoverageTest` 会盯着）：漏一条，权限页就少说了一个
      * 应用实际拥有的权限；多一条，就会白列一个并不存在的权限。
+     *
+     * [Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS] 是个例外，值得单独说：
+     * 它其实**有**动作可做（申请加入电池优化白名单），但那个动作的后果是「长时间
+     * 后台播放不被系统限制」，属于「后台保活」那一页。权限页只承认「应用拥有这条权限」，
+     * 动作不在这里给——同一件事开两个入口之后，两边读到的状态会各自刷新，早晚不一致。
      */
     val OTHER_PERMISSIONS: List<String> = listOf(
         Manifest.permission.INTERNET,
@@ -197,6 +202,7 @@ object PermissionRules {
         Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK,
         Manifest.permission.WAKE_LOCK,
         Manifest.permission.MODIFY_AUDIO_SETTINGS,
+        Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
     )
 
     /**

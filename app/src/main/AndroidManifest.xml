@@ -36,6 +36,25 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+        后台保活：请求加入「电池优化」白名单。
+
+        它本身是普通权限、安装即授予，**没有它也能读白名单状态**（那是
+        `PowerManager.isIgnoringBatteryOptimizations`）。缺了它只有一件事做不了：
+        弹那个系统框时 `startActivity` 直接抛 `ActivityNotFoundException`
+        （不是弹一个空框）——用户看到的是「点了没反应」，
+        而代码会把这次失败读成「本机没有这个框」，静默退化成跳列表页。
+
+        用途限于「长时间后台播放不被 Doze 掉网」，不是规避省电：
+        本地文件播放实测能在 Doze 下正常续播，需要它的是网络串流。
+
+        `tools:ignore="BatteryLife"`：lint 对这个权限有专门告警（Play 政策要求
+        说明核心用途）。保留是有意的，理由同上与 `KeepAliveAccess` 的类注释。
+    -->
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:ignore="BatteryLife" />
+
     <!-- 音效与蓝牙耳机 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission

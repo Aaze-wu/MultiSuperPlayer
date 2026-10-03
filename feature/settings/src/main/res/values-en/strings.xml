@@ -115,6 +115,34 @@
     <string name="msp_permissions_other_foreground_service_media_playback">Media playback foreground service</string>
     <string name="msp_permissions_other_wake_lock">Keep awake</string>
     <string name="msp_permissions_other_modify_audio_settings">Change audio settings</string>
+    <string name="msp_permissions_other_ignore_battery_optimizations">Ignore battery optimization</string>
+
+    <string name="msp_settings_keep_alive">Background keep-alive</string>
+
+    <string name="msp_keep_alive_entry_on">In the battery optimization allowlist</string>
+    <string name="msp_keep_alive_entry_off">Not in the battery optimization allowlist — may be limited in the background</string>
+
+    <string name="msp_keep_alive_section_switch">Battery optimization</string>
+    <string name="msp_keep_alive_switch_title">Unrestricted in background</string>
+    <string name="msp_keep_alive_switch_on">The system won\'t tighten network and background work while it sits idle.</string>
+    <string name="msp_keep_alive_switch_off">Not in the allowlist yet. Left in the background for a long time, the system may tighten network and background work.</string>
+    <string name="msp_keep_alive_switch_help">This is the system\'s "battery optimization" allowlist. Once added, deep sleep won\'t cut this app\'s network or postpone its background work. It is a separate mechanism from the vendor\'s own autostart / power-saving policy — set both.</string>
+    <string name="msp_keep_alive_switch_note">Turning this switch off does not remove the app from the allowlist — the system only lets an app request to be added; removing it is something you do yourself in the system\'s battery settings. Flipping the switch back takes you there.</string>
+
+    <string name="msp_keep_alive_section_vendor">Vendor background management</string>
+    <string name="msp_keep_alive_vendor_xiaomi">Xiaomi background management</string>
+    <string name="msp_keep_alive_vendor_huawei">Huawei startup management</string>
+    <string name="msp_keep_alive_vendor_honor">Honor startup management</string>
+    <string name="msp_keep_alive_vendor_oppo">OPPO background management</string>
+    <string name="msp_keep_alive_vendor_vivo">vivo background management</string>
+    <string name="msp_keep_alive_vendor_meizu">Meizu background management</string>
+    <string name="msp_keep_alive_vendor_samsung">Samsung battery management</string>
+    <string name="msp_keep_alive_vendor_one_plus">OnePlus background management</string>
+    <string name="msp_keep_alive_vendor_other">System app info</string>
+    <string name="msp_keep_alive_vendor_note_page">"Autostart" and "power saving" are run by the vendor and ignore the allowlist above. Being killed after locking the screen usually means this one is still locked down.</string>
+    <string name="msp_keep_alive_vendor_note_fallback">This device isn\'t in the known vendor list, so the system\'s "App info" page will open.</string>
+    <string name="msp_keep_alive_vendor_action">Open</string>
+    <string name="msp_keep_alive_vendor_help">Vendor page addresses differ across devices and OS versions and sometimes won\'t open. When they don\'t, the "App info" page is used instead.</string>
 
     <string name="msp_settings_section_base_theme">Base theme</string>
     <string name="msp_settings_section_color_source">Colour source</string>

@@ -53,6 +53,7 @@ import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
 import com.multisuperplayer.feature.settings.AsrSettingsRoute
+import com.multisuperplayer.feature.settings.KeepAliveRoute
 import com.multisuperplayer.feature.settings.LocalModelSettingsRoute
 import com.multisuperplayer.feature.settings.PermissionsRoute
 import com.multisuperplayer.feature.settings.PermissionsViewModel
@@ -215,6 +216,16 @@ private const val ABOUT_ROUTE = "settings/about"
  * 「设置页里有一行『文件访问』，点它跳到系统的授权页面」变成过去式的原因。
  */
 private const val PERMISSIONS_ROUTE = "settings/permissions"
+
+/**
+ * 后台保活页：电池优化白名单 + 厂商后台管理入口。
+ *
+ * 和权限页一样是**真目的地**。两页分开是因为它们解决的不是同一类问题：
+ * 权限页列的是「应用声明过什么」（系统说了算），这一页处理的是
+ * **厂商自己加的那层后台限制**（连 API 都没有，只能靠包名猜页面）。
+ * 合成一页会让用户以为「权限都给了就不会被杀」。
+ */
+private const val KEEP_ALIVE_ROUTE = "settings/keep-alive"
 
 /**
  * 首次启动申请权限前先等多久（毫秒）。
@@ -418,6 +429,7 @@ private fun MspAppScaffold() {
                     onOpenAsrSettings = { navController.navigate(ASR_SETTINGS_ROUTE) },
                     onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
                     onOpenPermissions = { navController.navigate(PERMISSIONS_ROUTE) },
+                    onOpenKeepAlive = { navController.navigate(KEEP_ALIVE_ROUTE) },
                 )
             }
             composable(TRANSLATION_SETTINGS_ROUTE) {
@@ -436,6 +448,9 @@ private fun MspAppScaffold() {
             }
             composable(PERMISSIONS_ROUTE) {
                 PermissionsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(KEEP_ALIVE_ROUTE) {
+                KeepAliveRoute(onBack = { navController.popBackStack() })
             }
             composable(APPEARANCE_SETTINGS_ROUTE) {
                 AppearanceSettingsRoute(onBack = { navController.popBackStack() })

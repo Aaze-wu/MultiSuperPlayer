@@ -268,11 +268,15 @@ class PermissionRulesTest {
     }
 
     @Test
-    fun `清单对照表 - 折叠区里的都是应用改不了的`() {
-        // 前台的媒体通知、网络访问这些在安装时就已经定了。往这里塞一条可更改的权限，
-        // 权限页上就会有一项「列出来但点不了」。
+    fun `清单对照表 - 折叠区里的都不在可单列清单里`() {
+        // 折叠区是「这一页不给动作」的那一批，所以它和可单列清单必须没有交集——
+        // 有交集就会出现同一条权限在页面上出现两次（一次带按钮、一次不带）。
+        //
+        // 注意它**不**等于「应用改不了」：`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+        // 就在折叠区里，而它是能申请的——只是动作归「后台保活」页（见 `OTHER_PERMISSIONS`
+        // 的注释）。所以这条断言只能钉住「不重复」，钉不住「可不可更改」。
         PermissionRules.OTHER_PERMISSIONS.forEach { permission ->
-            assertFalse("$permission 是可更改项，不该放进折叠区", PermissionRules.LISTED_PERMISSIONS.contains(permission))
+            assertFalse("$permission 是可单列项，不该放进折叠区", PermissionRules.LISTED_PERMISSIONS.contains(permission))
         }
     }
 

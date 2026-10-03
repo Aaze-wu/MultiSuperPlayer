@@ -123,6 +123,34 @@
     <string name="msp_permissions_other_foreground_service_media_playback">媒體播放前台服務</string>
     <string name="msp_permissions_other_wake_lock">保持喚醒</string>
     <string name="msp_permissions_other_modify_audio_settings">更改音訊設定</string>
+    <string name="msp_permissions_other_ignore_battery_optimizations">忽略電池最佳化</string>
+
+    <string name="msp_settings_keep_alive">後台常駐</string>
+
+    <string name="msp_keep_alive_entry_on">已加入電池最佳化白名單</string>
+    <string name="msp_keep_alive_entry_off">未加入電池最佳化白名單，長時間置於背景可能被限制</string>
+
+    <string name="msp_keep_alive_section_switch">電池最佳化</string>
+    <string name="msp_keep_alive_switch_title">背景不受限制</string>
+    <string name="msp_keep_alive_switch_on">系統不會因為它長時間閒置而收緊網路與背景工作。</string>
+    <string name="msp_keep_alive_switch_off">尚未加入白名單。長時間置於背景時，系統可能收緊網路與背景工作。</string>
+    <string name="msp_keep_alive_switch_help">這是系統的「電池最佳化」白名單。加入之後，手機深度休眠時不會切斷這個應用的網路，也不會延後它的背景工作。它和廠商自己的「自啟動 / 省電策略」是兩套東西，兩個都要設定。</string>
+    <string name="msp_keep_alive_switch_note">關掉這個開關不會立刻退出白名單——系統只允許應用申請加入，移出要你自己到系統的電池設定裡操作。撥回去會帶你去那裡。</string>
+
+    <string name="msp_keep_alive_section_vendor">廠商背景管理</string>
+    <string name="msp_keep_alive_vendor_xiaomi">小米的背景管理</string>
+    <string name="msp_keep_alive_vendor_huawei">華為的啟動管理</string>
+    <string name="msp_keep_alive_vendor_honor">榮耀的啟動管理</string>
+    <string name="msp_keep_alive_vendor_oppo">OPPO 的背景管理</string>
+    <string name="msp_keep_alive_vendor_vivo">vivo 的背景管理</string>
+    <string name="msp_keep_alive_vendor_meizu">魅族的背景管理</string>
+    <string name="msp_keep_alive_vendor_samsung">三星的電池管理</string>
+    <string name="msp_keep_alive_vendor_one_plus">一加的背景管理</string>
+    <string name="msp_keep_alive_vendor_other">系統的應用資訊</string>
+    <string name="msp_keep_alive_vendor_note_page">「自啟動」和「省電策略」由廠商自己管，不看上面那個白名單。鎖屏後被清掉通常就是這裡沒放開。</string>
+    <string name="msp_keep_alive_vendor_note_fallback">本機不在已知的廠商名單裡，會開啟系統的「應用資訊」頁面。</string>
+    <string name="msp_keep_alive_vendor_action">去設定</string>
+    <string name="msp_keep_alive_vendor_help">廠商頁面的位址在不同機型與系統版本上不一樣，有時會打不開。打不開時自動退回「應用資訊」頁面。</string>
 
     <string name="msp_settings_section_base_theme">主題基底</string>
     <string name="msp_settings_section_color_source">取色來源</string>

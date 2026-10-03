@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.7-alpha.1** (pre-release)
+- Current version: **0.6.8-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -518,8 +518,9 @@ directory, attached and selected automatically. Settings → Speech recognition 
 | **v0.6.4** | **On-device offline translation: the provider list gains *Local (runs on this device)* (Qwen3-0.6B, about 345 MB, downloaded on demand with sha256 verification and a delete-that-model-only action); constrained decoding pins the output shape down (including the item count), fixing two "it can never work on a real device" bugs (a benchmark query that always throws was treated as a failed generation, and 0.6B merging a whole batch into one array element)** | Done |
 | **v0.6.5** | **Cloud speech recognition subtitle generation: *Recognition method* gains *Cloud* (OpenAI-compatible `/audio/transcriptions`, four presets plus custom); upload in fixed 5-minute chunks (about 9.6 MB each) with per-sentence timestamps when `segments` are returned and one cue per chunk otherwise; 20 failure classes split by "what to do next"; the address field shows the final request URL live and an unfinished address greys out the player button; two privacy notices** | Done |
 | **v0.6.6** | **More translation models: on-device gains *Tencent Hunyuan HY-MT2-1.8B* (int8, about 1.7 GB, translation-specialised, offered as an optional high-quality tier while 0.6B stays the default); the memory requirement is stated before the download and one extra hint appears when it exceeds 40% of the device's total memory (a hint, never a block); the Ollama preset now defaults to Hunyuan HY-MT1.5-1.8B; target languages go 5 → 15 (Russian / Spanish / French / German / Portuguese / Italian / Arabic / Thai / Vietnamese / Indonesian added)** | Done |
-| **v0.6.7** | **Permissions: a new *Permissions* page in Settings lists the four things the app can ask for (media read / all files access / notifications / Bluetooth) with their state and action, plus a collapsible note for the six permissions granted at install time; the first launch after install asks once for notifications and media read (not for all files access or Bluetooth); the library re-scans itself when a permission was granted elsewhere and the app comes back to the foreground** | **Current** |
-| Later | A background-playback keep-alive switch, audio translation, equalizer | Planned |
+| **v0.6.7** | **Permissions: a new *Permissions* page in Settings lists the four things the app can ask for (media read / all files access / notifications / Bluetooth) with their state and action, plus a collapsible note for the six permissions granted at install time; the first launch after install asks once for notifications and media read (not for all files access or Bluetooth); the library re-scans itself when a permission was granted elsewhere and the app comes back to the foreground** | Done |
+| **v0.6.8** | **Background keep-alive: a new *Background keep-alive* page in Settings requests the battery-optimisation exemption with one tap (the switch re-reads the system state every time the page is resumed instead of keeping a local copy) and opens the vendor's own background-management page (Xiaomi / Huawei / Honor / OPPO / vivo / Meizu / Samsung / OnePlus, falling back to the app info page for unknown vendors); the permissions page's collapsible section gains *ignore battery optimizations*** | **Current** |
+| Later | Audio translation, equalizer | Planned |
 
 ---
 

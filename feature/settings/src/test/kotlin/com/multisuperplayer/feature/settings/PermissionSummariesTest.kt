@@ -244,7 +244,7 @@ class PermissionSummariesTest {
     // -------------------------------------------------------------- 折叠说明区
 
     @Test
-    fun `折叠区 - 六条权限各有标签`() {
+    fun `折叠区 - 七条权限各有标签`() {
         val expected = mapOf(
             Manifest.permission.INTERNET to "网络访问",
             Manifest.permission.ACCESS_NETWORK_STATE to "查看网络状态",
@@ -252,6 +252,8 @@ class PermissionSummariesTest {
             Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK to "媒体播放前台服务",
             Manifest.permission.WAKE_LOCK to "保持唤醒",
             Manifest.permission.MODIFY_AUDIO_SETTINGS to "更改音频设置",
+            // 用系统设置里那一项的名字，用户好对照（见 PermissionSummaries.otherLabel）。
+            Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS to "忽略电池优化",
         )
 
         expected.forEach { (permission, text) ->
@@ -496,6 +498,7 @@ class PermissionSummariesTest {
             "msp_permissions_other_foreground_service_media_playback",
             "msp_permissions_other_wake_lock",
             "msp_permissions_other_modify_audio_settings",
+            "msp_permissions_other_ignore_battery_optimizations",
         )
     }
 }

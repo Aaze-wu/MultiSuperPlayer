@@ -12,6 +12,8 @@ import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.permissions.AppPermissions
 import com.multisuperplayer.core.data.permissions.PermissionSnapshot
+import com.multisuperplayer.core.data.power.KeepAliveAccess
+import com.multisuperplayer.core.data.power.KeepAliveState
 import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
@@ -127,6 +129,15 @@ class SettingsViewModel(
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
     private val permissions: AppPermissions,
+    /**
+     * 「后台保活」那一行要读的档位（在不在电池优化白名单里）。
+     *
+     * 判定全在 `KeepAliveRules` 里（纯函数、有单测），这里只拿结论——
+     * 入口页不做判定，否则「什么算不受限」就有两处说法。
+     * 构造零成本（一次 `getSystemService`），所以放进这个
+     * **应用启动时就会被创建**的 ViewModel 里没有代价。
+     */
+    private val keepAlive: KeepAliveAccess,
     private val dispatchers: DispatcherProvider,
     /**
      * 语音识别的两条依赖。
@@ -186,6 +197,23 @@ class SettingsViewModel(
      */
     fun refreshPermissions(activity: Activity?) {
         permissionStateFlow.value = permissions.snapshot(activity)
+    }
+
+    /**
+     * 「后台保活」那一行的档位。
+     *
+     * 和 [permissionState] 完全同一类状态：白名单是**系统里的状态**，
+     * 用户在系统设置页里改完再回来，进程还活着，收不到任何通知。
+     * 所以界面必须在外层 `ON_RESUME` 时调 [refreshKeepAlive] 重新问一次；
+     * 少了这一次，用户申请完回来会看到入口页还说「未加入」——
+     * 他会怀疑自己刚才那一步没生效。
+     */
+    private val keepAliveStateFlow = MutableStateFlow(keepAlive.state())
+    val keepAliveState: StateFlow<KeepAliveState> = keepAliveStateFlow.asStateFlow()
+
+    /** 重新问一次系统。理由见 [keepAliveState]。 */
+    fun refreshKeepAlive() {
+        keepAliveStateFlow.value = keepAlive.state()
     }
 
     /**

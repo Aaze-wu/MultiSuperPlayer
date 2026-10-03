@@ -16,6 +16,7 @@ import com.multisuperplayer.core.data.library.SafTreeScanner
 import com.multisuperplayer.core.data.library.SafTreeStore
 import com.multisuperplayer.core.data.permissions.AppPermissions
 import com.multisuperplayer.core.data.playlist.PlaylistStore
+import com.multisuperplayer.core.data.power.KeepAliveAccess
 import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
@@ -56,6 +57,12 @@ val dataModule = module {
     // 权限页与首次启动申请要问的那几件事（状态 / 该申请什么 / 该去哪儿）。
     // 它把上面两个单例和「问过没有」的记忆拼在一起，所以排在这两个之后。
     single { AppPermissions(context = androidContext(), scanner = get(), storage = get()) }
+
+    // 「后台保活」页要问的事：在不在电池优化白名单里、这台是哪家厂商、
+    // 以及该跳到哪个系统页面。做成单例而不是每次 `KeepAliveAccess(context)`：
+    // 它的方法本来就无状态，单例只是为了「谁拿到的都是同一份规则」，
+    // 而不是为了共享缓存。
+    single { KeepAliveAccess(context = androidContext()) }
 
     // 内置文件浏览器（只读）。依赖上面三个，所以排在这里。
     single {

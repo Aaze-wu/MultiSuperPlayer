@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
@@ -29,6 +30,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.data.permissions.PermissionSnapshot
+import com.multisuperplayer.core.data.power.KeepAliveState
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -36,9 +38,9 @@ import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 设置**入口页**：六行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
+ * 设置**入口页**：七行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
- * 为什么把它拆成入口页 + 六个子页，而不是继续把设置项铺在一页里：
+ * 为什么把它拆成入口页 + 七个子页，而不是继续把设置项铺在一页里：
  *
  * 1. 一页铺开的表在设置项变多之后必然要滚两三屏，而用户每次进来只为一件事。
  *    找「长按倍速」要先滚过所有主题选项，这个成本会随每一项新增而增长。
@@ -48,7 +50,7 @@ import org.koin.androidx.compose.koinViewModel
  * 3. 「关于」这类信息页和「调什么」的设置页混在一起，是后面加「检查更新」、
  *    开源许可、导出日志时最别扭的地方。分开之后它们各有各的地方。
  *
- * 这个页面因此**不需要**任何写入回调，只读摘要 + 六条导航。
+ * 这个页面因此**不需要**任何写入回调，只读摘要 + 七条导航。
  */
 @Composable
 fun SettingsRoute(
@@ -59,12 +61,14 @@ fun SettingsRoute(
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenPermissions: () -> Unit = {},
+    onOpenKeepAlive: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val translation by viewModel.translation.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
     val permissionState by viewModel.permissionState.collectAsStateWithLifecycle()
+    val keepAliveState by viewModel.keepAliveState.collectAsStateWithLifecycle()
     val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
     val localModelEntry by viewModel.localModelEntry.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -76,6 +80,9 @@ fun SettingsRoute(
     // 三是本地翻译模型，它是在「字幕与翻译 → 本地模型」子页里下的。
     // 所以订阅 `ON_RESUME` 重新问一次，而不是只读一次构造值——
     // 那样用户会看到「我明明开了 / 明明下完了，这里还写着没有」。
+    //
+    // 同一类里还有「后台保活」那一行：电池优化白名单是在**系统页面**里改的，
+    // 用户申请完回到这里，进程还活着，也没有任何回调。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -85,6 +92,7 @@ fun SettingsRoute(
                 viewModel.refreshPermissions(context.findActivity())
                 viewModel.refreshAsrStatus()
                 viewModel.refreshLocalModelStatus()
+                viewModel.refreshKeepAlive()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -100,6 +108,7 @@ fun SettingsRoute(
         localModelEntry = localModelEntry,
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
         permissionState = permissionState,
+        keepAliveState = keepAliveState,
         modifier = modifier,
         onOpenAppearance = onOpenAppearance,
         onOpenPlayback = onOpenPlayback,
@@ -107,6 +116,7 @@ fun SettingsRoute(
         onOpenAsrSettings = onOpenAsrSettings,
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
+        onOpenKeepAlive = onOpenKeepAlive,
     )
 }
 
@@ -131,12 +141,19 @@ fun SettingsScreen(
     localModelEntry: LocalModelEntryState = LocalModelEntryState(),
     softwareDecodingAvailable: Boolean = true,
     permissionState: PermissionSnapshot = PermissionSnapshot(),
+    /**
+     * 「后台保活」那一行的档位。默认给 [KeepAliveState.RESTRICTED]：
+     * 那是**保守且大概率正确**的那一档（新装的应用都不在白名单里），
+     * 而反过来默认「已加入」会让预览和真实首帧说一句不成立的话。
+     */
+    keepAliveState: KeepAliveState = KeepAliveState.RESTRICTED,
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenPermissions: () -> Unit = {},
+    onOpenKeepAlive: () -> Unit = {},
 ) {
     // 系统取色要 Android 12。判断放这里而不是塞进 [SettingsSummaries]：
     // `Build.VERSION.SDK_INT` 在 JVM 单测里恒为 0，进了纯函数就测不了「支持」那条分支。
@@ -150,7 +167,7 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            // 六行平铺，不加小节标题：「设置」标题下紧跟一个「设置」小节是废话，
+            // 七行平铺，不加小节标题：「设置」标题下紧跟一个「设置」小节是废话，
             // 而这几个分类各自就是一个小节名，再加一层分组只是多两行留白。
             item {
                 SettingActionRow(
@@ -207,6 +224,21 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_permissions),
                     subtitle = PermissionSummaries.entry(permissionState).string(),
                     onClick = onOpenPermissions,
+                )
+            }
+            item {
+                SettingActionRow(
+                    // 排在「权限」之后：这两行都是「应用需要系统让步」那一类，
+                    // 但它们是两套独立机制（白名单管网络，厂商管家管后台清理），
+                    // 所以是两行而不是权限页里的一行——混进去会让人以为
+                    // 「权限都给了就不会被杀」。（权限页那里的说明也指着这一页。）
+                    //
+                    // 图标用「省电」而不是「闪电」：系统设置里那一项就叫「电池优化」，
+                    // 用户是拿着这行的名字去系统里找对应开关的。
+                    icon = Icons.Outlined.BatterySaver,
+                    title = stringResource(R.string.msp_settings_keep_alive),
+                    subtitle = KeepAliveSummaries.entry(keepAliveState).string(),
+                    onClick = onOpenKeepAlive,
                 )
             }
             item {

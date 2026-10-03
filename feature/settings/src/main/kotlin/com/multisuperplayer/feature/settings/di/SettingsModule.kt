@@ -2,6 +2,7 @@ package com.multisuperplayer.feature.settings.di
 
 import com.multisuperplayer.feature.settings.AboutViewModel
 import com.multisuperplayer.feature.settings.AsrSettingsViewModel
+import com.multisuperplayer.feature.settings.KeepAliveViewModel
 import com.multisuperplayer.feature.settings.LocalModelSettingsViewModel
 import com.multisuperplayer.feature.settings.PermissionsViewModel
 import com.multisuperplayer.feature.settings.SettingsViewModel
@@ -34,4 +35,7 @@ val settingsFeatureModule = module {
     // 设置入口页那一行的副标题和权限页里的四行要同时是新的，
     // 分成两个实例就会出现「入口说未开启、进去却是已开启」。
     viewModelOf(::PermissionsViewModel)
+    // 「后台保活」子页。它只服务这一页（拨开关弹的是它自己的系统框，
+    // 没有第二个观察者），所以状态跟着页面走就够，不需要像权限那样住单例。
+    viewModelOf(::KeepAliveViewModel)
 }

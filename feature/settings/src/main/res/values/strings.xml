@@ -161,6 +161,40 @@
     <string name="msp_permissions_other_foreground_service_media_playback">媒体播放前台服务</string>
     <string name="msp_permissions_other_wake_lock">保持唤醒</string>
     <string name="msp_permissions_other_modify_audio_settings">更改音频设置</string>
+    <!-- 用系统设置里那一项的名字，用户要对照的是那个页面 -->
+    <string name="msp_permissions_other_ignore_battery_optimizations">忽略电池优化</string>
+
+    <!-- ===== 后台保活 ===== -->
+
+    <string name="msp_settings_keep_alive">后台保活</string>
+
+    <string name="msp_keep_alive_entry_on">已加入电池优化白名单</string>
+    <!-- 入口页那一行只说白名单那一半：厂商那套一行放不下，而且认得出厂商才是少数 -->
+    <string name="msp_keep_alive_entry_off">未加入电池优化白名单，长时间后台可能被限制</string>
+
+    <string name="msp_keep_alive_section_switch">电池优化</string>
+    <!-- 标题用系统框里那句「后台不受限制」，不用需求里的「保活」：用户拨完开关看到的是系统框 -->
+    <string name="msp_keep_alive_switch_title">后台不受限制</string>
+    <string name="msp_keep_alive_switch_on">系统不会因为它长时间闲置而收紧网络和后台任务。</string>
+    <string name="msp_keep_alive_switch_off">还没加入白名单。长时间放在后台时，系统可能收紧网络和后台任务。</string>
+    <string name="msp_keep_alive_switch_help">这是系统的「电池优化」白名单。加入之后，手机深度休眠时不会掐断这个应用的网络，也不会推迟它的后台任务。它和厂商自己的「自启动 / 省电策略」是两套东西，两个都要设。</string>
+    <!-- 必须说清「关掉 ≠ 已经退出」：系统只允许应用申请加入，移出是用户在系统页面里的操作 -->
+    <string name="msp_keep_alive_switch_note">关掉这个开关不会立刻退出白名单——系统只允许应用申请加入，移出要你自己到系统的电池设置里操作。拨回去会带你去那儿。</string>
+
+    <string name="msp_keep_alive_section_vendor">厂商后台管理</string>
+    <string name="msp_keep_alive_vendor_xiaomi">小米的后台管理</string>
+    <string name="msp_keep_alive_vendor_huawei">华为的启动管理</string>
+    <string name="msp_keep_alive_vendor_honor">荣耀的启动管理</string>
+    <string name="msp_keep_alive_vendor_oppo">OPPO 的后台管理</string>
+    <string name="msp_keep_alive_vendor_vivo">vivo 的后台管理</string>
+    <string name="msp_keep_alive_vendor_meizu">魅族的后台管理</string>
+    <string name="msp_keep_alive_vendor_samsung">三星的电池管理</string>
+    <string name="msp_keep_alive_vendor_one_plus">一加的后台管理</string>
+    <string name="msp_keep_alive_vendor_other">系统的应用信息</string>
+    <string name="msp_keep_alive_vendor_note_page">「自启动」和「省电策略」由厂商自己管，不看上面那个白名单。锁屏后被清掉通常就是这里没放开。</string>
+    <string name="msp_keep_alive_vendor_note_fallback">本机不在已知的厂商名单里，会打开系统的「应用信息」页。</string>
+    <string name="msp_keep_alive_vendor_action">去设置</string>
+    <string name="msp_keep_alive_vendor_help">厂商页面的地址在不同机型和系统版本上不一样，有时会打不开。打不开时自动退回到「应用信息」页。</string>
 
     <!-- ===== 外观 ===== -->
 
