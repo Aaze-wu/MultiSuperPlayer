@@ -278,6 +278,10 @@ class ExoPlayerController(
         // `setPreferredTextLanguages` 按界面语言挑；`setSelectUndeterminedTextLanguage`
         // 兜住「轨道没标语言」的片源（否则它一条都不会选，而用户在面板里能看到它，
         // 就会以为「点不动」）。
+        //
+        // 注意这两条设下去之后**内核自己就会选字幕轨**，于是 [autoSelectTextTrack] 里
+        // 那套保守规则（强制轨排最后、语言对不上就不挂）多数时候轮不到执行。
+        // 两者的分工写在那个方法的 KDoc 里，改这里之前先读它。
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setPreferredTextLanguages(*preferredTextLanguages.toTypedArray())
             .setSelectUndeterminedTextLanguage(true)
@@ -365,12 +369,16 @@ class ExoPlayerController(
                 /**
                  * 该显示哪些字幕行。
                  *
-                 * 这就是内嵌字幕的**唯一**来源：我们没挂 Media3 的 `SubtitleView`，
-                 * 所以这些 cue 不会自己出现在画面上，而是被收进 `embeddedSubtitle`，
+                 * 内嵌字幕进界面**只有这一条路**：cue 被收进 `embeddedSubtitle`，
                  * 由我们自己的字幕层（和外挂字幕同一套）渲染、翻译、导出。
                  *
-                 * 位图字幕（PGS / VobSub）的 `Cue.text` 是空的，这里会自然丢掉它们
-                 * （它们本来也只能由渲染器直接画）。
+                 * 注意「只有这一条路」不是凭空成立的：`PlayerView` 自己也会拿到同一批
+                 * cue 并画一遍（它内部的 `SubtitleView`），所以**播放页里**
+                 * `PlayerVideoSurface` 必须把那一层遮掉，否则同一句字幕会在屏幕上看两遍。
+                 * 两者都在同一个 `Player` 上取数据，改这里之前先读那份 KDoc。
+                 *
+                 * 位图字幕（PGS / VobSub）的 `Cue.text` 是空的，这里会自然丢掉它们；
+                 * 关掉 `SubtitleView` 之后它们也就真的不显示了（README 第 12 条）。
                  */
                 override fun onCues(cueGroup: CueGroup) {
                     val texts = cueGroup.cues.mapNotNull { cue: Cue ->
@@ -455,11 +463,56 @@ class ExoPlayerController(
             groupIndex++
         }
         _tracks.value = list
+        autoSelectTextTrack(list)
+    }
 
+    /**
+     * 内核没有选任何文本轨时，我们自己补一条。
+     *
+     * ## 这是**第二层**兜底，不是主路径
+     *
+     * `init` 里已经给 Media3 设了 `setPreferredTextLanguages`（取自界面语言）+
+     * `setSelectUndeterminedTextLanguage(true)`（兜住没标语言的轨），所以**绝大多数
+     * 情况下内核自己就选好了**：语言与界面语言一致、语言未标、或者容器标了
+     * `default` 的轨，都由 Media3 先选。那时下面第 2 步直接返回，
+     * [bestEmbeddedTextTrack] 算出来的结果会被丢掉——**那不是死代码**，
+     * 而是「内核选得更早」。
+     *
+     * 我们这套规则真正生效的角落只有一个：**语言对不上、而容器标了默认轨**。
+     * Media3 的 `preferredTextLanguages` 匹配不上它就不会选，
+     * `setSelectUndeterminedTextLanguage` 只管「未标语言」那一种，于是内核留空，
+     * 由我们按 [bestEmbeddedTextTrack] 的保守规则挂上。
+     *
+     * ## 为什么每个提前返回都要留一条日志
+     *
+     * 这里出过一个**很难查**的问题：日志里 `自动选中内嵌字幕轨「…」` 一千多行
+     * **一次都没出现**，一度被当成「整条自动挑选路径是死代码」。真实原因是
+     * **第 3 步被内核抢先**——它和另外两个提前返回在日志里长得完全一样（都是空白），
+     * 于是「代码没执行」和「执行了但没走到底」分不开。
+     *
+     * 三个提前返回各留一条**能互相区分**的日志：它们说的都是「没改选轨」，
+     * 但一个说「用户手选过」、一个说「没什么可选的」、一个说「内核已经选好了」。
+     * 下次遇到同样的问题，看日志就够了，不用再从「日志里没有」倒推「代码没跑」。
+     */
+    private fun autoSelectTextTrack(list: List<MspTrackInfo>) {
         // 用户今天手选过就别自动改了——那会把用户的明确选择反复推翻。
-        if (textTrackChoice != null) return
-        val auto = list.bestEmbeddedTextTrack(preferredTextLanguages) ?: return
-        if (list.any { it.kind == MspTrackKind.TEXT && it.isSelected }) return
+        if (textTrackChoice != null) {
+            MspLog.d(TAG) { "字幕轨已由用户手选（$textTrackChoice），不做自动挑选" }
+            return
+        }
+        val auto = list.bestEmbeddedTextTrack(preferredTextLanguages)
+        if (auto == null) {
+            MspLog.d(TAG) { "没有可自动挂上的内嵌字幕轨（偏好语言 $preferredTextLanguages）" }
+            return
+        }
+        if (list.any { it.kind == MspTrackKind.TEXT && it.isSelected }) {
+            // 这一条**必须**留下：内核是选好了的，而上面两种是「没人选」。
+            // 对用户可见的结果一样（都能在面板里看到轨），含义却相反。
+            MspLog.d(TAG) {
+                "内核已自行选中文本轨「${list.firstSelectedTextTrack()?.displayLabel("?")}」，不介入"
+            }
+            return
+        }
         selectTrack(MspTrackKind.TEXT, auto.id)
         MspLog.d(TAG) {
             "自动选中内嵌字幕轨「${auto.displayLabel(auto.id)}」（语言 ${auto.language ?: "未标"}）"

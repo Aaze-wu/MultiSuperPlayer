@@ -75,7 +75,13 @@ data class MspTrackInfo(
      * 1. 格式显示成「未知」——`codecs` 就在手边，白白丢掉；
      * 2. [isTextRenderable] 判 false ⇒ 这条轨从面板的清单里**整个消失**，而
      *    「当前挂着哪条」那条路（[firstSelectedTextTrack]）不看格式、照样把它画在
-     *    面板顶部。于是同一个面板上面写着「已自动选中「zh」」、下面一条可选项都没有。
+     *    面板顶部。
+     *
+     * 第 2 条曾经真的在界面上出现过（上面写「已自动选中「zh」」、下面一条可选项
+     * 都没有），那是这里还只看 `mimeType` 的时候。现在两条路的格式判据同源，
+     * 这类「已选中却不可选」不会再出现；但两条路的**过滤条件仍不对称**
+     * （[firstSelectedTextTrack] 不调用 [isTextRenderable]），改动前先读那两处
+     * 的 KDoc。
      */
     fun subtitleMimeType(): String = subtitleMimeOf(mimeType = mimeType, codec = codec)
 
@@ -85,11 +91,14 @@ data class MspTrackInfo(
     /**
      * 这条轨道的内容能不能进我们的**文本**字幕层。
      *
-     * 位图字幕（PGS / VobSub）只能由渲染器直接画到画面上，而我们没有挂 Media3 的
-     * `SubtitleView`（见 `SubtitleOrigin.EMBEDDED` 的设计说明）。所以它们**不会**
-     * 显示——这一点必须明说，而不是让它们在列表里装作可以选，用户点完什么都没发生
-     * 只会以为播放器坏了。（它们的 `Cue.text` 也是空的，`onCues` 那一侧会自然丢掉，
-     * 这里只是提前把它们从清单里摘出去。）
+     * 位图字幕（PGS / VobSub）的 `Cue.text` 是空的，我们的层拿不到字，所以它们
+     * **不会**显示——这一点必须明说，而不是让它们在列表里装作可以选，用户点完什么都
+     * 没发生只会以为播放器坏了。（`onCues` 那一侧本来也会自然丢掉空文本，这里只是
+     * 提前把它们从清单里摘出去。）
+     *
+     * 唯一能画位图的那条路是 Media3 自己的 `SubtitleView`（`PlayerView` 内部那个），
+     * 而播放页为了不让内嵌字幕画两遍，正是把它遮掉了——所以「遮住」和「位图轨不显示」
+     * 是同一个决定的两面，拆不开。
      */
     fun isTextRenderable(): Boolean {
         val mime = subtitleMimeType()
@@ -275,6 +284,17 @@ private val AUTO_PICK_ORDER: Comparator<MspTrackInfo> =
 
 /**
  * 自动挑一条内嵌字幕轨来挂。null = **不自动挂**（用户可以自己去面板里选）。
+ *
+ * ## 这是**第二层**：内核先选，这里兜底
+ *
+ * `ExoPlayerController.init` 已经给 Media3 设了 `setPreferredTextLanguages`（取自
+ * 界面语言）+ `setSelectUndeterminedTextLanguage(true)`，**内核自己就会选轨道**。
+ * 所以本函数只在「内核一条都没选」时才轮得到（调用点见 `autoSelectTextTrack`）；
+ * 片源与界面语言一致、或轨道没标语言时，走的都是内核那套，这里的规则**不会执行**。
+ *
+ * 于是下面两条规则真正生效的场合很窄：**语言对不上、而容器自己标了默认轨**。
+ * 那正是内核不管的角落（`preferredTextLanguages` 匹配不上就不选，
+ * `selectUndeterminedTextLanguage` 只管「未标语言」）。
  *
  * ## 规则（两层，顺序不能反）
  *

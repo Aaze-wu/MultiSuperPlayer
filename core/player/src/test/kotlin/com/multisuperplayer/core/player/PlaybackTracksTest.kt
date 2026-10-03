@@ -155,7 +155,9 @@ class PlaybackTracksTest {
 
     @Test
     fun `文本轨清单排除位图字幕`() {
-        // 我们不挂 Media3 的 SubtitleView，位图字幕没有任何东西能画它。
+        // 位图字幕的 `Cue.text` 是空的，我们的文本层拿不到字；唯一能画它的
+        // Media3 `SubtitleView` 在播放页又被遮掉了（否则内嵌字幕会画两遍），
+        // 所以没有任何东西能画它。
         // 让它们留在清单里的症状是：用户在列表里点了一条，屏幕上什么都没发生。
         //
         // 这三个 MIME 是 Media3 1.11.1 里真实存在的值（`javap -constants MimeTypes`）。

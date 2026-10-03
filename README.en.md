@@ -91,9 +91,13 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
   because otherwise last item's pick would follow the next one, which looks exactly like subtitles being
   attached to the wrong media — and nothing on screen would say a manual pick was ever in effect.
 - **Subtitles that ship inside the file**: **subtitle tracks muxed into the container** are fed into **our
-  own subtitle layer** (not Media3's `SubtitleView`), so display modes, bilingual mode, translation and the
-  timeline offset treat them exactly like sibling files. They are listed in the same panel as the file
-  candidates, with language, format and default/forced flags. The format is read from `Format.codecs`, not
+  own subtitle layer**, so display modes, bilingual mode, translation and the timeline offset treat them
+  exactly like sibling files. `PlayerView`, however, carries a `SubtitleView` of its own that keeps drawing
+  the same cues from `onCues` once `setPlayer()` has run, so the player screen sets that layer to `GONE`:
+  otherwise an embedded track shows up as **two** copies on screen (offset from each other, i.e. a ghost
+  image) and the "hidden" display mode cannot hide it either. Sibling subtitle files never go through
+  Media3's parsers, so they are unaffected. They are listed in the same panel as the file candidates, with
+  language, format and default/forced flags. The format is read from `Format.codecs`, not
   from `sampleMimeType`: Media3 reports every text track it extracts from a container as
   `application/x-media3-cues` and keeps the real format (`application/x-subrip` and friends) in `codecs`.
   Judging by `sampleMimeType` classifies them as unknown and the whole track then **vanishes** from the
@@ -275,7 +279,8 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 | **v0.5.13** | **Landscape layout dedicated to audio: cover left, lyrics right, permanent control strip (also fixes controls that could not be brought back)** | Done |
 | **v0.5.14** | **"Choose subtitle file…" in the subtitle panel; previous / next buttons on the bottom bar; fixes playback controls never appearing in the notification (the Media3 session was never registered)** | Done |
 | **v0.5.15** | **Subtitle tracks muxed into the container are fed into our own subtitle layer (including the fix that reads the format from `codecs`); audio / embedded-subtitle track pickers; subtitle timeline offset ±** | Done |
-| **v0.5.16** | **Subtitle style: presets for text size / line spacing / outline / bottom margin, edited from either the player or the settings page (one shared setting, applied immediately), with a one-tap reset (the default presets match v0.5.15's rendering parameters exactly)** | **Current** |
+| **v0.5.16** | **Subtitle style: presets for text size / line spacing / outline / bottom margin, edited from either the player or the settings page (one shared setting, applied immediately), with a one-tap reset (the default presets match v0.5.15's rendering parameters exactly)** | Done |
+| **v0.5.17** | **Embedded subtitles are no longer drawn twice (the `SubtitleView` inside `PlayerView` is hidden), which also makes display mode *Hidden* actually hide; the subtitle panel now tells "no external subtitle attached" apart from "embedded tracks exist but no line has been read yet"; the automatic embedded-track pick now logs why it did or did not act** | **Current** |
 | v0.6 | On-device ASR subtitle generation | Planned |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
@@ -583,13 +588,14 @@ These are deliberate for this release, not oversights:
     playlist that one field is missing (everything else is there). Fixing it means changing the storage
     format and writing a migration, which is disproportionate for one name in one log line.
 12. **Bitmap subtitles inside the file (PGS / VobSub / DVB) never show up in the panel.** Our own subtitle
-    layer draws text; bitmap subtitles need a different rendering path (the one Media3 ships, which this
-    project deliberately does not use as the main path — using it would make embedded subtitles bypass
-    display modes, bilingual mode, translation and the offset). The panel therefore lists **text** embedded
-    tracks only: a bitmap track neither appears nor can be selected, and the panel does not explain why
-    (it simply looks like "this file has no embedded subtitles"). Supporting it for real means handing
-    bitmap tracks to Media3's `SubtitleView` as a second layer, at the cost of two subtitle layers having
-    to agree on "who drew text at which instant". Left for a later version.
+    layer draws text, and a bitmap `Cue` carries an empty `text`, so there is nothing to lay out at all.
+    The only renderer that can draw bitmaps is Media3's own `SubtitleView` (the one inside `PlayerView`) —
+    and the player screen hides exactly that one, so that embedded **text** subtitles are not drawn twice
+    (see "Subtitles that ship inside the file" above). The panel therefore lists **text** embedded tracks
+    only: a bitmap track neither appears nor can be selected, and the panel does not explain why (it simply
+    looks like "this file has no embedded subtitles"). Supporting it for real means giving bitmap tracks a
+    rendering path of their own, at the cost of two subtitle layers having to agree on "who drew text at
+    which instant". Left for a later version.
 
 ---
 

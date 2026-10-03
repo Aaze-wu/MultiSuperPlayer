@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.player
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -252,8 +253,16 @@ private fun StatusBlock(state: SubtitleUiState) {
                     )
                 }
 
+                // 「片源里有字幕轨」和「一条字幕都没有」是两件不同的事，不能共用一句话。
+                //
+                // 内嵌轨是**边播边读**的：在容器的第一句台词到达之前，`embeddedTrack`
+                // 仍然是 null（见 `SubtitleLoadState.withEmbedded` 里那句按兵不动），
+                // 而候选列表里**已经列着**那几条轨了。这中间有一个几秒的窗口，此时
+                // 说「没有挂上外挂字幕文件」是准确的，说「没有挂上任何字幕」就把片源
+                // 自带的那几条一起否掉了——同一个面板上面说「什么都没挂上」、下面
+                // 列着两条可选轨，用户只会去看字幕文件名。
                 else -> Text(
-                    text = stringResource(R.string.msp_player_none_attached),
+                    text = stringResource(nothingAttachedText(state.embeddedTracks.isNotEmpty())),
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                 )
@@ -308,6 +317,35 @@ internal fun showsNoUsableSubtitleHint(state: SubtitleUiState): Boolean =
         state.embeddedTracks.isEmpty() &&
         !state.isLoading &&
         state.issue == null
+
+/**
+ * 「当前挂着哪条」那一格在**什么都没挂**时该说哪句话。
+ *
+ * ## 为什么不能只留一句话
+ *
+ * 原来只有「当前没有挂上任何字幕。」一句，而它是一句**全局断言**：用户在那一刻
+ * 会认为片子里没有任何字幕可用。可是内嵌轨是边播边读的——容器里那几条轨在
+ * `onTracksChanged` 时就已经知道了（候选列表里已经列出来），而第一句台词要等到
+ * 播放头走到有字幕的地方才到。实测（`multi.mkv`，40 秒片段、字幕从 23 秒起）：
+ * 中间有 **4 秒多**的窗口，面板上面写着「没有挂上任何字幕」、下面「片源自带的字幕」
+ * 分区里列着两条可选轨。
+ *
+ * 代价不是难看：用户会去改字幕文件名，而字幕其实好好的，只是还没开口。
+ *
+ * ## 为什么看 `embeddedTracks` 而不是看「内嵌轨已选」
+ *
+ * `embeddedTracks` 是**片源里有哪些可渲染的文本轨**，在轨道清单解析出来那一刻就有；
+ * 而「已选中的那条」要等内核/我们选完才非 null，两个信号的时序不同。这里要回答的
+ * 是「这个片子里有没有字幕」，前者才是对的提问方式：即使那条轨因为语言对不上而
+ * 没被自动选中，下面候选列表里也列着它、用户可以自己点，说「没有字幕」仍然是错的。
+ */
+@StringRes
+internal fun nothingAttachedText(hasEmbeddedTracks: Boolean): Int =
+    if (hasEmbeddedTracks) {
+        R.string.msp_player_embedded_no_cues_yet
+    } else {
+        R.string.msp_player_none_attached
+    }
 
 /**
  * 微调的四个步长。两档而不是一档：0.5 秒够把明显偏了的拉近，0.1 秒才够把

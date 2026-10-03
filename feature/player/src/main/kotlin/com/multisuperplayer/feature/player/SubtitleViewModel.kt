@@ -175,9 +175,12 @@ class SubtitleViewModel(
         tracks.embeddedSubtitle,
     ) { load, embedded ->
         load.withEmbedded(
-            // 「自动」时用内核**实际选中**的那条：它已经把语言、默认/强制标记
-            // 都算过了（见 `bestEmbeddedTextTrack`），字幕层再算一遍就会出现
-            // 两份规则、两个结果。
+            // 「自动」时用内核**实际选中**的那条，而不是自己再挑一遍。
+            //
+            // 挑轨这件事一共只有两个地方会做，而且顺序固定：先是内核
+            // （`init` 里设的 `setPreferredTextLanguages` + `setSelectUndeterminedTextLanguage`），
+            // 内核一条都没选时才是 `autoSelectTextTrack` 那套保守规则。
+            // 字幕层再算第三遍就会出现三份规则、三个结果。
             autoTrack = tracks.tracks.value.firstSelectedTextTrack(),
             cues = embedded.cues,
             mediaUri = entry.value?.uri,

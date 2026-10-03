@@ -17,7 +17,7 @@
     <string name="msp_player_scanning">正在尋找字幕…</string>
     <string name="msp_player_reading">正在讀取字幕…</string>
     <string name="msp_player_cues">%1$s · %2$d 條</string>
-    <string name="msp_player_none_attached">目前沒有掛上任何字幕。</string>
+    <string name="msp_player_none_attached">沒有掛上外掛字幕檔。</string>
     <string name="msp_player_translation_missing_shown_original">這份字幕沒有譯文，已按原文顯示。</string>
     <string name="msp_player_auto_select">自動選擇</string>
     <string name="msp_player_auto_selected">已自動選中「%1$s」</string>
@@ -25,6 +25,7 @@
     <string name="msp_player_no_usable_subtitle">這個資料夾裡沒有找到可用的字幕檔案。</string>
     <string name="msp_player_embedded_section">片源自帶的字幕</string>
     <string name="msp_player_embedded_track">內嵌字幕 %1$d</string>
+    <string name="msp_player_embedded_no_cues_yet">片源裡有字幕軌，還沒讀到第一句台詞。</string>
     <string name="msp_player_subtitle_sync">字幕時間軸</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
     <string name="msp_player_subtitle_sync_reset">歸零</string>
@@ -53,7 +54,7 @@
     <string name="msp_player_issue_directory_invisible">讀不到這個檔案所在的資料夾，可能是沒有儲存權限。</string>
     <string name="msp_player_issue_scan_failed">尋找字幕時發生錯誤：%1$s</string>
     <string name="msp_player_issue_no_subtitles">這個資料夾裡沒有字幕檔案。</string>
-    <string name="msp_player_issue_no_match">資料夾裡有字幕，但檔名和這部片對不上。可以在下面手動選一個。</string>
+    <string name="msp_player_issue_no_match">資料夾裡沒有和片名同名的字幕。可以在下面手動選一條。</string>
     <string name="msp_player_issue_load_failed">「%1$s」讀取失敗：%2$s</string>
 
     <!-- ===== 匯出 ===== -->

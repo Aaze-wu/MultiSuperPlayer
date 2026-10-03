@@ -14,7 +14,7 @@
     <string name="msp_player_scanning">Looking for subtitles…</string>
     <string name="msp_player_reading">Reading subtitles…</string>
     <string name="msp_player_cues">%1$s · %2$d line(s)</string>
-    <string name="msp_player_none_attached">No subtitle is attached.</string>
+    <string name="msp_player_none_attached">No external subtitle file is attached.</string>
     <string name="msp_player_translation_missing_shown_original">This subtitle has no translation; showing the original text.</string>
     <string name="msp_player_auto_select">Automatic</string>
     <string name="msp_player_auto_selected">Auto-selected “%1$s”</string>
@@ -22,6 +22,7 @@
     <string name="msp_player_no_usable_subtitle">No usable subtitle file was found in this folder.</string>
     <string name="msp_player_embedded_section">Subtitles in the file itself</string>
     <string name="msp_player_embedded_track">Embedded subtitle %1$d</string>
+    <string name="msp_player_embedded_no_cues_yet">This file has subtitle tracks; the first line has not been read yet.</string>
     <string name="msp_player_subtitle_sync">Subtitle timing</string>
     <string name="msp_player_subtitle_sync_step">%1$s s</string>
     <string name="msp_player_subtitle_sync_reset">Reset</string>
@@ -50,7 +51,7 @@
     <string name="msp_player_issue_directory_invisible">This file’s folder cannot be read, most likely because storage permission is missing.</string>
     <string name="msp_player_issue_scan_failed">Error while looking for subtitles: %1$s</string>
     <string name="msp_player_issue_no_subtitles">There are no subtitle files in this folder.</string>
-    <string name="msp_player_issue_no_match">The folder has subtitles, but none of their names match this video. You can pick one below.</string>
+    <string name="msp_player_issue_no_match">The folder has no subtitle named after this video. You can pick one below.</string>
     <string name="msp_player_issue_load_failed">Could not read “%1$s”: %2$s</string>
 
     <!-- ===== Export ===== -->

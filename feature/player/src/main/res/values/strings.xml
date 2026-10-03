@@ -22,7 +22,14 @@
     <string name="msp_player_scanning">正在查找字幕…</string>
     <string name="msp_player_reading">正在读取字幕…</string>
     <string name="msp_player_cues">%1$s · %2$d 条</string>
-    <string name="msp_player_none_attached">当前没有挂上任何字幕。</string>
+    <!--
+      只讲**外挂**字幕。这句在「外挂没挂上、内嵌也没认领」时显示，但只要片源里
+      有字幕轨，第一句台词到达之前就会短暂处于这个状态（内嵌轨是边播边读的）。
+      写成「没有挂上任何字幕」是一句**全局断言**，而那一刻片源自带的字幕轨其实
+      已经选好了——同一个面板上面说「什么都没挂上」、下面列着两条可选轨。
+      片源里有字幕轨时改走 msp_player_embedded_no_cues_yet。
+    -->
+    <string name="msp_player_none_attached">没有挂上外挂字幕文件。</string>
     <string name="msp_player_translation_missing_shown_original">这份字幕没有译文，已按原文显示。</string>
     <string name="msp_player_auto_select">自动选择</string>
     <string name="msp_player_auto_selected">已自动选中「%1$s」</string>
@@ -30,6 +37,8 @@
     <string name="msp_player_no_usable_subtitle">这个文件夹里没有找到可用的字幕文件。</string>
     <string name="msp_player_embedded_section">片源自带的字幕</string>
     <string name="msp_player_embedded_track">内嵌字幕 %1$d</string>
+    <!-- 片源里有字幕轨、但一行还没读到（见 msp_player_none_attached 的注释）。 -->
+    <string name="msp_player_embedded_no_cues_yet">片源里有字幕轨，还没读到第一句台词。</string>
     <!-- 时间轴微调：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
     <string name="msp_player_subtitle_sync">字幕时间轴</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
@@ -61,7 +70,7 @@
     <string name="msp_player_issue_directory_invisible">读不到这个文件所在的文件夹，可能是没有存储权限。</string>
     <string name="msp_player_issue_scan_failed">查找字幕时出错：%1$s</string>
     <string name="msp_player_issue_no_subtitles">这个文件夹里没有字幕文件。</string>
-    <string name="msp_player_issue_no_match">文件夹里有字幕，但文件名和这条片子对不上。可以在下面手动选一个。</string>
+    <string name="msp_player_issue_no_match">文件夹里没有和片名同名的字幕。可以在下面手动选一条。</string>
     <string name="msp_player_issue_load_failed">「%1$s」读取失败：%2$s</string>
 
     <!-- ===== 导出 ===== -->
