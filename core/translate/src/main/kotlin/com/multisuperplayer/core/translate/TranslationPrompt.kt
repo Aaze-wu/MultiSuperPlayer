@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * **改了本文件里任何一个影响输出的字，都要把这个数字 +1**，否则旧缓存会被
  * 当成新提示词的结果复用，用户点了「重新翻译」却一条都没变——那看起来像按钮坏了。
  */
-internal const val TRANSLATION_PROMPT_VERSION = 1
+internal const val TRANSLATION_PROMPT_VERSION = 2
 
 /**
  * 系统提示词。
@@ -59,9 +59,79 @@ internal fun buildSystemPrompt(target: TranslationTarget, glossary: Glossary): S
         }
 
         append("\n## 示例\n")
-        append("输入：{\"lines\": [\"Where are you going?\", \"- Home.\\n- Wait!\"]}\n")
-        append("输出：{\"translations\": [\"你要去哪儿？\", \"- 回家。\\n- 等等！\"]}\n")
+        val example = exampleFor(target)
+        append("输入：").append(example.input).append('\n')
+        append("输出：").append(example.output).append('\n')
     }
+}
+
+/**
+ * 一组示例：`输入：` 与 `输出：` 后面跟什么。
+ *
+ * 写成两个字段而不是一对 `Pair`，是因为它在提示词里出现两次且必须成对：
+ * 两个无名参数很容易在改动时把顺序写反，而“输入/输出对调”的提示词依旧是一段
+ * 语法完美的文本，只是把模型往反方向带。
+ */
+private class PromptExample(val input: String, val output: String)
+
+/**
+ * 默认的示例输入：两行英语，第二行是两个人在对话（带「- 」分段）。
+ *
+ * 抽成常量而不是在五个分支里各写一遍：这串东西在源码里的写法（`\"` `\\n`）
+ * 和它在提示词里真正的样子差得远，复制五次早晚会有一处不一样。
+ */
+private const val EXAMPLE_INPUT_ENGLISH = "{\"lines\": [\"Where are you going?\", \"- Home.\\n- Wait!\"]}"
+
+/** 目标语言是英语时用的源文（中文），道理见下。 */
+private const val EXAMPLE_INPUT_CHINESE = "{\"lines\": [\"你去哪儿？\", \"- 回家。\\n- 等等！\"]}"
+
+/**
+ * 取该目标语言的示例。
+ *
+ * ## 为什么示例必须和 `target` 一致
+ *
+ * 原来这里只有一组「英文→简体中文」的硬编码示例。选日语时，提示词里会同时出现
+ * 「把字幕逐行翻译成日本語」和一条输出中文的示例——**自相矛盾**。
+ * 模型会跟着示例走（它比要求那句话更具体、更可模仿），于是日语目标得到中文译文，
+ * 而且因为语法上一切正常，没有任何错误可查。
+ *
+ * ## 为什么用 `when` 穷举而不是查表
+ *
+ * `when` 过了枚举全部分支就是个编译期检查：以后新增一门目标语言时，编译器会直接在
+ * 这里报错，逼着补一条示例；查表（`mapOf(...).getOrDefault(默认)`）只会静默地
+ * 沿用别人的语言，又一次把矛盾写进提示词。
+ *
+ * 输入那侧默认用**英语**（模型对“英语作源”最稳），只有目标语言就是英语时才反过来
+ * 用中文——否则会出现「英文翻成英文」这种什么也没示范的示例。
+ */
+private fun exampleFor(target: TranslationTarget): PromptExample = when (target) {
+    TranslationTarget.SIMPLIFIED_CHINESE -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"你要去哪儿？\", \"- 回家。\\n- 等等！\"]}",
+    )
+
+    TranslationTarget.TRADITIONAL_CHINESE -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"你要去哪裡？\", \"- 回家。\\n- 等等！\"]}",
+    )
+
+    // 目标语言是英语，所以源语言换成中文：拿英文当输入去示范「翻成英文」等于什么都没示范。
+    TranslationTarget.ENGLISH -> PromptExample(
+        input = EXAMPLE_INPUT_CHINESE,
+        output = "{\"translations\": [\"Where are you going?\", \"- Home.\\n- Wait!\"]}",
+    )
+
+    // 日语目标。例子里故意带上「- 」双人对话与句末「。」，
+    // 因为日语字幕的这两处习惯（说话人标记、句号）是模型最容易跟着英文改掉的地方。
+    TranslationTarget.JAPANESE -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"どこへ行くの？\", \"- 家に帰る。\\n- ちょっと待って！\"]}",
+    )
+
+    TranslationTarget.KOREAN -> PromptExample(
+        input = EXAMPLE_INPUT_ENGLISH,
+        output = "{\"translations\": [\"어디 가는 거야?\", \"- 집에 가.\\n- 잠깐만!\"]}",
+    )
 }
 
 /**

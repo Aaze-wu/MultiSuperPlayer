@@ -5,6 +5,7 @@ import com.multisuperplayer.core.model.SubtitleFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -41,14 +42,16 @@ class SubtitleSourceSelectionTest {
         isForced: Boolean = false,
         isBilingual: Boolean = false,
         trailingTagCount: Int = SubtitleFileNaming.analyze(fileName).trailingTagCount,
+        sizeBytes: Long = 1_024L,
+        uri: String = "content://media/external/file/$fileName",
     ) = SubtitleSource(
-        uri = "content://media/external/file/$fileName",
+        uri = uri,
         fileName = fileName,
         format = SubtitleFormat.SRT,
         languageTag = languageTag,
         isForced = isForced,
         isBilingual = isBilingual,
-        sizeBytes = 1_024L,
+        sizeBytes = sizeBytes,
         matchScore = matchScore,
         trailingTagCount = trailingTagCount,
     )
@@ -184,5 +187,35 @@ class SubtitleSourceSelectionTest {
         assertFalse(unrelated.matchesMedia)
         assertFalse(unrelated.isAutoMatchable)
         assertNull(listOf(unrelated).bestAutoMatch())
+    }
+
+    @Test
+    fun `重扫后手选的那条换成新扫描的同名项`() {
+        // 手选定下的是「哪一条文件」，不是那份文件当时的体积。体积参与解析缓存的
+        // 命中判定（见 ParsedSubtitleCache），沿用旧对象就等于「手选过一次的字幕
+        // 之后永远读不到新内容」：重新生成、外部改文件，界面都还是第一次那份结果。
+        val chosenEarlier = source("VoiceJa3.asr.srt", matchScore = 100, sizeBytes = 216L)
+        val rescanned = listOf(
+            source("VoiceJa3.asr.srt", matchScore = 100, sizeBytes = 612L),
+            source("VoiceJa.ja.srt", matchScore = 100, languageTag = "ja"),
+        )
+
+        val refreshed = rescanned.freshVersionOf(chosenEarlier)
+
+        assertEquals(612L, refreshed.sizeBytes)
+        assertSame("必须是这次扫描里的那个对象", rescanned[0], refreshed)
+    }
+
+    @Test
+    fun `重扫后候选里没有手选的那条时沿用旧的`() {
+        // 文件被删/改名了就加载失败并提示，**不能**悄悄换成另一条字幕：
+        // 用户明确点过的东西不该被自动逻辑推翻，换成别的比报错更难理解。
+        val chosenEarlier = source("UserPicked.srt", matchScore = 100, sizeBytes = 216L)
+        val rescanned = listOf(source("Show.chs.srt", matchScore = 100, languageTag = "zh-Hans"))
+
+        val refreshed = rescanned.freshVersionOf(chosenEarlier)
+
+        assertSame(chosenEarlier, refreshed)
+        assertEquals("content://media/external/file/UserPicked.srt", refreshed.uri)
     }
 }

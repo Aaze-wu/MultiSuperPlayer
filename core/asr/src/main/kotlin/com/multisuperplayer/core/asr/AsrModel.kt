@@ -40,9 +40,10 @@ enum class AsrFileRole {
 /**
  * 一个需要下载的模型文件。
  *
- * 三个字段全部来自**上游仓库的真实文件**：`sizeBytes` 与 `sha256` 是我们自己下载一遍
- * 后算出来的（HuggingFace 的 `/api/models/<repo>` 只给文件名，**不返回体积和哈希**，
- * 所以这两个数只能实测）。
+ * 三个字段全部来自**上游仓库的真实文件**：`sizeBytes` 与 `sha256` 都得实测。HuggingFace 的
+ * `/api/models/<repo>` 只给文件名；`/api/models/<repo>/tree/main?expand=true` 会给 LFS
+ * 大文件带上体积与 sha256，但 `tokens.txt` 这类小文件走的是普通 Git 对象，那里没有哈希——
+ * 所以两个数最终都以「真下载一遍再算」为准，新加一条模型时这一步不能省。
  *
  * 为什么要钉 sha256：这个下载器要往用户手机上写将近 200 MB 的二进制模型，而它的失败
  * 方式是**静默**的——少一个字节、被运营商/代理塞了一个 HTML 错误页、下载到一半断了，
@@ -92,6 +93,19 @@ data class AsrModelInfo(
     fun file(role: AsrFileRole): AsrModelFile =
         files.firstOrNull { it.role == role }
             ?: error("模型「$id」的清单里缺少 ${role.name} 文件")
+
+    /**
+     * 这条模型是不是 **transducer**（zipformer 系）：清单里同时有 encoder / decoder / joiner。
+     *
+     * 为什么用它分流、而不是再加一个 [AsrEngine] 成员：[AsrEngine] 说的是**解码的形状**
+     * （整段解完 vs 边喂边解），而 transducer 和 paraformer 都是「整段解完」——
+     * 真正要分的是「把哪个路径填进哪个字段」，那件事本来就由 [AsrFileRole] 表达
+     * （它存在的意义就是「这个文件填进引擎的哪个字段」，见上）。让角色继续承担这份职责，
+     * 就不必维护「引擎种类」和「清单里有哪些文件」这两份可能互相矛盾的真相。
+     *
+     * 判据取 `ENCODER`：它是三件套里必然出现的那一件，而 paraformer 的清单里只有 `MODEL`。
+     */
+    val isTransducer: Boolean get() = files.any { it.role == AsrFileRole.ENCODER }
 
     /** 「约 78.1 MB」。 */
     fun sizeText(): MspText = MspText.Res(R.string.msp_asr_model_size, TimeFormat.fileSize(totalBytes))

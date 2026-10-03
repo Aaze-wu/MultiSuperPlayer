@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.6.1-alpha.1** (pre-release)
+- Current version: **0.6.2-alpha.1** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -78,8 +78,15 @@ Release notes: [docs/release-notes](docs/release-notes/)
 
   The route is chosen by the **source itself**, never by "which field happens to be populated" — keying
   on a field would route browser entries down the media-library path and silently find nothing.
-- **Encoding fallback**: non-UTF-8 subtitles (GBK and friends) are tried against a list of candidate
-  encodings, and the parse warnings state which one was used.
+- **Encoding fallback**: non-UTF-8 subtitles are tried against a list of candidate encodings, and the
+  parse warnings state which one was used. Chinese falls back to GB18030; Japanese files, which are
+  commonly **Shift-JIS (CP932)**, get a separate decision — and it is **not** "whichever candidate comes
+  first wins": the GB18030 reading is used as the baseline, and Shift-JIS is only adopted when its text
+  looks **more Japanese** (more kana and ideographs, fewer halfwidth katakana and private-use
+  characters). Otherwise both are double-byte encodings and whoever is tried first wins, so GBK Chinese
+  subtitles would be stolen by the Japanese candidate. Known trade-off: Japanese that contains **no kana
+  at all, only ideographs**, still lands on GB18030 (both encodings decode it, so there is nothing to
+  choose between them).
 - **Display modes**: hidden / original only / translation only / bilingual.
 - **Never blank.** If you pick "translation only" and the subtitle has no translation, the app falls back
   to showing the original **and says why**, instead of rendering nothing and making you think subtitles
@@ -127,6 +134,12 @@ Release notes: [docs/release-notes](docs/release-notes/)
   (content, target language, model), so identical content is never paid for twice.
 - **Glossary**: names and proper nouns are replaced with placeholders before the request and restored
   afterwards, so the model cannot silently rewrite them.
+- **The example in the prompt follows the target language**: the "input / output" sample is generated for
+  the language being translated into (translate to Japanese and it demonstrates Japanese, including "two
+  speakers on one line keep their line breaks") instead of always demonstrating Chinese. Models copy the
+  example: a Chinese example makes them answer in Chinese reliably — no error, no parse failure, just the
+  wrong language, which looks like the model being bad at its job. The list of target languages and the
+  examples are bound one-to-one at compile time (add a language without its example and the build fails).
 - **Diagnosable failures.** Failures are classified into categories that each require a *different*
   remedy — not configured / unauthorized / quota exhausted / rate limited / rejected / server error /
   network / bad response / empty completion / truncated. The UI offers an action you can actually take,
@@ -266,9 +279,12 @@ folder has no subtitles"** — the two need opposite fixes (grant a permission v
 No network, no upload: the audio track is turned into subtitles using the phone's own compute, and the
 resulting file goes straight into the subtitle sheet, **already selected**.
 
-- **Two models to choose from**: Chinese offline (Paraformer small, about 78.1 MB) and bilingual streaming
-  (Zipformer, about 190 MB). Size and intended use are part of each option, and **only the selected model
-  is downloaded** — the other one is not fetched "while we are at it".
+- **Three models to choose from**: Chinese offline (Paraformer small, about 78.1 MB), Japanese offline
+  (ReazonSpeech, about 169.0 MB) and bilingual streaming (Zipformer, about 189.8 MB). Size and intended use
+  are part of each option, and **only the selected model is downloaded** — the others are not fetched
+  "while we are at it". The Japanese one is a **Japanese-only** whole-segment model: it cannot recognize
+  Chinese or English at all, and in exchange it is more accurate on Japanese than the streaming model. That
+  trade-off is written on the option itself instead of being left for the user to discover.
 - **Download source is editable**: the default is the Chinese mirror `hf-mirror.com`; entering
   `https://huggingface.co` switches to the official source, and **clearing the field goes back to the
   default**. A wrong-looking address is flagged and explained, but never blocks the *Download* button —
@@ -280,6 +296,10 @@ resulting file goes straight into the subtitle sheet, **already selected**.
   **never touches subtitles you already generated** (that is what the confirmation says, and it was
   verified on a real device); the VAD segmentation model is a **shared resource** and stays.
 - **Recognition never goes online**: audio does not leave the device.
+- **Japanese output carries no spaces between kana**: ReazonSpeech emits **one token at a time**, so writing
+  the raw output to disk gives you `こ ん に ち は`. The post-processing collapses only the space between
+  **kana and kana**; the space between kana and English (`こんにちは world`) is kept as it is, otherwise it
+  would eat the word separators too.
 - **Four different failures, four different messages**: "this file has no usable audio track" /
   "no speech detected" / "subtitles were recognized but could not be saved" / "decoding failed". Their
   next steps are completely different (pick another file / pick audio with someone talking / free up
@@ -323,7 +343,9 @@ resulting file goes straight into the subtitle sheet, **already selected**.
 | **v0.5.17** | **Embedded subtitles are no longer drawn twice (the `SubtitleView` inside `PlayerView` is hidden), which also makes display mode *Hidden* actually hide; the subtitle panel now tells "no external subtitle attached" apart from "embedded tracks exist but no line has been read yet"; the automatic embedded-track pick now logs why it did or did not act** | Done |
 | **v0.5.18** | **Sleep timer (5 min – 1 h 30 m / *until the end of this item*, with a live countdown and a way to cancel it); picture-in-picture (auto-enters on HOME, or manually from the player page, with a play/pause action in the small window); playback queue panel (tap a row to jump, remove one item, drag the handle to reorder, clear the whole queue), with the queue order kept strictly in sync with the underlying playlist** | Done |
 | **v0.5.19** | **Sleep timer gains a "Custom…" duration (hours / minutes fields, 1 minute to 24 hours; *Set* stays disabled for invalid or out-of-range input, and an empty form is not treated as an error; a custom duration shows up on the player chip just like a preset, e.g. "3 h 20 m")** | Done |
-| **v0.6** | **On-device offline ASR subtitle generation: two models (Paraformer ~78.1 MB / Zipformer ~189.8 MB), incremental download with per-file sha256 verification, deleting a model leaves generated subtitles alone, editable download source (empty = mirror), generated subtitles stored in a private directory and attached and selected automatically** | **Current** |
+| **v0.6** | **On-device offline ASR subtitle generation: incremental download with per-file sha256 verification, deleting a model leaves generated subtitles alone, editable download source (empty = mirror), generated subtitles stored in a private directory and attached and selected automatically** | Done |
+| **v0.6.1** | **"About" page rework, help question marks on settings entries, more professional wording; release signing wired up with a build-time signature self-check** | Done |
+| **v0.6.2** | **Multi-language support (Japanese first): a dedicated Japanese offline model (ReazonSpeech) to download; automatic Shift-JIS (CP932) detection for subtitle files; prompt examples generated per target language; automatic collapsing of spaces between Japanese kana** | **Current** |
 | Later | Cloud ASR, audio translation, equalizer | Planned |
 
 ---
@@ -453,7 +475,7 @@ core/
   data/                  Data sources (MediaStore scanning, SAF, settings persistence)
   subtitle/              Subtitle/lyrics parsing engine (pure logic, unit-testable)
   translate/             Subtitle translation (provider presets, batching/cache/glossary, export)
-  asr/                   On-device speech recognition (sherpa-onnx: VAD segmentation + offline Paraformer/Zipformer)
+  asr/                   On-device speech recognition (sherpa-onnx: VAD segmentation + offline Paraformer / Zipformer, including a Japanese-only model)
   ui/                    Design system and theming (dynamic color, presets, custom accents)
   player/                Media3 playback wrapper and playback service
 feature/

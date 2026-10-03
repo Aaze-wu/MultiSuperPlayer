@@ -72,6 +72,10 @@ internal object AsrTextNormalizer {
      * 用码点而不是 `Char` 遍历：扩展 B 区（U+20000 以上的罕见人名用字）是代理对，
      * 按 `Char` 看会得到两个「非汉字」的半代理，于是那些人名中间会留下一个空格——
      * 一个只在罕见姓氏上出现的、看起来像「数据脏」的 bug。
+     *
+     * 日语那条模型是**逐字 token** 输出的（官方示例里就是 `"よ", "う", "呼", "び"`），
+     * 所以假名必须算在「中日韩字符」里，否则一条日语字幕会变成「こ ん に ち は」，
+     * 而我们上面的英文一样把「字母之间保留空格」当默认——两种写法都不是日语正字法。
      */
     private fun collapseCjkSpaces(text: String): String {
         val out = StringBuilder(text.length)
@@ -90,14 +94,16 @@ internal object AsrTextNormalizer {
         return out.toString()
     }
 
-    /** 汉字、中文标点、全角标点——它们之间都不该有空格。 */
+    /** 汉字、假名、中文标点、全角标点——它们之间都不该有空格。 */
     private fun isCjkLike(codePoint: Int): Boolean = when (codePoint) {
         in 0x3400..0x4DBF -> true      // 扩展 A
         in 0x4E00..0x9FFF -> true      // 基本区
         in 0xF900..0xFAFF -> true      // 兼容汉字
         in 0x20000..0x2FA1F -> true    // 扩展 B～F 与兼容补充
-        in 0x3000..0x303F -> true      // 中文标点（、。「」《》等）
-        in 0xFF00..0xFFEF -> true      // 全角/半角形式（，！？（）：；等）
+        in 0x3000..0x303F -> true      // 中文/日文标点（、。「」《》々等）
+        in 0x3040..0x309F -> true      // 平假名
+        in 0x30A0..0x30FF -> true      // 片假名（含长音符「ー」、中点「・」、小写假名）
+        in 0xFF00..0xFFEF -> true      // 全角/半角形式（，！？（）：；、半角片假名等）
         else -> false
     }
 

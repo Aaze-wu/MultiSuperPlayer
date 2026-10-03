@@ -2,6 +2,7 @@ package com.multisuperplayer.core.asr
 
 import com.multisuperplayer.core.common.text.MspText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -17,7 +18,10 @@ import org.junit.Test
  * - 下载地址里 `repo` 被一起换成可配置项（最经典的错法），症状是「换镜像之后 404」；
  * - 清单里的 `sizeBytes` 敲错一位，症状是**永远下不完**（下完的文件大小对不上声明的值,
  *   于是 `AsrModelLocator.statusOf` 永远说「缺这个文件」，重新下载也永远不会成功）；
- * - 清单里漏一个角色（流式模型漏 joiner），症状是引擎构造时在原生层崩，堆栈里没有信息。
+ * - 清单里漏一个角色（流式模型漏 joiner），症状是引擎构造时在原生层崩，堆栈里没有信息；
+ * - 清单的**形状**和模型不是一类（transducer 的三件套填进了 paraformer 的单字段），
+ *   症状同样是在原生层崩，而且看起来像「模型文件下坏了」——因为引擎那边只会
+ *   被填进去的那一支，另一支是空路径。
  *
  * 所以这里既测逻辑，也把**实测过的字节数**钉住：那几个数是从上游仓库真实下载下来量过的
  * （见 roadmap 的 v0.6 记录），在测试里独立写一遍是唯一能发现「敲错一位」的办法。
@@ -162,15 +166,61 @@ class AsrModelCatalogTest {
         AsrModelCatalog.models.forEach { model ->
             // 缺角色是编程错误，`file()` 会抛；这里就是让它在测试里抛，而不是在手机上
             model.file(AsrFileRole.TOKENS)
-            when (model.engine) {
-                AsrEngine.OFFLINE -> model.file(AsrFileRole.MODEL)
-                AsrEngine.STREAMING -> {
-                    model.file(AsrFileRole.ENCODER)
-                    model.file(AsrFileRole.DECODER)
-                    model.file(AsrFileRole.JOINER)
-                }
+            // 分派依据必须与引擎那侧一致：**看清单里有哪些文件**，不是看引擎是哪一种。
+            // 离线那一档里两种形状共存（paraformer 是单文件、zipformer 是 transducer），
+            // 按引擎分派的话 transducer 会被要求交出一个它根本没有的 `MODEL`。
+            if (model.isTransducer) {
+                model.file(AsrFileRole.ENCODER)
+                model.file(AsrFileRole.DECODER)
+                model.file(AsrFileRole.JOINER)
+                assertFalse(
+                    "${model.id} 同时带 MODEL 和三件套：引擎只用得着其中一支，另一支是死数据",
+                    model.files.any { it.role == AsrFileRole.MODEL },
+                )
+            } else {
+                model.file(AsrFileRole.MODEL)
             }
         }
+    }
+
+    @Test
+    fun `三件套齐全的才算 transducer`() {
+        // 引擎拿这个布尔量决定往哪个配置对象里填路径，填错的后果是原生层模型加载失败
+        // （JNI 把没填的字段当空路径）。所以这条判据得钉在测试里，而不是只活在注释里。
+        assertFalse(AsrModelCatalog.byId(AsrModelCatalog.PARA_FORMER_ID).isTransducer)
+        assertTrue(AsrModelCatalog.byId(AsrModelCatalog.ZIPFORMER_ID).isTransducer)
+        assertTrue(AsrModelCatalog.byId(AsrModelCatalog.JAPANESE_ZIPFORMER_ID).isTransducer)
+
+        // 只有 encoder 也算 transducer：`file(DECODER)` 会抛，但那样是**报错**，
+        // 比默不作声地错填成 paraformer 好——这条断言锁的就是这个方向。
+        val halfBuilt = AsrModelInfo(
+            id = "half-built",
+            engine = AsrEngine.OFFLINE,
+            repo = "owner/name",
+            name = MspText.Plain("只半套"),
+            description = MspText.Plain("测试用"),
+            languageTag = "zh",
+            files = listOf(
+                AsrModelFile(AsrFileRole.ENCODER, "encoder.onnx", 1L, "0".repeat(64)),
+                AsrModelFile(AsrFileRole.TOKENS, "tokens.txt", 1L, "0".repeat(64)),
+            ),
+        )
+        assertTrue(halfBuilt.isTransducer)
+        assertThrows(IllegalStateException::class.java) { halfBuilt.file(AsrFileRole.DECODER) }
+    }
+
+    @Test
+    fun `日语模型的清单就是上游那四个文件`() {
+        // 这条模型的取舍（只认日语、离线整段解码、decoder 保 fp32）写在
+        // `AsrModelCatalog.japaneseZipformer` 的注释里，这里只钉能自动化检查的部分。
+        val model = AsrModelCatalog.byId(AsrModelCatalog.JAPANESE_ZIPFORMER_ID)
+        assertEquals(AsrEngine.OFFLINE, model.engine)
+        // 语言标记会随着生成的字幕写进文件（也决定翻译默认翻成什么），不能是空的
+        assertEquals("ja", model.languageTag)
+        assertEquals(
+            setOf(AsrFileRole.ENCODER, AsrFileRole.DECODER, AsrFileRole.JOINER, AsrFileRole.TOKENS),
+            model.files.map { it.role }.toSet(),
+        )
     }
 
     @Test
@@ -207,6 +257,12 @@ class AsrModelCatalogTest {
                 "decoder-epoch-99-avg-1.onnx" to 13_876_452L,
                 "joiner-epoch-99-avg-1.int8.onnx" to 3_228_404L,
                 "tokens.txt" to 56_317L,
+            ),
+            AsrModelCatalog.JAPANESE_ZIPFORMER_ID to listOf(
+                "encoder-epoch-99-avg-1.int8.onnx" to 154_670_139L,
+                "decoder-epoch-99-avg-1.onnx" to 11_767_836L,
+                "joiner-epoch-99-avg-1.onnx" to 10_720_115L,
+                "tokens.txt" to 45_754L,
             ),
         )
 

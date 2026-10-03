@@ -90,6 +90,7 @@
     <string name="msp_player_asr_title">Speech recognition</string>
     <string name="msp_player_asr_hint">Recognition runs entirely on this device; audio is never uploaded. Expect roughly the length of the video.</string>
     <string name="msp_player_asr_generate">Generate subtitles</string>
+    <string name="msp_player_asr_using_model">Using “%1$s”: it only recognizes the language it was trained on.</string>
     <string name="msp_player_asr_need_model">This needs a speech model first (%1$s). Once downloaded, no network is required.</string>
     <string name="msp_player_asr_download_generate">Download model and generate (%1$s)</string>
     <string name="msp_player_asr_downloading">Downloading model…</string>

@@ -109,6 +109,7 @@
     <string name="msp_player_asr_title">语音识别</string>
     <string name="msp_player_asr_hint">语音识别在本机完成，音频不会上传。所需时间大致与片长相当。</string>
     <string name="msp_player_asr_generate">生成字幕</string>
+    <string name="msp_player_asr_using_model">将使用「%1$s」识别，它只认自己训练过的语言。</string>
     <string name="msp_player_asr_need_model">需要先下载识别模型（%1$s），下好之后就不需要联网了。</string>
     <string name="msp_player_asr_download_generate">下载模型并生成（%1$s）</string>
     <string name="msp_player_asr_downloading">正在下载模型…</string>

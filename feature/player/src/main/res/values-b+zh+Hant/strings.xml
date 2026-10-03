@@ -93,6 +93,7 @@
     <string name="msp_player_asr_title">語音辨識</string>
     <string name="msp_player_asr_hint">語音辨識在本機完成，音訊不會上傳。所需時間大致與片長相當。</string>
     <string name="msp_player_asr_generate">產生字幕</string>
+    <string name="msp_player_asr_using_model">將使用「%1$s」辨識，它只認自己訓練過的語言。</string>
     <string name="msp_player_asr_need_model">需要先下載辨識模型（%1$s），下載後就不需要網路了。</string>
     <string name="msp_player_asr_download_generate">下載模型並產生（%1$s）</string>
     <string name="msp_player_asr_downloading">正在下載模型…</string>

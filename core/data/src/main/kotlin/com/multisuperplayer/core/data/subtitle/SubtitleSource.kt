@@ -85,6 +85,20 @@ private val SubtitleOrigin.selectionRank: Int
 fun List<SubtitleSource>.sortedForSelection(): List<SubtitleSource> = sortedWith(candidateOrder)
 
 /**
+ * 用户手选的那条在**这一次扫描结果**里的对应项。
+ *
+ * 手选定下的是「哪一条文件」（由 uri 指认），不是「那份文件当时的元数据」。重扫之后
+ * 必须换成新扫描出来的那一条，否则体积永远是旧的——而体积参与解析缓存的命中判定
+ * （见 [ParsedSubtitleCache]），沿用旧对象就等于「用户手选过一次的字幕，之后再也读不到
+ * 新内容」：重新生成字幕、外部改了那个文件，界面都还是第一次那份解析结果。
+ *
+ * 候选里找不到（文件被删掉/改名了）才沿用旧的：用户明确点过的东西不该被自动逻辑推翻，
+ * 加载失败会给出提示，那比「悄悄换成另一条字幕」诚实。
+ */
+fun List<SubtitleSource>.freshVersionOf(previous: SubtitleSource): SubtitleSource =
+    firstOrNull { it.uri == previous.uri } ?: previous
+
+/**
  * 从候选里挑出该自动挂上的那一条。
  *
  * 够格的不止一条时取排序第一——命名朴素的那条，且同分时结果稳定，

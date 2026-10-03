@@ -7,6 +7,9 @@
     <string name="msp_asr_model_paraformer_name">Chinese only (small Paraformer)</string>
     <string name="msp_asr_model_paraformer_desc">Chinese-only recognition; fast and accurate. The right choice when you only need subtitles for Chinese audio.</string>
 
+    <string name="msp_asr_model_japanese_name">Japanese only (ReazonSpeech)</string>
+    <string name="msp_asr_model_japanese_desc">Japanese-only recognition; Chinese and English are not supported. Decodes whole segments, which is more accurate for Japanese than the streaming model.</string>
+
     <string name="msp_asr_model_zipformer_name">Chinese + English streaming (Zipformer)</string>
     <string name="msp_asr_model_zipformer_desc">Handles sentences that mix Chinese and English; English words are kept as they are. A larger model, and slower to run.</string>
 

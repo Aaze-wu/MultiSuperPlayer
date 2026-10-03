@@ -8,7 +8,7 @@ import com.multisuperplayer.core.common.text.MspText
  * `hf-mirror.com` 是 HuggingFace 的国内镜像，路径结构与官方完全一致
  * （`<base>/<repo>/resolve/main/<file>`），实测能直接下到这几条模型。
  *
- * 为什么不默认 `huggingface.co`：这两条模型一共约 268 MB，而官方站在国内**经常**
+ * 为什么不默认 `huggingface.co`：这几条模型一共约 437 MB，而官方站在国内**经常**
  * 连得上、只是慢到几十 KB/s —— 那种体验不像「下载失败」，像「卡住了」，
  * 用户会一直等。镜像站可以直接改成官方站，所以默认取「能用」的那一个。
  */
@@ -51,21 +51,25 @@ fun AsrModelInfo.downloadUrl(file: AsrModelFile, baseUrl: String?): String =
  *
  * ## 为什么不把模型打进 APK
  *
- * 两条都很大（78.1 MB / 189.8 MB），而用户通常只需要一条。打进包里等于让每个
- * 用户都为两条付费（下载体积、安装体积、以及 32 位设备上的存储），
+ * 三条都很大（78.1 MB / 169.0 MB / 189.8 MB），而用户通常只需要一条。打进包里等于让每个
+ * 用户都为三条付费（下载体积、安装体积、以及 32 位设备上的存储），
  * 而字幕生成这个功能是**用的时候才需要**。所以模型放在应用私有目录里按需下载。
  *
  * ## 为什么选 `.int8` 量化版
  *
  * 手机上跑的瓶颈是算力（见 [AsrModelInfo.engine] 的注释），int8 版比 fp32 小一半、
- * 快一倍，而这两个模型在中文上的字错率差别在字幕场景下可以忽略。
- * 注意 Zipformer 的 **decoder 没有 int8 版**（上游那个包里就是 fp32 的），
- * 这不是写错了。
+ * 快一倍，而量化在这几条模型上的字错率差别在字幕场景下可以忽略。
+ *
+ * 但 **decoder 一律保持 fp32**，这不是写错了：上游给出的 int8 组合就是「encoder int8 +
+ * decoder fp32 + joiner int8」，decoder 不量化是意料之中的取舍——它的输出要直接喂给
+ * joint network，量化误差会嵌进每一次解码。而它本身只有十几 MB，省不下多少下载量。
+ * （中英那条上游只有 fp32 的 decoder；日语那条虽有 int8 版也按官方取 fp32，
+ * 它的 joiner 同理取 fp32——那个镜像里只提供 fp32，更准，代价只有 8 MB。）
  */
 object AsrModelCatalog {
 
     /**
-     * 两条模型的 id。
+     * 三条模型的 id。
      *
      * 声明顺序不能随意：`DEFAULT_ID` 引用 `PARA_FORMER_ID`，而 object 里的
      * `const val` 初始化是按书写顺序做的，写在后面就会报
@@ -73,6 +77,7 @@ object AsrModelCatalog {
      */
     const val PARA_FORMER_ID: String = "paraformer-zh-small"
     const val ZIPFORMER_ID: String = "zipformer-bilingual-zh-en"
+    const val JAPANESE_ZIPFORMER_ID: String = "zipformer-ja-reazonspeech"
 
     /** 用户没选、或者存的值已经不存在时用哪一条。 */
     const val DEFAULT_ID: String = PARA_FORMER_ID
@@ -136,8 +141,66 @@ object AsrModelCatalog {
         ),
     )
 
+    /**
+     * 日语专用模型（ReazonSpeech 训练的 zipformer transducer）。
+     *
+     * ## 为什么指着一个第三方镜像仓库，而不指官方发布
+     *
+     * 官方只从 GitHub Releases 发 `.tar.bz2`（包名 `sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01`），
+     * HuggingFace 上没有对应的官方仓库（查官方仓库会得到 401，**但 401 只说明这个仓库名不存在，
+     * 不说明模型不存在**）。下载器只认「HF 仓库」这一种地址形状（见 [downloadUrl]），
+     * 所以这里指向社区在 HF 上放的**同源副本**：两个互不相干的镜像仓库里，`encoder` 与
+     * `tokens.txt` 的 sha256 完全一致，内容与官方包一致。多接一套 GitHub Releases 的地址拼接
+     * 与重定向处理，只为了省这一层间接，不划算。
+     *
+     * ## 精度组合：encoder int8 + decoder fp32 + joiner fp32
+     *
+     * 按上面「为什么选 `.int8`」那一节的理由取。joiner 本可以取 int8（另一个镜像提供），
+     * 但 fp32 更准，代价只有 8 MB。
+     *
+     * ## 这条模型只认日语
+     *
+     * ReazonSpeech 是纯日语语料，模型不认识中文、英文。它对韩语、粤语也没有能力——
+     * 想要「一条模型认多语」得换成 SenseVoice 那类，但体积会是这条的 1.4 倍且日语准确率
+     * 反而不如专用模型。所以选择是明确的：**要日语就用这条**。
+     */
+    private val japaneseZipformer = AsrModelInfo(
+        id = JAPANESE_ZIPFORMER_ID,
+        engine = AsrEngine.OFFLINE,
+        repo = "DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01",
+        name = MspText.Res(R.string.msp_asr_model_japanese_name),
+        description = MspText.Res(R.string.msp_asr_model_japanese_desc),
+        languageTag = "ja",
+        files = listOf(
+            AsrModelFile(
+                role = AsrFileRole.ENCODER,
+                path = "encoder-epoch-99-avg-1.int8.onnx",
+                sizeBytes = 154_670_139,
+                sha256 = "2c7bd08a8a99f9ddd0d9e458456577b1f6279214e51426f114f9eced44c54e1d",
+            ),
+            AsrModelFile(
+                role = AsrFileRole.DECODER,
+                path = "decoder-epoch-99-avg-1.onnx",
+                sizeBytes = 11_767_836,
+                sha256 = "58b18211ae06265466bfa17172dab574df94f76c8bcb61a3640c28ba860e4124",
+            ),
+            AsrModelFile(
+                role = AsrFileRole.JOINER,
+                path = "joiner-epoch-99-avg-1.onnx",
+                sizeBytes = 10_720_115,
+                sha256 = "d38a81d1191c9ed6de6a1719503692e07e3e973e2364adde0abae5eaaded1174",
+            ),
+            AsrModelFile(
+                role = AsrFileRole.TOKENS,
+                path = "tokens.txt",
+                sizeBytes = 45_754,
+                sha256 = "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def",
+            ),
+        ),
+    )
+
     /** 全部内置模型，顺序就是设置页里的显示顺序（小的在前）。 */
-    val models: List<AsrModelInfo> = listOf(paraformerZhSmall, zipformerBilingualZhEn)
+    val models: List<AsrModelInfo> = listOf(paraformerZhSmall, japaneseZipformer, zipformerBilingualZhEn)
 
     /** 按 id 找。找不到（老版本留下的值、手工改过的配置）回落到默认模型。 */
     fun byId(id: String?): AsrModelInfo {

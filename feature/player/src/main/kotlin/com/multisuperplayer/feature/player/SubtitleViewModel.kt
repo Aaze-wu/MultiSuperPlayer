@@ -26,6 +26,7 @@ import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import com.multisuperplayer.core.data.subtitle.SubtitleScan
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.bestAutoMatch
+import com.multisuperplayer.core.data.subtitle.freshVersionOf
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
@@ -648,7 +649,12 @@ class SubtitleViewModel(
             SubtitleSelection.Auto -> sources.bestAutoMatch()
             // 手选的照用，哪怕它已经不在候选列表里（重扫时目录暂时读不到之类）。
             // 用户明确点过的东西不该被自动逻辑推翻。
-            is SubtitleSelection.Source -> current.source
+            //
+            // 但**元数据要用这一次扫描的**：手选定下的是「哪一条文件」，不是那份文件
+            // 当时的体积。旧对象带着旧体积，而体积参与解析缓存的命中判定
+            // （见 ParsedSubtitleCache），沿用旧对象就等于「手选过的那条字幕以后
+            // 永远读不到新内容」——重新生成、外部改文件，界面都还是第一次那份解析结果。
+            is SubtitleSelection.Source -> sources.freshVersionOf(current.source)
             // 内嵌轨不走文件加载：行是内核给的，没有「选哪份文件」这一步。
             is SubtitleSelection.Embedded -> null
         }

@@ -31,8 +31,9 @@ private const val TAG = "SubtitleRepo"
  *
  * ## 缓存的是「解析结果」而不是「文件字节」
  *
- * 解析一份几千条的字幕要跑正则，比读文件贵得多。缓存挂在 uri 上、按访问顺序淘汰，
- * 上限很小（[MAX_CACHED_DOCUMENTS]）——单条媒体的候选字幕通常只有几个，
+ * 解析一份几千条的字幕要跑正则，比读文件贵得多。缓存的键是「uri + 体积」
+ * （见 [ParsedSubtitleCache]：只按 uri 命中会让「文件内容变了」永远读到旧解析结果），
+ * 上限很小（[ParsedSubtitleCache.MAX_ENTRIES]）——单条媒体的候选字幕通常只有几个，
  * 缓存存在的意义是「切走再切回来别重新解析」，不是当数据库用。
  */
 class SubtitleRepository(
@@ -49,12 +50,7 @@ class SubtitleRepository(
 
     private val cacheMutex = Mutex()
 
-    /** `accessOrder = true`：读一次就把它挪到队尾，淘汰最久没用过的。 */
-    private val cache = object :
-        LinkedHashMap<String, SubtitleDocument>(CACHE_INITIAL_CAPACITY, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SubtitleDocument>): Boolean =
-            size > MAX_CACHED_DOCUMENTS
-    }
+    private val cache = ParsedSubtitleCache()
 
     /**
      * 找出这条媒体的字幕候选，按关联度从高到低排序。
@@ -197,13 +193,16 @@ class SubtitleRepository(
     }
 
     /**
-     * 读取并解析一条字幕。同一个 uri 第二次调用直接给缓存。
+     * 读取并解析一条字幕。同一条（uri + 体积都一样）第二次调用直接给缓存。
+     *
+     * 体积参与命中判定的理由见 [ParsedSubtitleCache]：只按 uri 命中会让「重新生成字幕」
+     * 和「重新扫描字幕」都读不到新内容。
      *
      * 失败**不进缓存**：文件可能只是暂时读不到（SD 卡没挂上、权限刚授予），
      * 把失败缓存下来会让用户怎么重试都没用。
      */
     suspend fun load(source: SubtitleSource): SubtitleLoadResult {
-        cacheMutex.withLock { cache[source.uri] }?.let { return SubtitleLoadResult.Loaded(it) }
+        cacheMutex.withLock { cache.get(source) }?.let { return SubtitleLoadResult.Loaded(it) }
 
         return withContext(dispatchers.io) {
             val bytes = try {
@@ -235,7 +234,7 @@ class SubtitleRepository(
             }
 
             val document = buildDocument(source, decoded, parsed)
-            cacheMutex.withLock { cache[source.uri] = document }
+            cacheMutex.withLock { cache.put(source, document) }
             MspLog.d(TAG) {
                 "${source.fileName} 解析出 ${document.cues.size} 条字幕（判定格式 ${parsed.format}）"
             }
@@ -352,10 +351,6 @@ class SubtitleRepository(
     }
 
     private companion object {
-        /** 单条媒体同时挂着的字幕文档上限。 */
-        const val MAX_CACHED_DOCUMENTS = 6
-        const val CACHE_INITIAL_CAPACITY = 8
-
         /** 8 MB。正常字幕文件在几百 KB 量级，超过这个数基本是选错了文件。 */
         const val MAX_SOURCE_BYTES = 8L * 1024 * 1024
     }

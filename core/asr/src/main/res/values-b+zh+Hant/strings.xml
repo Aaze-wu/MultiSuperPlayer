@@ -7,6 +7,9 @@
     <string name="msp_asr_model_paraformer_name">中文離線（Paraformer 小模型）</string>
     <string name="msp_asr_model_paraformer_desc">純中文辨識，速度快、錯字少，適合為中文影片生成字幕。</string>
 
+    <string name="msp_asr_model_japanese_name">日語離線（ReazonSpeech）</string>
+    <string name="msp_asr_model_japanese_desc">日語專用，只認日語：中文和英文都辨識不出來。整段解碼，在日語上比串流模型更準。</string>
+
     <string name="msp_asr_model_zipformer_name">中英雙語串流（Zipformer）</string>
     <string name="msp_asr_model_zipformer_desc">支援中英混說，句中的英文會原樣保留。模型體積更大，辨識速度較慢。</string>
 

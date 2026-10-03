@@ -22,6 +22,12 @@
     <string name="msp_asr_model_paraformer_name">中文离线（Paraformer 小模型）</string>
     <string name="msp_asr_model_paraformer_desc">纯中文识别，速度快、错字少，适合为中文视频生成字幕。</string>
 
+    <string name="msp_asr_model_japanese_name">日语离线（ReazonSpeech）</string>
+    <string name="msp_asr_model_japanese_desc">日语专用，只认日语：中文和英文都识别不出来。整段解码，在日语上比流式模型更准。</string>
+
+    <string name="msp_asr_model_zipformer_name">中英双语流式（Zipformer）</string>
+    <string name="msp_asr_model_zipformer_desc">支持中英混说，句中的英文会原样保留。模型体积更大，识别速度较慢。</string>
+
     <!-- 失败提示。每种失败一句话，因为「下一步该做什么」不同：网络等一等、
          源不对换一个、空间不够清理一下。合成一句「生成失败」会让人反复重试
          一个必然失败的操作。 -->
@@ -38,8 +44,5 @@
     <string name="msp_asr_error_engine">识别引擎出错：%1$s</string>
     <string name="msp_asr_error_storage">字幕已生成，但保存失败（存储空间可能不足）</string>
     <string name="msp_asr_error_unknown">识别失败：%1$s</string>
-
-    <string name="msp_asr_model_zipformer_name">中英双语流式（Zipformer）</string>
-    <string name="msp_asr_model_zipformer_desc">支持中英混说，句中的英文会原样保留。模型体积更大，识别速度较慢。</string>
 
 </resources>

@@ -106,6 +106,14 @@ class AsrTranscriber internal constructor(
                 while (true) {
                     val speech = engine.nextSegment() ?: break
                     val text = AsrTextNormalizer.normalize(engine.recognize(speech.samples))
+                    // 每段的**区间**只有这一行会写出来。切句出问题时（并句、丢开头）
+                    // 别的日志只能告诉你「一共几条」，看不出「本该 6 条却只有 2 条」，
+                    // 也看不出那 2 条横跨了 11 秒。记在 DEBUG 上：release 的 INFO
+                    // 门限会挡掉它，不会给两小时的片子刷出上千行。
+                    MspLog.d(TAG) {
+                        "VAD 段：${speech.startSample} 起 ${speech.samples.size} 采样" +
+                            " → 「${text.take(40)}」"
+                    }
                     // 纯噪声段（VAD 判成语音但识不出字）直接丢掉：留一条空字幕
                     // 在屏幕上会让用户以为生成坏了。丢在这里而不是最后，
                     // 是为了让后面的外扩/分界逻辑看到的是真正相邻的两句。

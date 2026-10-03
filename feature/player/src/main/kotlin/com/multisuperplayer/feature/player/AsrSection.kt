@@ -95,6 +95,15 @@ internal fun AsrSection(
 @Composable
 private fun IdleBlock(state: AsrUiState.Idle, onGenerate: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            // 模型是在设置页选的，按钮在这里。不把「这一条认什么语言」写到按钮旁边，
+            // 用户就只能靠自己记得上次在设置里点了哪一行。选错的代价不是报错，而是
+            // 几句听起来像那么回事的胡话（实测：中文素材 + 日语模型 → 两条「はい」），
+            // 而他会以为「语音识别这东西不准」。
+            text = MspText.Res(R.string.msp_player_asr_using_model, state.model.name).string(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (!state.installed) {
             Text(
                 // 先把体积说清楚：不打招呼就用流量下几十上百 MB 是另一回事。

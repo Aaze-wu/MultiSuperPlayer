@@ -6,6 +6,7 @@ import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineParaformerModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
 import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
@@ -27,6 +28,17 @@ import java.io.IOException
  * 只把「一个起点 + 一个样本数组」这种纯数据交出去。
  */
 internal class DetectedSpeech(val startSample: Int, val samples: FloatArray)
+
+/**
+ * 取清单里某个角色文件的绝对路径。
+ *
+ * 引擎要交给 JNI 的是一串**绝对路径**，而清单里存的是「仓库内的相对路径」——
+ * 两件事合在一起写就成了 `locator.fileOf(model, model.file(role)).absolutePath`，
+ * 一屏里出现六次。缺角色的情况由 [AsrModelInfo.file] 报出来（带角色名），
+ * 所以这里不需要自己判空。
+ */
+private fun AsrModelLocator.pathOf(model: AsrModelInfo, role: AsrFileRole): String =
+    fileOf(model, model.file(role)).absolutePath
 
 /**
  * 「一段样本 → 一句话」这一步的策略。
@@ -125,10 +137,24 @@ internal class SherpaEngine(
     private val recognizer: SegmentRecognizer,
 ) : Closeable {
 
-    /** 喂一块 16 kHz 单声道样本。块长随意，VAD 自己按窗口攒。 */
+    /**
+     * 喂给 VAD 的闸门：**不管调用方给多大的块，进 `acceptWaveform` 的永远是一个窗口**。
+     *
+     * 这不是省开销，是正确性：一次喂大会让 VAD 漏掉这块里的大部分音频（静音看不见 →
+     * 并句 → 超长段识别成几个字）。实测数据见 [VadWindowFeeder] 的类注释——
+     * 按解码器块长 16384 点喂，同一段 18 秒 6 句的素材只出 2 段；按 512 点喂出 6 段。
+     */
+    private val windows = VadWindowFeeder(AsrVadTuning.WINDOW_SIZE) { vad.acceptWaveform(it) }
+
+    /**
+     * 喂一块 16 kHz 单声道样本。块长随意——切窗口是这里的事，见 [windows]。
+     *
+     * 解码器（[PcmExtractor]）一给就是 16384 个采样点，直接转手给 VAD 就是我们
+     * 踩过的那个坑，所以这里必须过一手。
+     */
     fun accept(chunk: FloatArray) {
         if (chunk.isNotEmpty()) {
-            vad.acceptWaveform(chunk)
+            windows.accept(chunk)
         }
     }
 
@@ -151,8 +177,14 @@ internal class SherpaEngine(
         return null
     }
 
-    /** 音频喂完了。调用之后仍要 `nextSegment()` 直到 `null`，否则最后一段会丢。 */
+    /**
+     * 音频喂完了。调用之后仍要 `nextSegment()` 直到 `null`，否则最后一段会丢。
+     *
+     * 顺序不能反：先把不足一窗的尾巴补齐喂给 VAD（见 [VadWindowFeeder.finish]），
+     * 再 `flush()`。反过来的话，最后那最多 32 ms 的音频从来没进过 VAD。
+     */
     fun finish() {
+        windows.finish()
         vad.flush()
     }
 
@@ -230,21 +262,41 @@ internal class SherpaEngineFactory(private val context: Context) {
         )
         val tokens = locator.fileOf(model, model.file(AsrFileRole.TOKENS)).absolutePath
         when (model.engine) {
+            // 离线这一档里有两种**不同的模型形状**，必须分开填配置对象：
+            // 单文件模型填 `paraformer`，transducer（zipformer）填 `transducer` 三件套。
+            //
+            // 填错了不是「效果差一点」：JNI 会把**没填的那些字段当成空路径**去加载，
+            // 于是报出来的是原生层的模型加载失败，堆栈里一个字都读不出来，看起来
+            // 像模型文件坏了。所以这里跟着清单里的角色走，而不是跟着「模型叫什么」猜。
             AsrEngine.OFFLINE -> OfflineSegmentRecognizer(
                 OfflineRecognizer(
                     assetManager = null,
                     config = OfflineRecognizerConfig(
                         featConfig = featureConfig,
-                        modelConfig = OfflineModelConfig(
-                            paraformer = OfflineParaformerModelConfig(
-                                model = locator.fileOf(model, model.file(AsrFileRole.MODEL)).absolutePath,
-                            ),
-                            tokens = tokens,
-                            numThreads = INFERENCE_THREADS,
-                            provider = PROVIDER,
-                            debug = false,
-                            modelType = "paraformer",
-                        ),
+                        modelConfig = if (model.isTransducer) {
+                            OfflineModelConfig(
+                                transducer = OfflineTransducerModelConfig(
+                                    encoder = locator.pathOf(model, AsrFileRole.ENCODER),
+                                    decoder = locator.pathOf(model, AsrFileRole.DECODER),
+                                    joiner = locator.pathOf(model, AsrFileRole.JOINER),
+                                ),
+                                tokens = tokens,
+                                numThreads = INFERENCE_THREADS,
+                                provider = PROVIDER,
+                                debug = false,
+                            )
+                        } else {
+                            OfflineModelConfig(
+                                paraformer = OfflineParaformerModelConfig(
+                                    model = locator.pathOf(model, AsrFileRole.MODEL),
+                                ),
+                                tokens = tokens,
+                                numThreads = INFERENCE_THREADS,
+                                provider = PROVIDER,
+                                debug = false,
+                                modelType = "paraformer",
+                            )
+                        },
                     ),
                 ),
             )
@@ -256,9 +308,9 @@ internal class SherpaEngineFactory(private val context: Context) {
                         featConfig = featureConfig,
                         modelConfig = OnlineModelConfig(
                             transducer = OnlineTransducerModelConfig(
-                                encoder = locator.fileOf(model, model.file(AsrFileRole.ENCODER)).absolutePath,
-                                decoder = locator.fileOf(model, model.file(AsrFileRole.DECODER)).absolutePath,
-                                joiner = locator.fileOf(model, model.file(AsrFileRole.JOINER)).absolutePath,
+                                encoder = locator.pathOf(model, AsrFileRole.ENCODER),
+                                decoder = locator.pathOf(model, AsrFileRole.DECODER),
+                                joiner = locator.pathOf(model, AsrFileRole.JOINER),
                             ),
                             tokens = tokens,
                             numThreads = INFERENCE_THREADS,

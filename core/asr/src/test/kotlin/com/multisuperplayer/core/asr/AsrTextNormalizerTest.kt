@@ -114,6 +114,32 @@ class AsrTextNormalizerTest {
     }
 
     @Test
+    fun `日语的假名之间不留空格，假名与英文之间的保留`() {
+        // 日语那条模型也是**逐字 token** 输出（官方示例里就是 "よ", "う", "呼", "び"）。
+        // 假名没被算进「中日韩字符」的话，一条日语字幕会变成「こ ん に ち は」——
+        // 那不是日语正字法，而屏幕上看不出是程序的问题还是模型的问题。
+        assertEquals("こんにちは", AsrTextNormalizer.normalize("こ ん に ち は"))
+        assertEquals("こんにちは世界", AsrTextNormalizer.normalize("こんにちは 世界"))
+        assertEquals("今日はいい天気ですね", AsrTextNormalizer.normalize("今日 は いい 天気 です ね"))
+        // 片假名区里除了假名还有长音符「ー」和中点「・」，它们跟着一起折叠
+        assertEquals("ロボット・アニメーション", AsrTextNormalizer.normalize("ロボット ・ アニメーション"))
+
+        // 但「假名和拉丁字母之间」的那个空格是**内容**：日文里夹英文单词时不能吃掉
+        assertEquals("こんにちは world", AsrTextNormalizer.normalize("こんにちは world"))
+        assertEquals("NHK のニュース", AsrTextNormalizer.normalize("NHK の ニュース"))
+    }
+
+    @Test
+    fun `日语的行首标点同样被去掉`() {
+        // 「。」「、」都在 LEADING_PUNCTUATION 里，规则不区分中日的句读
+        assertEquals("今日はいい天気ですね", AsrTextNormalizer.normalize("。今日はいい天気ですね"))
+        // 行尾的感叹号是正常内容
+        assertEquals("美味しい！", AsrTextNormalizer.normalize("美味しい！"))
+        // 只有假名结果的照样算有意义（假名是 Letter），这一点与中文一致
+        assertTrue(AsrTextNormalizer.isMeaningful(AsrTextNormalizer.normalize("はい")))
+    }
+
+    @Test
     fun `isMeaningful 认字母和数字，不认纯标点`() {
         assertTrue(AsrTextNormalizer.isMeaningful("你好"))
         assertTrue(AsrTextNormalizer.isMeaningful("abc"))
