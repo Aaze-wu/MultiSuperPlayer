@@ -185,4 +185,18 @@
     <string name="msp_import_error_read">Could not read the file: %1$s</string>
     <string name="msp_import_error_save">Import failed: the playlists were not written (storage may be full)</string>
 
+    <!-- ==== Network URLs (type an address and play it) ====
+         The rules that decide what counts as a valid address live in core:data
+         (`RemoteUrlRules.normalize`); these strings only report the verdict.
+         None of them has leading or trailing whitespace, so no quoting is needed. -->
+    <string name="msp_network_title">Network URLs</string>
+    <string name="msp_network_source_desc">Play an http or https link directly. NAS and media servers on your local network work too.</string>
+    <string name="msp_network_input_label">Link to a video or audio file</string>
+    <string name="msp_network_input_hint">Starts with http:// or https://, or just a domain name</string>
+    <string name="msp_network_invalid">This is not a playable address: use an http:// or https:// link, or a domain name</string>
+    <string name="msp_network_play">Play</string>
+    <string name="msp_network_history">Recently used</string>
+    <string name="msp_network_empty_title">No network address has been played yet</string>
+    <string name="msp_network_empty_desc">Enter a link above to play it right away. Recently used addresses stay here so you can play them again with one tap.</string>
+    <string name="msp_network_remove">Remove from the list</string>
 </resources>

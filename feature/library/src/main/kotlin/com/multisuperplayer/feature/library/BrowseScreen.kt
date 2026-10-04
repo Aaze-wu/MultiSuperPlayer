@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -84,11 +85,14 @@ private const val BROWSE_TAG = "BrowseRoute"
  * @param onOpenSubtitle 点一个字幕文件时，把这条候选交给它。与 [onPlayRequest]
  *   分开是必要的：字幕**不是媒体**，它要去的地方（当前正在播的那条）完全不同，
  *   而把 `.srt` 混进播放队列只会得到一句「无法播放」。
+ * @param onOpenNetwork 点来源清单里的「网络地址」时去哪里。页面本体不知道自己
+ *   能被导航到哪儿（那一层的知识在 `MspApp` 的导航图里），所以只能由外面传进来。
  */
 @Composable
 fun BrowseRoute(
     onPlayRequest: (List<MediaEntry>, Int) -> Unit = { _, _ -> },
     onOpenSubtitle: (SubtitleSource) -> Unit = {},
+    onOpenNetwork: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val viewModel: BrowseViewModel = koinViewModel()
@@ -227,6 +231,7 @@ fun BrowseRoute(
             // 页面本体不该为了这件事也去依赖 `SubtitleFileNaming`。
             onOpenSubtitle(subtitleSourceOf(entry.ref, entry.name, entry.sizeBytes))
         },
+        onOpenNetwork = onOpenNetwork,
     )
 
     if (pickerOpen) {
@@ -276,6 +281,7 @@ internal fun BrowseScreen(
     onOpenAllFilesAccess: () -> Unit = {},
     onOpenFile: (BrowserEntry) -> Unit = {},
     onOpenSubtitle: (BrowserEntry) -> Unit = {},
+    onOpenNetwork: () -> Unit = {},
 ) {
     val trail = state.trail
     if (trail == null) {
@@ -286,6 +292,7 @@ internal fun BrowseScreen(
             onAddTree = onAddTree,
             onRemoveTree = onRemoveTree,
             onOpenAllFilesAccess = onOpenAllFilesAccess,
+            onOpenNetwork = onOpenNetwork,
         )
     } else {
         DirectoryBrowser(
@@ -323,6 +330,7 @@ private fun SourceList(
     onAddTree: () -> Unit,
     onRemoveTree: (String) -> Unit,
     onOpenAllFilesAccess: () -> Unit,
+    onOpenNetwork: () -> Unit,
 ) {
     Scaffold(
         modifier = modifier,
@@ -347,6 +355,10 @@ private fun SourceList(
                 container = MaterialTheme.colorScheme.surfaceVariant,
                 content = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // 「网络地址」固定在提示条下面，**不在** `roots` 那一支里：
+            // 一个文件夹都没授权时它也得在。看网络地址本来就不需要存储权限，
+            // 把它藏进「有授权才显示」的清单里，等于让只想看网络片子的人无从下手。
+            NetworkSourceRow(onEnter = onOpenNetwork)
             val roots = state.roots
             when {
                 roots == null -> Centered { CircularProgressIndicator() }
@@ -376,6 +388,55 @@ private fun SourceList(
             }
         }
     }
+}
+
+/**
+ * 来源清单里的「网络地址」这一行。
+ *
+ * ## 为什么它是一个动作行，而不是一个 [BrowserRoot]
+ *
+ * [BrowserRoot] 描述的是「一个能逐层浏览的位置」：它有 `ref`、能进到目录里、
+ * 由 `DirectorySource` 列出内容。网络地址这三件都没有——它是一串用户手输的地址，
+ * 没有一个「当前目录」可列。硬塞进去的代价是给 [BrowserSourceKind] 加一个新成员，
+ * 再让 `BrowserRoots`、`BrowserRepository.sourceOf`、`BrowserTrail` 都跟着处理
+ * 一个**永远列不出东西**的来源；而 `BrowserTrail` 要求至少一节面包屑、那一节还
+ * 必须有一个真实的 `ref`，为它编一个假 ref 只会让「返回上一层」变成一句空话。
+ * 所以这里就是一个跳转动作：点了去另一页，那一页自己管输入与历史。
+ *
+ * ## 为什么它的位置不跟着 `roots` 走
+ *
+ * 一个文件夹都没授权的时候这一行也得在：用网络地址看片子本来就不需要任何存储权限，
+ * 而把它放进「有授权才显示」的那个清单里，等于让只想看网络片子的人无从下手。
+ */
+@Composable
+private fun NetworkSourceRow(onEnter: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onEnter),
+        leadingContent = {
+            Icon(
+                imageVector = Icons.Outlined.Public,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        headlineContent = {
+            Text(
+                text = stringResource(R.string.msp_network_title),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        // 允许两行：这句说明要同时讲「可以直接放一个链接」和「局域网里的 NAS 也行」，
+        // 挤成一行必然被截成「直接播放一个 http / https 链接，也能放局域网里…」，
+        // 而截掉的那半句恰好是很多人真正想找的功能。
+        supportingContent = {
+            Text(
+                text = stringResource(R.string.msp_network_source_desc),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+    )
 }
 
 @Composable

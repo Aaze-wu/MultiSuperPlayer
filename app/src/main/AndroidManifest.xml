@@ -124,7 +124,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- 系统“打开方式” -->
+            <!-- 系统的「打开方式」。
+
+                 数据元素是**元素之间取并集、元素之内取交集**：单独一条
+                 `<data android:scheme="file" />` = 「file 开头的任何类型」，
+                 单独一条 `<data android:mimeType="video/*" />` = 「任何 scheme 的 video」。
+                 也就是说下面这两条单独的元素其实已经把 http/https 上的视频包进来了：
+                 浏览器能报出 `video/mp4` 时，本应用已经会出现在「打开方式」里。
+                 后面那四条把 scheme 显式写出来，一是把这个事实写在纸面上，
+                 二是不依赖「读者正确理解那个并集语义」。
+
+                 ⚠️ 这里**刻意没有**只写 `<data android:scheme="http" />` 的元素：
+                 那一条会让本应用出现在**每一次网页链接的「打开方式」里**
+                 （新闻、购物、任何链接都是），既是骚扰，也会让用户把
+                 「用本应用打开」当成浏览器坏了。需要放网络地址时走应用内的
+                 「网络」入口（浏览页里那一行），不靠污染系统选择器。 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -133,11 +147,31 @@
                 <data android:scheme="content" />
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="video/*" />
+                <!-- 网页调起（如 OpenList / Alist 的「用外部应用打开」）：
+                     scheme 与类型**必须成对写出**，理由见上面的警告。 -->
+                <data
+                    android:mimeType="audio/*"
+                    android:scheme="http" />
+                <data
+                    android:mimeType="video/*"
+                    android:scheme="http" />
+                <data
+                    android:mimeType="audio/*"
+                    android:scheme="https" />
+                <data
+                    android:mimeType="video/*"
+                    android:scheme="https" />
             </intent-filter>
 
-            <!-- 从其他应用分享 -->
+            <!-- 从其他应用分享（单条 + 多条）。
+
+                 `ACTION_SEND_MULTIPLE` 必须单独声明：系统不会把「分享 3 个视频」
+                 当成 3 次 `ACTION_SEND`，它用的是另一个 action，少了这行就是
+                 「选了几个视频里没有本应用」。收到多份时的行为是整队进队列、
+                 从第一条开始放。 -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="video/*" />

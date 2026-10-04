@@ -105,14 +105,29 @@ data class PlaylistItem(
         /**
          * 从 [MediaEntry.id] 反推来源。
          *
-         * 只有**浏览页自己造的那个前缀**能反推（它是我们写进去的，见
-         * `BrowserEntry.MEDIA_ID_PREFIX`）；其余（MediaStore 的数字 id、
-         * `saf:` 开头的字符串）一律算媒体库——不能因为「看起来不像数字」就下结论，
+         * 只有**我们自己写进去的那几个前缀**能反推（浏览页的
+         * `BrowserEntry.MEDIA_ID_PREFIX`、网络地址与外部打开的
+         * [ExternalMediaIds]）；其余（MediaStore 的数字 id、`saf:` 开头的字符串）
+         * 一律算媒体库——不能因为「看起来不像数字」就下结论，
          * 猜错会把 SAF 条目送去按文件路径查字幕（同样是查不到）。
+         *
+         * ## 为什么是 `when` 而不是 `if / else`
+         *
+         * 这里原本只有两个分支（浏览页前缀 / 其余），于是「新增一个来源」
+         * 这件事在编译期没有任何提示：新来源的条目回放时静默退化成
+         * [MediaSource.MEDIA_STORE]，症状是**同目录字幕永远找不到**，
+         * 而且只有真的去播那个文件才看得出来。改成 `when` 之后，
+         * 至少每条前缀各占一行，加来源时这里会在 diff 里显形。
+         *
+         * 各前缀互不重叠，所以顺序无关；`else` 保持媒体库不变：
+         * 认不出来的 id 按最保守的假设处理，是这一整段唯一不会说谎的默认值。
          */
-        fun sourceOf(mediaId: String): MediaSource =
-            if (BrowserEntry.isBrowserMediaId(mediaId)) MediaSource.FILE_SYSTEM
-            else MediaSource.MEDIA_STORE
+        fun sourceOf(mediaId: String): MediaSource = when {
+            ExternalMediaIds.isRemoteId(mediaId) -> MediaSource.REMOTE
+            ExternalMediaIds.isSharedId(mediaId) -> MediaSource.SHARED
+            BrowserEntry.isBrowserMediaId(mediaId) -> MediaSource.FILE_SYSTEM
+            else -> MediaSource.MEDIA_STORE
+        }
     }
 }
 

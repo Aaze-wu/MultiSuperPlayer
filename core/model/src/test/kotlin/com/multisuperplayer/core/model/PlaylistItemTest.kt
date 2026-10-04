@@ -53,4 +53,46 @@ class PlaylistItemTest {
         val item = PlaylistItem(mediaId = "12345", uri = "content://x", title = "movie")
         assertEquals(MediaSource.SHARED, item.toEntry(MediaSource.SHARED).source)
     }
+
+    @Test
+    fun `手输的网络地址回放时仍然是远端来源`() {
+        // 和上面那个 SAF 用例是同一条原则：判据是「是不是我们写进去的那个前缀」。
+        // 判成媒体库的话，字幕查找会去问 MediaStore 要这条 http 地址的「同目录」。
+        val url = "https://host/dir/a.mp4"
+        val id = ExternalMediaIds.remoteIdOf(url)
+
+        assertEquals("url:https://host/dir/a.mp4", id)
+        assertEquals(MediaSource.REMOTE, PlaylistItem.sourceOf(id))
+        assertEquals(
+            MediaSource.REMOTE,
+            PlaylistItem(mediaId = id, uri = url, title = "a").toEntry().source,
+        )
+    }
+
+    @Test
+    fun `分享进来的 content uri 不会被当成媒体库条目`() {
+        // 两者都长成 `content://…`，只能靠前缀区分：`shared:` 是外部应用递进来的
+        // （读权限跟着那次调用，和 MediaStore 无关），不带前缀的才是媒体库。
+        // 认错同样不会报错，只会让同目录字幕去问 MediaStore 要一个不存在的相对路径。
+        val uri = "content://com.other.app/video/9"
+        val id = ExternalMediaIds.sharedIdOf(uri)
+
+        assertEquals(MediaSource.SHARED, PlaylistItem.sourceOf(id))
+        assertEquals(
+            MediaSource.SHARED,
+            PlaylistItem(mediaId = id, uri = uri, title = "v").toEntry().source,
+        )
+    }
+
+    @Test
+    fun `四个来源的前缀互不包含`() {
+        // `sourceOf` 用的是 when + 前缀判断，分支顺序不影响结果的前提正是
+        // 「没有任何一个前缀是另一个的前缀」。这条用例把这个前提钉在原地，
+        // 将来谁改了前缀（比如把 `url:` 改成 `u:`）会立刻失败。
+        assertEquals(MediaSource.FILE_SYSTEM, PlaylistItem.sourceOf(BrowserEntry.mediaIdOf("/sdcard/a.mp4")))
+        assertEquals(MediaSource.REMOTE, PlaylistItem.sourceOf(ExternalMediaIds.remoteIdOf("http://a/b.mp4")))
+        assertEquals(MediaSource.SHARED, PlaylistItem.sourceOf(ExternalMediaIds.sharedIdOf("content://a/b.mp4")))
+        // SAF 的 id 里带 `:`，但它不带任何前缀 ⇒ 落到最保守的分支。
+        assertEquals(MediaSource.MEDIA_STORE, PlaylistItem.sourceOf("saf:primary:Music/a.flac"))
+    }
 }

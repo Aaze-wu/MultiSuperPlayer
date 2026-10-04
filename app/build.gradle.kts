@@ -40,7 +40,13 @@ plugins {
 // 第一个「功能已经封口」的版本，再挂一个 beta 后缀只会让用户以为它还没做完。
 // versionCode 10000 —— 注意这里 major 第一次不是 0，所以那串数字从三位跳到了五位，
 // 界面/文档里核对版本时别再照着三位数去找。
-val appVersionName: String = "1.0.0"
+//
+// 1.1.0 这一档发 beta：外部来源（别的应用打开、网页调起、手输网络地址）这一组
+// 功能会碰系统的 intent 解析与清单匹配，而这两件事**在 JVM 单测里几乎观测不到**
+// （匹配规则由系统决定、`Intent` 在单测里是空壳）。先发 beta 让真机上先跑一轮。
+// versionCode 10100 —— 与 1.0.0 的 10000 同段不同档，覆盖安装不报降级。
+// ⚠️ alpha 是内部测试用的通道名，不公开发布；公开发布一律用 beta。
+val appVersionName: String = "1.1.0-beta.1"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

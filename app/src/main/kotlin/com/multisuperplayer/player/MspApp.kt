@@ -36,6 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import com.multisuperplayer.core.model.text.MspText
+import com.multisuperplayer.core.data.external.PendingExternalPlayback
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.ui.chrome.AppChromeState
@@ -50,6 +51,7 @@ import com.multisuperplayer.core.ui.theme.MspTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import com.multisuperplayer.feature.library.BrowseRoute
 import com.multisuperplayer.feature.library.LibraryRoute
+import com.multisuperplayer.feature.library.NetworkRoute
 import com.multisuperplayer.feature.library.PlaylistsRoute
 import com.multisuperplayer.feature.library.RecentRoute
 import com.multisuperplayer.feature.player.PlayerRoute
@@ -68,6 +70,7 @@ import com.multisuperplayer.feature.settings.StartupUpdateDialog
 import com.multisuperplayer.feature.settings.TranslationSettingsRoute
 import com.multisuperplayer.feature.settings.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.context.GlobalContext
 
 /**
  * 应用级脚手架：主题 + 底部导航 + 导航图。
@@ -176,6 +179,16 @@ fun MspApp() {
     // 而需要让位的 NavigationBar 在这上面好几层。
     val chromeState = remember { AppChromeState() }
 
+    // 外部递进来的播放请求（别的应用「用本应用打开」、网页调起、分享）。
+    //
+    // 它是 Koin 单例而不是 ViewModel，所以这里只能用容器取——`koinViewModel()`
+    // 拿的是 ViewModel，而这一份状态的生命周期必须长于任何一个页面：写它的是
+    // `MainActivity.onCreate` / `onNewIntent`，读它的是这棵树里的一个
+    // `LaunchedEffect`（两者不是同一个 `ViewModelStoreOwner`）。
+    //
+    // `remember`：Koin 的解析是查表，但没必要每次重组都查一遍。
+    val pendingExternal = remember { GlobalContext.get().get<PendingExternalPlayback>() }
+
     CompositionLocalProvider(
         LocalArtworkAccentState provides artworkAccentState,
         LocalAppChromeState provides chromeState,
@@ -188,7 +201,10 @@ fun MspApp() {
             colorFromArtwork = theme.colorFromArtwork ?: MspThemeDefaults.COLOR_FROM_ARTWORK,
             customAccent = customAccentSeeds,
         ) {
-            MspAppScaffold(updateViewModel = updateViewModel)
+            MspAppScaffold(
+                updateViewModel = updateViewModel,
+                pendingExternal = pendingExternal,
+            )
         }
     }
 }
@@ -223,6 +239,15 @@ private enum class MspDestination(
  * 用户在播放页按返回键应该回到刚才那个列表，而不是退出应用。
  */
 private const val PLAYER_ROUTE = "player"
+
+/**
+ * 网络地址页（手输链接直接播放）。
+ *
+ * 它不是标签页，而是从**浏览页的来源清单**推上来的普通目的地——和
+ * [PLAYER_ROUTE] 一样是「从某一页进去、按返回键回那一页」的子页面。
+ * 它的入口在 `SourceList` 里那一个动作行上。
+ */
+private const val NETWORK_ROUTE = "network"
 
 /**
  * 翻译设置不是标签页，而是从设置页（或播放页字幕面板）推上来的普通目的地。
@@ -308,7 +333,10 @@ private const val PERMISSION_SETTLE_TIMEOUT_MS = 30_000L
 private const val LOCAL_MODEL_ROUTE = "settings/translation/local"
 
 @Composable
-private fun MspAppScaffold(updateViewModel: UpdateViewModel) {
+private fun MspAppScaffold(
+    updateViewModel: UpdateViewModel,
+    pendingExternal: PendingExternalPlayback,
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -441,6 +469,19 @@ private fun MspAppScaffold(updateViewModel: UpdateViewModel) {
                 BrowseRoute(
                     onPlayRequest = playFrom,
                     onOpenSubtitle = openSubtitle,
+                    // 「网络地址」那一行在浏览页里面，但去哪个页面只有这一层知道
+                    // （导航图住在这里），所以只能把 «去哪儿» 当参数传下去。
+                    // `launchSingleTop`：连点两次不会堆出两层网络地址页。
+                    onOpenNetwork = {
+                        navController.navigate(NETWORK_ROUTE) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable(NETWORK_ROUTE) {
+                NetworkRoute(
+                    onPlayRequest = playFrom,
+                    // 按返回键回到浏览页的来源清单。
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(MspDestination.RECENT.route) {
@@ -535,6 +576,27 @@ private fun MspAppScaffold(updateViewModel: UpdateViewModel) {
                 AboutRoute(onBack = { navController.popBackStack() })
             }
         }
+    }
+
+    // 外部递进来的播放请求（别的应用「用本应用打开」、网页调起、分享）。
+    //
+    // 为什么在这里消费：它说的是一件**和用户当前在哪一页无关**的事，和下面那个
+    // 启动更新弹窗同一类；而且只有这一层同时握着 `navController` 和 [playFrom]——
+    // 换到某一页里去消费的话，用户在别的标签页时这次请求就永远没人接。
+    //
+    // `LaunchedEffect(pending)` 的 key 是**那份条目本身**：每次 `submit` 都会换一个
+    // 新 list（不会原地改），所以应用活着时再收到一次分享一定会重新触发。
+    // 反过来如果把 key 写成 `Unit`，第二次请求就静默失效了。
+    val pendingExternalEntries by pendingExternal.entries.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingExternalEntries) {
+        val entries = pendingExternalEntries ?: return@LaunchedEffect
+        // **先取走再播**，顺序不能反：`consume()` 得在 `playFrom` 之前生效，
+        // 否则旋转屏幕/重建组合会让同一个待播被重放一次——用户看到的是
+        // 「刚打开的视频自己从头开始」。
+        pendingExternal.consume()
+        // 多文件分享是**整队进队列、从第一条开始**（用户决定）：分开播只能播一条，
+        // 而用户选中几条的时候说的就是「这些都放」。
+        playFrom(entries, 0)
     }
 
     // 启动检查查到新版本时挂在屏幕上的那个框。

@@ -183,4 +183,15 @@
     <string name="msp_import_error_read">讀取檔案失敗：%1$s</string>
     <string name="msp_import_error_save">匯入失敗，播放清單沒有寫進去（可能是儲存空間不足）</string>
 
+    <!-- 網路位址（手輸 URL 直接播放）。理由見 values/strings.xml 的同一段說明。 -->
+    <string name="msp_network_title">網路位址</string>
+    <string name="msp_network_source_desc">直接播放一個 http / https 連結，也可以放區域網路裡的 NAS、媒體伺服器。</string>
+    <string name="msp_network_input_label">影片或音訊的連結</string>
+    <string name="msp_network_input_hint">以 http:// 或 https:// 開頭，也可以只寫網域</string>
+    <string name="msp_network_invalid">這不是一個能播放的網址：填 http:// 或 https:// 的連結，或者一個網域</string>
+    <string name="msp_network_play">播放</string>
+    <string name="msp_network_history">最近用過</string>
+    <string name="msp_network_empty_title">還沒有播放過網路位址</string>
+    <string name="msp_network_empty_desc">在上面填一個連結就能直接播放。最近用過的網址會留在這裡，下次點一下就放。</string>
+    <string name="msp_network_remove">從清單裡移除</string>
 </resources>

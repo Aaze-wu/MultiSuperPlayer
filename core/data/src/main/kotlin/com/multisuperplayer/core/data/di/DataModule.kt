@@ -34,6 +34,9 @@ import com.multisuperplayer.core.data.subtitle.GeneratedSubtitleStore
 import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
 import com.multisuperplayer.core.data.export.TextExportWriter
 import com.multisuperplayer.core.data.export.TextImportReader
+import com.multisuperplayer.core.data.external.ExternalMediaResolver
+import com.multisuperplayer.core.data.external.PendingExternalPlayback
+import com.multisuperplayer.core.data.remote.RemoteUrlStore
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import com.multisuperplayer.core.data.update.GitHubReleasesSource
@@ -134,6 +137,21 @@ val dataModule = module {
      * 转发式注册（而不是再 new 一个）保证两条路拿到的是同一个实例。
      */
     single<PlaylistImportSink> { get<PlaylistStore>() }
+
+    // 手输网络地址的历史。单独一个 DataStore 文件（msp_remote）而不是混进 msp_settings：
+    // 它的键名长度不定、而且我们会按上限裁剪这份清单，两件事都不适合和用户设置挤在一起。
+    single { RemoteUrlStore(context = androidContext(), dispatchers = get()) }
+
+    // 外部递进来的 uri → MediaEntry（补上 provider 才知道的名字/大小/类型）。
+    // 无状态，注册成单例只是不想每次新建；真正的理由见类注释（必须在收到请求的
+    // **当下**就查，`content://` 的读权限只活在那一次调用里）。
+    single { ExternalMediaResolver(context = androidContext(), dispatchers = get()) }
+
+    // 「有外部请求进来，还没人播它」这一个跨层状态。必须是进程级单例：
+    // 写它的是 MainActivity（`onCreate` / `onNewIntent`），读它的是 `MspApp` 里的
+    // 一个 `LaunchedEffect`，两者生命周期不同——用 ViewModel 的话，
+    // `koinViewModel()` 在不同的 `LocalViewModelStoreOwner` 上拿到的是**两个实例**。
+    single { PendingExternalPlayback(resolver = get()) }
 
     // API Key 加密存起来（AndroidKeyStore + AES/GCM），密文进 msp_settings 这个 DataStore。
     single { ApiKeyStore(context = androidContext(), dispatchers = get()) }

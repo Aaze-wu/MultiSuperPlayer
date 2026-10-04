@@ -224,4 +224,20 @@
     <!-- 方案已经算好、写盘时才失败。和上面的「读不了」不是一回事。 -->
     <string name="msp_import_error_save">导入失败，播放列表没有写进去（可能是存储空间不足）</string>
 
+    <!-- ============================================================
+         网络地址（手输 URL 直接播放）
+         ============================================================
+         「合法不合法」由 core:data 的 `RemoteUrlRules.normalize` 判，文案只负责把
+         结论说出来。这里所有的字符串都不带首尾空白，所以不需要额外包引号。
+         ============================================================ -->
+    <string name="msp_network_title">网络地址</string>
+    <string name="msp_network_source_desc">直接播放一个 http / https 链接，也能放局域网里的 NAS、媒体服务器。</string>
+    <string name="msp_network_input_label">视频或音频的链接</string>
+    <string name="msp_network_input_hint">以 http:// 或 https:// 开头，也可以只写域名</string>
+    <string name="msp_network_invalid">这不是一个能播放的地址：填 http:// 或 https:// 的链接，或者一个域名</string>
+    <string name="msp_network_play">播放</string>
+    <string name="msp_network_history">最近用过</string>
+    <string name="msp_network_empty_title">还没有播放过网络地址</string>
+    <string name="msp_network_empty_desc">在上面填一个链接就能直接播放。最近用过的地址会留在这里，下次点一下就放。</string>
+    <string name="msp_network_remove">从列表里移除</string>
 </resources>

@@ -2,6 +2,7 @@ package com.multisuperplayer.feature.library.di
 
 import com.multisuperplayer.feature.library.BrowseViewModel
 import com.multisuperplayer.feature.library.LibraryViewModel
+import com.multisuperplayer.feature.library.NetworkViewModel
 import com.multisuperplayer.feature.library.PlaylistsViewModel
 import com.multisuperplayer.feature.library.RecentViewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -22,4 +23,7 @@ val libraryModule = module {
     viewModelOf(::RecentViewModel)
     viewModelOf(::PlaylistsViewModel)
     viewModelOf(::BrowseViewModel)
+    // 网络地址页。它的入口在浏览页的来源清单里（不是底部标签页），
+    // 但状态归它自己：地址框里的半截输入和浏览页的目录位置没有任何关系。
+    viewModelOf(::NetworkViewModel)
 }
