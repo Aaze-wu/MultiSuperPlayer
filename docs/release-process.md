@@ -37,7 +37,36 @@ val appVersionName: String = "0.9.0-beta.1"
 这份文件是 **Release 正文的来源**，不是「写给人看的内部文档」：更新页会把整段内容显示给
 用户，所以它就是「这一版做了什么」的唯一一份说明，不用再维护第二份。
 
-### 3. 编译并归档
+### 3. 先提交、再打 tag（顺序不能反）
+
+版本号和发布说明改完之后**先提交**；beta / 正式版还要**先打 tag**，然后才编译。
+
+理由不是洁癖：`assembleRelease` 在**配置阶段**就执行 `git describe --tags --always --dirty`，
+把结果注进 `BuildConfig.GIT_TAG` / `GIT_DIRTY`（见 `app/build.gradle.kts` 里的 `gitDescribe`）。
+先编译后提交，包里带的就是**上一版的 tag** 加一个 `-dirty`，于是日志抬头（`MspLogInitializer`
+的「会话开始」块、以及导出报告的抬头）会写：
+
+```
+来源: v0.9.0（1bbbac4，含未提交改动）      ← 这个包其实是 1.0.0
+```
+
+而那段抬头存在的理由正是「这段日志是哪次运行的、装的哪个包」——它一旦说错，排查的人会把
+新版本的 bug 当成旧版本的。
+
+```powershell
+git add -A
+git commit -m "feat(vX.Y.Z): <一行摘要>"
+git tag -a vX.Y.Z -m "vX.Y.Z"        # alpha 不要这一步，见下
+```
+
+**alpha 不打 tag**：它的抬头会写成 `v0.9.0-3-gabc1234`，读作「在 v0.9.0 之后第 3 个提交」。
+这不是错，内部包本来就该长这样。
+
+**要重建一个已发布版本的包时，必须在那个 tag 上编译**（HEAD 停在 tag 提交、工作区干净）。
+在 tag 之后又提交了东西的 HEAD 上编译，抬头会变成 `v1.0.0-1-g8a1ac17` —— 那个包不再对应
+Release 里挂着的那个，两者 sha256 对不上时也就说不清是哪一份的问题了。
+
+### 4. 编译并归档
 
 ```powershell
 .\gradlew.bat assembleRelease
@@ -46,9 +75,9 @@ val appVersionName: String = "0.9.0-beta.1"
 产物在 `app/build/outputs/apk/release/app-release.apk`，归档一份到
 `dist/MultiSuperPlayer-v<版本号>.apk`。`dist/` 只是本地留档，不是发布渠道。
 
-**alpha 编到这里就够**：装到自己机器上试，不建 tag、不建 Release。
+**alpha 编到这里就够**：装到自己机器上试，不建 Release。
 
-### 4. 建 Release（alpha 跳过这一步）
+### 5. 建 Release（alpha 跳过这一步）
 
 ```powershell
 # 公开测试版
@@ -72,7 +101,12 @@ beta 期间会有修 bug 的提交，转正式版就三步：
 1. `appVersionName` 改成 `0.9.0` ——**去掉后缀就是「升上去」，不是换一个新版本号**；
 2. beta 期间的修复内容**追加**进 `docs/release-notes/v0.9.0.md`。**不要去改 `-beta.1` 那份**：
    那份已经是发给用户的公告了，改了之后同一个 tag 下面的说明和用户当初读到的不一样；
-3. `assembleRelease` → 建 Release，**不加 `--prerelease`**，加 `--latest`。
+3. 提交、打新 tag `v0.9.0`，**然后才是** `assembleRelease` → 建 Release，**不加 `--prerelease`**，
+   加 `--latest`。顺序照第二节第 3 步，那是现在唯一一件光看代码看不出来、却会让日志抬头
+   说错版本的事。
+
+（beta 的 tag `v0.9.0-beta.1` 留着不动：它指向的是 beta 那次提交，重打会让已经装了 beta 的
+人抬头里的 tag 和包里的代码对不上。）
 
 **不需要**动 `versionCode`：同一数值段的 alpha / beta / 正式版共用一个 code，这是有意的
 （Android 只在**降级**时拒绝安装，同 code 覆盖安装是允许的）。
@@ -81,9 +115,11 @@ beta 期间会有修 bug 的提交，转正式版就三步：
 
 ## 四、发完要看四件事
 
-1. **`git describe --tags` 和包里的 `versionName` 是同一个号**。关于页显示的是注入进包的
-   tag，两者不一致就是「版本号改了一处、忘了另一处」的那种情况——这也是当初把版本号收成
-   唯一来源的原因。
+1. **`git describe --tags` 和包里的 `versionName` 是同一个号**。包里注入的 tag 出现在**日志
+   抬头**（关于页只显示版本号，不显示来源）：导出一次日志，确认抬头那行 `来源: …` 是这一版
+   的 tag、而且**不带**「含未提交改动」。两个号不一致是「版本号改了一处、忘了另一处」；
+   带上「含未提交改动」则是**编译排在了提交之前**（见第二节第 3 步）——这也是当初把版本号
+   收成唯一来源的原因。
 2. **关于页的徽章**：beta 显示「测试版」，alpha 显示「预览版」，正式版不显示徽章。
 3. **更新页两条通道各试一次**：切到「正式版」，确认看不到刚发的 beta；切到「测试版」，
    确认看得到。这一步是在验 `UpdateChannel.allows`，不是在验界面。
@@ -99,6 +135,7 @@ beta 期间会有修 bug 的提交，转正式版就三步：
   只会让更新页拿着第一个去装。
 - **重建 Release 不要动 tag。** 先 `gh release delete <tag>`，再 `gh release create <tag> ...`
   （tag 本来就存在，`gh` 会直接用它建 Release）。**不要 `git tag -d` 重打**：已经装了那个包的
-  人，关于页显示的 tag 会和包里的代码对不上，而那正是「版本号必须唯一来源」想避免的事。
+  人，抬头里那行 `来源: …` 会和包里的代码对不上，而那正是「版本号必须唯一来源」想避免的事。
+  （重建时自己要在 tag 那个提交上编译，见第二节第 3 步。）
 - **`dist/` 里不要放同名不同内容的包。** 那里是留档；同一个文件名下出现两份不同的内容，
   以后 sha256 对不上时没人查得出是哪一份的问题。
