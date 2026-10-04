@@ -286,7 +286,8 @@
 
     <!-- 标题区里的标记，只在预发行包里出现（构建脚本从 versionName 后缀推出 channel） -->
     <string name="msp_settings_about_preview">预览版</string>
-    <string name="msp_settings_about_preview_note">预发行测试版，功能与文案可能还会改动。</string>
+    <string name="msp_settings_about_beta">测试版</string>
+    <string name="msp_settings_about_preview_note">预发行版本，功能与文案可能还会改动。</string>
 
     <string name="msp_settings_section_links">使用与反馈</string>
 
@@ -573,9 +574,9 @@
     <string name="msp_update_status_ignored">已忽略 %1$s</string>
     <string name="msp_update_channel">更新通道</string>
     <string name="msp_update_channel_stable">正式版</string>
-    <string name="msp_update_channel_prerelease">预发行版</string>
+    <string name="msp_update_channel_beta">测试版</string>
     <string name="msp_update_channel_stable_desc">只接收正式版，最稳</string>
-    <string name="msp_update_channel_prerelease_desc">正式版和测试版都接收</string>
+    <string name="msp_update_channel_beta_desc">正式版和测试版都接收，比正式版早一步</string>
     <string name="msp_update_auto_check">自动检查更新</string>
     <string name="msp_update_auto_check_desc">打开这一页时顺手查一次，最快 12 小时一次</string>
     <string name="msp_update_token">GitHub 令牌</string>

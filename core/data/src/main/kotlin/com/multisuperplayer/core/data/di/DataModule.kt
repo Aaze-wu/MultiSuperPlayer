@@ -35,10 +35,10 @@ import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import com.multisuperplayer.core.data.update.GitHubReleasesSource
 import com.multisuperplayer.core.data.update.UpdateApkVerifier
-import com.multisuperplayer.core.data.update.UpdateChannel
 import com.multisuperplayer.core.data.update.UpdateDownloader
 import com.multisuperplayer.core.data.update.UpdateInstaller
 import com.multisuperplayer.core.data.update.UpdateManager
+import com.multisuperplayer.core.data.update.UpdateRules
 import com.multisuperplayer.core.data.update.UpdateSettingsRepository
 import com.multisuperplayer.core.data.update.UpdateSource
 import com.multisuperplayer.core.data.update.UpdateSourceConfig
@@ -221,17 +221,19 @@ val dataModule = module {
     // ------------------------------------------------------------------ 应用更新
 
     // 通道的默认值跟着「当前装的是不是预发行版」走。反过来的默认值（一律正式版）
-    // 看起来更稳，但它会让装预发行版的人**永远收不到后续的预发行版**，而且
+    // 看起来更稳，但它会让装预发行版的人**永远收不到后续的测试版**，而且
     // 界面上显示的还是「已是最新版本」——一个静默失效的开关。
+    //
+    // 规则本身放在 `UpdateRules` 里而不是写在这：以前它是内联在这里的，
+    // 于是同一个判断有了两份（一份在 `UpdateRules.defaultChannelFor`，只有单测在读，
+    // 一份在这里）。两份规则的分歧不报错，只表现为「某天默认通道变了」。
     single {
         UpdateSettingsRepository(
             context = androidContext(),
             dispatchers = get(),
-            defaultChannel = if (get<AppBuildInfo>().isPreview) {
-                UpdateChannel.PRERELEASE
-            } else {
-                UpdateChannel.STABLE
-            },
+            defaultChannel = UpdateRules.defaultChannelFor(
+                currentIsPreRelease = get<AppBuildInfo>().isPreview,
+            ),
         )
     }
 

@@ -212,7 +212,8 @@
     <string name="msp_settings_section_logs">日誌</string>
 
     <string name="msp_settings_about_preview">預覽版</string>
-    <string name="msp_settings_about_preview_note">預發行測試版，功能與文案可能還會變動。</string>
+    <string name="msp_settings_about_beta">測試版</string>
+    <string name="msp_settings_about_preview_note">預發行版本，功能與文案可能還會變動。</string>
 
     <string name="msp_settings_section_links">使用與回饋</string>
 
@@ -456,9 +457,9 @@
     <string name="msp_update_status_ignored">已忽略 %1$s</string>
     <string name="msp_update_channel">更新通道</string>
     <string name="msp_update_channel_stable">正式版</string>
-    <string name="msp_update_channel_prerelease">預發行版</string>
+    <string name="msp_update_channel_beta">測試版</string>
     <string name="msp_update_channel_stable_desc">只接收正式版，最穩定</string>
-    <string name="msp_update_channel_prerelease_desc">正式版和測試版都接收</string>
+    <string name="msp_update_channel_beta_desc">正式版和測試版都接收，比正式版早一步</string>
     <string name="msp_update_auto_check">自動檢查更新</string>
     <string name="msp_update_auto_check_desc">打開這一頁時順手查一次，最快 12 小時一次</string>
     <string name="msp_update_token">GitHub 權杖</string>

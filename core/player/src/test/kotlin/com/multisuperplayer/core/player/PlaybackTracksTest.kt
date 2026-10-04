@@ -81,17 +81,29 @@ class PlaybackTracksTest {
         assertFalse(track.matchesLanguage(listOf("en", "ja")))
     }
 
-    // ---------------- bestEmbeddedTextTrack ----------------
+    // ---------------- bestEmbeddedSubtitleTrack ----------------
 
     @Test
-    fun `没有文本轨时不自动挂字幕`() {
-        assertNull(emptyList<MspTrackInfo>().bestEmbeddedTextTrack(listOf("zh")))
-        // 位图字幕（PGS）不算文本轨：挂上它也不会有任何字出现（见 isTextRenderable）。
-        // `application/pgs` 是 Media3 里那个**真的**值（`MimeTypes.APPLICATION_PGS`）。
+    fun `一条画得出来的轨都没有时不自动挂字幕`() {
+        assertNull(emptyList<MspTrackInfo>().bestEmbeddedSubtitleTrack(listOf("zh")))
+        // 格式认不出来的轨不算：挂上去的症状是「屏幕上一行字都没有，而面板说已自动
+        // 选中」——用户只能以为播放器坏了。
+        val unknown = listOf(text(id = "x", language = "zh", mimeType = "application/octet-stream"))
+        assertNull(unknown.bestEmbeddedSubtitleTrack(listOf("zh")))
+        // 只有音频轨时更是什么都不挂。
+        assertNull(listOf(audio(id = "a")).bestEmbeddedSubtitleTrack(listOf("zh")))
+    }
+
+    @Test
+    fun `位图轨也算能自动挂上的字幕`() {
+        // v0.9 之后位图由我们自己的位图层画，于是它必须「自动挑得中」且「用户点得动」。
+        // `application/pgs` 是 Media3 里那个**真的**值（`MimeTypes.APPLICATION_PGS`）：
+        // 这里原来写的是 `application/x-pgs`，那个值在 Media3 里不存在，
+        // 于是那条断言（assertNull）即使绿着也从来没验过真东西。
         val bitmap = listOf(
             text(id = "p", language = "zh", mimeType = "application/pgs", isDefault = true),
         )
-        assertNull(bitmap.bestEmbeddedTextTrack(listOf("zh")))
+        assertEquals("p", bitmap.bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
@@ -102,7 +114,7 @@ class PlaybackTracksTest {
             text(id = "fr", language = "fr", isDefault = true),
             text(id = "zh", language = "zh"),
         )
-        assertEquals("zh", tracks.bestEmbeddedTextTrack(listOf("zh"))?.id)
+        assertEquals("zh", tracks.bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
@@ -113,9 +125,9 @@ class PlaybackTracksTest {
             text(id = "fr", language = "fr"),
             text(id = "ja", language = "ja"),
         )
-        assertNull(tracks.bestEmbeddedTextTrack(listOf("zh")))
+        assertNull(tracks.bestEmbeddedSubtitleTrack(listOf("zh")))
         val withDefault = tracks + text(id = "de", language = "de", isDefault = true)
-        assertEquals("de", withDefault.bestEmbeddedTextTrack(listOf("zh"))?.id)
+        assertEquals("de", withDefault.bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
@@ -125,10 +137,10 @@ class PlaybackTracksTest {
             text(id = "forced", language = "zh", isForced = true, isDefault = true),
             text(id = "full", language = "zh"),
         )
-        assertEquals("full", tracks.bestEmbeddedTextTrack(listOf("zh"))?.id)
+        assertEquals("full", tracks.bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
         // 只有强制轨可选时还是挂它：空屏也比「什么都没有」更接近用户要的。
         val onlyForced = listOf(text(id = "forced", language = "zh", isForced = true))
-        assertEquals("forced", onlyForced.bestEmbeddedTextTrack(listOf("zh"))?.id)
+        assertEquals("forced", onlyForced.bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
@@ -138,7 +150,7 @@ class PlaybackTracksTest {
             text(id = "a", language = "zh"),
             text(id = "b", language = "zh", isDefault = true),
         )
-        assertEquals("b", tracks.bestEmbeddedTextTrack(listOf("zh"))?.id)
+        assertEquals("b", tracks.bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
@@ -147,18 +159,19 @@ class PlaybackTracksTest {
             text(id = "zh", language = "zh"),
             text(id = "en", language = "en", isDefault = true),
         )
-        assertEquals("en", tracks.bestEmbeddedTextTrack(emptyList())?.id)
-        assertNull(listOf(text(id = "zh", language = "zh")).bestEmbeddedTextTrack(emptyList()))
+        assertEquals("en", tracks.bestEmbeddedSubtitleTrack(emptyList())?.id)
+        assertNull(listOf(text(id = "zh", language = "zh")).bestEmbeddedSubtitleTrack(emptyList()))
     }
 
-    // ---------------- embeddedTextTracks / isTextRenderable ----------------
+    // ---------------- embeddedSubtitleTracks / isTextRenderable / isBitmapRenderable ----------------
 
     @Test
-    fun `文本轨清单排除位图字幕`() {
-        // 位图字幕的 `Cue.text` 是空的，我们的文本层拿不到字；唯一能画它的
-        // Media3 `SubtitleView` 在播放页又被遮掉了（否则内嵌字幕会画两遍），
-        // 所以没有任何东西能画它。
-        // 让它们留在清单里的症状是：用户在列表里点了一条，屏幕上什么都没发生。
+    fun `字幕轨清单收下文本型和位图型 只丢掉音频轨`() {
+        // v0.9 之前这里是「排除位图」：容器里的 PGS 没有任何东西能画
+        // （唯一能画它的 Media3 `SubtitleView` 在播放页被遮掉了，否则内嵌字幕会
+        // 画两遍），而让用户点一条「点了没反应」的轨比不给他点更坏。
+        // 现在位图层自己画，于是「能画的」这个集合变宽了——继续排除位图的话，
+        // 用户挑不了它、自动挑轨也挑不到它，片源里明明有中文字幕却说没有。
         //
         // 这三个 MIME 是 Media3 1.11.1 里真实存在的值（`javap -constants MimeTypes`）。
         // 原来写成 `application/x-pgs` / `application/x-vobsub` —— 它们在 Media3 里
@@ -170,7 +183,12 @@ class PlaybackTracksTest {
             text(id = "dvb", language = "zh", mimeType = "application/dvbsubs"),
             MspTrackInfo(id = "audio", kind = MspTrackKind.AUDIO, mimeType = "audio/ac3"),
         )
-        assertEquals(listOf("srt"), tracks.embeddedTextTracks().map { it.id })
+        assertEquals(
+            listOf("srt", "pgs", "vobsub", "dvb"),
+            tracks.embeddedSubtitleTracks().map { it.id },
+        )
+        // 格式认不出来的那条不该混进来（清单不是「所有 TEXT 轨」）。
+        assertTrue(listOf(text(mimeType = "application/octet-stream")).embeddedSubtitleTracks().isEmpty())
     }
 
     @Test
@@ -182,6 +200,41 @@ class PlaybackTracksTest {
         // 认不出来的 MIME 不算：宁可少一条，也不要给用户一个点了没反应的选项。
         assertFalse(text(mimeType = "application/octet-stream").isTextRenderable())
         assertFalse(text(mimeType = "").isTextRenderable())
+        // 位图也不算**文本**可渲染：它的 `Cue.text` 是空的，交给文本层就是一行空白。
+        // 这一行曾经靠「`subtitleFormatOf` 认不出 pgs」间接成立，现在那三个 MIME
+        // 有映射了，拦住它的是函数第一行那份名单（顺序承重，别把它挪到最后）。
+        assertFalse(text(mimeType = "application/pgs").isTextRenderable())
+    }
+
+    @Test
+    fun `位图判据和文本判据互不包含`() {
+        val pgs = text(mimeType = "application/pgs")
+        assertTrue(pgs.isBitmapRenderable())
+        assertTrue(pgs.isRenderableSubtitle())
+        assertFalse(pgs.isTextRenderable())
+
+        val srt = text(mimeType = "application/x-subrip")
+        assertTrue(srt.isTextRenderable())
+        assertTrue(srt.isRenderableSubtitle())
+        assertFalse(srt.isBitmapRenderable())
+
+        // 两个都判 false 的那种轨：它既不该出现在清单里，也不该被自动挂上。
+        val nothing = text(mimeType = "application/octet-stream")
+        assertFalse(nothing.isTextRenderable())
+        assertFalse(nothing.isBitmapRenderable())
+        assertFalse(nothing.isRenderableSubtitle())
+    }
+
+    @Test
+    fun `位图 MIME 只认那三个 不按前缀猜`() {
+        // 靠前缀（`application/`）或「名字里有 pgs」去判会误伤：
+        // 猜着放进来等于给用户一个点了没反应的选项。
+        // 大小写不是问题：`subtitleMimeType()` 已经归一化了（容器里写什么都可能）。
+        assertTrue(text(mimeType = "APPLICATION/PGS").isBitmapRenderable())
+        assertTrue(text(mimeType = "application/dvbsubs").isBitmapRenderable())
+        assertFalse(text(mimeType = "application/pgs2").isBitmapRenderable())
+        assertFalse(text(mimeType = "application/x-pgs").isBitmapRenderable())
+        assertFalse(text(mimeType = "").isBitmapRenderable())
     }
 
     // ---------------- Media3 的 cue 包 MIME（内嵌轨的实际情况） ----------------
@@ -202,23 +255,31 @@ class PlaybackTracksTest {
         assertEquals("application/x-subrip", mkv.subtitleMimeType())
         assertEquals(SubtitleFormat.SRT, mkv.subtitleFormat())
         assertTrue(mkv.isTextRenderable())
-        assertEquals(listOf("zh"), listOf(mkv).embeddedTextTracks().map { it.id })
+        assertEquals(listOf("zh"), listOf(mkv).embeddedSubtitleTracks().map { it.id })
         // 自动挑选也必须能看到它，否则「打开就有字幕」这条也一起坏掉。
-        assertEquals("zh", listOf(mkv).bestEmbeddedTextTrack(listOf("zh"))?.id)
+        assertEquals("zh", listOf(mkv).bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
-    fun `cue 包 MIME 配位图 codecs 仍然要排除`() {
+    fun `cue 包 MIME 配位图 codecs 要还原成位图格式`() {
         // media3-extractor 的 `DefaultSubtitleParserFactory` 也处理 pgs/vobsub/dvbsubs，
-        // 它们输出的轨同样被重写成 cue 包 MIME，真实格式落在 `codecs` 里。这些 cue 的
-        // `text` 是空的（只有 bitmap），挂上它们屏幕上不会出现任何字。
+        // 它们输出的轨同样被重写成 cue 包 MIME，真实格式落在 `codecs` 里。
         // 如果这里把 `codecs` 丢掉（只认得出的格式才采信），`application/pgs` 会退化成
-        // cue 包 MIME、被「cue 包一律可渲染」那条宽松规则放进来。
-        val pgs = text(mimeType = "application/x-media3-cues", codec = "application/pgs", isDefault = true)
+        // cue 包 MIME、被「cue 包一律文本可渲染」那条宽松规则收进文本层，
+        // 屏幕上就是一条空白行。
+        val pgs = text(
+            id = "pgs",
+            mimeType = "application/x-media3-cues",
+            codec = "application/pgs",
+            isDefault = true,
+        )
         assertEquals("application/pgs", pgs.subtitleMimeType())
-        assertEquals(SubtitleFormat.UNKNOWN, pgs.subtitleFormat())
+        assertEquals(SubtitleFormat.PGS, pgs.subtitleFormat())
         assertFalse(pgs.isTextRenderable())
-        assertTrue(listOf(pgs).embeddedTextTracks().isEmpty())
+        // 但它是**可渲染**的（位图层），而且必须在清单里、也挑得中。
+        assertTrue(pgs.isBitmapRenderable())
+        assertEquals(listOf("pgs"), listOf(pgs).embeddedSubtitleTracks().map { it.id })
+        assertEquals("pgs", listOf(pgs).bestEmbeddedSubtitleTrack(listOf("zh"))?.id)
     }
 
     @Test
@@ -283,11 +344,38 @@ class PlaybackTracksTest {
         // 「为什么 SRT 渲染出来是乱的」来问。
         assertEquals(SubtitleFormat.UNKNOWN, subtitleFormatOf(null))
         assertEquals(SubtitleFormat.UNKNOWN, subtitleFormatOf(""))
-        // 位图字幕走的是**这条**路径：MIME 真实存在（`MimeTypes.APPLICATION_PGS`），
-        // 但它不是一个字幕**文本**格式，所以映射不出来——排除位图靠的是
-        // `BITMAP_SUBTITLE_MIMES` 那张表，不是「映射不出来」。
-        assertEquals(SubtitleFormat.UNKNOWN, subtitleFormatOf("application/pgs"))
-        assertEquals(SubtitleFormat.UNKNOWN, subtitleFormatOf("application/vobsub"))
+        assertEquals(SubtitleFormat.UNKNOWN, subtitleFormatOf("application/octet-stream"))
+        // 位图字幕**认得出来**（v0.9 起）：界面上写「图像字幕」而不是「未知格式」，
+        // 用户看到「未知」会以为是我们的兼容性问题。这三个 MIME 和
+        // `BITMAP_SUBTITLE_MIMES` 同源，两者必须一起改。
+        assertEquals(SubtitleFormat.PGS, subtitleFormatOf("application/pgs"))
+        assertEquals(SubtitleFormat.VOBSUB, subtitleFormatOf("application/vobsub"))
+        assertEquals(SubtitleFormat.DVB, subtitleFormatOf("application/dvbsubs"))
+    }
+
+    @Test
+    fun `三个位图 MIME 既是可识别的格式也是位图判据`() {
+        // 两处名单分开写是最容易漂的地方（“加了一个忘了另一个”的症状是：清单里写
+        // 着「PGS」，点下去什么都不显示）。这里用一条测试把它们钉在一起。
+        listOf(
+            "application/pgs" to SubtitleFormat.PGS,
+            "application/vobsub" to SubtitleFormat.VOBSUB,
+            "application/dvbsubs" to SubtitleFormat.DVB,
+        ).forEach { (mime, format) ->
+            assertEquals(format, subtitleFormatOf(mime))
+            val track = text(mimeType = mime)
+            assertTrue("$mime 应该是位图可渲染", track.isBitmapRenderable())
+            assertFalse("$mime 不该被当成文本可渲染", track.isTextRenderable())
+        }
+        // 反方向：`SubtitleFormat` 那边「是位图」的集合必须恰好是这三个。多一个会让
+        // 外挂字幕的扫盘把一个不该收的后缀收进来（见 `discoverableExtensions`），
+        // 少一个就是上面那个「清单里写着、点下去不显示」。
+        assertEquals(
+            setOf(SubtitleFormat.PGS, SubtitleFormat.VOBSUB, SubtitleFormat.DVB),
+            SubtitleFormat.entries.filter { it.isBitmap }.toSet(),
+        )
+        // MIME 那份名单也一样，只认这三个（`application/dvbsubs` 不是从枚举名推出来的，
+        // 所以这里手写而不是拼字符串）。
     }
 
     // ---------------- 音频轨清单 ----------------

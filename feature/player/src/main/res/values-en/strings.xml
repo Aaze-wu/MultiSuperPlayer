@@ -26,6 +26,7 @@
     <string name="msp_player_embedded_lines_pending">No line read yet</string>
     <string name="msp_player_embedded_prereading">Pre-reading subtitles…</string>
     <string name="msp_player_embedded_preread_failed">Could not pre-read subtitles, rate adjustment may be off</string>
+    <string name="msp_player_embedded_bitmap_note">Bitmap subtitles: timing and rate do not apply</string>
     <string name="msp_player_subtitle_sync">Subtitle timing</string>
     <string name="msp_player_subtitle_sync_step">%1$s s</string>
     <string name="msp_player_subtitle_sync_reset">Reset</string>
@@ -48,6 +49,7 @@
     <string name="msp_player_detail_generated">on-device recognition</string>
     <string name="msp_player_format_lrc">LRC lyrics</string>
     <string name="msp_player_format_lrc_enhanced">Enhanced LRC (per syllable)</string>
+    <string name="msp_player_format_dvb">DVB subtitles</string>
 
     <!-- ===== Display modes ===== -->
     <string name="msp_player_mode_off">Hidden</string>

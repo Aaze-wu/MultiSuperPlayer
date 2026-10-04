@@ -206,7 +206,8 @@
 
     <!-- Shown in the header area only for pre-release builds. -->
     <string name="msp_settings_about_preview">Preview</string>
-    <string name="msp_settings_about_preview_note">Pre-release test build; features and wording may still change.</string>
+    <string name="msp_settings_about_beta">Beta</string>
+    <string name="msp_settings_about_preview_note">Pre-release build; features and wording may still change.</string>
 
     <string name="msp_settings_section_links">Using and feedback</string>
 
@@ -456,9 +457,9 @@
     <string name="msp_update_status_ignored">Ignored %1$s</string>
     <string name="msp_update_channel">Update channel</string>
     <string name="msp_update_channel_stable">Stable</string>
-    <string name="msp_update_channel_prerelease">Pre-release</string>
+    <string name="msp_update_channel_beta">Beta</string>
     <string name="msp_update_channel_stable_desc">Stable releases only</string>
-    <string name="msp_update_channel_prerelease_desc">Stable and pre-release releases</string>
+    <string name="msp_update_channel_beta_desc">Stable plus beta builds, one step ahead</string>
     <string name="msp_update_auto_check">Check automatically</string>
     <string name="msp_update_auto_check_desc">Check once when you open this page, at most every 12 hours</string>
     <string name="msp_update_token">GitHub token</string>

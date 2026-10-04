@@ -38,6 +38,9 @@ internal fun SubtitleDisplayMode.label(): MspText = when (this) {
 internal fun SubtitleFormat.label(): MspText = when (this) {
     SubtitleFormat.LRC -> MspText.Res(R.string.msp_player_format_lrc)
     SubtitleFormat.ENHANCED_LRC -> MspText.Res(R.string.msp_player_format_lrc_enhanced)
+    // `displayName` 是 `DVB Subtitle`（单数、且是内部叫法），英文里读起来不像一项格式名，
+    // 所以这一条也走资源。PGS / VobSub 那两个名字是业界通用的写法，直接用 `displayName`。
+    SubtitleFormat.DVB -> MspText.Res(R.string.msp_player_format_dvb)
     SubtitleFormat.UNKNOWN -> MspText.unknown()
     else -> MspText.Plain(displayName)
 }
@@ -164,7 +167,7 @@ internal fun MspTrackInfo.embeddedTitle(): MspText =
         ?: MspText.Res(R.string.msp_player_embedded_track, indexInGroup + 1)
 
 /**
- * 「当前挂着哪条」那一格下面那行小字：格式 / 语言 / 默认…，再加一句「还没读到台词」。
+ * 「当前挂着哪条」那一格下面那行小字：格式 / 语言 / 默认…，再加一句状态说明。
  *
  * 内嵌轨是**边播边读**的：轨很快就认下来了（容器一解析出轨道清单就认），而第一句
  * 台词要等播放头走到有字幕的地方才到。这一段窗口里面板上如果只写着「内嵌字幕 1」
@@ -182,19 +185,33 @@ internal fun MspTrackInfo.embeddedTitle(): MspText =
  * `Ready` / `Off` 时行为与改动前完全一致。
  *
  * 抽成纯函数是为了能断言——这句话只在真的**一行都没有**时出现，一有台词就必须消失。
+ *
+ * ## 位图轨为什么不能走上面那三个分支
+ *
+ * PGS / VobSub / DVB 轨不预读（预读的门槛是 `isTextRenderable()`），也不会累积
+ * cue——内核在位图这条路上给的是「此刻该显示什么」，放完就空。于是 `cueCount`
+ * 恒为 0、`preRead` 恒为 `Off`，上面那个 `when` 会选到「尚未读到台词」：
+ * **屏幕上明明有字幕，面板却说一行都没读到**，而且这句话永远不会消失。
+ *
+ * 位图轨在这一格该说的是它自己的事：「字幕时间轴 / 速率对它不生效」。这两根滑块
+ * 就在同一个面板下面，用户真的会去拖它们，而拖了不会有任何变化。
  */
 internal fun embeddedStatusDetails(
     track: MspTrackInfo,
     cueCount: Int,
     preRead: EmbeddedPreReadState = EmbeddedPreReadState.Off,
 ): MspText {
-    val note: MspText? = when (preRead) {
-        EmbeddedPreReadState.Reading -> MspText.Res(R.string.msp_player_embedded_prereading)
-        // 失败时不管已经读到几行都说：速率要按**整表**换算才准确，
-        // 而「预读失败」是用户唯一能看出「为什么调了没反应」的线索。
-        is EmbeddedPreReadState.Failed -> MspText.Res(R.string.msp_player_embedded_preread_failed)
-        EmbeddedPreReadState.Off, is EmbeddedPreReadState.Ready ->
-            if (cueCount > 0) null else MspText.Res(R.string.msp_player_embedded_lines_pending)
+    val note: MspText? = if (track.isBitmapRenderable()) {
+        MspText.Res(R.string.msp_player_embedded_bitmap_note)
+    } else {
+        when (preRead) {
+            EmbeddedPreReadState.Reading -> MspText.Res(R.string.msp_player_embedded_prereading)
+            // 失败时不管已经读到几行都说：速率要按**整表**换算才准确，
+            // 而「预读失败」是用户唯一能看出「为什么调了没反应」的线索。
+            is EmbeddedPreReadState.Failed -> MspText.Res(R.string.msp_player_embedded_preread_failed)
+            EmbeddedPreReadState.Off, is EmbeddedPreReadState.Ready ->
+                if (cueCount > 0) null else MspText.Res(R.string.msp_player_embedded_lines_pending)
+        }
     }
     return if (note == null) {
         track.describeDetails()

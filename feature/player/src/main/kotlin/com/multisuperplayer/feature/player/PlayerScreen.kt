@@ -720,6 +720,20 @@ fun PlayerScreen(
             isPlaying = state.isPlaying,
             modifier = layerModifier.then(gestureModifier),
         ) {
+            // 位图字幕（PGS / VobSub / DVB）单独一层，铺满**画面矩形**。
+            //
+            // 它必须排在 `SubtitleOverlay` 前面（也就是下面）：两者在屏幕上互斥
+            // （一条 cue 要么是文本要么是图），但万一同时来了，压在上面的是用户
+            // 自己调过字号/描边的文本层——那一份更「是他的字幕」。位图是片源自带的
+            // 原始排版，被盖住比盖住别人更可接受。
+            //
+            // 注意它和 `SubtitleOverlay` 的 modifier **不一样**：这层不能有边距。
+            // 位图的坐标是画面比例，多一个 16dp 的左右边距就是横向偏 16dp。
+            BitmapSubtitleLayer(
+                cues = subtitleState.bitmapCues,
+                modifier = Modifier.fillMaxSize(),
+            )
+
             // 字幕层叠在画面矩形**里面**（见 PlayerVideoSurface 的 overlay 参数），
             // 所以它跟着画面的实际高度走，而不会跑到黑边里。
             //

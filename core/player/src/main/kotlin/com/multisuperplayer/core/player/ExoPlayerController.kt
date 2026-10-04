@@ -179,6 +179,17 @@ class ExoPlayerController(
     private val _embeddedSubtitle = MutableStateFlow(EmbeddedSubtitleState())
     override val embeddedSubtitle: StateFlow<EmbeddedSubtitleState> = _embeddedSubtitle.asStateFlow()
 
+    /**
+     * 此刻该显示的**位图**字幕（PGS / VobSub / DVB）。切换条目时清空。
+     *
+     * 它和 [embeddedSubtitle] 是**互斥**的：同一时刻只有一条文本轨在解码，而一条轨
+     * 要么出字 (`Cue.text`) 要么出图 (`Cue.bitmap`)。两份状态却都存在，是因为
+     * 它们分别对应两套完全不同的渲染代码；互斥性由 `onCues` 自己保证
+     * （收到图就清文本，见那里的注释），而不是靠「反正另一份是空的」。
+     */
+    private val _embeddedBitmap = MutableStateFlow(EmbeddedBitmapState())
+    override val embeddedBitmap: StateFlow<EmbeddedBitmapState> = _embeddedBitmap.asStateFlow()
+
     /** 整轨字幕预读的状态。切条目、换轨、轨道信息还没出来时都是 `Off`。 */
     private val _embeddedPreRead = MutableStateFlow<EmbeddedPreReadState>(EmbeddedPreReadState.Off)
     override val embeddedPreRead: StateFlow<EmbeddedPreReadState> = _embeddedPreRead.asStateFlow()
@@ -392,6 +403,10 @@ class ExoPlayerController(
                     // 音频没有自动挑选那一步，只能显式清。
                     clearAudioOverride()
                     _embeddedSubtitle.value = EmbeddedSubtitleState()
+                    // 位图同理，而且更入眼：一张 1080p 的字幕图不只会显示错的内容，
+                    // 它还会占着屏幕中央——上一部片子的歌词图留在今晚的电影上，
+                    // 用户第一反应是「这播放器坏了」。
+                    _embeddedBitmap.value = EmbeddedBitmapState()
                     // 预读同理：上一部片子那份整轨台词表（甚至只是「正在读」这个状态）
                     // 留下来，新片子就会在没读完之前一直显示「正在预读字幕」，而读的是
                     // 上一部。这里只**取消并归零**，不重启：新片子的轨道清单还没下来，
@@ -434,10 +449,29 @@ class ExoPlayerController(
                  * `PlayerVideoSurface` 必须把那一层遮掉，否则同一句字幕会在屏幕上看两遍。
                  * 两者都在同一个 `Player` 上取数据，改这里之前先读那份 KDoc。
                  *
-                 * 位图字幕（PGS / VobSub）的 `Cue.text` 是空的，这里会自然丢掉它们；
-                 * 关掉 `SubtitleView` 之后它们也就真的不显示了（README 第 12 条）。
+                 * 位图字幕（PGS / VobSub / DVB）的 `Cue.text` 是**空**的，只有 `Cue.bitmap`，
+                 * 所以它们走 [embeddedBitmap] 这条平行的路（见 `EmbeddedBitmapCue`）。
+                 * 两者在同一个回调里分流：这里看到的 `CueGroup` 永远只属于**一条**轨，
+                 * 而一条轨只会出字或只会出图。
                  */
                 override fun onCues(cueGroup: CueGroup) {
+                    // 位图：内核的原话就是「现在该显示这些」，所以每次都**整体覆盖**。
+                    // 空的批次就是「现在不该显示」，而换轨时内核恰好会先发一批空的
+                    // （`TextRenderer` 换轨会清一次输出）——于是「切到位图轨之后旧文本
+                    // 还压在图上」和「切到文本轨之后旧图还留在屏幕上」这两种错都不会发生：
+                    // 两边都由这一批数据本身纠正，不依赖轨道清单能多及时地回调。
+                    val bitmaps = cueGroup.cues.toEmbeddedBitmapCues()
+                    if (bitmaps.size != _embeddedBitmap.value.cues.size) {
+                        MspLog.d(TAG) { "内嵌位图字幕读到 ${bitmaps.size} 张" }
+                    }
+                    _embeddedBitmap.value = EmbeddedBitmapState(bitmaps)
+                    if (bitmaps.isNotEmpty()) {
+                        // 收到图 = 当前挂的不是文本轨，而上一条文本轨读到的那几行属于
+                        // 另一条轨（别的语言、甚至别的时间轴）。留着它，屏幕上会**永久**
+                        // 压着一行旧台词：位图是 REPLACE 行为，它不会去动文本层的状态，
+                        // 而文本层的状态只会在下一条文本轨送 cue 时才被覆盖。
+                        _embeddedSubtitle.value = EmbeddedSubtitleState()
+                    }
                     // 整轨预读已经就绪时**必须停写**流式表：它只装「已经播过的段落」，
                     // 让它继续写，就是把刚读出来的整表一点点换回那份越播越少的流式表，
                     // 表现正是要修的那个 bug（调快没反应、调慢有时有效）。
@@ -543,13 +577,13 @@ class ExoPlayerController(
      * `setSelectUndeterminedTextLanguage(true)`（兜住没标语言的轨），所以**绝大多数
      * 情况下内核自己就选好了**：语言与界面语言一致、语言未标、或者容器标了
      * `default` 的轨，都由 Media3 先选。那时下面第 2 步直接返回，
-     * [bestEmbeddedTextTrack] 算出来的结果会被丢掉——**那不是死代码**，
+     * [bestEmbeddedSubtitleTrack] 算出来的结果会被丢掉——**那不是死代码**，
      * 而是「内核选得更早」。
      *
      * 我们这套规则真正生效的角落只有一个：**语言对不上、而容器标了默认轨**。
      * Media3 的 `preferredTextLanguages` 匹配不上它就不会选，
      * `setSelectUndeterminedTextLanguage` 只管「未标语言」那一种，于是内核留空，
-     * 由我们按 [bestEmbeddedTextTrack] 的保守规则挂上。
+     * 由我们按 [bestEmbeddedSubtitleTrack] 的保守规则挂上。
      *
      * ## 为什么每个提前返回都要留一条日志
      *
@@ -568,7 +602,7 @@ class ExoPlayerController(
             MspLog.d(TAG) { "字幕轨已由用户手选（$textTrackChoice），不做自动挑选" }
             return
         }
-        val auto = list.bestEmbeddedTextTrack(preferredTextLanguages)
+        val auto = list.bestEmbeddedSubtitleTrack(preferredTextLanguages)
         if (auto == null) {
             MspLog.d(TAG) { "没有可自动挂上的内嵌字幕轨（偏好语言 $preferredTextLanguages）" }
             return
@@ -1243,12 +1277,14 @@ class ExoPlayerController(
         val textChoiceBefore = textTrackChoice
         val paramsBefore = player.trackSelectionParameters
         val embeddedBefore = _embeddedSubtitle.value
+        val embeddedBitmapBefore = _embeddedBitmap.value
         val abRepeatBefore = abRepeat
         block()
         if (player.currentMediaItem?.mediaId != mediaIdBefore) return
         textTrackChoice = textChoiceBefore
         player.trackSelectionParameters = paramsBefore
         _embeddedSubtitle.value = embeddedBefore
+        _embeddedBitmap.value = embeddedBitmapBefore
         abRepeat = abRepeatBefore
     }
 

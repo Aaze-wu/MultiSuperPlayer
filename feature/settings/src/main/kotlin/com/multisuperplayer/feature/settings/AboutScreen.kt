@@ -373,7 +373,16 @@ private fun AboutHeader(buildInfo: AppBuildInfo) {
         if (buildInfo.isPreview) {
             Spacer(Modifier.height(10.dp))
             Text(
-                text = stringResource(R.string.msp_settings_about_preview),
+                // 「测试版」和「预览版」说的不是同一件事：前者是「可以用了，帮忙看看」，
+                // 后者是「随时会变，别当回事」。`beta` 现在是对外发的那一档，
+                // 一律写成「预览版」等于把一个正常可用的公开版本说成实验品。
+                text = stringResource(
+                    if (buildInfo.isBetaChannel) {
+                        R.string.msp_settings_about_beta
+                    } else {
+                        R.string.msp_settings_about_preview
+                    },
+                ),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier

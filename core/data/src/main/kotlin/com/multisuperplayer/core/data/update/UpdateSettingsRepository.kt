@@ -189,8 +189,24 @@ class UpdateSettingsRepository(
  * 用「按名字找」而不是 `valueOf`：那个会抛 `IllegalArgumentException`，
  * 于是某天有人把枚举项改名之后，**所有已经装了旧版的应用**在下次启动读设置时崩掉。
  * 读不出来就退回默认通道，那是一个用户能自己改回来的状态。
+ *
+ * 但「退回默认」对改过名的那一档不够：`0.8.1` 及以前叫 `PRERELEASE`（正式版 + 预发行版），
+ * 现在叫 `BETA`。已装了预发行版的用户退回默认恰好也是 `BETA`，看不出问题；
+ * 可一个**手动**把通道改成「预发行版」的正式版用户会被退回「只收正式版」——
+ * 他下次再也不会收到测试版，而界面上显示的是他自己选过的那个选项。
+ * 所以旧名字要显式翻译一次，而不是靠默认值兜住。
  */
-private fun String?.toChannelOrNull(): UpdateChannel? = when (this) {
+internal fun String?.toChannelOrNull(): UpdateChannel? = when (this) {
     null -> null
+    LEGACY_PRERELEASE_CHANNEL -> UpdateChannel.BETA
     else -> UpdateChannel.entries.firstOrNull { it.name == this }
 }
+
+/**
+ * `0.8.1` 及以前对「正式版 + 预发行版」那一档的枚举名。
+ *
+ * 只读不写：从今往后存进去的永远是 `BETA`，这个常量只会越来越没用，但删不得——
+ * 删掉就会让那批用户的设置在无人告知的情况下变掉，而这是**读**路径上的兼容，
+ * 与以后还会不会写这个值无关。
+ */
+private const val LEGACY_PRERELEASE_CHANNEL = "PRERELEASE"

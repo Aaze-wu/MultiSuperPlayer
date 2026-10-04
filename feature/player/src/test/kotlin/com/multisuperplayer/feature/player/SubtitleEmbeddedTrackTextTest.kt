@@ -8,6 +8,8 @@ import com.multisuperplayer.core.player.EmbeddedPreReadState
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -244,6 +246,73 @@ class SubtitleEmbeddedTrackTextTest {
         )
 
         assertEquals(MspText.Res(R.string.msp_player_embedded_track, 1), track.embeddedTitle())
+    }
+
+    // ------------------------------------------------------------ 位图轨（v0.9）
+
+    @Test
+    fun `位图轨不说尚未读到台词`() {
+        // 这一句是 v0.9 之前真正会出现在屏幕上的东西：PGS / VobSub / DVB 轨的
+        // `cueCount` **恒为 0**（内核在位图这条路上给的是「此刻该显示什么」，
+        // 放完就空，不是逐条累积），于是「尚未读到台词」会一直挂在那里不消失——
+        // 而画面里字幕正在正常显示。用户会去查一个根本没坏的东西。
+        //
+        // 位图轨在这一格该说的是它自己的事：时间轴 / 速率那两根滑块就在同一块面板
+        // 下面，拖了不会有任何变化。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/pgs")
+
+        assertEquals(
+            MspText.join(
+                SUBTITLE_DETAIL_SEPARATOR,
+                listOf(
+                    track.describeDetails(),
+                    MspText.Res(R.string.msp_player_embedded_bitmap_note),
+                ),
+            ),
+            embeddedStatusDetails(track, cueCount = 0),
+        )
+    }
+
+    @Test
+    fun `位图那一条要排在预读分支前面`() {
+        // 顺序在这里是**承重**的，和 `isTextRenderable` 里那两行的道理一样。
+        // 位图轨不会预读（预读的门槛是 `isTextRenderable()`），所以「位图轨 +
+        // 预读中」是一个不会出现的组合——正因为不会出现，把位图分支挪到 `when`
+        // 后面时没有任何东西会报错，只有这一条会红。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/vobsub")
+
+        assertEquals(
+            MspText.join(
+                SUBTITLE_DETAIL_SEPARATOR,
+                listOf(
+                    track.describeDetails(),
+                    MspText.Res(R.string.msp_player_embedded_bitmap_note),
+                ),
+            ),
+            embeddedStatusDetails(track, cueCount = 0, preRead = EmbeddedPreReadState.Reading),
+        )
+    }
+
+    @Test
+    fun `位图轨的格式取自 codecs 且不是未知`() {
+        // 位图 MIME 现在同时被两条路认：文本层用它**排掉**位图轨
+        // （`isTextRenderable` 第一行），格式那一格用它**认出**格式。
+        // 只改前一处的话，位图轨会被排掉、又在格式格里写「未知」——
+        // 而它明明是可渲染的，屏幕上什么都不会提示。
+        val track = embedded(mimeType = "application/x-media3-cues", codec = "application/pgs")
+
+        assertEquals(
+            MspText.join(
+                SUBTITLE_DETAIL_SEPARATOR,
+                listOf(
+                    SubtitleFormat.PGS.label(),
+                    MspText.Plain("zh"),
+                ),
+            ),
+            track.describeDetails(),
+        )
+        assertTrue("位图轨必须在可选清单里", track.isRenderableSubtitle())
+        assertFalse("但不能走文本层", track.isTextRenderable())
     }
 
     private fun embedded(

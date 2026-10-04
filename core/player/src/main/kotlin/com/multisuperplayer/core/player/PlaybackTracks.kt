@@ -91,14 +91,13 @@ data class MspTrackInfo(
     /**
      * 这条轨道的内容能不能进我们的**文本**字幕层。
      *
-     * 位图字幕（PGS / VobSub）的 `Cue.text` 是空的，我们的层拿不到字，所以它们
-     * **不会**显示——这一点必须明说，而不是让它们在列表里装作可以选，用户点完什么都
-     * 没发生只会以为播放器坏了。（`onCues` 那一侧本来也会自然丢掉空文本，这里只是
-     * 提前把它们从清单里摘出去。）
+     * 判 false 的是两种轨：位图字幕（PGS / VobSub / DVB——`Cue.text` 是空的、只有
+     * 一张图），以及格式认不出来的那些。**位图轨并不等于「不可渲染」**：它们走
+     * [isBitmapRenderable] 那条路，一样会出现在可选清单里（见 [embeddedSubtitleTracks]）。
      *
-     * 唯一能画位图的那条路是 Media3 自己的 `SubtitleView`（`PlayerView` 内部那个），
-     * 而播放页为了不让内嵌字幕画两遍，正是把它遮掉了——所以「遮住」和「位图轨不显示」
-     * 是同一个决定的两面，拆不开。
+     * 🔴 第一行的顺序是**承重的**：`subtitleFormatOf` 现在认识 pgs / vobsub / dvbsubs 了，
+     * 于是最后那行「格式认识的就算文本可渲染」会把位图轨放进来。位图必须先被排掉，
+     * 改这个函数时先看这两行的先后。
      */
     fun isTextRenderable(): Boolean {
         val mime = subtitleMimeType()
@@ -111,6 +110,20 @@ data class MspTrackInfo(
         if (mime.contains("cea-608") || mime.contains("cea-708")) return true
         return subtitleFormatOf(mime) != SubtitleFormat.UNKNOWN
     }
+
+    /**
+     * 这条轨道是**位图**字幕：片源里已经排好版的图片。
+     *
+     * 它和文本层不是同一段代码：位图没有字号/描边/双语可调，位置也是文件里写死的
+     * （我们只把它摆到它自己声明的地方）。渲染在 `PlayerVideoSurface` 的位图层里，
+     * 不能走 `SubtitleOverlay`——那个层的 modifier 是「底部居中 + 左右 16dp」，
+     * 是给排版出来的文本用的，套到比例坐标的位图上位置就错了。
+     * 详见 `EmbeddedBitmapCue` 的 KDoc。
+     */
+    fun isBitmapRenderable(): Boolean = subtitleMimeType() in BITMAP_SUBTITLE_MIMES
+
+    /** 这条轨道的内容我们**画得出来**（文本层或位图层，两者之一）。 */
+    fun isRenderableSubtitle(): Boolean = isTextRenderable() || isBitmapRenderable()
 }
 
 /**
@@ -130,7 +143,7 @@ data class MspTrackInfo(
 internal const val MEDIA3_CUES_MIME = "application/x-media3-cues"
 
 /**
- * 位图字幕的 MIME——我们画不出来，必须从「可选字幕轨」里排除。
+ * 位图字幕的 MIME。
  *
  * 值来自 `javap -constants androidx.media3.common.MimeTypes`（1.11.1）：
  * `APPLICATION_PGS` / `APPLICATION_VOBSUB` / `APPLICATION_DVBSUBS`。注意**没有**
@@ -142,8 +155,13 @@ internal const val MEDIA3_CUES_MIME = "application/x-media3-cues"
  * `DefaultSubtitleParserFactory` 同样处理 pgs / vobsub / dvbsubs，而它输出的轨正是被
  * 重写成 cue 包的（`PgsParser` 产出的 `Cue` 只有 bitmap、`text` 为空）。所以
  * 「cue 包 MIME 一律可渲染」那条宽松规则挡不住 PGS，只有这份名单拦得住它。
+ *
+ * 现在这份名单有两个用途，而且**方向相反**：
+ * 1. [MspTrackInfo.isTextRenderable] 用它把位图从文本层里排掉；
+ * 2. [MspTrackInfo.isBitmapRenderable] 用它把位图认出来、交给位图层。
+ * 两处必须同源，否则会出现「文本层排掉了、位图层也没收」这种一条都不画的局面。
  */
-private val BITMAP_SUBTITLE_MIMES = setOf(
+internal val BITMAP_SUBTITLE_MIMES = setOf(
     "application/pgs",
     "application/vobsub",
     "application/dvbsubs",
@@ -334,13 +352,21 @@ fun MspTrackInfo.matchesLanguage(preferred: List<String>): Boolean {
 }
 
 /**
- * 同分时的取舍顺序：**非强制轨优先，其次默认轨优先**。
+ * 同分时的取舍顺序：**非强制轨优先，其次默认轨优先，最后文本轨优先于位图轨**。
  *
  * 强制轨只覆盖外语台词那几句，自动挂上它大部分时间是空屏；
  * 旁边有完整字幕时选它就是选错。
+ *
+ * 最后那个键是 v0.9 加的。文本和位图两类字幕就是同一份内容的两种存法，而文本那一种
+ * 处处更优：字号/描边/双语可调、延迟和速率真的起作用、还能送去翻译。拿不准的时候
+ * 选文本——把位图放在**最后一个**键，就不会推翻前面那两条更重要的规则
+ * （「强制的非强制轨」不会因为它是位图而被排到强制轨前面去）。
  */
-private val AUTO_PICK_ORDER: Comparator<MspTrackInfo> =
-    compareBy<MspTrackInfo>({ if (it.isForced) 1 else 0 }, { if (it.isDefault) 0 else 1 })
+private val AUTO_PICK_ORDER: Comparator<MspTrackInfo> = compareBy<MspTrackInfo>(
+    { if (it.isForced) 1 else 0 },
+    { if (it.isDefault) 0 else 1 },
+    { if (it.isBitmapRenderable()) 1 else 0 },
+)
 
 /**
  * 自动挑一条内嵌字幕轨来挂。null = **不自动挂**（用户可以自己去面板里选）。
@@ -369,12 +395,12 @@ private val AUTO_PICK_ORDER: Comparator<MspTrackInfo> =
  * `preferred` 是**字幕偏好语言**，当前取自应用界面语言（还没有独立的设置项，
  * 那一项属于语言/翻译那一版）。空列表 = 只认「默认轨」标记。
  */
-fun List<MspTrackInfo>.bestEmbeddedTextTrack(preferred: List<String>): MspTrackInfo? {
-    val texts = embeddedTextTracks()
-    if (texts.isEmpty()) return null
-    val matching = texts.filter { it.matchesLanguage(preferred) }
+fun List<MspTrackInfo>.bestEmbeddedSubtitleTrack(preferred: List<String>): MspTrackInfo? {
+    val subtitles = embeddedSubtitleTracks()
+    if (subtitles.isEmpty()) return null
+    val matching = subtitles.filter { it.matchesLanguage(preferred) }
     if (matching.isNotEmpty()) return matching.minWithOrNull(AUTO_PICK_ORDER)
-    return texts.filter { it.isDefault }.minWithOrNull(AUTO_PICK_ORDER)
+    return subtitles.filter { it.isDefault }.minWithOrNull(AUTO_PICK_ORDER)
 }
 
 /**
@@ -404,6 +430,19 @@ interface TrackSelectionController {
      * ——上一部片子的整轨台词表留在新片子上，是「内容不对而界面看不出」那种错误。
      */
     val embeddedPreRead: StateFlow<EmbeddedPreReadState>
+
+    /**
+     * 此刻该显示的**位图**字幕（PGS / VobSub / DVB）。
+     *
+     * 与 [embeddedSubtitle] 平行：那条是「内嵌字幕的**文本**」，这条是「内嵌字幕的**图**」。
+     * 两者都是内核推什么就是什么（`onCues` 的原话就是「现在该显示什么」），
+     * 所以这份状态**没有**开始/结束时间，也没有半点延迟/速率的余地（原因见
+     * `EmbeddedBitmapCue` 的 KDoc）。
+     *
+     * 没挂位图轨时恒为**空**（而不是 null）：空的语义就是「这一帧没字幕」，
+     * 与「没挂轨」在界面上是同一件事。
+     */
+    val embeddedBitmap: StateFlow<EmbeddedBitmapState>
 
     /**
      * 选定某一条轨道（用户明确点的）。
@@ -456,9 +495,23 @@ fun List<MspTrackInfo>.audioTracks(): List<MspTrackInfo> =
 fun List<MspTrackInfo>.selectedAudioTrack(): MspTrackInfo? =
     filter { it.kind == MspTrackKind.AUDIO && it.isSelected }.singleOrNull()
 
-/** 只留能在我们自己的字幕层里渲染的文本轨（位图字幕、以及没有文本的轨都排除）。 */
-fun List<MspTrackInfo>.embeddedTextTracks(): List<MspTrackInfo> =
-    filter { it.kind == MspTrackKind.TEXT && it.isTextRenderable() }
+/**
+ * 只留**我们画得出来**的字幕轨：文本型，以及位图型（PGS / VobSub / DVB）。
+ *
+ * ## 为什么位图也进来
+ *
+ * 这个清单有两个用途，它们对位图的要求正好相反：
+ * 1. **给用户选**——位图字幕是画得出来的（v0.9），从清单里藏掉它等于「片源里明明
+ *    有中文字幕，界面上说你没有」；
+ * 2. **挂上之后能不能显示**——文本走 `SubtitleOverlay`，位图走 `PlayerVideoSurface`
+ *    里那一层，两者都“能显示”，只是代码不同（见 [MspTrackInfo.isBitmapRenderable]）。
+ *
+ * 真正要排除的只有一种：**格式认不出来的轨**（比如内嵌的图形字幕变体）。
+ * 注意这条清单**不代表**可以预读——位图轨的预读由 [MspTrackInfo.isTextRenderable]
+ * 单独把着（见 `preReadRequest`）。
+ */
+fun List<MspTrackInfo>.embeddedSubtitleTracks(): List<MspTrackInfo> =
+    filter { it.kind == MspTrackKind.TEXT && it.isRenderableSubtitle() }
 
 /** 内核当前实际选中的那条文本轨（没有就是 null）。 */
 fun List<MspTrackInfo>.firstSelectedTextTrack(): MspTrackInfo? =
@@ -481,6 +534,15 @@ fun subtitleFormatOf(mimeType: String?): SubtitleFormat {
         "text/x-ssa", "application/x-ssa" -> SubtitleFormat.SSA
         "text/x-ass", "application/x-ass" -> SubtitleFormat.ASS
         "application/ttml+xml", "application/x-ttml+xml", "text/ttml" -> SubtitleFormat.TTML
+        // 位图字幕：这三个 MIME 认得出来之后，界面上就能写清「图像字幕」而不是
+        // 「未知格式」——用户看到「未知」会以为是我们的兼容性问题，而这三个
+        // 本来就是**画出来**的，看文件名或后缀根本区分不了。
+        // 🔴 它们同时也是 [MspTrackInfo.isBitmapRenderable] 里那份名单（
+        // `BITMAP_SUBTITLE_MIMES`）的来源，改这里必须同步看那边（两处不同源就会出现
+        // 「文本层排掉了、位图层又没收」这种一条都不画的局面）。
+        "application/pgs" -> SubtitleFormat.PGS
+        "application/vobsub" -> SubtitleFormat.VOBSUB
+        "application/dvbsubs" -> SubtitleFormat.DVB
         else -> SubtitleFormat.UNKNOWN
     }
 }

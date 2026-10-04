@@ -227,6 +227,39 @@ class AppBuildInfoTest {
         assertFalse(AppBuildInfo.Unknown.isPreview)
     }
 
+    // ------------------------------------------------------------------ 测试版标记
+
+    @Test
+    fun `beta 既是预览版也是测试版`() {
+        // 两个属性管的事不同：`isPreview` 管「要不要挂标记」，
+        // `isBetaChannel` 管「挂哪一个词」。beta 两个都是真。
+        val beta = info(versionChannel = "beta")
+
+        assertTrue(beta.isPreview)
+        assertTrue(beta.isBetaChannel)
+    }
+
+    @Test
+    fun `通道名大小写和空格不影响是不是测试版`() {
+        // 这个字段来自构建脚本，大小写或多余空格都不该让它变成「另一个通道」。
+        assertTrue(info(versionChannel = "BETA").isBetaChannel)
+        assertTrue(info(versionChannel = " beta ").isBetaChannel)
+    }
+
+    @Test
+    fun `别的通道不是测试版`() {
+        // alpha 走的是「预览版」那个词：它不对外发布，说成「测试版」
+        // 等于告诉用户「这个可以去装了」。
+        assertFalse(info().isBetaChannel)
+        assertFalse(info(versionChannel = "").isBetaChannel)
+        assertFalse(info(versionChannel = "   ").isBetaChannel)
+        assertFalse(info(versionChannel = "alpha").isBetaChannel)
+        // `beta1` 是另一个名字，不能因为前缀相同就算进来——
+        // 通道名是要拿去和构建脚本、tag、更新源对齐的东西，不是模糊匹配。
+        assertFalse(info(versionChannel = "beta1").isBetaChannel)
+        assertFalse(AppBuildInfo.Unknown.isBetaChannel)
+    }
+
     // ------------------------------------------------------------------ 兜底值
 
     @Test

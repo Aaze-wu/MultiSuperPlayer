@@ -56,12 +56,12 @@ object UpdateSummaries {
 
     fun channel(channel: UpdateChannel): MspText = when (channel) {
         UpdateChannel.STABLE -> MspText.Res(R.string.msp_update_channel_stable)
-        UpdateChannel.PRERELEASE -> MspText.Res(R.string.msp_update_channel_prerelease)
+        UpdateChannel.BETA -> MspText.Res(R.string.msp_update_channel_beta)
     }
 
     fun channelDescription(channel: UpdateChannel): MspText = when (channel) {
         UpdateChannel.STABLE -> MspText.Res(R.string.msp_update_channel_stable_desc)
-        UpdateChannel.PRERELEASE -> MspText.Res(R.string.msp_update_channel_prerelease_desc)
+        UpdateChannel.BETA -> MspText.Res(R.string.msp_update_channel_beta_desc)
     }
 
     fun token(hasToken: Boolean): MspText = if (hasToken) {

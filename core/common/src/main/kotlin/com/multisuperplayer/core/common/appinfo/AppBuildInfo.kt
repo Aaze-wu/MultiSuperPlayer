@@ -5,6 +5,31 @@ import com.multisuperplayer.core.common.info.InfoRow
 import com.multisuperplayer.core.common.text.MspText
 
 /**
+ * 版本号后缀里会出现的那几个通道名。**唯一**一处定义。
+ *
+ * 同一个名字至少出现在三处：`versionName` 的后缀（`0.9.0-beta.1`）、git tag
+ * （`v0.9.0-beta.1`）、以及更新通道「该收哪些版本」的判据（`` `UpdateChannel` ``）。
+ * 散着写迟早会有一天只改了两处，而那时的表现是「某个通道忽然什么都收不到」——
+ * 一个不报错、只是静默失效的开关。
+ *
+ * 放在 `core:common` 是因为依赖只能朝这个方向走：`core:data` 看得到这里，
+ * 反过来不行。
+ */
+object AppChannelNames {
+
+    /** 公开测试版：`0.9.0-beta.1`。对外发布，更新通道里的「测试版」收这一种。 */
+    const val BETA = "beta"
+
+    /**
+     * 内部构建：`0.9.0-alpha.1`。
+     *
+     * **不对外发布**（不上传 Releases），更新通道里也没有任何一档收它。
+     * 它出现在这里只是为了「关于页能认出自己是个什么包」。
+     */
+    const val ALPHA = "alpha"
+}
+
+/**
  * 当前安装包的构建信息。
  *
  * 数据源头是 `BuildConfig`（由 `app/build.gradle.kts` 在**构建时**注入 git tag / commit /
@@ -34,8 +59,27 @@ data class AppBuildInfo(
     val versionChannel: String = "",
 ) {
 
-    /** 是不是预发行版。界面据此在标题区挂「预览版」标记。 */
+    /**
+     * 是不是预发行版。界面据此在标题区挂标记（[isBetaChannel] 决定挂哪一个词）。
+     *
+     * 只有两种情况会走到这里：公开测试版 `beta`，以及**不会公开**的内部构建。
+     * 正式包里通道号是空串，于是徽章整块不出现。
+     */
     val isPreview: Boolean get() = versionChannel.isNotBlank()
+
+    /**
+     * 是不是**公开测试版**（`beta`）。
+     *
+     * 关于页据此把标记写成「测试版」而不是「预览版」。两个词对用户的含义不一样：
+     * 「预览版」是「随时会变，别当回事」，「测试版」是「可以用了，帮忙看看」。
+     * 现在 `beta` 是对外发的那一档，用前者等于把一个正常可用的公开版本说成实验品。
+     *
+     * 比较前 `trim()`：这个字段来自构建脚本，多一个空格就变成另一个通道；
+     * 与其它字段同一套规矩——空白等于「没取到」，但那属于 [isPreview] 的判断，
+     * 这里只回答「是不是 beta」，取不到就是不是。
+     */
+    val isBetaChannel: Boolean
+        get() = versionChannel.trim().equals(AppChannelNames.BETA, ignoreCase = true)
 
     /** 形如 `0.5.4 (50500)`；拿不到版本号时返回「未知」。 */
     fun versionText(): MspText {

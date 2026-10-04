@@ -25,11 +25,38 @@ enum class SubtitleFormat(
     TTML("TTML / DFXP / SMPTE-TT", listOf("ttml", "dfxp", "xml")),
     VOBSUB("VobSub", listOf("idx", "sub")),
     PGS("PGS (Sup)", listOf("sup")),
+
+    /**
+     * 数字电视广播用的位图字幕。
+     *
+     * 后缀刻意是**空**：它只以「容器里的一条轨」（`application/dvbsubs`）的形式存在，
+     * 没有哪个后缀能对应到它。真给一个（比如 `.sub`）的话，`candidatesForExtension`
+     * 就会对 `.sub` 文件返回两个候选，而其中一个是永远解析不出来的——
+     * 排查「这个 .sub 为什么读不了」时，那个假的候选会把人带到错的方向上。
+     * （`.sub` 现在归 VOBSUB，那才是现实里的大多数。）
+     */
+    DVB("DVB Subtitle", emptyList()),
     UNKNOWN("Unknown", emptyList()),
     ;
 
     val isLyricStyle: Boolean
         get() = this == LRC || this == ENHANCED_LRC
+
+    /**
+     * 这是**位图**字幕（一张张已经排好版的图片），不是文本。
+     *
+     * 判据只有这一处，因为它决定了三件不相干的事，而三处各写一份的话必然会漂：
+     * 1. 能不能被解析成文本（`core:subtitle` 的解析器注册表里**没有**它们）；
+     * 2. 能不能当外挂字幕文件被发现（见 `SubtitleFileNaming.discoverableExtensions`）；
+     * 3. 画的时候走哪条路（文本层还是位图层，见 `core:player` 的
+     *    `MspTrackInfo.isBitmapRenderable`）。
+     *
+     * 注意它的「另一半」在 `core:player` 的 `BITMAP_SUBTITLE_MIMES`：那边是 MIME 世界的
+     * 说法（容器报给我们的是 `application/pgs`，不是 `SubtitleFormat`），两边无法
+     * 合并成一个常量，但有一条测试钉着它们的对应关系。
+     */
+    val isBitmap: Boolean
+        get() = this == VOBSUB || this == PGS || this == DVB
 
     companion object {
         /** 后缀 → 候选格式（可能多个，例如 lrc 同时对应两种）。 */

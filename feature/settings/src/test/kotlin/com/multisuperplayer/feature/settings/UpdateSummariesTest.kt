@@ -110,16 +110,16 @@ class UpdateSummariesTest {
             R.string.msp_update_channel_stable,
         )
         Assert.assertEquals(
-            idOf(UpdateSummaries.channel(UpdateChannel.PRERELEASE)),
-            R.string.msp_update_channel_prerelease,
+            idOf(UpdateSummaries.channel(UpdateChannel.BETA)),
+            R.string.msp_update_channel_beta,
         )
         Assert.assertEquals(
             idOf(UpdateSummaries.channelDescription(UpdateChannel.STABLE)),
             R.string.msp_update_channel_stable_desc,
         )
         Assert.assertEquals(
-            idOf(UpdateSummaries.channelDescription(UpdateChannel.PRERELEASE)),
-            R.string.msp_update_channel_prerelease_desc,
+            idOf(UpdateSummaries.channelDescription(UpdateChannel.BETA)),
+            R.string.msp_update_channel_beta_desc,
         )
     }
 
@@ -127,7 +127,22 @@ class UpdateSummariesTest {
     fun `通道 - 两个通道的说明不是同一句`() {
         Assert.assertNotEquals(
             idOf(UpdateSummaries.channelDescription(UpdateChannel.STABLE)),
-            idOf(UpdateSummaries.channelDescription(UpdateChannel.PRERELEASE)),
+            idOf(UpdateSummaries.channelDescription(UpdateChannel.BETA)),
+        )
+    }
+
+    @Test
+    fun `通道 - 每个枚举项都有名字和说明`() {
+        // 枚举加一项而忘了写文案时，`when` 会编译不过；但「文案写成了上面那一条的」
+        // 编译得过，界面上表现为两个选项长得一模一样——那等于多了一个没用的选项。
+        val ids = UpdateChannel.entries.map { channel ->
+            listOf(idOf(UpdateSummaries.channel(channel)), idOf(UpdateSummaries.channelDescription(channel)))
+        }.flatten()
+
+        Assert.assertEquals(
+            "有两个通道项共用同一条文案",
+            ids.size,
+            ids.toSet().size,
         )
     }
 
@@ -292,9 +307,9 @@ class UpdateSummariesTest {
             "msp_update_status_ignored",
             "msp_update_channel",
             "msp_update_channel_stable",
-            "msp_update_channel_prerelease",
+            "msp_update_channel_beta",
             "msp_update_channel_stable_desc",
-            "msp_update_channel_prerelease_desc",
+            "msp_update_channel_beta_desc",
             "msp_update_auto_check",
             "msp_update_auto_check_desc",
             "msp_update_token",

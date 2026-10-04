@@ -129,7 +129,7 @@ fun UpdateRoute(
 fun UpdateScreen(
     state: UpdateUiState,
     settings: UpdateSettings = UpdateSettings(
-        channel = UpdateChannel.PRERELEASE,
+        channel = UpdateChannel.BETA,
         autoCheck = true,
         ignoredTag = null,
         lastCheckAtEpochMs = null,

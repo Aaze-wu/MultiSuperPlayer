@@ -126,6 +126,10 @@ Release notes: [docs/release-notes](docs/release-notes/)
   `application/x-media3-cues` and keeps the real format (`application/x-subrip` and friends) in `codecs`.
   Judging by `sampleMimeType` classifies them as unknown and the whole track then **vanishes** from the
   panel — while the top line still says `Auto-selected "zh"`, i.e. the two halves contradict each other.
+  Everything listed above (display modes, bilingual mode, translation, timeline offset, rate, styling)
+  covers **text** embedded tracks only: a bitmap track (PGS / VobSub / DVB) carries a picture and no text
+  and goes through a **bitmap layer painted over the video rect**, so none of those switches except the
+  display mode apply to it — for the reasons and the cost, see item 12 in section five.
 - **Subtitle timeline offset**: ±0.1 s and ±0.5 s steps that accumulate, plus a *Reset* button. A positive
   value means the subtitle appears **later** (if it shows up before the sound, tune positive). The offset
   only shifts the timeline as a whole; it never changes how long a line stays on screen.
@@ -544,6 +548,45 @@ Row 8 of the Settings hub is *Check for updates*, which opens a page with three 
 - **The token is optional.** It works without one; supplying one only raises the limit from
   60 to 5000 requests per hour. It is stored on this device only, encrypted with the system
   keystore, and never uploaded — the page says so right next to the field.
+
+#### Three build lines, two channels
+
+Releases come in three rungs while the update page has only two options — that is not a missing
+feature:
+
+| Version | What it is | Stable channel | Beta channel |
+| --- | --- | --- | --- |
+| `X.Y.Z` | Stable | ✅ | ✅ |
+| `X.Y.Z-beta.N` | Public beta | ❌ | ✅ |
+| `X.Y.Z-alpha.N` | Internal build | ❌ | ❌ |
+
+- **`alpha` is not a third rung, it simply never gets published.** Those builds are compiled
+  locally and installed by hand; no Release is ever created for them. So a "alpha only" option in
+  the update page would have nothing to offer and would be a choice that never does anything —
+  and the user would blame themselves for picking it wrong.
+- **The beta channel has to accept stable builds.** Otherwise a user who installed a beta can never
+  get back on track: receiving a stable build is the only way out of the beta line.
+- **The criterion is the tag, not GitHub's `prerelease` checkbox.** The checkbox is a switch a
+  human ticks at publish time and can forget; the `-beta.1` suffix is written into the package by
+  the build, so it cannot be forgotten. The lenient side is the beta channel: it accepts both
+  "tag carries `-beta.N`" and "marked pre-release but the tag has no suffix", while the stable
+  channel accepts neither. A forgotten tick then leaks a beta to people who *chose* the beta
+  channel, instead of pushing it to everyone.
+- **alpha, beta and stable of the same version share one `versionCode`**
+  (`major*10000 + minor*100 + patch`), on purpose: `versionCode` only answers "can this overwrite
+  install", while newer/older is decided by semver — and `0.9.0-alpha.1 < 0.9.0-beta.1 < 0.9.0`
+  already holds in semver 2.0, so not a line of `UpdateVersion`'s comparison had to change.
+- **The old name is translated once, explicitly.** Up to 0.8.1 this rung was called `PRERELEASE`;
+  it is now `BETA`. Without that mapping a user on a pre-release build would fall back to the
+  default, which happens to be `BETA` too (so nothing looks wrong) — but a *stable* user who had
+  deliberately picked this rung would be silently moved back to "stable only": he stops receiving
+  betas and is never told.
+- **The About page uses two different words.** `beta` reads *Beta*; `alpha` reads *Preview*. The
+  first means "usable, please take a look", the second "it will change, do not rely on it".
+  Calling both *Preview* would describe a perfectly usable public build as an experiment.
+
+The step-by-step operations for this ladder (which line to edit, which command to run, what to
+verify afterwards) are in [`docs/release-process.md`](docs/release-process.md) (Chinese).
 
 #### The check layer does not know about GitHub
 
@@ -986,15 +1029,22 @@ These are deliberate for this release, not oversights:
     discovery log line**: it writes "looking for subtitles for xxx", and for an entry restored from a
     playlist that one field is missing (everything else is there). Fixing it means changing the storage
     format and writing a migration, which is disproportionate for one name in one log line.
-12. **Bitmap subtitles inside the file (PGS / VobSub / DVB) never show up in the panel.** Our own subtitle
-    layer draws text, and a bitmap `Cue` carries an empty `text`, so there is nothing to lay out at all.
-    The only renderer that can draw bitmaps is Media3's own `SubtitleView` (the one inside `PlayerView`) —
-    and the player screen hides exactly that one, so that embedded **text** subtitles are not drawn twice
-    (see "Subtitles that ship inside the file" above). The panel therefore lists **text** embedded tracks
-    only: a bitmap track neither appears nor can be selected, and the panel does not explain why (it simply
-    looks like "this file has no embedded subtitles"). Supporting it for real means giving bitmap tracks a
-    rendering path of their own, at the cost of two subtitle layers having to agree on "who drew text at
-    which instant". Left for a later version.
+12. **Embedded bitmap subtitles (PGS / VobSub / DVB) are drawn now, but every subtitle tweak and style
+    setting is deliberately ignored for them.** A bitmap cue carries a picture and no text (`Cue.text` is
+    empty), so it takes a **second rendering path**: the player page overlays a dedicated layer on the
+    video rect (`BitmapSubtitleLayer`) whose layout arithmetic is copied line for line from Media3's
+    `SubtitlePainter.setupBitmapLayout`. Media3's own `SubtitleView` stays covered (otherwise embedded
+    **text** subtitles would be painted twice — see "Subtitles that ship inside the file" above), so
+    exactly one of the two paths draws at any instant. Three things stay out of that layer on purpose:
+    **subtitle delay / rate** (those are a shift and a scale we apply to the timeline ourselves, while
+    bitmap cues are delivered by Media3 straight from their timestamps), **subtitle styling** (font size /
+    line spacing / outline / bottom margin — the glyphs are already baked into the picture) and
+    **whole-track pre-reading** (that exists to hand the text layer the entire table up front). The panel
+    spells this out for a bitmap track instead of letting it look like "this track could not be read".
+    Separately, whether VobSub / DVB actually draw depends on the palette and size in the file's
+    initialisation data (`VobsubParser` has quite strict preconditions); only PGS has been verified
+    against a real sample, and those two are treated as "use it if it works, act as if the track is
+    absent if it does not".
 13. **The on-device speech recognition models are not bundled into the APK; the user downloads them.**
     The two models are about 78.1 MB and 189.8 MB, and putting 78 MB into the installer would make
     everyone who does not want this feature wait through an extra download, so the flow is "pick a model,

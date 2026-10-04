@@ -32,6 +32,18 @@ data class UpdateVersion(
 
     val isPreRelease: Boolean get() = preRelease.isNotEmpty()
 
+    /**
+     * 预发行的**种类**，即第一个标识符的小写形式（`beta.1` → `beta`、`alpha.2` → `alpha`）。
+     *
+     * 单列一个属性，是因为「是不是预发行」和「是哪一种预发行」是两件事：
+     * 更新通道要按种类分流（`beta` 对外、`alpha` 永不对外），而只看前者的代码
+     * 会把两者混成一档——表现是内部构建被推给选了「测试版」的用户。
+     *
+     * 正式版没有种类，是 `null` 而不是空串：空串是一个合法的、但谁也不是的标识符
+     * （`0.9.0-.1` 那种写法），两者混同的话 `-""` 会需要单独一条判据。
+     */
+    val preReleaseKind: String? get() = preRelease.firstOrNull()?.lowercase()
+
     /** 与 `app/build.gradle.kts` 同一套编码，用于界面显示与「同数值段」判断。 */
     val versionCode: Int get() = major * 10_000 + minor * 100 + patch
 

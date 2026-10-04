@@ -50,16 +50,15 @@ internal object SubtitleFileNaming {
     /**
      * 可以作为「文本外挂字幕」被发现的格式后缀。
      *
-     * 刻意排掉 [SubtitleFormat.VOBSUB] / [SubtitleFormat.PGS]：它们是**位图**字幕
-     * （一张张图片 + 索引文件），需要专门的图形渲染器，解析器读不出任何文本。
+     * 刻意排掉所有位图格式（[SubtitleFormat.isBitmap]：VobSub / PGS / DVB）：它们是
+     * 一张张图片 + 索引文件，需要专门的图形渲染器，解析器读不出任何文本。
      * 把它们列进候选，只会让子集列表里多出一堆「点了必然失败」的文件。
+     *
+     * 用 `isBitmap` 而不是逐个点名，是为了让以后再加一个位图格式时**这里自动生效**
+     * ——那种「新格式悄悄跑进候选清单」的缺口在界面上只表现为「点它没反应」。
      */
     val discoverableExtensions: List<String> = SubtitleFormat.entries
-        .filterNot {
-            it == SubtitleFormat.UNKNOWN ||
-                it == SubtitleFormat.VOBSUB ||
-                it == SubtitleFormat.PGS
-        }
+        .filterNot { it == SubtitleFormat.UNKNOWN || it.isBitmap }
         .flatMap { it.extensions }
         .distinct()
 

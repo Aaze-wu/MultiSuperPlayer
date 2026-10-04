@@ -56,6 +56,13 @@
       用户遇到的就是「调了没反应」。
     -->
     <string name="msp_player_embedded_preread_failed">预读字幕失败，速率调整可能不准</string>
+    <!--
+      同一位置：当前挂着的是位图字幕（PGS / VobSub / DVB）。
+      位图轨既不会预读、也不会累积台词（内核给的是「此刻该显示什么」），于是
+      「尚未读到台词」在那里会是一句**永远不会消失的假话**（屏幕上明明有字幕）。
+      这句话要同时回答「为什么面板上说不出台词条数」和「为什么下面那两根滑块拖了没反应」。
+    -->
+    <string name="msp_player_embedded_bitmap_note">位图字幕，字幕时间轴和速率对它不生效</string>
     <!-- 时间轴纠偏：正数 = 字幕比声音晚出现。方向写清楚了才不用用户自己试。 -->
     <string name="msp_player_subtitle_sync">字幕时间轴</string>
     <string name="msp_player_subtitle_sync_step">%1$s 秒</string>
@@ -85,6 +92,7 @@
     <string name="msp_player_detail_generated">本机识别</string>
     <string name="msp_player_format_lrc">LRC 歌词</string>
     <string name="msp_player_format_lrc_enhanced">增强型 LRC（逐字）</string>
+    <string name="msp_player_format_dvb">DVB 字幕</string>
 
     <!-- ===== 显示模式 ===== -->
     <string name="msp_player_mode_off">隐藏</string>

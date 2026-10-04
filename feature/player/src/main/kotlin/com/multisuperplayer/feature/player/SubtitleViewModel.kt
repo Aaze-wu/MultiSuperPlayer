@@ -36,12 +36,13 @@ import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleOrigin
 import com.multisuperplayer.core.model.SubtitleTrack
+import com.multisuperplayer.core.player.EmbeddedBitmapCue
 import com.multisuperplayer.core.player.EmbeddedPreReadState
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import com.multisuperplayer.core.player.TrackSelectionController
 import com.multisuperplayer.core.player.cuesOrNull
-import com.multisuperplayer.core.player.embeddedTextTracks
+import com.multisuperplayer.core.player.embeddedSubtitleTracks
 import com.multisuperplayer.core.player.firstSelectedTextTrack
 
 import com.multisuperplayer.core.translate.SubtitleExportFormat
@@ -216,6 +217,24 @@ class SubtitleViewModel(
             SyncTuning(offsetMs, ratePermille)
         }
 
+    /**
+     * 轨道清单 + 此刻的位图字幕。
+     *
+     * 合并成一格的理由和 [SyncTuning] 一样：`combine` 最多只接五个带类型的流，
+     * 而这里的两个输入本来就是**同一次内核回调**的产物（`onTracksChanged` 给清单，
+     * `onCues` 给图），分开占两格反而会让「清单里有位图轨」和「手头有图要画」
+     * 这两件事在界面上错开一帧。
+     */
+    private data class TrackSnapshot(
+        val tracks: List<MspTrackInfo>,
+        val bitmapCues: List<EmbeddedBitmapCue>,
+    )
+
+    private val trackSnapshot: Flow<TrackSnapshot> =
+        combine(tracks.tracks, tracks.embeddedBitmap) { list, bitmap ->
+            TrackSnapshot(list, bitmap.cues)
+        }
+
     /** 加载结果。只依赖「哪条媒体 + 选了哪条字幕 + 第几次扫」。 */
     private val loadState: StateFlow<SubtitleLoadState> = combine(
         entry,
@@ -298,9 +317,9 @@ class SubtitleViewModel(
         resolvedLoadState,
         settingsRepository.settings,
         translation.texts,
-        tracks.tracks,
+        trackSnapshot,
         syncTuning,
-    ) { load, settings, texts, trackList, tuning ->
+    ) { load, settings, texts, snapshot, tuning ->
         val merged = load.document?.let { texts.appliedTo(it, load.translationToken()) }
         resolveSubtitleState(
             load = if (merged == null) load else load.copy(
@@ -308,7 +327,8 @@ class SubtitleViewModel(
                 hasTranslation = merged.hasTranslation(),
             ),
             displayMode = settings.displayMode,
-            embeddedTracks = trackList.embeddedTextTracks(),
+            embeddedTracks = snapshot.tracks.embeddedSubtitleTracks(),
+            bitmapCues = snapshot.bitmapCues,
             timelineOffsetMs = tuning.offsetMs,
             subtitleRatePermille = tuning.ratePermille,
             style = settings.style,
@@ -1021,7 +1041,7 @@ data class SubtitleUiState(
     val translatedCount: Int = 0,
     /** 可翻的行数（不算注释行和空行）。0 表示这份字幕没什么可翻的。 */
     val translatableCount: Int = 0,
-    /** 容器里的字幕轨（只含能够在我们自己的字幕层里渲染的那些）。 */
+    /** 容器里的字幕轨（只含我们画得出来的：文本型 + 位图型）。 */
     val embeddedTracks: List<MspTrackInfo> = emptyList(),
     /** 当前挂着的内嵌字幕轨。null = 用的是外挂字幕（或者没挂）。 */
     val embeddedTrack: MspTrackInfo? = null,
@@ -1033,6 +1053,25 @@ data class SubtitleUiState(
      * 前者等，后者去检查字幕。
      */
     val embeddedPreRead: EmbeddedPreReadState = EmbeddedPreReadState.Off,
+    /**
+     * 此刻该画的**位图**字幕（PGS / VobSub / DVB），可能是零张。
+     *
+     * ## 为什么在状态里，而不让渲染层自己去订阅
+     *
+     * 理由和 [style] 一样：`PlayerScreen` / `PlayerVideoSurface` 拿到的就是这个
+     * 对象。让渲染层再依赖一个 `TrackSelectionController` 就会出现两个数据源各自
+     * 重组，而屏幕上的表现是「字幕已经消失的那一帧还恋恋不舍地留着」。
+     *
+     * ## 它不受 [timelineOffsetMs] / [subtitleRatePermille] 影响
+     *
+     * 不是漏了：位图字幕是流式到达的，没有整轨台词表可以回查，于是微调和速率
+     * 对它们无意义（画出来的永远是「内核此刻给的那张」）。详见 `EmbeddedBitmapCue`
+     * 的 KDoc——那里也写了为什么为了凑上这两个旋钮而把整轨位图留在内存里不可接受。
+     *
+     * 「隐藏」时会变空：位图和文本是两条渲染路径，只在文本那条上尊重那个开关的话，
+     * 用户会看到「关掉字幕之后画面上还留着一行外文」。
+     */
+    val bitmapCues: List<EmbeddedBitmapCue> = emptyList(),
     /**
      * 字幕时间轴微调（毫秒）。正数 = 字幕比声音**晚**出现。
      *
@@ -1083,6 +1122,7 @@ internal fun resolveSubtitleState(
     load: SubtitleLoadState,
     displayMode: SubtitleDisplayMode,
     embeddedTracks: List<MspTrackInfo> = emptyList(),
+    bitmapCues: List<EmbeddedBitmapCue> = emptyList(),
     timelineOffsetMs: Long = 0L,
     subtitleRatePermille: Int = SUBTITLE_RATE_BASE_PERMILLE,
     style: SubtitleStyle = SubtitleStyle.DEFAULT,
@@ -1091,10 +1131,17 @@ internal fun resolveSubtitleState(
     val fallbackNeeded = displayMode == SubtitleDisplayMode.TRANSLATION_ONLY &&
         document != null &&
         !load.hasTranslation
+    val effectiveMode = if (fallbackNeeded) SubtitleDisplayMode.ORIGINAL_ONLY else displayMode
+
+    // 「隐藏」必须把位图也一起清掉。位图和文本是两份状态、两条渲染路径，
+    // 只在文本那条上尊重那个开关的话，用户会看到「关掉字幕之后画面上还留着一行
+    // 外文」——而他会把这个理解成开关坏了，而不是「图像字幕不归它管」。
+    // 判 [effectiveMode] 而不是 [displayMode]：真正落在状态里、被渲染层读的是前者。
+    val visibleBitmapCues = subtitleCuesForMode(bitmapCues, effectiveMode)
 
     return SubtitleUiState(
         displayMode = displayMode,
-        effectiveMode = if (fallbackNeeded) SubtitleDisplayMode.ORIGINAL_ONLY else displayMode,
+        effectiveMode = effectiveMode,
         phase = load.phase,
         attached = load.attached,
         document = document,
@@ -1108,11 +1155,36 @@ internal fun resolveSubtitleState(
         embeddedTracks = embeddedTracks,
         embeddedTrack = load.embeddedTrack,
         embeddedPreRead = load.embeddedPreRead,
+        bitmapCues = visibleBitmapCues,
         timelineOffsetMs = timelineOffsetMs,
         subtitleRatePermille = subtitleRatePermille,
         style = style,
     )
 }
+
+/**
+ * 字幕总开关落到**某一条渲染路径**上：关掉时把这条路径的 cue 清空。
+ *
+ * 位图和文本是两份状态、两条渲染路径（[SubtitleUiState.bitmapCues] 与
+ * [SubtitleUiState.document]）。只在文本那条上尊重那个开关的话，用户关掉字幕之后
+ * 画面上还留着一行外文——他会把这个理解成「开关坏了」，而不是「图像字幕不归它管」。
+ *
+ * ## 为什么是泛型，而且为什么不判元素类型
+ *
+ * 这条规则只看列表的**有 / 没有**，不看元素是什么；做成泛型纯粹是为了能在
+ * `feature:player` 的 JVM 单测里钉住它——[EmbeddedBitmapCue] 的每一个实例都必须
+ * 带一张真的 `Bitmap`，而 `Bitmap` 在宿主机 JVM 上构造不出来（单测里只有
+ * `android.jar` 的空壳）。如果这个函数写死 `List<EmbeddedBitmapCue>`，这条规则就
+ * 变成了「只能在模拟器上试一次」的东西，而那正是 [resolveSubtitleState] 当初被抽成
+ * 纯函数要避免的处境。
+ *
+ * 判 [SubtitleDisplayMode.OFF] 而不是「没在渲染」：`isRendering` 还要求文档非空，
+ * 用它会顺带把「字幕开关开着、但这一帧刚好没有台词」也清掉——那是正常的空档。
+ */
+internal fun <T> subtitleCuesForMode(
+    cues: List<T>,
+    mode: SubtitleDisplayMode,
+): List<T> = if (mode == SubtitleDisplayMode.OFF) emptyList() else cues
 
 /**
  * 字幕层该拿哪个时刻去查 cue。
