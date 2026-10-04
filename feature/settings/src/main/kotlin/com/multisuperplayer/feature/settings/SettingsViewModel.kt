@@ -418,6 +418,21 @@ class SettingsViewModel(
         playbackSettingsRepository.setRecordRecentPlays(enabled)
     }
 
+    /**
+     * 允许不受信任的 https 证书。
+     *
+     * 这里**不做二次确认弹窗**：打开它的用户有两个来源——自建服务器的拥有者，
+     * 或者刚刚被一条「证书不被信任」的错误提示指过来的人。两种人都已经知道自己在干什么，
+     * 而弹窗对他俩都只是多一次点击。该说的风险写在那一行自己的帮助里和打开后的提示条上，
+     * 那是**看得见**的；弹窗是看完就忘的。
+     *
+     * 只写仓库、不碰正在跑的控制器：控制器那边的收集器（`AppPlaybackViewModel`）
+     * 会自己把它同步过去。这里是设置页，播不播是另一个页面的事。
+     */
+    fun setTrustUntrustedCertificates(enabled: Boolean) = persist("允许不受信任的证书=$enabled") {
+        playbackSettingsRepository.setTrustUntrustedCertificates(enabled)
+    }
+
     // ------------------------------------------------------------------ 字幕翻译
 
     /**

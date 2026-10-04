@@ -2,7 +2,6 @@ package com.multisuperplayer.feature.settings
 
 import android.os.Build
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,8 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Translate
@@ -43,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,8 +51,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.settings.AppLanguage
@@ -134,6 +132,9 @@ fun AppearanceSettingsScreen(
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val dynamicColorBlockedByOled = baseTheme == MspBaseTheme.BLACK
     val dynamicColorUsable = dynamicColorSupported && !dynamicColorBlockedByOled
+    // 强调色选择弹窗。这一页只此一个对话框，所以用一个布尔量而不是枚举；
+    // 它渲染在 `Scaffold` 外面，不会随列表滚动被回收（见文件末尾）。
+    var showAccentPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -166,23 +167,50 @@ fun AppearanceSettingsScreen(
             }
 
             item {
-                AccentPicker(
-                    selected = accent,
-                    // 自定义色生效时预设那一排**不再勾选**：当前用的确实不是任何一项预设。
-                    // 但六个色块仍然可点——点下去就是「用回那个预设」（会顺手删掉自定义色）。
-                    customActive = theme.customAccent != null,
-                    onSelect = onSelectAccent,
+                val custom = theme.customAccent
+                // 被盖子盖住时必须说出来。强调色的上面还压着两个取色开关，
+                // 此刻点开列表换一个颜色，界面上可能**一点变化都没有**——
+                // 不说清这件事，用户看到的就是「这里坏了」。
+                val coveredBy = when {
+                    artworkColorEnabled -> R.string.msp_settings_accent_covered_artwork
+                    dynamicColorUsable && dynamicColorPreferred ->
+                        R.string.msp_settings_accent_covered_dynamic
+                    else -> null
+                }
+                SettingChoiceRow(
+                    // 整页只有它一个「选颜色」的设置项，而颜色本身就是它的值，
+                    // 所以右侧的值旁边要画一块色（`SettingChoiceRow` 的 valueSwatch）。
+                    icon = Icons.Outlined.ColorLens,
+                    title = stringResource(R.string.msp_settings_accent_label),
+                    value = if (custom != null) {
+                        stringResource(R.string.msp_settings_custom_accent_option)
+                    } else {
+                        accent.label.string()
+                    },
+                    valueSwatch = accentSwatchColor(customAccent = custom, preset = accent),
+                    subtitle = if (coveredBy != null) {
+                        stringResource(coveredBy)
+                    } else {
+                        stringResource(R.string.msp_settings_accent_desc)
+                    },
+                    onClick = { showAccentPicker = true },
                     help = stringResource(R.string.msp_settings_theme_note_accent),
                 )
             }
 
-            item {
-                CustomAccentSection(
-                    current = theme.customAccent,
-                    onSelect = onSelectCustomAccent,
-                    onClear = onClearCustomAccent,
-                    help = stringResource(R.string.msp_settings_custom_accent_note),
-                )
+            // 滑块只在「自定义」被选中时出现：六个预设全部在弹窗里，它们不需要滑块；
+            // 而常驻的代价是这一页永远多出三根意义不明的滑块（它们与上面那一排
+            // 颜色选项没有任何视觉联系，用户不知道自己在拖什么）。
+            val customAccent = theme.customAccent
+            if (customAccent != null) {
+                item {
+                    CustomAccentSection(
+                        current = customAccent,
+                        onSelect = onSelectCustomAccent,
+                        onClear = onClearCustomAccent,
+                        help = stringResource(R.string.msp_settings_custom_accent_note),
+                    )
+                }
             }
 
             item { SectionHeader(stringResource(R.string.msp_settings_section_color_source)) }
@@ -245,6 +273,58 @@ fun AppearanceSettingsScreen(
             }
         }
     }
+
+    // 对话框放在 `Scaffold` **外面**：`AlertDialog` 是独立窗口，放进 `LazyColumn` 的 item 里
+    // 反而会跟着列表一起被回收（见 `PlaybackSettingsScreen` 里同样的做法）。
+    if (showAccentPicker) {
+        val custom = theme.customAccent
+        // 选项类型写成 `MspAccent?`：`null` 就是「自定义」那一项。不给它编一个假的
+        // 枚举值，是因为它真的不是任何一项预设——那样反而要让 `fromId` 接受一个
+        // 不存在的 id。
+        ChoiceDialog(
+            title = stringResource(R.string.msp_settings_accent_label),
+            options = MspAccent.entries + listOf<MspAccent?>(null),
+            // 自定义生效时一个预设都不勾：让某一项亮着会让人以为「我用的是它，
+            // 只是颜色被改了」。
+            selected = if (custom != null) null else accent,
+            label = { option ->
+                option?.label?.string()
+                    ?: stringResource(R.string.msp_settings_custom_accent_option)
+            },
+            description = { option ->
+                if (option == null) {
+                    stringResource(R.string.msp_settings_custom_accent_option_desc)
+                } else {
+                    null
+                }
+            },
+            leading = { option ->
+                // 还没存过自定义色时，「自定义」那一项画的是**选中它会得到的那个颜色**
+                // （与 onSelect 里落盘的是同一个值），而不是一个空圈——
+                // 空圈看起来像这个选项不可用。
+                AccentOptionDot(
+                    color = if (option != null) {
+                        option.lightPrimary
+                    } else {
+                        accentSwatchColor(customAccent = custom ?: DEFAULT_CUSTOM_ACCENT, preset = accent)
+                    },
+                )
+            },
+            onSelect = { option ->
+                if (option == null) {
+                    // 选中「自定义」要**立刻**落盘一个颜色。只展开滑块是不够的：
+                    // 此刻界面上真正生效的还是原来那个预设色，用户会以为这一下什么都没发生，
+                    // 而下面的滑块又只属于「已选中自定义」这一态。
+                    // 已经存过自定义色就原样再存一次（值不变，幂等）。
+                    onSelectCustomAccent(custom ?: DEFAULT_CUSTOM_ACCENT)
+                } else {
+                    onSelectAccent(option)
+                }
+                showAccentPicker = false
+            },
+            onDismiss = { showAccentPicker = false },
+        )
+    }
 }
 
 // --------------------------------------------------------------------- 语言
@@ -305,88 +385,62 @@ private fun BaseThemeRow(
 
 // --------------------------------------------------------------------- 强调色
 
-@Composable
-private fun AccentPicker(
-    selected: MspAccent,
-    customActive: Boolean,
-    onSelect: (MspAccent) -> Unit,
-    help: String,
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        // 强调色是这一页唯一「选一个颜色」的控件，也是唯一没有副标题的控件，
-        // 所以它的说明只能挂在标签旁边的问号上。
-        Row(
-            modifier = Modifier.padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.msp_settings_accent_label),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            SettingHelpIcon(
-                title = stringResource(R.string.msp_settings_accent_label),
-                text = help,
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            MspAccent.entries.forEach { candidate ->
-                AccentSwatch(
-                    accent = candidate,
-                    // 自定义色生效时一个都不勾：当前用的确实不是任何一项预设，
-                    // 让某一项亮着会让人以为「我用的是它，只是颜色被改了」。
-                    selected = !customActive && candidate == selected,
-                    onClick = { onSelect(candidate) },
-                )
-            }
-        }
-    }
-}
+/**
+ * 「选中自定义」时先落盘的那个颜色。
+ *
+ * 弹窗里那项的画色与真的选中它时写入的值必须**是同一个**：两处各写一份的话，
+ * 用户看到的小色点会和他真正得到的东西不是一种颜色。
+ */
+private val DEFAULT_CUSTOM_ACCENT = CustomAccent(
+    hueDegrees = CustomAccentRanges.DEFAULT_HUE,
+    saturation = CustomAccentRanges.DEFAULT_SATURATION,
+    lightness = CustomAccentRanges.DEFAULT_LIGHTNESS,
+)
 
-@Composable
-private fun AccentSwatch(
-    accent: MspAccent,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    // 色块用「亮色基底下的主色」：主题基底是深色时也能看清这是哪个颜色，
-    // 因为真正需要辨认的是色相，不是它在当前主题下的具体取值。
-    val swatch = accent.lightPrimary
-    // 先算好再进 semantics 的 lambda：那里面不是可组合上下文，拿不到 stringResource。
-    val accentLabel = accent.label.string()
+/**
+ * 强调色那一行右侧的色块（以及弹窗里每项左边的小色点）取哪个颜色。
+ *
+ * 自定义色优先——它才是真正生效的那一个（`MspTheme` 的优先级是「自定义 > 预设」）。
+ * 两个取色开关的「覆盖」不进这里：色块要回答的是「我选的是哪个颜色」，
+ * 而「它此刻被盖住了」由副标题说。
+ *
+ * 两种来源统一取「亮色基底下的主色」（[MspAccent.lightPrimary] 与
+ * [customAccentColors] 的 `lightPrimary`）：色块在深色主题下也要能认出色相。
+ */
+private fun accentSwatchColor(customAccent: CustomAccent?, preset: MspAccent): Color =
+    customAccent?.let { custom ->
+        customAccentColors(
+            hueDegrees = custom.hueDegrees,
+            saturation = custom.saturation,
+            lightness = custom.lightness,
+        ).lightPrimary
+    } ?: preset.lightPrimary
 
+/**
+ * 选项左边的小色点。
+ *
+ * 列表里只有「颜色」这一项需要它：六个预设的名字（靛蓝 / 紫罗兰 / ……）
+ * 单看文字根本无法选中想要的那个。纯装饰，`contentDescription` 留空——
+ * 选项的名字就在它右边，读屏用户不需要再听一遍颜色名。
+ */
+@Composable
+private fun AccentOptionDot(color: Color) {
     Box(
         modifier = Modifier
-            .size(48.dp)
-            .background(swatch, CircleShape)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.outlineVariant,
-                shape = CircleShape,
-            )
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            // 颜色本身对读屏用户不可见，必须给出名字，否则这一行是六个无名圆圈。
-            .semantics { contentDescription = accentLabel },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (selected) {
-            Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-    }
+            .padding(start = 12.dp)
+            .size(20.dp)
+            .background(color, CircleShape),
+    )
 }
 
 // ------------------------------------------------------------- 自定义强调色
 
 /**
  * 自定义强调色：三根滑块 + 一块实时预览。
+ *
+ * 只在**自定义色已经生效时**才被渲染（所以 [current] 不是可空的）：它是「已经在用自定义」
+ * 这一态的控制面板，不是入口。做成常驻的代价是每个用户都得多看三根滑块，而它们默认
+ * 拖了还会把预设色改成自定义色——那正是「我什么都没动，主题却变了」的来源。
  *
  * 三件和「普通设置项」不一样的事都写在帮助问号里（`msp_settings_custom_accent_note`），
  * 因为它们全部反直觉：
@@ -400,24 +454,16 @@ private fun AccentSwatch(
  */
 @Composable
 private fun CustomAccentSection(
-    current: CustomAccent?,
+    current: CustomAccent,
     onSelect: (CustomAccent) -> Unit,
     onClear: () -> Unit,
     help: String,
 ) {
-    val active = current != null
-    // 只在「有没有自定义色」翻转时重新取值，而不是每次 current 变化都重置：
-    // 保存成功的那一刻和用户松手是同一个瞬间，按值重置会把正在拖的另一根滑块拽回去。
-    // 清除之后 `active` 变回 false，滑块回到默认位置——此时确实没有颜色可以显示了。
-    var hue by remember(active) {
-        mutableFloatStateOf(current?.hueDegrees ?: CustomAccentRanges.DEFAULT_HUE)
-    }
-    var saturation by remember(active) {
-        mutableFloatStateOf(current?.saturation ?: CustomAccentRanges.DEFAULT_SATURATION)
-    }
-    var lightness by remember(active) {
-        mutableFloatStateOf(current?.lightness ?: CustomAccentRanges.DEFAULT_LIGHTNESS)
-    }
+    // 初值只在**挂载时**取一次（`current` 不做 key）：保存成功的那一刻就是用户松手
+    // 的那一刻，跟着 `current` 重置会把正在拖的另一根滑块拽回去。
+    var hue by remember { mutableFloatStateOf(current.hueDegrees) }
+    var saturation by remember { mutableFloatStateOf(current.saturation) }
+    var lightness by remember { mutableFloatStateOf(current.lightness) }
     // 落盘前统一收敛一次：滑块的 range 已经在边界上，但「存进去的一定合法」这件事
     // 不能只靠 UI 的 range 保证——DataStore 里躺着一个越界值的话，读回来的配色会直接崩。
     val commit = {
@@ -443,16 +489,6 @@ private fun CustomAccentSection(
             SettingHelpIcon(
                 title = stringResource(R.string.msp_settings_section_custom_accent),
                 text = help,
-            )
-        }
-
-        if (!active) {
-            // 没说这句的话，这一块就是三根「拖了也不知道发生了什么」的滑块。
-            Text(
-                text = stringResource(R.string.msp_settings_custom_accent_hint_none),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
             )
         }
 
@@ -501,10 +537,8 @@ private fun CustomAccentSection(
             onCommit = commit,
         )
 
-        if (active) {
-            TextButton(onClick = onClear, modifier = Modifier.align(Alignment.End)) {
-                Text(stringResource(R.string.msp_settings_custom_accent_revert))
-            }
+        TextButton(onClick = onClear, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.msp_settings_custom_accent_revert))
         }
     }
 }

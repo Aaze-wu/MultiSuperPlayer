@@ -38,6 +38,12 @@
     <string name="msp_playback_error_no_permission">没有读取该文件的权限。请重新选择这个文件或文件夹以授予访问权限</string>
     <string name="msp_playback_error_cleartext">系统禁止明文 HTTP 播放</string>
     <string name="msp_playback_error_network_failed">无法连接到服务器，请检查网络或播放地址</string>
+    <!--
+      ⚠️ 证书失败与「网络不通」共用同一个错误码（2001，见 PlaybackErrorMapper 里的注释），
+      两者必须各有一句。文案顺带把「下一步去哪」说出来：用户看到「证书不认识」时
+      根本想不到应用里还有个开关能放它。
+    -->
+    <string name="msp_playback_error_certificate">服务器证书不被信任，无法建立安全连接。自建服务器可在「设置 → 播放」里打开「允许不受信任的证书」</string>
     <string name="msp_playback_error_network_timeout">连接服务器超时，请检查网络</string>
     <string name="msp_playback_error_http_status">服务器返回了错误状态码，播放地址可能已失效</string>
 

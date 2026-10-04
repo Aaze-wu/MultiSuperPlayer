@@ -35,6 +35,7 @@
     <string name="msp_playback_error_no_permission">No permission to read this file. Pick the file or folder again to grant access</string>
     <string name="msp_playback_error_cleartext">The system blocks plain HTTP playback</string>
     <string name="msp_playback_error_network_failed">Cannot reach the server. Check your network or the playback address</string>
+    <string name="msp_playback_error_certificate">The server certificate is not trusted, so no secure connection could be established. For a self-hosted server you can turn on "Allow untrusted certificates" in Settings \u2192 Playback</string>
     <string name="msp_playback_error_network_timeout">Timed out connecting to the server. Check your network</string>
     <string name="msp_playback_error_http_status">The server returned an error status. The playback address may no longer be valid</string>
 

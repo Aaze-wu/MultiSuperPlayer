@@ -97,6 +97,15 @@ class PlaybackSettingsRepository(
         it[Keys.EQUALIZER_BAND_GAINS] = encoded
     }
 
+    /**
+     * 安全相关的开关，所以只写值、**不做任何“聪明”的联动**：
+     * 不在这里顺手清掉别的记录、也不弹提示——写入者只有设置页那一个开关，
+     * 多一处分叉就多一处「关掉之后没有真的关掉」的可能。
+     */
+    suspend fun setTrustUntrustedCertificates(enabled: Boolean) = edit {
+        it[Keys.TRUST_UNTRUSTED_CERTIFICATES] = enabled
+    }
+
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         withContext(dispatchers.io) { store.edit(block) }
     }
@@ -137,6 +146,16 @@ class PlaybackSettingsRepository(
          * 也看得懂。
          */
         val EQUALIZER_BAND_GAINS = stringPreferencesKey("playback.equalizer_band_gains")
+
+        /**
+         * 是否放行不受信任的 https 证书（见 [PlaybackSettings.trustUntrustedCertificates]）。
+         *
+         * 键名里把 `untrusted` 写全很重要：将来若有人加一个「按域名白名单」的机制，
+         * 那是一个**不同**的设置项（更窄、更安全），不能把这个键改造成那个——
+         * 改键等于把已经打开了它的用户的选择默默换成另一种语义。
+         */
+        val TRUST_UNTRUSTED_CERTIFICATES =
+            booleanPreferencesKey("playback.trust_untrusted_certificates")
     }
 }
 
@@ -161,4 +180,6 @@ internal fun Preferences.toPlaybackSettings(): PlaybackSettings = PlaybackSettin
     // 只读出来，**不解析**：字符串读不动的时候该由上层回落到平直曲线，
     // 而「读不动」的样子是 null 或一段垃圾，两者对上层是一回事。
     equalizerBandGains = this[PlaybackSettingsRepository.Keys.EQUALIZER_BAND_GAINS],
+    trustUntrustedCertificates =
+        this[PlaybackSettingsRepository.Keys.TRUST_UNTRUSTED_CERTIFICATES],
 )

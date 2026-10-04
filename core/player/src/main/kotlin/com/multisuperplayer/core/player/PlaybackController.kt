@@ -239,6 +239,27 @@ interface PlaybackController : TrackSelectionController {
     fun setForceSoftwareDecoding(enabled: Boolean)
 
     /**
+     * 是否允许播放 https 资源时放行**不受系统信任的证书**（默认 false）。
+     *
+     * 存在的唯一理由是自建服务器：NAS、openlist/AList、反向代理经常用自签名证书或
+     * 私有 CA 签的证书，系统的信任库里没有它，握手直接死在
+     * `CertPathValidatorException: Trust anchor for certification path not found`。
+     * 用户如果是那台服务器的主人，他能自己判断要不要放行——但**这个判断必须由他显式做出**，
+     * 所以默认关闭，且打开之后只影响 http(s)：本地文件、`content://` 那条路不受影响。
+     *
+     * 打开之后内核会把「证书链校验」和「主机名校验」两件事一起放行（自签证书通常两件都不满足），
+     * 实现见 `MspDataSourceFactory`。
+     *
+     * ## 生效时机：下一条，不是这一条
+     *
+     * 已经建好的数据源带着旧决定，所以它不会让当前这条失败的媒体突然能放——用户看到错误后
+     * 拨开关、再点一次播放即可。这不是偷懒：当前失败若并非证书问题（网络真的不通），
+     * 自动重试只会叠出第二条提示，把用户刚建立起来的因果（我开了开关→它就好了）
+     * 搅乱。所以这里只改状态，重新准备播放（`prepare()`）**由上层按用户动作触发**。
+     */
+    fun setTrustUntrustedCertificates(enabled: Boolean)
+
+    /**
      * 按一下「A-B 循环」：未设 → 设 A → 设 B 并开始 → 清空。
      *
      * 只有一个入口、内部读当前位置，而不是暴露 `setAbRepeat(a, b)`：后者要求

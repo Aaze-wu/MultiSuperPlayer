@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Speed
@@ -59,6 +60,7 @@ fun PlaybackSettingsRoute(
         onSetBoostSpeed = viewModel::setBoostSpeed,
         onSetRememberPosition = viewModel::setRememberPosition,
         onSetRecordRecentPlays = viewModel::setRecordRecentPlays,
+        onSetTrustUntrustedCertificates = viewModel::setTrustUntrustedCertificates,
         modifier = modifier,
     )
 }
@@ -76,6 +78,7 @@ fun PlaybackSettingsScreen(
     onSetBoostSpeed: (Float) -> Unit = {},
     onSetRememberPosition: (Boolean) -> Unit = {},
     onSetRecordRecentPlays: (Boolean) -> Unit = {},
+    onSetTrustUntrustedCertificates: (Boolean) -> Unit = {},
 ) {
     // 当前打开的选择对话框（null = 没开）。
     //
@@ -209,6 +212,32 @@ fun PlaybackSettingsScreen(
                     onCheckedChange = onSetRecordRecentPlays,
                     help = stringResource(R.string.msp_settings_record_recent_help),
                 )
+            }
+
+            item { SectionHeader(stringResource(R.string.msp_settings_section_network)) }
+            item {
+                // 唯一一个**与安全相关**的开关，所以它是这一页上唯一带常驻提示条的。
+                //
+                // 副标题只说当前状态（“打开/关闭”），风险放在帮助里和下面那条提示里：
+                // 「已打开」这三个字在副标题上并不刺眼，而用户一年前为了自己的 NAS
+                // 打开它之后，就再也不会打开这一页了。
+                val trust = playback.trustUntrustedCertificates == true
+                SettingsSwitchRow(
+                    icon = { Icon(Icons.Outlined.LockOpen, contentDescription = null) },
+                    title = stringResource(R.string.msp_settings_trust_certificates),
+                    subtitle = if (trust) {
+                        stringResource(R.string.msp_settings_trust_certificates_on)
+                    } else {
+                        stringResource(R.string.msp_settings_trust_certificates_off)
+                    },
+                    checked = trust,
+                    enabled = true,
+                    onCheckedChange = onSetTrustUntrustedCertificates,
+                    help = stringResource(R.string.msp_settings_trust_certificates_help),
+                )
+            }
+            if (playback.trustUntrustedCertificates == true) {
+                item { InfoNote(stringResource(R.string.msp_settings_trust_certificates_warning)) }
             }
         }
     }

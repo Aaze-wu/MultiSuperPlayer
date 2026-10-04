@@ -236,6 +236,52 @@ class SettingsSummariesTest {
     }
 
     @Test
+    fun `播放 - 打开信任证书时必须在摘要里说出来`() {
+        val settings = PlaybackSettings(trustUntrustedCertificates = true)
+
+        // 这一条是**安全**状态：用户可能一年前为了自己那台自签名证书的 NAS
+        // 打开过，之后再没想起它。设置摘要页是他唯一每次都会路过的位置。
+        assertText(
+            "1× · 长按 2× · 适应 · 放行证书",
+            SettingsSummaries.playback(settings, softwareDecodingAvailable = true),
+        )
+    }
+
+    @Test
+    fun `播放 - 信任证书关着或从未设置过时都不说`() {
+        // 和前面那些尾标相反（「没有强制软解」不是需要提醒的事），所以默认态必须**安静**：
+        // 否则每一行摘要都会多出三个字，而「说自己没放行证书」没有任何信息量。
+        assertText(
+            "1× · 长按 2× · 适应",
+            SettingsSummaries.playback(PlaybackSettings(), softwareDecodingAvailable = true),
+        )
+        assertText(
+            "1× · 长按 2× · 适应",
+            SettingsSummaries.playback(
+                PlaybackSettings(trustUntrustedCertificates = false),
+                softwareDecodingAvailable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `播放 - 证书那一条排在所有尾标之后`() {
+        val settings = PlaybackSettings(
+            forceSoftwareDecoding = true,
+            rememberPosition = false,
+            recordRecentPlays = false,
+            trustUntrustedCertificates = true,
+        )
+
+        // 顺序固定成「功能开关 → 记不记事 → 安全」。安全那条放最后是有意的：
+        // 它是最容易被忽略、也最需要被看到的一条，读到最后一行时它最显眼。
+        assertText(
+            "1× · 长按 2× · 适应 · 强制软解 · 不记位置 · 不记播放历史 · 放行证书",
+            SettingsSummaries.playback(settings, softwareDecodingAvailable = true),
+        )
+    }
+
+    @Test
     fun `播放 - 本包没有 FFmpeg 时不说强制软解, 只说没有 FFmpeg`() {
         val settings = PlaybackSettings(forceSoftwareDecoding = true)
 

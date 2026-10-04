@@ -63,6 +63,13 @@ class AppPlaybackViewModel(
                 // 两个开关分开下发：它们管的是不同的事，共用一个值会让用户
                 // 「只想关掉播放历史」时连「接着播」一起丢掉。
                 controller.setRecordRecentPlays(settings.recordRecentPlays != false)
+                // 允许不受信任的证书（见 PlaybackSettings.trustUntrustedCertificates）。
+                // 它和内核对数据源的选择是**读开关**而不是写状态：内核只记下这个意图，
+                // 真正生效在下一条媒体建立数据源时。所以这里不会打断正在播的东西，
+                // 也不会让当前这条因证书而失败的媒体突然能放——那需要用户再点一次播放。
+                controller.setTrustUntrustedCertificates(
+                    settings.trustUntrustedCertificates == true,
+                )
 
                 // 倍速只在**什么都没在播**的时候下发。
                 //

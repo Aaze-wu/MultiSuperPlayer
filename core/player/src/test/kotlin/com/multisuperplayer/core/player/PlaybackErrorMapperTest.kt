@@ -3,6 +3,10 @@ package com.multisuperplayer.core.player
 import androidx.media3.common.PlaybackException
 import com.multisuperplayer.core.model.text.MspText
 import java.io.File
+import java.io.IOException
+import java.security.cert.CertPathValidatorException
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -154,7 +158,7 @@ class PlaybackErrorMapperTest {
     fun `具体原因会追加到文案里`() {
         val text = PlaybackErrorMapper.describe(
             errorCode = PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            causeName = "UnknownHostException",
+            causeNames = listOf("UnknownHostException"),
         )
         val res = text as MspText.Res
 
@@ -167,7 +171,7 @@ class PlaybackErrorMapperTest {
         // cause 就是 PlaybackException 本身时，追加只会让文案更啰嗦。
         val text = PlaybackErrorMapper.describe(
             errorCode = PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
-            causeName = "androidx.media3.common.PlaybackException",
+            causeNames = listOf("androidx.media3.common.PlaybackException"),
         )
         val res = text as MspText.Res
 
@@ -177,6 +181,119 @@ class PlaybackErrorMapperTest {
             "通用原因不该走「带原因」那一支",
         )
         assertFalse(res.args.any { it is String && it.contains("media3") }, "实际参数：${res.args}")
+    }
+
+    @Test
+    fun `被 R8 重打包成单字母的原因不追加`() {
+        // 用户实际看到的那条提示是「（错误码 2001，u）」——发布版把 Media3 的异常类
+        // 重打包成了 `q5.u`。一个单字母的名字对用户是零信息，而且比不说还糟：
+        // 看起来像程序出了 bug。所以「名字太短」和「名字是通用异常」一样直接丢。
+        val text = PlaybackErrorMapper.describe(
+            errorCode = PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            causeNames = listOf("q5.u", "q5.v"),
+        )
+        val res = text as MspText.Res
+
+        assertEquals(R.string.msp_playback_error_with_code, res.id, "实际参数：${res.args}")
+    }
+
+    @Test
+    fun `证书不被信任与网络不通必须给两句不同的话`() {
+        // 两者共用 `ERROR_CODE_IO_NETWORK_CONNECTION_FAILED`（自签名证书实测就被
+        // 折成这个码），所以只能靠 cause 链区分。一句文案被两种相反成因共用，
+        // 就一定有一边在说谎；而它们的下一步动作是相反的（查 Wi-Fi / 确认服务器证书）。
+        val certificate = PlaybackErrorMapper.describe(
+            errorCode = PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            causeNames = PlaybackErrorMapper.causeNames(sslHandshakeFailure()),
+        )
+        val network = PlaybackErrorMapper.describe(
+            errorCode = PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            causeNames = PlaybackErrorMapper.causeNames(IOException("connect timed out")),
+        )
+
+        assertEquals(R.string.msp_playback_error_certificate, certificate.branchId())
+        assertEquals(R.string.msp_playback_error_network_failed, network.branchId())
+        assertNotEquals(certificate, network)
+    }
+
+    @Test
+    fun `证书那一句不再拼接无意义的原因`() {
+        // 证书那句已经把「下一步去哪」说完了（去设置里打开允许不受信任的证书）。
+        // 再挂一个 `SSLHandshakeException` 只是把一个英文类名塞给用户看。
+        val text = PlaybackErrorMapper.describe(
+            errorCode = PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            causeNames = PlaybackErrorMapper.causeNames(sslHandshakeFailure()),
+        )
+        val res = text as MspText.Res
+
+        assertEquals(R.string.msp_playback_error_with_code, res.id, "实际参数：${res.args}")
+        assertFalse(res.args.any { it is String }, "不该有任何原因子串：${res.args}")
+    }
+
+    @Test
+    fun `只有握手失败才叫证书问题`() {
+        // `SSLHandshakeException` **本身不算**：协议版本不对、双方没有共同密码套件
+        // 也抛它，而那两种再怎么信任证书也放不过去——把它们说成「证书不被信任」
+        // 会把用户支去拨一个没有用的开关。
+        assertFalse(
+            PlaybackErrorMapper.isCertificateFailure(
+                listOf("javax.net.ssl.SSLHandshakeException"),
+            ),
+        )
+        assertTrue(
+            PlaybackErrorMapper.isCertificateFailure(
+                listOf("java.security.cert.CertificateException"),
+            ),
+        )
+        assertTrue(
+            PlaybackErrorMapper.isCertificateFailure(
+                listOf("java.security.cert.CertPathValidatorException"),
+            ),
+        )
+        // 主机名不匹配也靠「放宽校验」修，所以也算。
+        assertTrue(
+            PlaybackErrorMapper.isCertificateFailure(
+                listOf("javax.net.ssl.SSLPeerUnverifiedException"),
+            ),
+        )
+        assertFalse(PlaybackErrorMapper.isCertificateFailure(listOf("java.io.IOException")))
+    }
+
+    @Test
+    fun `causeNames 会走完整条异常链`() {
+        // 实测的链是 `PlaybackException → q5.u → SSLHandshakeException
+        // → CertificateException → CertPathValidatorException`：真正有用的那两类
+        // 在第二、三层。只看 `cause` 看不到它们。
+        val names = PlaybackErrorMapper.causeNames(sslHandshakeFailure())
+
+        assertEquals("java.lang.RuntimeException", names.first(), "实际：$names")
+        assertTrue(names.any { it == "javax.net.ssl.SSLHandshakeException" }, "实际：$names")
+        assertTrue(
+            names.any { it == "java.security.cert.CertPathValidatorException" },
+            "实际：$names",
+        )
+        assertEquals(4, names.size, "RuntimeException → IOException → SSLHandshakeException → CertPathValidatorException，实际：$names")
+    }
+
+    @Test
+    fun `没有 cause 时链就只有一层`() {
+        // 链必须自己收尾：不能假设任何异常都带 cause（`IllegalArgumentException`
+        // 这种随手抛的就没有），也不能无限往下走。
+        assertEquals(emptyList(), PlaybackErrorMapper.causeNames(null))
+        assertEquals(
+            listOf("java.lang.RuntimeException"),
+            PlaybackErrorMapper.causeNames(RuntimeException("isolated")),
+        )
+    }
+
+    /** 复现实测那条链：握手失败包着证书校验失败。 */
+    private fun sslHandshakeFailure(): Throwable {
+        val certificate = CertPathValidatorException(
+            "Trust anchor for certification path not found.",
+        )
+        val handshake = SSLHandshakeException("java.security.cert.CertPathValidatorException")
+        handshake.initCause(certificate)
+        return RuntimeException(IOException(handshake))
     }
 
     // ===== 下面是资源文件自身的检查：纯逻辑断言管不到「话写得对不对」 =====
@@ -205,6 +322,36 @@ class PlaybackErrorMapperTest {
         val line = xml.lineSequence().first { it.contains("name=\"msp_playback_error_decoder_unavailable\"") }
 
         assertFalse(line.contains("设置"), "不该建议去设置里改什么，实际：$line")
+    }
+
+    @Test
+    fun `证书那句必须写出那个开关叫什么`() {
+        // 这句是「用户能不能自己解决」的唯一线索，而它指向的设置项名字**写在另一个模块**
+        // （`feature/settings` 的 `msp_settings_trust_certificates`）。两处各写一遍名字
+        // 的话一定会漂移：错误提示说「打开『信任证书』」，而设置里那一行叫「允许不受信任的证书」——
+        // 用户会以为那是两个东西。所以那串字面量在这里钉一次。
+        val xml = languageStrings()
+        val line = xml.lineSequence().first { it.contains("name=\"msp_playback_error_certificate\"") }
+
+        assertTrue(
+            line.contains("允许不受信任的证书"),
+            "文案必须指名道姓地说出设置项的名字，实际：$line",
+        )
+        assertTrue(line.contains("播放"), "还要说清去哪个页面，实际：$line")
+    }
+
+    @Test
+    fun `证书那句不会把「网络不通」的建议也抄一遍`() {
+        // 两种成因的下一步动作是相反的：一个去查 Wi-Fi/地址，一个去确认服务器证书。
+        // 两边都说等于什么都没说。
+        val xml = languageStrings()
+        val certificate = xml.lineSequence()
+            .first { it.contains("name=\"msp_playback_error_certificate\"") }
+        val network = xml.lineSequence()
+            .first { it.contains("name=\"msp_playback_error_network_failed\"") }
+
+        assertNotEquals(certificate, network)
+        assertFalse(certificate.contains("请检查网络"), "实际：$certificate")
     }
 
     /** 读 zh-Hans 的 `values/strings.xml` 原文——JVM 单测里拿不到 `Resources`。 */

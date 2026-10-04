@@ -65,6 +65,9 @@
     <string name="msp_settings_summary_tail_no_position">不记位置</string>
     <string name="msp_settings_summary_tail_no_recent">不记播放历史</string>
 
+    <!-- 「放行证书」是个安全状态，所以它和别的尾标不一样：开着的时候必须在设置入口就看得见 -->
+    <string name="msp_settings_summary_tail_trust_certificates">放行证书</string>
+
     <!-- 例：`长按 2×`。`%1$s` 是档位（1.5× / 2× …） -->
     <string name="msp_settings_summary_long_press">长按 %1$s</string>
 
@@ -231,6 +234,17 @@
     <string name="msp_settings_theme_note_accent">强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。</string>
 
     <string name="msp_settings_accent_label">强调色</string>
+    <!--
+      副标题先说「它是什么」；被两个取色开关盖住时换成「被谁盖住」——
+      那种状态下点开这个设置项换颜色是**没有任何反应**的，必须提前说。
+    -->
+    <string name="msp_settings_accent_desc">标题、按钮、进度条与歌词高亮都跟随它</string>
+    <string name="msp_settings_accent_covered_artwork">已被封面取色覆盖</string>
+    <string name="msp_settings_accent_covered_dynamic">已被系统取色覆盖</string>
+
+    <!-- 选择弹窗里多出来的那一项：它不属于任何预设色，所以用自己的名字 -->
+    <string name="msp_settings_custom_accent_option">自定义</string>
+    <string name="msp_settings_custom_accent_option_desc">自己拖动色相、饱和度和明度</string>
 
     <!-- ===== 外观：自定义强调色 ===== -->
 
@@ -240,9 +254,6 @@
     <string name="msp_settings_custom_accent_lightness">明度</string>
     <string name="msp_settings_custom_accent_preview">预览</string>
     <string name="msp_settings_custom_accent_revert">回到预设强调色</string>
-
-    <!-- 只在从没自定义过时出现：否则用户看到的是一片「拖了没反应」的滑块 -->
-    <string name="msp_settings_custom_accent_hint_none">还没有自定义颜色。拖动上面的滑块即可创建。</string>
 
     <!--
       这段话长度不短，但它必须写着：一个能拖的东西，用户默认会预期「拖到哪就到哪」，
@@ -296,6 +307,19 @@
 <string name="msp_settings_record_recent_on">播放过的内容会出现在「最近播放」页，点进去能接着上次的位置</string>
 <string name="msp_settings_record_recent_off">不再记录新的播放历史</string>
 
+    <!--
+      「网络」分区目前只有一项，单独开一个分区是为了让它的位置可预期：它同时被三处
+      文案指向（播放失败的错误提示、这一行的帮助图标、摘要尾标），用户从错误提示
+      跑过来时要一眼看到。
+    -->
+
+    <string name="msp_settings_section_network">网络</string>
+
+    <string name="msp_settings_trust_certificates">允许不受信任的证书</string>
+    <string name="msp_settings_trust_certificates_on">已打开：任何 https 地址的证书都不再校验</string>
+    <string name="msp_settings_trust_certificates_off">已关闭：只接受系统信任的证书</string>
+    <string name="msp_settings_trust_certificates_warning">已跳过证书校验。同一个网络里的其他人可能冒充你连接的服务器，不要在公共 Wi-Fi 下保持打开。</string>
+
     <!-- 选择对话框里的档位说明，两处都是「等同于默认」的意思 -->
     <string name="msp_settings_speed_normal">正常速度</string>
     <string name="msp_settings_speed_default">默认值</string>
@@ -329,7 +353,7 @@
       本版更新说明的正文。**每次发版都要改这一条，三份语言文件一起改**。
       `\n` 是换行；以「· 」开头的行在界面上按条目排版。
     -->
-    <string name="msp_settings_about_whats_new_body">本版让播放器能接收从外面递进来的东西：其它应用的「打开方式」、分享过来的音视频，以及你自己手填的网络地址。\n\n· 外部打开：在文件管理器或浏览器里对音频 / 视频选「用其它应用打开」，直接开始播放；应用已经在运行时也接得住这次请求，不会被静默丢掉\n· 接收分享：其它应用分享单条或多条都能收，多选时整队进队列、从第一条开始播；content:// 形式递进来的文件会先查真实文件名与大小，列表里显示的是文件名而不是一串编号\n· 网络地址：浏览页新增「网络地址」入口，填一条 http / https 地址就能直接播放，局域网里的 NAS、媒体服务器也能用；协议可以省略（只写域名即可），自动记住最近用过的 20 条地址\n· 「打开方式」只对音频 / 视频出手：http/https 链接只有在明确标了类型时才会出现，不跟所有网页链接抢入口\n· 此前一版：1.0.0 翻译文本改用 MspText（不会再漏中文）、自定义强调色、翻译缓存可清空、播放记录与播放列表可导出导入\n\n已知限制：网络播放没有自定义请求头 / User-Agent 的入口，需要登录或防盗链的地址放不了；只支持 http / https，rtsp / ftp / 磁力链接不支持；外部打开与分享进来的条目不进「最近」页，同一个地址第二次播放会接着上次的位置；同一个文件经「打开方式」播和从媒体库播是两个不同的身份，续播位置不共享；不含 32 位原生库。</string>
+    <string name="msp_settings_about_whats_new_body">本版让播放器能接收从外面递进来的东西：其它应用的「打开方式」、分享过来的音视频，以及你自己手填的网络地址；此外还修掉两处只有真机上手才看得出来的问题。\n\n· 外部打开：在文件管理器或浏览器里对音频 / 视频选「用其它应用打开」，直接开始播放；应用已经在运行时也接得住这次请求，不会被静默丢掉\n· 接收分享：其它应用分享单条或多条都能收，多选时整队进队列、从第一条开始播；content:// 形式递进来的文件会先查真实文件名与大小，列表里显示的是文件名而不是一串编号\n· 网络地址：浏览页新增「网络地址」入口，填一条 http / https 地址就能直接播放，局域网里的 NAS、媒体服务器也能用；协议可以省略（只写域名即可），自动记住最近用过的 20 条地址\n· 「打开方式」只对音频 / 视频出手：http/https 链接只有在明确标了类型时才会出现，不跟所有网页链接抢入口\n· 强调色改成弹窗选择：设置 → 外观里的强调色不再挤在页面中把排版撑坏，点开是一个列表，末尾加了「自定义」；选中「自定义」时才展开色相 / 饱和度 / 明度三根滑块\n· 自建服务器连不上时不再指错方向：证书不受信任（自签名的 NAS 或 openlist、域名不匹配、证书过期）以前会被报成「网络不通」，现在会明确说是证书问题，并新增「设置 → 播放 → 允许不受信任的证书」开关（默认关闭，打开后页面上常驻一条风险提示）\n· 此前一版：1.0.0 翻译文本改用 MspText（不会再漏中文）、自定义强调色、翻译缓存可清空、播放记录与播放列表可导出导入\n\n已知限制：网络播放没有自定义请求头 / User-Agent 的入口，需要登录或防盗链的地址放不了；只支持 http / https，rtsp / ftp / 磁力链接不支持；外部打开与分享进来的条目不进「最近」页，同一个地址第二次播放会接着上次的位置；同一个文件经「打开方式」播和从媒体库播是两个不同的身份，续播位置不共享；「允许不受信任的证书」打开后不再校验任何 https 证书，不要在网络不可信时长期保持打开；不含 32 位原生库。</string>
 
     <string name="msp_settings_view">查看</string>
 
@@ -602,8 +626,7 @@
     <string name="msp_settings_default_aspect_help">只影响之后打开的文件。在播放页里临时改的比例只作用于那一次播放，不会写到这里。</string>
     <string name="msp_settings_default_speed_help">跨文件保留：在播放页里改了倍速，这里也会跟着变。「长按倍速」是另一个开关，不受这里影响。</string>
     <string name="msp_settings_remember_position_help">关掉后每次从头播放。已经记住的位置不会被删除，重新打开这个开关就能继续用。</string>
-    <string name="msp_settings_record_recent_help">关掉后不再记录新的播放历史。续播位置由「记住播放位置」单独控制，不受这里影响。已经记下的不会被删除，重新打开就能看到。</string>
-    <string name="msp_settings_base_url_help">以 /v1 结尾的地址会被自动补上 /chat/completions。改这里可以指向自己的中转服务，只要它的接口与 OpenAI 兼容。</string>
+    <string name="msp_settings_record_recent_help">关掉后不再记录新的播放历史。续播位置由「记住播放位置」单独控制，不受这里影响。已经记下的不会被删除，重新打开就能看到。</string>    <string name="msp_settings_trust_certificates_help">自建服务器（NAS、openlist/AList、反向代理）常用自签名证书，系统信任库里没有它，播放时会直接报「证书不被信任」。打开后所有 https 地址都会跳过证书校验，包括主机名不匹配和已过期的证书。只有确信那台服务器是自己的才打开。</string>    <string name="msp_settings_base_url_help">以 /v1 结尾的地址会被自动补上 /chat/completions。改这里可以指向自己的中转服务，只要它的接口与 OpenAI 兼容。</string>
     <string name="msp_settings_test_help">测试会真的翻一句样板文本，同时验证地址、密钥、模型名，以及这家厂商是否接受本应用发送的请求格式。会消耗极少的 token。</string>
     <string name="msp_settings_asr_source_help">默认使用 hf-mirror.com 国内镜像。填 https://huggingface.co 则改用官方源，国内访问通常很慢。</string>
 

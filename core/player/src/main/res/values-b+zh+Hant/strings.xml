@@ -28,6 +28,7 @@
     <string name="msp_playback_error_no_permission">沒有讀取該檔案的權限。請重新選擇這個檔案或資料夾以授予存取權限</string>
     <string name="msp_playback_error_cleartext">系統禁止明文 HTTP 播放</string>
     <string name="msp_playback_error_network_failed">無法連線到伺服器，請檢查網路或播放位址</string>
+    <string name="msp_playback_error_certificate">伺服器憑證不受信任，無法建立安全連線。自建伺服器可在「設定 → 播放」裡開啟「允許不受信任的憑證」</string>
     <string name="msp_playback_error_network_timeout">連線伺服器逾時，請檢查網路</string>
     <string name="msp_playback_error_http_status">伺服器回傳了錯誤狀態碼，播放位址可能已失效</string>
 

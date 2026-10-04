@@ -36,6 +36,7 @@
     <string name="msp_settings_summary_tail_no_ffmpeg">本包無 FFmpeg</string>
     <string name="msp_settings_summary_tail_no_position">不記位置</string>
     <string name="msp_settings_summary_tail_no_recent">不記播放記錄</string>
+    <string name="msp_settings_summary_tail_trust_certificates">放行憑證</string>
 
     <string name="msp_settings_summary_long_press">長按 %1$s</string>
     <string name="msp_settings_summary_model_unset">未填模型名</string>
@@ -176,6 +177,12 @@
     <string name="msp_settings_theme_note_accent">強調色會立即套用到整個應用程式：標題、按鈕、進度條和歌詞高亮都跟隨它。</string>
 
     <string name="msp_settings_accent_label">強調色</string>
+    <string name="msp_settings_accent_desc">標題、按鈕、進度條與歌詞高亮都跟隨它</string>
+    <string name="msp_settings_accent_covered_artwork">已被封面取色覆蓋</string>
+    <string name="msp_settings_accent_covered_dynamic">已被系統取色覆蓋</string>
+
+    <string name="msp_settings_custom_accent_option">自訂</string>
+    <string name="msp_settings_custom_accent_option_desc">自己拖動色相、飽和度與明度</string>
 
     <string name="msp_settings_section_custom_accent">自訂強調色</string>
     <string name="msp_settings_custom_accent_hue">色相</string>
@@ -183,8 +190,6 @@
     <string name="msp_settings_custom_accent_lightness">明度</string>
     <string name="msp_settings_custom_accent_preview">預覽</string>
     <string name="msp_settings_custom_accent_revert">回到預設強調色</string>
-
-    <string name="msp_settings_custom_accent_hint_none">還沒有自訂顏色。拖動上面的滑桿即可建立。</string>
 
     <string name="msp_settings_custom_accent_note">拖動滑桿時會即時預覽，放開才真正儲存並套用。明度只決定淺色模式下的主色——深色模式下的主色會自動取相反的明度，否則亮色強調色在深色背景上會糊掉。明度的可調範圍不是從純黑到純白：那兩個極端等於沒有強調色。</string>
 
@@ -221,6 +226,13 @@
     <string name="msp_settings_record_recent_on">播放過的內容會出現在「最近播放」頁，點進去能接著上次的位置</string>
     <string name="msp_settings_record_recent_off">不再記錄新的播放歷史</string>
 
+    <string name="msp_settings_section_network">網路</string>
+
+    <string name="msp_settings_trust_certificates">允許不受信任的憑證</string>
+    <string name="msp_settings_trust_certificates_on">已開啟：任何 https 位址的憑證都不再驗證</string>
+    <string name="msp_settings_trust_certificates_off">已關閉：只接受系統信任的憑證</string>
+    <string name="msp_settings_trust_certificates_warning">已跳過憑證驗證。同一個網路裡的其他人可能冒充你連線的伺服器，不要在公共 Wi-Fi 下保持開啟。</string>
+
     <string name="msp_settings_speed_normal">正常速度</string>
     <string name="msp_settings_speed_default">預設值</string>
 
@@ -243,7 +255,7 @@
 
     <string name="msp_settings_about_link_failed">無法開啟瀏覽器：%1$s</string>
 
-    <string name="msp_settings_about_whats_new_body">本版讓播放器能接收從外面遞進來的東西：其它應用程式的「開啟方式」、分享過來的音訊 / 影片，以及你自己手填的網路位址。\n\n· 外部開啟：在檔案管理器或瀏覽器裡對音訊 / 影片選「用其它應用程式開啟」，直接開始播放；應用程式已經在執行時也接得住這次請求，不會被靜默丟掉\n· 接收分享：其它應用程式分享單筆或多筆都能收，多選時整隊進佇列、從第一筆開始播；content:// 形式遞進來的檔案會先查真實檔名與大小，清單裡顯示的是檔名而不是一串編號\n· 網路位址：瀏覽頁新增「網路位址」入口，填一條 http / https 位址就能直接播放，區域網路裡的 NAS、媒體伺服器也能用；通訊協定可以省略（只寫網域即可），自動記住最近用過的 20 筆位址\n· 「開啟方式」只對音訊 / 影片出手：http/https 連結只有在明確標了類型時才會出現，不跟所有網頁連結搶入口\n· 前一版：1.0.0 翻譯文字改用 MspText（不會再漏中文）、自訂強調色、翻譯快取可清空、播放記錄與播放清單可匯出匯入\n\n已知限制：網路播放沒有自訂請求標頭 / User-Agent 的入口，需要登入或防盜連的位址放不了；只支援 http / https，rtsp / ftp / 磁力連結不支援；外部開啟與分享進來的項目不進「最近」頁，同一個位址第二次播放會接著上次的位置；同一個檔案經「開啟方式」播和從媒體庫播是兩個不同的身分，續播位置不共享；不含 32 位元原生函式庫。</string>
+    <string name="msp_settings_about_whats_new_body">本版讓播放器能接收從外面遞進來的東西：其它應用程式的「開啟方式」、分享過來的音訊 / 影片，以及你自己手填的網路位址；此外還修掉兩處只有真機上手才看得出來的問題。\n\n· 外部開啟：在檔案管理器或瀏覽器裡對音訊 / 影片選「用其它應用程式開啟」，直接開始播放；應用程式已經在執行時也接得住這次請求，不會被靜默丟掉\n· 接收分享：其它應用程式分享單筆或多筆都能收，多選時整隊進佇列、從第一筆開始播；content:// 形式遞進來的檔案會先查真實檔名與大小，清單裡顯示的是檔名而不是一串編號\n· 網路位址：瀏覽頁新增「網路位址」入口，填一條 http / https 位址就能直接播放，區域網路裡的 NAS、媒體伺服器也能用；通訊協定可以省略（只寫網域即可），自動記住最近用過的 20 筆位址\n· 「開啟方式」只對音訊 / 影片出手：http/https 連結只有在明確標了類型時才會出現，不跟所有網頁連結搶入口\n· 強調色改成彈窗選擇：設定 → 外觀裡的強調色不再擠在頁面中把排版撐壞，點開是一份清單，末尾加了「自訂」；選中「自訂」時才展開色相 / 飽和度 / 明度三根滑桿\n· 自建伺服器連不上時不再指錯方向：憑證不受信任（自簽署的 NAS 或 openlist、網域不符、憑證過期）以前會被報成「網路不通」，現在會明確說是憑證問題，並新增「設定 → 播放 → 允許不受信任的憑證」開關（預設關閉，開啟後頁面上常駐一條風險提示）\n· 前一版：1.0.0 翻譯文字改用 MspText（不會再漏中文）、自訂強調色、翻譯快取可清空、播放記錄與播放清單可匯出匯入\n\n已知限制：網路播放沒有自訂請求標頭 / User-Agent 的入口，需要登入或防盜連的位址放不了；只支援 http / https，rtsp / ftp / 磁力連結不支援；外部開啟與分享進來的項目不進「最近」頁，同一個位址第二次播放會接著上次的位置；同一個檔案經「開啟方式」播和從媒體庫播是兩個不同的身分，續播位置不共享；「允許不受信任的憑證」開啟後不再驗證任何 https 憑證，不要在網路不可信時長期保持開啟；不含 32 位元原生函式庫。</string>
 
     <string name="msp_settings_view">檢視</string>
 
@@ -475,8 +487,7 @@
     <string name="msp_settings_default_aspect_help">只影響之後打開的檔案。在播放頁裡臨時改的比例只作用於那一次播放，不會寫到這裡。</string>
     <string name="msp_settings_default_speed_help">跨檔案保留：在播放頁裡改了倍速，這裡也會跟著變。「長按倍速」是另一個開關，不受這裡影響。</string>
     <string name="msp_settings_remember_position_help">關掉後每次從頭播放。已經記住的位置不會被刪除，重新打開這個開關就能繼續用。</string>
-    <string name="msp_settings_record_recent_help">關掉後不再記錄新的播放歷史。續播位置由「記住播放位置」單獨控制，不受這裡影響。已經記下的不會被刪除，重新打開就能看到。</string>
-    <string name="msp_settings_base_url_help">以 /v1 結尾的位址會自動補上 /chat/completions。改這裡可以指向自己的中轉服務，只要它的介面與 OpenAI 相容。</string>
+    <string name="msp_settings_record_recent_help">關掉後不再記錄新的播放歷史。續播位置由「記住播放位置」單獨控制，不受這裡影響。已經記下的不會被刪除，重新打開就能看到。</string>    <string name="msp_settings_trust_certificates_help">自建伺服器（NAS、openlist/AList、反向代理）常用自簽憑證，系統信任庫裡沒有它，播放時會直接報「憑證不受信任」。開啟後所有 https 位址都會跳過憑證驗證，包括主機名不符與已過期的憑證。只有確信那台伺服器是自己的才開啟。</string>    <string name="msp_settings_base_url_help">以 /v1 結尾的位址會自動補上 /chat/completions。改這裡可以指向自己的中轉服務，只要它的介面與 OpenAI 相容。</string>
     <string name="msp_settings_test_help">測試會真的翻一句樣板文本，同時驗證位址、金鑰、模型名稱，以及這家廠商是否接受本應用程式送出的請求格式。會消耗極少的 token。</string>
     <string name="msp_settings_asr_source_help">預設使用 hf-mirror.com 國內鏡像。填 https://huggingface.co 則改用官方來源，國內存取通常很慢。</string>
 

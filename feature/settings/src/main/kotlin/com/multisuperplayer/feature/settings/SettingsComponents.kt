@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -189,6 +190,10 @@ private fun TitleWithHelp(
  * [value] 右侧把当前值直接写出来，而不是只画一个箭头：用户扫一眼设置页就能知道
  * 「默认画面比例是裁剪」，不用逐个点进去确认。
  *
+ * [valueSwatch] 在 [value] 左边补一块颜色。它是给「当前值是一个颜色」的行用的
+ * （强调色）：只写「靛蓝」这两个字，用户得先知道靛蓝是什么颜色，
+ * 而设置页上那个颜色此刻正好就画在整页的按钮和标题上，一块色比一个词快得多。
+ *
  * [help] 非空时在标题右边挂一个问号（见 [SettingHelpIcon]）。
  */
 @Composable
@@ -199,6 +204,7 @@ internal fun SettingChoiceRow(
     subtitle: String,
     onClick: () -> Unit,
     help: String? = null,
+    valueSwatch: Color? = null,
 ) {
     ListItem(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -208,6 +214,15 @@ internal fun SettingChoiceRow(
         supportingContent = { Text(subtitle) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (valueSwatch != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(valueSwatch),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodyMedium,
@@ -373,6 +388,11 @@ internal fun SettingsSwitchRow(
  * [label] / [description] 是**可组合**的回调而不是 `String` 参数：文案在资源里，
  * 只能在这一层解析；传 `String` 的话调用方就得先拿 `String`，
  * 而那些值恰恰是「哪一条文案」的语义（见 `MspText` 的说明）。
+ *
+ * [leading] 画在小圆点和文字之间，给「选项本身是**颜色**」这类列表用：
+ * 强调色的六个名字（靛蓝/紫罗兰/……）单看文字无法选中想要的那个，必须配一块色。
+ * 它插在 `RadioButton` 之后而不是替换掉小圆点：单选语义（选中了哪一个）与
+ * 「这个选项长什么样」是两件事，前者只能由 [RadioButton] 表达。
  */
 @Composable
 internal fun <T> ChoiceDialog(
@@ -383,6 +403,7 @@ internal fun <T> ChoiceDialog(
     description: @Composable (T) -> String?,
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
+    leading: (@Composable (T) -> Unit)? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -409,6 +430,7 @@ internal fun <T> ChoiceDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // onClick = null：整行已经接收点击了，再挂一次会点一下触发两次。
                             RadioButton(selected = isSelected, onClick = null)
+                            leading?.invoke(option)
                             Text(
                                 text = label(option),
                                 style = MaterialTheme.typography.bodyLarge,

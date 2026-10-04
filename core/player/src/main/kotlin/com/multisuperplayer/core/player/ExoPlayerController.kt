@@ -16,6 +16,7 @@ import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.MediaEntry
@@ -230,6 +231,36 @@ class ExoPlayerController(
         (0 until locales.size()).mapNotNull { normalizeLanguageTag(locales.get(it).toLanguageTag()) }
     }
 
+    /**
+     * 用户设置的「允许不受信任的证书」（持久化的那份在 `:core:data`）。
+     *
+     * 默认 `false`，而且**这里的默认值必须和设置项自己的默认值一致**：属性初始值
+     * 是 DataStore 读出来之前生效的那个值，两边不一致的话，应用冷启的前几十毫秒
+     * 会用一个用户没选过的行为去取数据（对本地文件无所谓，对「证书不信任」
+     * 这类会静默降级安全性的开关就是实打实的风险）。
+     *
+     * 它只被 [MspDataSourceFactory] 读，而那个读发生在每条媒体创建数据源时，
+     * 所以拨开关不需要重建 player，也不需要重载当前条目——下一条生效。
+     */
+    private var trustUntrustedCertificates = false
+
+    /**
+     * 传给内核的媒体源工厂。
+     *
+     * `ExoPlayer.Builder` 上**没有** `setDataSourceFactory`，数据源只能通过
+     * [DefaultMediaSourceFactory] 递进去（`MediaSource.Factory` 才是那个接缝）。
+     * 构造时机和 [decoderManager] 一样受限于「属性按声明顺序初始化」：它必须在
+     * [player] 之前建好，否则 `player` 拿到的是个还没赋值的 null。
+     *
+     * 用的是 `setDataSourceFactory` 而不是 `DefaultMediaSourceFactory(DataSource.Factory)`
+     * 那个构造：后者标了 `@UnstableApi`，前者没有——同样一件事，一个需要 OptIn，
+     * 一个不需要。
+     */
+    private val mediaSourceFactory = DefaultMediaSourceFactory(appContext)
+        .setDataSourceFactory(
+            MspDataSourceFactory.create(appContext) { trustUntrustedCertificates },
+        )
+
     override val player: ExoPlayer = ExoPlayer.Builder(appContext)
         .apply {
             // 永远装上带 FFmpeg 的渲染器工厂（只要这个安装包里有 FFmpeg），
@@ -250,6 +281,10 @@ class ExoPlayerController(
             }
         }
         .setHandleAudioBecomingNoisy(true)
+        // 数据源接缝。宁可永远装上这个看的见开关的工厂，也不要「打开开关时重建 player」：
+        // 重建会丢掉当前播放位置、队列、A-B 循环和手选的音轨，而用户是在设置页
+        // 拨完开关、切回播放页才开播的，那时哪一样丢了都不行。
+        .setMediaSourceFactory(mediaSourceFactory)
         .build()
         .apply {
             setAudioAttributes(
@@ -377,9 +412,15 @@ class ExoPlayerController(
                     // 换语言的场景下没必要跟着变（错误提示本身就活不过几秒）。
                     // 用 `appContext` 而不是 `context` 是为了避免把 Activity 泄漏进
                     // 播放器的长生命周期回调里。
+                    //
+                    // 这里交出去的是**整条 cause 链**而不是 `cause?.simpleName`：
+                    // 发布版 R8 会把 Media3 的异常类重打包成 `q5.u` 这种名字，
+                    // 实测用户看到的错误提示是「（错误码 2001，u）」——外层那个名字
+                    // 恰恰是最没信息量的一个，真正的 `SSLHandshakeException`
+                    // 在链的第二层。见 [PlaybackErrorMapper.causeNames]。
                     pendingErrorMessage = PlaybackErrorMapper.describe(
                         errorCode = error.errorCode,
-                        causeName = error.cause?.let { it::class.java.simpleName },
+                        causeNames = PlaybackErrorMapper.causeNames(error),
                         softwareDecoding = softwareAttemptForCurrentMedia(),
                     ).resolve(appContext.resources)
                     MspLog.e(TAG, error) { "播放失败：$pendingErrorMessage" }
@@ -1373,6 +1414,22 @@ class ExoPlayerController(
             fellBackMediaId = null
             applyDecoderMode(baseDecoderMode())
             publish()
+        }
+    }
+
+    /**
+     * 只改状态，不碰已经建好的数据源。
+     *
+     * 这是有意为之：当前这条媒体若是刚刚因为证书而死掉的，重新去取一次也是同样的结果
+     * （同一个 `DataSource` 早已带着旧决定打开了），用户要的是「拨开关 → 再点播放」，
+     * 那一步会重新 `prepare()`、重新取数据源，新决定自然生效。反过来在这里帮他自动重试，
+     * 会让一个本来就很含糊的失败（握手失败）变成两条提示。
+     */
+    override fun setTrustUntrustedCertificates(enabled: Boolean) {
+        onMain {
+            if (trustUntrustedCertificates == enabled) return@onMain
+            trustUntrustedCertificates = enabled
+            MspLog.i(TAG) { "信任不受信任的证书 = $enabled（对下一条生效）" }
         }
     }
 

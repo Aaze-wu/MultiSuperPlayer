@@ -234,4 +234,39 @@ class PlaybackSettingsTest {
 
         assertNull(settings.equalizerEnabled)
     }
+
+    @Test
+    fun `信任不受信任证书的键名是写入用户设备的契约`() {
+        // 这一条比别的键更要紧：如果键名改了，已安装用户**打开过**的开关会读不出来，
+        // 表现为「升级后自建服务器又播不了了」——用户会以为升级把功能弄坏了。
+        // 反过来如果哪天有人把这个键名复用成别的语义（比如域名白名单），
+        // 这些用户的选择就会被默默换成另一种意思，同样只有这条测试能拦住。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.trust_untrusted_certificates") to true,
+        ).toPlaybackSettings()
+
+        assertEquals(true, settings.trustUntrustedCertificates)
+    }
+
+    @Test
+    fun `没设置过信任证书时是 null 而不是关着`() {
+        // null = 「没设置过」，由内核的默认值（关）决定行为。写成 false 就是把
+        // 默认值搬进了数据层；而这个开关的默认值是不能漂移的那一个——
+        // 哪天有人在数据层把默认值改成 true，等于给所有用户默认关掉证书校验。
+        assertNull(preferencesOf().toPlaybackSettings().trustUntrustedCertificates)
+    }
+
+    @Test
+    fun `信任证书不会被别的布尔键带出来`() {
+        // 播放设置里布尔键已经有一把（软件解码、记住位置、记录历史、均衡器），
+        // 前缀全都以 `playback.` 开头，写错一个不会报错，只会让「开一个开关
+        // 把另一个也开上」——而这里多开的那一个会静默降低安全性。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.force_software_decoding") to true,
+            booleanPreferencesKey("playback.equalizer_enabled") to true,
+            booleanPreferencesKey("theme.dynamic_color") to true,
+        ).toPlaybackSettings()
+
+        assertNull(settings.trustUntrustedCertificates)
+    }
 }
