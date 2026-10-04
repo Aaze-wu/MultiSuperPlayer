@@ -2,7 +2,6 @@ package com.multisuperplayer.feature.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -30,25 +29,23 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.ui.list.ReorderDragAutoScroll
 import com.multisuperplayer.core.ui.list.ReorderDragRules
+import com.multisuperplayer.core.ui.list.ReorderDragTrigger
+import com.multisuperplayer.core.ui.list.reorderDragSource
+import com.multisuperplayer.core.ui.list.rememberReorderDragState
+import com.multisuperplayer.core.ui.list.rememberReorderPreview
 
 /**
  * 播放队列面板：看现在排了什么，直接跳到某一条，删掉、重排。
@@ -162,81 +159,66 @@ private fun QueueList(
 ) {
     val listState = rememberLazyListState()
     val density = LocalDensity.current
-    val rowHeightPx = with(density) { QUEUE_ROW_HEIGHT.toPx() }
     // 渐变盖在列表上时用的底色：用 `surface` 的**不透明**值——渐变要假装内容是从
     // 面板里淡出来的，而底部面板的底色就是 `surface`。半透明的话，被盖住的那半行
     // 会透出来，反而更像渲染错。
     val scrimColor = MaterialTheme.colorScheme.surface
 
-    // 拖动中的三项状态：从哪一行起的、累计位移了多少、现在悬在哪一行上。
+    // 拖动状态用和播放列表那两处**同一份**实现（`core:ui` 的 `ReorderDragState`）：
+    // 这里只是手势的来源不同（按把手立即开始拖，不是长按整行），而「位移了多少、
+    // 现在悬在哪一行、列表自己滚了之后落点要跟着变」这套算术是一样的。
     // 用 `remember` 而不是 `rememberSaveable`：转屏时手势必然已经中断，
     // 恢复一个「正在被拖的行」只会让界面看起来卡在半空。
-    var dragFrom by remember { mutableStateOf<Int?>(null) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    var dragTarget by remember { mutableIntStateOf(-1) }
+    val drag = rememberReorderDragState()
+    // 拖动期间渲染的是这一份（真实队列在拖动中不动），松手时调一次 `onMove`。
+    val shown = rememberReorderPreview(items = queue, state = drag, onCommit = onMove)
+    val handleZonePx = with(density) { QUEUE_DRAG_HANDLE.toPx() }
+    // 「正在播放」那一行按**标识**找，不是按下标：拖动期间列表渲染的是预览顺序，
+    // 下标已经对不上了，拿 `index == currentIndex` 会把标记画到别人身上。
+    // 用 `===` 而不是 `==`：队列里同一首放两次（值相等但是两条）时也只标记真正在放的那一条。
+    val currentEntry = queue.getOrNull(currentIndex)
 
     Box(modifier = Modifier.fillMaxWidth().heightIn(max = QUEUE_LIST_MAX_HEIGHT)) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-            itemsIndexed(queue) { index, entry ->
-                val dragging = dragFrom == index
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                // 手势挂在**列表**上，不是在每一行上：行会被列表回收（滚出可视区），
+                // 挂在行上的手势会跟着行一起消失——表现就是「拖到一半突然断掉，
+                // 剩下的滑动去把面板划走了」。挂在列表上就永远活得下来，
+                // 「按下的是哪一行」由拖拽源自己按 y 找。
+                .reorderDragSource(
+                    state = drag,
+                    listState = listState,
+                    itemCount = shown.size,
+                    trigger = ReorderDragTrigger.Immediate,
+                    // 队列里没有插横幅，`LazyColumn` 的下标就是数据下标。
+                    dataIndexOf = { it },
+                    canStart = { _, position, itemSize ->
+                        // 只在把手上能起拖（整行都能拖的话，单击切歌会变得几乎点不准
+                        // ——手指落下时总会先移动几个像素）；随机播放时顺序由播放器
+                        // 说了算，从头到尾都不起拖。
+                        !shuffleEnabled && position.x >= itemSize.width - handleZonePx
+                    },
+                ),
+        ) {
+            itemsIndexed(shown) { index, entry ->
+                val dragging = drag.isPicked(index)
                 QueueRow(
                     index = index,
                     entry = entry,
-                    isCurrent = index == currentIndex,
-                    isDropTarget = dragFrom != null && dragTarget == index && !dragging,
-                    shiftY = if (dragging) dragOffsetY else 0f,
+                    isCurrent = entry === currentEntry,
+                    shiftY = if (dragging) drag.offsetY else 0f,
                     elevated = dragging,
                     dragEnabled = !shuffleEnabled,
                     onPlay = { onPlay(index) },
                     onRemove = { onRemove(index) },
-                    // 拖拽只在把手上生效（`pointerInput` 挂在这个 Box 上，不是整行）：
-                    // 整行都是拖拽区的话，单击切歌会变得几乎点不准——手指落下时
-                    // 总会先移动几个像素。
-                    dragHandleModifier = if (shuffleEnabled) {
-                        Modifier
-                    } else {
-                        Modifier.pointerInput(index, queue.size) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    dragFrom = index
-                                    dragTarget = index
-                                    dragOffsetY = 0f
-                                },
-                                onDragEnd = {
-                                    val from = dragFrom
-                                    val target = dragTarget
-                                    dragFrom = null
-                                    dragOffsetY = 0f
-                                    dragTarget = -1
-                                    // 落点和出发点一样时什么都不做：`moveMediaItem`
-                                    // 即使移到自己身上也会让当前项重新缓冲一下。
-                                    if (from != null && !ReorderDragRules.isNoOp(from, target)) {
-                                        onMove(from, target)
-                                    }
-                                },
-                                // 手势被系统抢走（来电、切后台）时**不改队列**：
-                                // 用户没松手，这一下不算数。状态还是要清掉，
-                                // 不然那一行会永远歪在半空中。
-                                onDragCancel = {
-                                    dragFrom = null
-                                    dragOffsetY = 0f
-                                    dragTarget = -1
-                                },
-                            ) { change, dragAmount ->
-                                change.consume()
-                                dragOffsetY += dragAmount.y
-                                dragTarget = ReorderDragRules.targetIndex(
-                                    from = index,
-                                    dragOffsetY = dragOffsetY,
-                                    rowHeightPx = rowHeightPx,
-                                    size = queue.size,
-                                )
-                            }
-                        }
-                    },
                 )
             }
         }
+
+        // 拖到上下边缘时自动滚动（和播放列表那两处同一个实现，见 `core:ui`）。
+        ReorderDragAutoScroll(state = drag, listState = listState)
 
         QueueEdgeFade(
             state = listState,
@@ -263,19 +245,16 @@ private fun QueueRow(
     index: Int,
     entry: MediaEntry,
     isCurrent: Boolean,
-    isDropTarget: Boolean,
     shiftY: Float,
     elevated: Boolean,
     dragEnabled: Boolean,
     onPlay: () -> Unit,
     onRemove: () -> Unit,
-    dragHandleModifier: Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val background = when {
         // 被拖起来的那一行必须是不透明的：它要盖住下面的行，半透明会糊成一片。
         elevated -> colors.surfaceVariant
-        isDropTarget -> colors.primary.copy(alpha = 0.14f)
         isCurrent -> colors.primary.copy(alpha = 0.10f)
         else -> Color.Transparent
     }
@@ -345,8 +324,11 @@ private fun QueueRow(
         // 把手。随机播放时**照样画**、只是变淡：直接不画的话，那一行会少一截，
         // 用户会以为这个版本的队列没有排序功能；画出来但淡掉，配上下面的说明
         // 就是「现在不能拖」。
+        //
+        // 拖拽手势不挂在这里（以前挂在这里，所以行被回收时拖到一半会断）：
+        // 见 `ReorderDragSource`。这里只是把它画出来、并给 `canStart` 一个参照宽度。
         Box(
-            modifier = Modifier.size(40.dp).then(dragHandleModifier),
+            modifier = Modifier.size(QUEUE_DRAG_HANDLE_WIDTH),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -396,6 +378,22 @@ private fun BoxScope.QueueEdgeFade(
  * 固定值，理由见 [QueueRow]：拖拽的落点换算依赖它。
  */
 private val QUEUE_ROW_HEIGHT = 56.dp
+
+/**
+ * 把手那个方框的宽度。
+ *
+ * 拖拽起点是按位置判的（`canStart` 看手指离行尾有多远），所以这个值必须和
+ * 上面那个 `Box` 的宽度一致：改了宽度不改这里，就会变成「按在把手上却拖不动」。
+ */
+private val QUEUE_DRAG_HANDLE_WIDTH = 40.dp
+
+/**
+ * 把手的触摸区宽度（从行尾往里算）。
+ *
+ * 比 [QUEUE_DRAG_HANDLE_WIDTH] 多出那一行的 `padding(end = 4.dp)`：手指压在把手
+ * 最右边时不至于「差两像素就不是把手」。
+ */
+private val QUEUE_DRAG_HANDLE = QUEUE_DRAG_HANDLE_WIDTH + 4.dp
 
 /**
  * 列表区的最大高度。

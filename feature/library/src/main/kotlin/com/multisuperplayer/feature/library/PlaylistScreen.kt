@@ -47,9 +47,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
-import com.multisuperplayer.core.ui.list.rememberReorderDragState
-import com.multisuperplayer.core.ui.list.reorderDrag
+import com.multisuperplayer.core.ui.list.ReorderDragAutoScroll
+import com.multisuperplayer.core.ui.list.ReorderDragTrigger
+import com.multisuperplayer.core.ui.list.reorderDragItem
+import com.multisuperplayer.core.ui.list.reorderDragSource
 import com.multisuperplayer.core.ui.list.reorderItemColor
+import com.multisuperplayer.core.ui.list.rememberReorderDragState
+import com.multisuperplayer.core.ui.list.rememberReorderPreview
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -177,18 +181,37 @@ fun PlaylistsScreen(
                 )
 
                 else -> {
-                    // 这里的长按拖动和详情页用的是同一套（见 `Modifier.reorderDrag`）：
+                    // 这里的长按拖动和详情页用的是同一套（见 `ReorderDragSource`）：
                     // 两处各写一份的话，以后调整手感只会改到其中一处，
                     // 而「列表页拖着跟手、详情页发飘」这种差异没人会去复现。
                     val rows = state.playlists.orEmpty()
                     val listState = rememberLazyListState()
                     val drag = rememberReorderDragState()
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                    // 拖动期间渲染的是这一份，松手时才把「谁移到哪儿」交出去。
+                    val shown = rememberReorderPreview(items = rows, state = drag, onCommit = onMove)
+                    // 列表上面插着一条拖动提示：`LazyColumn` 的下标要减掉它才是数据下标。
+                    val headerCount = if (rows.size > 1) 1 else 0
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            // 手势挂在列表上，不在行上：行会被列表回收，挂在行上的
+                            // 手势会跟着行一起消失（表现是长按拖到一半突然断了）。
+                            .reorderDragSource(
+                                state = drag,
+                                listState = listState,
+                                itemCount = shown.size,
+                                trigger = ReorderDragTrigger.LongPress,
+                                dataIndexOf = { lazy ->
+                                    (lazy - headerCount).takeIf { it in shown.indices }
+                                },
+                            ),
+                    ) {
                         // 只有一条时拖动没有任何意义，提示也就不必占一行。
                         if (rows.size > 1) {
                             item(key = "drag-hint") { DragHint() }
                         }
-                        itemsIndexed(rows, key = { _, it -> it.id }) { index, playlist ->
+                        itemsIndexed(shown, key = { _, it -> it.id }) { index, playlist ->
                             PlaylistListRow(
                                 playlist = playlist,
                                 menuOpen = menuFor == playlist.id,
@@ -198,17 +221,13 @@ fun PlaylistsScreen(
                                 onOpen = { onOpen(playlist.id) },
                                 onRename = { renaming = playlist.id; menuFor = null },
                                 onDelete = { deleting = playlist.id; menuFor = null },
-                                modifier = Modifier.reorderDrag(
-                                    state = drag,
-                                    index = index,
-                                    itemKey = playlist.id,
-                                    listState = listState,
-                                    itemCount = rows.size,
-                                    onMove = onMove,
-                                ),
+                                modifier = Modifier.reorderDragItem(state = drag, index = index),
                             )
                         }
                     }
+                    // 拖到上下边缘时自动滚动。它不画任何东西，只要和列表待在同一个
+                    // 容器里就行（这里外面就是那个 `Box`）：靠 `listState` 和 `drag` 干活。
+                    ReorderDragAutoScroll(state = drag, listState = listState)
                 }
             }
         }
@@ -336,11 +355,11 @@ private fun PlaylistListRow(
  * 但行更高（有副标题和时长），长按 500ms 之后才开始拖，误触的代价只是一次什么都没
  * 发生的长按——而用户对这一页的预期就是「长按拖一下」。
  *
- * ## 手势本身在 `Modifier.reorderDrag` 里
+ * ## 手势本身在 `ReorderDragSource` 里
  *
  * 量行高、算落点、把位移画到行上这一套，和列表页的「播放列表清单」完全一样，
- * 所以都搬到了 `core:ui`（那里解释了「行高为什么是量出来的」）。这里只剩下
- * 「哪一行被拎起来 → 给什么底色」，而那是每一行自己的外貌。
+ * 所以都搬到了 `core:ui`（那里解释了「手势为什么必须挂在列表上」）。
+ * 这里只剩下「哪一行被拎起来 → 给什么底色」，而那是每一行自己的外貌。
  *
  * ## 拖动中的三个状态用 `remember` 而不是 `rememberSaveable`
  *
@@ -365,8 +384,25 @@ private fun PlaylistDetailPane(
 
     val listState = rememberLazyListState()
     val drag = rememberReorderDragState()
+    // 拖动期间渲染的是这一份：`onMoveItem` 会写库，那一份真实数据在拖动中
+    // 一下都不能动（写一次之后整页会重读，手里拖着的那一行会跟着跑）。
+    val rows = detail.rows
+    val shown = rememberReorderPreview(items = rows, state = drag, onCommit = onMoveItem)
+    // 上面可能插着失效横幅和拖动提示：`LazyColumn` 的下标要减掉它们才是数据下标。
+    val headerCount = (if (detail.missingCount > 0) 1 else 0) + (if (rows.size > 1) 1 else 0)
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .reorderDragSource(
+                state = drag,
+                listState = listState,
+                itemCount = shown.size,
+                trigger = ReorderDragTrigger.LongPress,
+                dataIndexOf = { lazy -> (lazy - headerCount).takeIf { it in shown.indices } },
+            ),
+    ) {
         if (detail.missingCount > 0) {
             item(key = "missing") {
                 Banner(
@@ -378,19 +414,12 @@ private fun PlaylistDetailPane(
             }
         }
         // 只有一条时拖动没有任何意义，提示也就没必要占一行。
-        if (detail.rows.size > 1) {
+        if (rows.size > 1) {
             item(key = "drag-hint") { DragHint() }
         }
-        itemsIndexed(detail.rows, key = { _, row -> row.item.mediaId }) { index, row ->
+        itemsIndexed(shown, key = { _, row -> row.item.mediaId }) { index, row ->
             Box(
-                modifier = Modifier.reorderDrag(
-                    state = drag,
-                    index = index,
-                    itemKey = row.item.mediaId,
-                    listState = listState,
-                    itemCount = detail.rows.size,
-                    onMove = onMoveItem,
-                ),
+                modifier = Modifier.reorderDragItem(state = drag, index = index),
             ) {
                 MediaEntryRow(
                     entry = row.display,
@@ -419,6 +448,10 @@ private fun PlaylistDetailPane(
             }
         }
     }
+
+    // 拖到上下边缘时自动滚动。和上面那个清单页一样，它不画东西，只是待在同一个
+    // 容器里（调用方用 `Box` 装着这一页）。
+    ReorderDragAutoScroll(state = drag, listState = listState)
 }
 
 /**

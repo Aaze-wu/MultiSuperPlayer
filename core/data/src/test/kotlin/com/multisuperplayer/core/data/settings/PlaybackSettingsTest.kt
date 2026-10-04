@@ -169,4 +169,69 @@ class PlaybackSettingsTest {
         assertEquals(false, settings.recordRecentPlays)
         assertNull(settings.rememberPosition)
     }
+
+    @Test
+    fun `均衡器的两个键名是写入用户设备的契约`() {
+        // 同上的理由：改了字面量，已安装用户「关掉均衡器」的选择和调好的曲线
+        // 都读不出来，表现为「升级之后声音忽然变回原样了」——用户不会把一个
+        // 音效设置的丢失和「升级」联系起来，只会觉得播放器变难听了。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.equalizer_enabled") to true,
+            stringPreferencesKey("playback.equalizer_band_gains") to "60:6.0,230:4.0",
+        ).toPlaybackSettings()
+
+        assertEquals(true, settings.equalizerEnabled)
+        assertEquals("60:6.0,230:4.0", settings.equalizerBandGains)
+    }
+
+    @Test
+    fun `没设置过均衡器时开关是 null 而不是 false`() {
+        // null = 「让上层按默认值来」（默认关）。写成 false 就等于数据层替上层
+        // 决定了默认值；哪天默认改成开，这个副本不会跟着变，症状是
+        // 「全新安装的用户和升级上来的用户行为不一样」。
+        val empty = preferencesOf().toPlaybackSettings()
+
+        assertNull(empty.equalizerEnabled)
+        assertNull(empty.equalizerBandGains)
+    }
+
+    @Test
+    fun `关掉均衡器不等于把曲线也删掉`() {
+        // 两个键必须分开：用户会「先关掉听两句对比」，然后还想把曲线开回来。
+        // 共用一个键（或者关掉时顺手把曲线清空）的实现在这里就会变成
+        // 「关一次，调好的设置就没了」。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.equalizer_enabled") to false,
+            stringPreferencesKey("playback.equalizer_band_gains") to "60:7.0,230:4.0",
+        ).toPlaybackSettings()
+
+        assertEquals(false, settings.equalizerEnabled)
+        assertEquals("60:7.0,230:4.0", settings.equalizerBandGains)
+    }
+
+    @Test
+    fun `均衡器曲线不会被别的字符串键带出来`() {
+        // 播放设置里有三个字符串键（画面比例、均衡器曲线，加上主题/字幕/翻译的），
+        // 前缀看着都沾边。读错一个不会报错，只会让均衡器面板一打开就显示一条
+        // 莫名其妙的曲线——而「BILINGUAL」这种值解析出来恰好是空，看起来像
+        // 「我的设置丢了」。
+        val settings = preferencesOf(
+            stringPreferencesKey("playback.aspect_ratio_mode") to "crop",
+            stringPreferencesKey("subtitle.display_mode") to "BILINGUAL",
+            stringPreferencesKey("theme.base") to "black",
+        ).toPlaybackSettings()
+
+        assertNull(settings.equalizerBandGains)
+        assertNull(settings.equalizerEnabled)
+    }
+
+    @Test
+    fun `均衡器开关不会被别的布尔键带出来`() {
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.record_recent_plays") to true,
+            booleanPreferencesKey("translation.auto_translate") to true,
+        ).toPlaybackSettings()
+
+        assertNull(settings.equalizerEnabled)
+    }
 }

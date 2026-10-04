@@ -469,13 +469,13 @@ internal fun PlayerActionChips(
 }
 
 /**
- * 「睡眠定时 / 播放队列 / 画中画」三个会话级入口。
+ * 「睡眠定时 / 播放队列 / 均衡器 / 画中画」四个会话级入口。
  *
  * ## 为什么单独一行，而不是并进 [PlayerActionChips]
  *
  * 那一行在竖屏下已经把宽度用完了（四个芯片加上内边距差不多就是一块屏宽），
  * 再塞两个进去，英文界面上必然有一个被挤掉。这两件事的性质也不同：
- * [PlayerActionChips] 是「调当前这条媒体怎么放」，这两个是「管这一次播放会话」。
+ * [PlayerActionChips] 是「调当前这条媒体怎么放」，这几个是「管这一次播放会话」。
  *
  * ## 为什么用 `FlowRow`
  *
@@ -520,7 +520,19 @@ internal fun PlayerSessionChips(
                 modifier = Modifier.widthIn(max = CHIP_MAX_WIDTH),
             )
         }
-        // 画中画排最后：它和上面两个的区别是**点了会离开这个界面**（画面缩成一个小
+        // 均衡器放在画中画**前面**：画中画是最后一个，因为它点了会离开这个界面。
+        session.equalizer?.let { chip ->
+            ChipButton(
+                // 芯片上的字是**现在的档位**（「低音增强」/「自定义」），没开的时候
+                // 写功能名（「均衡器」）——和睡眠定时芯片同一套读法：用户下次看这行
+                // 时要回答的问题是「现在声音是什么样」。
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_equalizer),
+            )
+        }
+        // 画中画排最后：它和上面几个的区别是**点了会离开这个界面**（画面缩成一个小
         // 窗口），摆在最靠后/最靠边的位置，误触的代价最小。
         session.pip?.let { chip ->
             ChipButton(
@@ -554,9 +566,9 @@ data class PlayerBarChip(
 )
 
 /**
- * 会话级入口的一整组（睡眠定时 / 队列 / 画中画）。
+ * 会话级入口的一整组（睡眠定时 / 队列 / 均衡器 / 画中画）。
  *
- * ## 为什么不写成三个平铺的参数
+ * ## 为什么不写成几个平铺的参数
  *
  * 这一组要穿过 `PlayerScreen` → `PortraitLayout` / `LandscapeLayout` →
  * `AudioLandscapeLayout` → `AudioLandscapeControls`（以及 `PlayerControlsOverlay`）
@@ -569,8 +581,9 @@ data class PlayerBarChip(
  * ## 字段的空值含义各不相同
  *
  * [sleepTimer] 为 null 是「预览/单测里没给」，[queue] 为 null 是「队列里没东西可看」，
- * [pip] 为 null 是「这台设备不支持画中画，或者当前放的是音频」。它们只是恰好都用
- * 可空表示「这个入口不画」。
+ * [equalizer] 为 null 是「预览/单测里没给」——真机上这个入口一直在：均衡器是在
+ * 开始播放**之前**就能设的（那时设备支不支持都还不知道），把它藏起来会让功能
+ * 变成「先放一会儿才出现」，而用户找的是一个设置项。
  *
  * 公开（而不是 internal）是因为它出现在 `PlayerScreen` 的参数表上，而那个组合
  * 函数是公开的——公开函数不能暴露 internal 类型。
@@ -579,15 +592,16 @@ data class PlayerBarChip(
 data class PlayerSessionChipSet(
     val sleepTimer: PlayerBarChip? = null,
     val queue: PlayerBarChip? = null,
+    val equalizer: PlayerBarChip? = null,
     val pip: PlayerBarChip? = null,
 ) {
     /**
-     * 三个入口都没有。
+     * 所有入口都没有。
      *
      * 「要不要占位置」的判断点和「要不要画」的渲染点必须是同一个集合：分开写的话，
-     * 以后加第四个入口时只改了一边，就会得到一行空白的间距（或一个跑出边界的东西）。
+     * 以后加第五个入口时只改了一边，就会得到一行空白的间距（或一个跑出边界的东西）。
      */
-    val isEmpty: Boolean get() = sleepTimer == null && queue == null && pip == null
+    val isEmpty: Boolean get() = sleepTimer == null && queue == null && equalizer == null && pip == null
 }
 
 /**
@@ -737,7 +751,7 @@ internal fun PlayerControlsOverlay(
     modifier: Modifier = Modifier,
     /** 音轨入口的配置。`null` = 这个片源只有一条音轨（或还没有轨道信息）。 */
     audioTrackChip: PlayerBarChip? = null,
-    /** 睡眠定时 / 队列 / 画中画三个会话级入口。默认空集 = 一个都不画。 */
+    /** 睡眠定时 / 队列 / 均衡器 / 画中画四个会话级入口。默认空集 = 一个都不画。 */
     sessionChips: PlayerSessionChipSet = PlayerSessionChipSet(),
 ) {
     Box(modifier = modifier.fillMaxSize()) {

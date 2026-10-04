@@ -132,6 +132,11 @@ fun PlayerRoute(
     val artworkAccent by viewModel.artworkAccent.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val audioTracks by viewModel.audioTracks.collectAsStateWithLifecycle()
+    // 均衡器。三个值都不会频繁变（开关点一下、曲线拖完才变一次、设备状态在
+    // 开始播放那一刻定下来），订在这一层不会把播放页拖进频繁重组。
+    val equalizerEnabled by viewModel.equalizerEnabled.collectAsStateWithLifecycle()
+    val equalizerCurve by viewModel.equalizerCurve.collectAsStateWithLifecycle()
+    val equalizerStatus by viewModel.equalizerStatus.collectAsStateWithLifecycle()
     // 睡眠定时与队列。两个都是「不常变」的值（用户点一下才变一次，定时到点变一次），
     // 所以订在这一层不会把播放页拖进频繁重组。
     val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
@@ -451,11 +456,24 @@ fun PlayerRoute(
         null
     }
 
-    // 三个会话级入口打包成一个对象再往下穿（见 `PlayerSessionChipSet` 的 KDoc：
-    // 平铺三个参数要穿过五层，以后加第四个入口就得改十处）。
+    // 均衡器入口。
+    //
+    // 它**不**根据设备支不支持来决定出不出现：设备支不支持只有在开始播放
+    // （拿到音频会话号）之后才知道，而「先放一会儿，控制条上才多出一个按钮」
+    // 是一种没人能归因的行为——用户找的是设置项，不是藏在播放状态里的开关。
+    // 不支持的情况由面板自己说清楚（见 `PlayerEqualizerSheet`）。
+    val equalizerChip = PlayerBarChip(
+        label = equalizerChipLabel(enabled = equalizerEnabled, curve = equalizerCurve),
+        active = equalizerEnabled,
+        onClick = { ui.openSheet(PlayerSheet.EQUALIZER) },
+    )
+
+    // 四个会话级入口打包成一个对象再往下穿（见 `PlayerSessionChipSet` 的 KDoc：
+    // 平铺四个参数要穿过五层，以后加第五个入口就得改十处）。
     val sessionChips = PlayerSessionChipSet(
         sleepTimer = sleepTimerChip,
         queue = queueChip,
+        equalizer = equalizerChip,
         pip = pipChip,
     )
 
@@ -578,6 +596,19 @@ fun PlayerRoute(
             onDismiss = ui::closeSheet,
         )
 
+        PlayerSheet.EQUALIZER -> PlayerEqualizerSheet(
+            enabled = equalizerEnabled,
+            curve = equalizerCurve,
+            status = equalizerStatus,
+            onToggle = viewModel::setEqualizerEnabled,
+            // 「整条曲线」一个出口：选预设和拖完一根滑块进来的都是这个回调，
+            // 于是「当前是哪条曲线」在面板里只有一个写入点。
+            onCurveChange = viewModel::setEqualizerCurve,
+            // 拖动过程中只下给内核、不写盘（写盘要等松手）。
+            onPreviewBand = viewModel::previewEqualizerBand,
+            onDismiss = ui::closeSheet,
+        )
+
         // 队列面板**不**在点条目后自己关：这个面板的存在意义就是「看着队列
         // 挑一条」，关掉就回到了「盲选」——而挑歌本来就是一件会反复的事。
         PlayerSheet.QUEUE -> PlayerQueueSheet(
@@ -630,7 +661,7 @@ fun PlayerScreen(
     subtitleState: SubtitleUiState = SubtitleUiState(),
     /** 音轨入口的芯片配置，`null` = 这个片源没有多条音轨。 */
     audioTrackChip: PlayerBarChip? = null,
-    /** 睡眠定时 / 队列 / 画中画三个会话级入口。默认空集 = 一个都不画。 */
+    /** 睡眠定时 / 队列 / 均衡器 / 画中画四个会话级入口。默认空集 = 一个都不画。 */
     sessionChips: PlayerSessionChipSet = PlayerSessionChipSet(),
     onTogglePlayPause: () -> Unit = {},
     onSkipNext: () -> Unit = {},
@@ -874,8 +905,8 @@ private fun PortraitLayout(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // 睡眠定时 / 队列 / 画中画。单独一行（不是并进上面那排芯片）：那一排在
-        // 竖屏下已经把宽度用完了，而且这三个是「管这次播放会话」、
+        // 睡眠定时 / 队列 / 均衡器 / 画中画。单独一行（不是并进上面那排芯片）：那一排在
+        // 竖屏下已经把宽度用完了，而且这几个是「管这次播放会话」、
         // 不是「调这条媒体」。
         PlayerSessionChips(
             session = sessionChips,

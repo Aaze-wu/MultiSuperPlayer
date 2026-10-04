@@ -199,4 +199,28 @@
 
     <!-- ===== 子母畫面 ===== -->
     <string name="msp_player_pip">子母畫面</string>
+
+    <!--
+      等化器。
+
+      預設名稱由我們自己管（這也是不用系統 `usePreset` 的另一個理由：那些名字
+      是廠商的）。增益與頻率的文字（`+6 dB`、`3.6 kHz`）不在這裡：它們是純函式
+      `EqualizerCurve.formatGain` / `formatFreq` 的輸出，三種語言寫法一樣。
+    -->
+    <string name="msp_player_equalizer">等化器</string>
+    <string name="msp_player_eq_enable">開啟等化器</string>
+    <string name="msp_player_eq_preset_flat">平直</string>
+    <string name="msp_player_eq_preset_bass">低音增強</string>
+    <string name="msp_player_eq_preset_treble">高音增強</string>
+    <string name="msp_player_eq_preset_vocal">人聲</string>
+    <string name="msp_player_eq_preset_rock">搖滾</string>
+    <string name="msp_player_eq_preset_pop">流行</string>
+    <string name="msp_player_eq_preset_jazz">爵士</string>
+    <string name="msp_player_eq_preset_classical">古典</string>
+    <!-- 自己拖出來的曲線匹配不上任何預設時寫的名字 -->
+    <string name="msp_player_eq_preset_custom">自訂</string>
+    <!-- 還沒開始播放：這時滑桿照樣能調，所以要說清楚為什麼聽不出變化 -->
+    <string name="msp_player_eq_idle_note">還沒開始播放：現在的調整會存下來，開始播放後才會聽到。</string>
+    <string name="msp_player_eq_unsupported_note">這台裝置沒有可用的等化器，開關與預設都不會有作用。</string>
+    <string name="msp_player_eq_mapping_note">這五段會對應到本機音訊效果支援的頻段上。</string>
 </resources>

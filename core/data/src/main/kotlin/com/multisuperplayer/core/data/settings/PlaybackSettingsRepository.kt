@@ -81,6 +81,22 @@ class PlaybackSettingsRepository(
         it[Keys.BOOST_SPEED] = speed
     }
 
+    suspend fun setEqualizerEnabled(enabled: Boolean) = edit {
+        it[Keys.EQUALIZER_ENABLED] = enabled
+    }
+
+    /**
+     * 存的是 `EqualizerCurve.encode` 出来的字符串。
+     *
+     * 参数用 String 而不是 `List<EqualizerBandGain>`：数据层因此不必依赖
+     * `:core:player` 的那套类型（它已经依赖了，但那是为了别的东西），
+     * 更重要的是**编码只有一处**——数据层自己拼一遍字符串，就会在两处
+     * 定义同一个格式。
+     */
+    suspend fun setEqualizerBandGains(encoded: String) = edit {
+        it[Keys.EQUALIZER_BAND_GAINS] = encoded
+    }
+
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         withContext(dispatchers.io) { store.edit(block) }
     }
@@ -109,6 +125,18 @@ class PlaybackSettingsRepository(
 
         /** 长按画面时的临时倍速（见 [PlaybackSettings.boostSpeed]）。 */
         val BOOST_SPEED = floatPreferencesKey("playback.boost_speed")
+
+        /** 均衡器开关（见 [PlaybackSettings.equalizerEnabled]）。 */
+        val EQUALIZER_ENABLED = booleanPreferencesKey("playback.equalizer_enabled")
+
+        /**
+         * 均衡器曲线（见 [PlaybackSettings.equalizerBandGains]）。
+         *
+         * 键名里带 `band_gains` 而不是 `curve`：真正存在磁盘上的是「每个频段的
+         * 增益」这个字符串，名字要和内容对得上，将来有人直接翻 DataStore 文件
+         * 也看得懂。
+         */
+        val EQUALIZER_BAND_GAINS = stringPreferencesKey("playback.equalizer_band_gains")
     }
 }
 
@@ -129,4 +157,8 @@ internal fun Preferences.toPlaybackSettings(): PlaybackSettings = PlaybackSettin
     rememberPosition = this[PlaybackSettingsRepository.Keys.REMEMBER_POSITION],
     recordRecentPlays = this[PlaybackSettingsRepository.Keys.RECORD_RECENT_PLAYS],
     boostSpeed = this[PlaybackSettingsRepository.Keys.BOOST_SPEED],
+    equalizerEnabled = this[PlaybackSettingsRepository.Keys.EQUALIZER_ENABLED],
+    // 只读出来，**不解析**：字符串读不动的时候该由上层回落到平直曲线，
+    // 而「读不动」的样子是 null 或一段垃圾，两者对上层是一回事。
+    equalizerBandGains = this[PlaybackSettingsRepository.Keys.EQUALIZER_BAND_GAINS],
 )

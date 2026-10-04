@@ -13,7 +13,8 @@ package com.multisuperplayer.core.ui.list
  *
  * 放在 `core:ui` 而不是某个 feature 里，是因为**好几处列表都用它**：播放队列
  * （`feature:player`，按把手拖动）、播放列表详情里的条目、以及播放列表**清单**
- * （后两处都在 `feature:library`，长按整行拖动，手势封装见 `Modifier.reorderDrag`）。
+ * （后两处都在 `feature:library`，长按整行拖动，手势封装见
+ * `Modifier.reorderDragSource`，落点由 `ReorderDragState` 使用）。
  * 各抄一份的话，手感修一处、别处不会跟着变，而那种差异没人会去复现。
  *
  * ## 全部按「跨过几行」算，不按像素比
@@ -66,4 +67,59 @@ object ReorderDragRules {
      * 重新缓冲一下——一次没意义的抖动）。
      */
     fun isNoOp(from: Int, to: Int): Boolean = from == to
+
+    /**
+     * 把 [from] 那一条拎出来插到 [to]（两者都是**当前**列表里的下标）。
+     *
+     * 抽成纯函数是为了让「拖动期间那份预览顺序」能被单测钉住：它和真实数据是
+     * 两份，掉了哪一条、重复了哪一条都不会报错，只会让界面显示一个不存在的顺序，
+     * 而那种错在真机上看起来像「松手之后顺序自己变了」。
+     *
+     * 下标越界或者 `from == to` 时**原样返回**（不复制）：拖动中的跨行是逐格报的，
+     * 中间难免出现「这一步没意义」，此时返回同一个列表实例还能顺带省掉一次
+     * 无谓的重组。
+     */
+    fun <T> move(items: List<T>, from: Int, to: Int): List<T> {
+        if (from == to) return items
+        if (from !in items.indices || to !in items.indices) return items
+        return items.toMutableList().apply { add(to, removeAt(from)) }
+    }
+
+    /**
+     * 手指贴在列表边缘时，列表该用多快的速度自动滚（像素/秒）。
+     *
+     * 正数往后滚（内容往上走，露出下面的条目）、负数往前滚、`0f` 不滚。
+     * 只有落进顶部/底部 [edgePx] 那条带子里才返回非零值，并且**越靠边越快**
+     * （线性加速到 [maxPxPerSecond]）：全程匀速会让「只想滚一点点」变成做不到
+     * 的事，而只有「最快那一档」又会让长列表一路冲过头。
+     *
+     * 带子比半个视口还高时按半个视口夹住。不夹的话上下两条带子会重叠，同一个
+     * 位置既算贴顶又算贴底，结果取决于先判断哪一边——那在真机上表现为
+     * 「拖着拖着列表突然往反方向滚」。
+     *
+     * 手指跑到视口外面（拖到了列表之外）时差值会超过带宽，靠 `coerceAtMost`
+     * 收到满速，而不是继续无限加速。
+     *
+     * 返回**速度**而不是位移，是因为位移要乘以帧间隔：不同设备的帧率不一样，
+     * 按帧给固定像素会让 120Hz 的机器滚得比 60Hz 快一倍。
+     */
+    fun autoScrollPxPerSecond(
+        fingerY: Float,
+        viewportHeightPx: Float,
+        edgePx: Float,
+        maxPxPerSecond: Float,
+    ): Float {
+        if (!fingerY.isFinite() || !viewportHeightPx.isFinite() || !edgePx.isFinite() ||
+            !maxPxPerSecond.isFinite()
+        ) {
+            return 0f
+        }
+        if (viewportHeightPx <= 0f || edgePx <= 0f || maxPxPerSecond <= 0f) return 0f
+        val zone = if (edgePx > viewportHeightPx / 2f) viewportHeightPx / 2f else edgePx
+        val intoBottom = fingerY - (viewportHeightPx - zone)
+        if (intoBottom > 0f) return maxPxPerSecond * (intoBottom / zone).coerceAtMost(1f)
+        val intoTop = zone - fingerY
+        if (intoTop > 0f) return -maxPxPerSecond * (intoTop / zone).coerceAtMost(1f)
+        return 0f
+    }
 }

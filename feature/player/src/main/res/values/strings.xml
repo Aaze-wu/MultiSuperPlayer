@@ -240,4 +240,28 @@
     <!-- ===== 画中画 ===== -->
     <!-- 控制条上的入口。英文用 PiP 缩写：写成 “Picture in picture” 会把芯片撑得比别的都长。 -->
     <string name="msp_player_pip">画中画</string>
+
+    <!--
+      均衡器。
+
+      预设名归我们自己管（不用系统 `usePreset` 的另一个理由：那些名字是厂商的）。
+      增益与频率的文字（`+6 dB`、`3.6 kHz`）不在这里：它们是纯函数
+      `EqualizerCurve.formatGain` / `formatFreq` 的输出，三种语言写法一样。
+    -->
+    <string name="msp_player_equalizer">均衡器</string>
+    <string name="msp_player_eq_enable">开启均衡器</string>
+    <string name="msp_player_eq_preset_flat">平直</string>
+    <string name="msp_player_eq_preset_bass">低音增强</string>
+    <string name="msp_player_eq_preset_treble">高音增强</string>
+    <string name="msp_player_eq_preset_vocal">人声</string>
+    <string name="msp_player_eq_preset_rock">摇滚</string>
+    <string name="msp_player_eq_preset_pop">流行</string>
+    <string name="msp_player_eq_preset_jazz">爵士</string>
+    <string name="msp_player_eq_preset_classical">古典</string>
+    <!-- 自己拖出来的曲线匹配不上任何预设时写的名字 -->
+    <string name="msp_player_eq_preset_custom">自定义</string>
+    <!-- 还没开始播放：这时滑块照样能调，所以要说清楚为什么听不出变化 -->
+    <string name="msp_player_eq_idle_note">还没开始播放：现在的调整会存下来，开始播放后才会听到。</string>
+    <string name="msp_player_eq_unsupported_note">这台设备没有可用的均衡器，开关和预设都不会有作用。</string>
+    <string name="msp_player_eq_mapping_note">这五段会映射到本机音频效果支持的频段上。</string>
 </resources>

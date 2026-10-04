@@ -46,15 +46,16 @@ data class PlayerSeekHint(
  * 播放页上会弹出的选择面板。
  *
  * 一个面板只改一个维度：`SPEED` 改倍速、`ASPECT_RATIO` 改画面比例、`AUDIO_TRACK`
- * 改音轨、`SLEEP_TIMER` 设定时、`QUEUE` 看/改队列。字幕不在这张表里——它是单独一个
+ * 改音轨、`SLEEP_TIMER` 设定时、`EQUALIZER` 调均衡器、`QUEUE` 看/改队列。字幕不在这张表里——它是单独一个
  * `ModalBottomSheet`（见 `PlayerRoute` 里的 `showSubtitleSheet`），因为它下面挂着
  * 一整棵状态机（扫描、翻译、导出），和这几个「选一个值就关掉」的面板不是一类东西。
  *
- * [QUEUE] 是这里唯一**不是「选一个值」**的面板（它能拖能删），但仍然属于这张表：
- * 它和其他几个共享同一套「同一时刻只开一个、开面板就点亮控制条、控制条自动淡化时
- * 要停下」的规矩，而那套规矩是写在 [PlayerUiState.openSheet] 里的。
+ * [QUEUE] 和 [EQUALIZER] 是这里**不**属于「选一个值就关掉」的面板（队列能拖能删，
+ * 均衡器的滑块要一边拖一边听）。它们仍然属于这张表：它们和其他几个共享同一套
+ * 「同一时刻只开一个、开面板就点亮控制条、控制条自动淡化时要停下」的规矩，
+ * 而那套规矩是写在 [PlayerUiState.openSheet] 里的。
  */
-enum class PlayerSheet { SPEED, ASPECT_RATIO, AUDIO_TRACK, SLEEP_TIMER, QUEUE }
+enum class PlayerSheet { SPEED, ASPECT_RATIO, AUDIO_TRACK, SLEEP_TIMER, EQUALIZER, QUEUE }
 
 /**
  * 播放页的**界面**状态：全屏、锁定、控制条显隐、提示泡、当前面板。

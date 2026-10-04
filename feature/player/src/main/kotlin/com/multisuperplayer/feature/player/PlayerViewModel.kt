@@ -10,6 +10,11 @@ import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.player.EqualizerBandGain
+import com.multisuperplayer.core.player.EqualizerController
+import com.multisuperplayer.core.player.EqualizerCurve
+import com.multisuperplayer.core.player.EqualizerRequest
+import com.multisuperplayer.core.player.EqualizerStatus
 import com.multisuperplayer.core.player.MspPlaybackState
 import com.multisuperplayer.core.player.MspRepeatMode
 import com.multisuperplayer.core.player.MspTrackInfo
@@ -49,6 +54,8 @@ class PlayerViewModel(
     private val tracks: TrackSelectionController,
     artworkPalette: ArtworkPaletteRepository,
     private val playbackSettings: PlaybackSettingsRepository,
+    /** 均衡器。它在 `:core:player` 里，生命周期跟着内核而不是这一页。 */
+    private val equalizer: EqualizerController,
 ) : ViewModel() {
 
     /**
@@ -64,6 +71,57 @@ class PlayerViewModel(
      */
     val settings: StateFlow<PlaybackSettings> = playbackSettings.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), PlaybackSettings())
+
+    /**
+     * 均衡器开关。
+     *
+     * 从 [settings] 派生而不是单独存一份：面板上的开关和磁盘里的值必须是同一本账，
+     * 否则会出现「开关是开的、声音没变」（写盘失败）或者反过来的情况，
+     * 而用户只能看到开关这一个信息。
+     *
+     * `== true`：数据层用 null 表示「从没设置过」，而界面上只有开/关两种样子，
+     * 默认关这个决定只在这一行。
+     */
+    val equalizerEnabled: StateFlow<Boolean> = settings
+        .map { it.equalizerEnabled == true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), false)
+
+    /**
+     * 均衡器曲线。读不出来（没设置过、或者存进去的是垃圾）时是平直的。
+     *
+     * 投影到**标准频段**上（见 `EqualizerCurve.onStandardBands`）：面板上永远是
+     * 那五根滑块，下标和曲线下标一一对应。解析放在这里（而不是数据层）是因为
+     * 它只能有一处：`EqualizerCurve.decode` 返回 null 表示「读不动」，回落到平直
+     * 是这一行的事。
+     */
+    val equalizerCurve: StateFlow<List<EqualizerBandGain>> = settings
+        .map(::currentCurve)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS),
+            EqualizerCurve.flat(),
+        )
+
+    /**
+     * 均衡器现在处于哪种状态：还没开始播放 / 可用 / 这台设备不支持。
+     *
+     * 三种状态都要能区分，因为它们的界面文案完全不同——把「还没开始播放」
+     * 说成「不支持」会让人以为这台手机就是不行（实际上面板开早了）。
+     */
+    val equalizerStatus: StateFlow<EqualizerStatus> = equalizer.status
+
+    init {
+        // 均衡器跟着**内核**走，不跟着这一页走：退出播放页之后音乐还在放，
+        // 效果也得还在。所以这里只 start（幂等），**绝不** release——
+        // release 会把正在生效的均衡器连根拔掉，而那件事不该由「关闭一个页面」
+        // 触发。
+        equalizer.start()
+        viewModelScope.launch {
+            // 以持久化值为唯一真相来下发：开关和曲线在同一个 collector 里一起落，
+            // 不会出现「曲线落下去了、开关没落」这种半套状态。
+            settings.collect(::applyEqualizer)
+        }
+    }
 
     val state: StateFlow<MspPlaybackState> = controller.state
     val currentEntry: StateFlow<MediaEntry?> = controller.currentEntry
@@ -256,6 +314,100 @@ class PlayerViewModel(
 
     /** 清空队列并停止播放。 */
     fun clearQueue() = controller.clearQueue()
+
+    /**
+     * 打开/关闭均衡器。
+     *
+     * 只写盘，不直接下令给内核：下发这一件事交给 [init] 里那个订阅设置的
+     * collector，于是「开关」和「曲线」永远一起落，也就不会出现
+     * 「关掉了，但用的是刚刚拖动出来的曲线」这种半套状态。
+     */
+    fun setEqualizerEnabled(enabled: Boolean) {
+        persistEqualizer { playbackSettings.setEqualizerEnabled(enabled) }
+    }
+
+    /**
+     * 把整条曲线存下来（选预设、或者拖完之后）。
+     *
+     * 存**整条**曲线而不是「第几段改成了多少」：设备段数不一样，存下标在另一台
+     * 设备上就是另一条曲线（见 `EqualizerBandGain`），而这个方法的调用方手里
+     * 本来就有整条曲线。
+     */
+    fun setEqualizerCurve(curve: List<EqualizerBandGain>) {
+        if (curve.isEmpty()) return
+        persistEqualizer { playbackSettings.setEqualizerBandGains(EqualizerCurve.encode(curve)) }
+    }
+
+    /**
+     * 拖动某个频段时的**临时**预览：只下发给内核，**不写盘**。
+     *
+     * ## 为什么拖动的每一帧都要下发
+     *
+     * 均衡器就是要一边拖一边听。只在下发最后一次（松手）的话，用户是在
+     * 「盲调」——五次尝试里四次听不到自己刚做了什么。
+     *
+     * ## 为什么不写盘
+     *
+     * 一次拖动会产生几十个中间值，全写进去就是把 DataStore 当记事本用；
+     * 真正要存的是**松手时的那一个**（调用方在 `onValueChangeFinished` 里调
+     * [setEqualizerCurve]）。
+     *
+     * ## 为什么可以读 [settings]
+     *
+     * 拖动期间一次盘都没写，所以 `settings.value` 里的曲线不会过期，
+     * 这一层就不需要再存一份「正在拖的曲线」——那正是「两份真相」的开头。
+     */
+    fun previewEqualizerBand(bandIndex: Int, gainDb: Float) {
+        val current = settings.value
+        val curve = currentCurve(current)
+        if (bandIndex !in curve.indices) return
+        equalizer.apply(
+            EqualizerRequest(
+                enabled = current.equalizerEnabled == true,
+                curve = curve.mapIndexed { index, band ->
+                    if (index == bandIndex) band.copy(gainDb = gainDb) else band
+                },
+            ),
+        )
+    }
+
+    /** 把设置里那一套均衡器状态下发给内核（开关 + 曲线一起）。 */
+    private fun applyEqualizer(settings: PlaybackSettings) {
+        equalizer.apply(
+            EqualizerRequest(
+                enabled = settings.equalizerEnabled == true,
+                curve = currentCurve(settings),
+            ),
+        )
+    }
+
+    /**
+     * 设置里那条曲线，投影到界面画的五个标准频段上。
+     *
+     * [equalizerCurve]、[previewEqualizerBand] 和 [applyEqualizer] 必须走**同一个**
+     * 函数：只要有一处自己解一遍，就会多出一份「界面上的第 3 根是哪一段」的答案，
+     * 而两个答案一旦不一致，症状就是「拖了滑块，变的是另一段」——它不会报错。
+     */
+    private fun currentCurve(settings: PlaybackSettings): List<EqualizerBandGain> =
+        EqualizerCurve.onStandardBands(
+            EqualizerCurve.decode(settings.equalizerBandGains) ?: EqualizerCurve.flat(),
+        )
+
+    /**
+     * 写均衡器设置。
+     *
+     * 写盘失败只记日志，和 [setSpeed] 一样：设置存不下来是小事，不该把正在播的
+     * 东西打断（何况 `viewModelScope` 里漏出去的异常会直接崩掉应用）。
+     */
+    private fun persistEqualizer(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: Exception) {
+                MspLog.w(TAG, error) { "均衡器设置写盘失败，本次会话仍然生效" }
+            }
+        }
+    }
 
     private companion object {
         const val TAG = "PlayerViewModel"

@@ -194,4 +194,27 @@
 
     <!-- ===== Picture in picture ===== -->
     <string name="msp_player_pip">PiP</string>
+
+    <!--
+      Equalizer. The preset names are ours (that is one more reason not to use the
+      system presets: those names belong to the vendor). Gain and frequency texts
+      (`+6 dB`, `3.6 kHz`) are deliberately not here: they come from the pure
+      functions `EqualizerCurve.formatGain` / `formatFreq`.
+    -->
+    <string name="msp_player_equalizer">Equalizer</string>
+    <string name="msp_player_eq_enable">Enable equalizer</string>
+    <string name="msp_player_eq_preset_flat">Flat</string>
+    <string name="msp_player_eq_preset_bass">Bass boost</string>
+    <string name="msp_player_eq_preset_treble">Treble boost</string>
+    <string name="msp_player_eq_preset_vocal">Vocal</string>
+    <string name="msp_player_eq_preset_rock">Rock</string>
+    <string name="msp_player_eq_preset_pop">Pop</string>
+    <string name="msp_player_eq_preset_jazz">Jazz</string>
+    <string name="msp_player_eq_preset_classical">Classical</string>
+    <!-- Shown when a hand-dragged curve matches no preset -->
+    <string name="msp_player_eq_preset_custom">Custom</string>
+    <!-- Not playing yet: the sliders still work, so say why nothing can be heard -->
+    <string name="msp_player_eq_idle_note">Nothing is playing yet: your changes are saved and you will hear them once playback starts.</string>
+    <string name="msp_player_eq_unsupported_note">This device has no usable equalizer, so the switch and the presets will have no effect.</string>
+    <string name="msp_player_eq_mapping_note">These five bands are mapped onto the frequencies your device actually supports.</string>
 </resources>

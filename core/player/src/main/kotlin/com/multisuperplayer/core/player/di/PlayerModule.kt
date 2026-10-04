@@ -1,8 +1,10 @@
 package com.multisuperplayer.core.player.di
 
+import com.multisuperplayer.core.player.EqualizerController
 import com.multisuperplayer.core.player.ExoPlayerController
 import com.multisuperplayer.core.player.NextlibSoftwareDecoderSupport
 import com.multisuperplayer.core.player.PlaybackController
+import com.multisuperplayer.core.player.PlayerAudioSessionObserver
 import com.multisuperplayer.core.player.SoftwareDecoderSupport
 import com.multisuperplayer.core.player.TrackSelectionController
 import org.koin.android.ext.koin.androidContext
@@ -42,4 +44,13 @@ val playerModule = module {
     // 绑定到**同一个**单例：轨道清单必须是同一个内核在维护，两个实例会变成
     // 两份真相，而且多出来的那个内核还会白白占着解码器。
     single<TrackSelectionController> { get<PlaybackController>() }
+
+    // 均衡器挂在播放器的音频会话上，而会话号在开始播放之前不存在，所以这里
+    // 只造「控制器」，真正的效果在 `start()` / 会话号变化时才建。
+    //
+    // 它观察的是**接口**（[AudioSessionObserver]）而不是直接持有
+    // [PlaybackController]：均衡器只需要「会话号是几、什么时候变了」，而
+    // `PlaybackController` 在 JVM 单测里是个几十个成员的巨型接口，为了测
+    // 「会话换了要重建效果」去伪造它不划算。
+    single { EqualizerController(PlayerAudioSessionObserver(get<PlaybackController>())) }
 }
