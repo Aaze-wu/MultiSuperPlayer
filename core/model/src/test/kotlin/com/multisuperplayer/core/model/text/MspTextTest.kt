@@ -1,6 +1,6 @@
-package com.multisuperplayer.core.common.text
+package com.multisuperplayer.core.model.text
 
-import com.multisuperplayer.core.common.R
+import com.multisuperplayer.core.model.R
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

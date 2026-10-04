@@ -12,7 +12,7 @@ import com.multisuperplayer.core.common.device.DeviceSnapshot
 import com.multisuperplayer.core.common.log.LogRepository
 import com.multisuperplayer.core.common.log.LogSummary
 import com.multisuperplayer.core.common.log.MspLog
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

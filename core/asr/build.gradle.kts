@@ -36,8 +36,10 @@ kotlin {
 
 dependencies {
     api(project(":core:model"))
-    // api 而不是 implementation：公开签名里用到 core:common 的 MspText，
-    // 消费方（feature:player / feature:settings）得能看见它。
+    // api 而不是 implementation：公开工厂 AsrTranscriber.create(context, dispatchers)
+    // 的第二个参数是 core:common 的 DispatcherProvider，消费方（core:data）得能看见它。
+    // （MspText 原来也住在这里，现在已经搬去 core:model，所以上面那条 api 从「顺手」
+    // 变成了「必需」；core:common 这条依旧要留，MspLog / TimeFormat 还在它那儿。）
     api(project(":core:common"))
 
     // -----------------------------------------------------------------------

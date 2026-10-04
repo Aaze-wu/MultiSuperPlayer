@@ -70,6 +70,28 @@ class ThemeSettingsRepository(
      */
     suspend fun selectAccent(id: String) = edit { it.applyAccentSelection(id) }
 
+    /**
+     * 选中一个自定义强调色（用户在滑块上松手时调用）。
+     *
+     * 与 [selectAccent] 完全对称：一个具体的颜色被选中时，盖在它上面的两个
+     * 取色开关必须让位，否则用户拖了滑块却发现颜色没变。
+     *
+     * 它**不会**动 [ThemeSettings.accentId]：那是「如果关掉自定义色，回到哪一个
+     * 预设」，属于另一个问题。[clearCustomAccent] 正是靠它还留着才能回到原位。
+     */
+    suspend fun selectCustomAccent(accent: CustomAccent) =
+        edit { it.applyCustomAccentSelection(accent) }
+
+    /**
+     * 「回到预设强调色」：只删掉自定义色这一个键，两个取色开关**不动**。
+     *
+     * 用户此刻看到的是自定义色，也就是说两个取色开关本来就已经是关的
+     * （是 [selectCustomAccent] 关掉的），所以这里没有需要一并处理的状态；
+     * 而如果他去关掉自定义色之前先手动打开了封面取色，那个开关是他的明确选择，
+     * 不该被这个动作顺手翻掉。
+     */
+    suspend fun clearCustomAccent() = edit { it.remove(Keys.CUSTOM_ACCENT) }
+
     suspend fun setUseDynamicColor(enabled: Boolean) = edit { it[Keys.DYNAMIC_COLOR] = enabled }
 
     suspend fun setColorFromArtwork(enabled: Boolean) = edit { it[Keys.COLOR_FROM_ARTWORK] = enabled }
@@ -90,6 +112,7 @@ class ThemeSettingsRepository(
         val ACCENT = stringPreferencesKey("theme.accent")
         val DYNAMIC_COLOR = booleanPreferencesKey("theme.dynamic_color")
         val COLOR_FROM_ARTWORK = booleanPreferencesKey("theme.color_from_artwork")
+        val CUSTOM_ACCENT = stringPreferencesKey("theme.custom_accent")
     }
 }
 
@@ -107,6 +130,10 @@ internal fun Preferences.toThemeSettings(): ThemeSettings = ThemeSettings(
     accentId = this[ThemeSettingsRepository.Keys.ACCENT]?.takeIf { it.isNotBlank() },
     useDynamicColor = this[ThemeSettingsRepository.Keys.DYNAMIC_COLOR],
     colorFromArtwork = this[ThemeSettingsRepository.Keys.COLOR_FROM_ARTWORK],
+    // 解不出来当「没设置过」。这里**不能**用 `takeIf { it.isNotBlank() }` 那种写法：
+    // 自定义色的载体是「三个数」，空串与半截数据对一个滑块来说同样是坏数据，
+    // 该处理的只有「能不能解析成三个数」这一件事（见 CustomAccentCodec）。
+    customAccent = CustomAccentCodec.decode(this[ThemeSettingsRepository.Keys.CUSTOM_ACCENT]),
 )
 
 /**
@@ -120,6 +147,26 @@ internal fun Preferences.toThemeSettings(): ThemeSettings = ThemeSettings(
  */
 internal fun MutablePreferences.applyAccentSelection(id: String) {
     this[ThemeSettingsRepository.Keys.ACCENT] = id
+    this[ThemeSettingsRepository.Keys.DYNAMIC_COLOR] = false
+    this[ThemeSettingsRepository.Keys.COLOR_FROM_ARTWORK] = false
+    // 选中一个预设 = 明确表示「不用自定义色了」。**必须真的删掉这个键**，
+    // 只在 UI 层「忽略它」是不行的：MspTheme 的优先级是「自定义 > 预设」，
+    // 留着一个自定义色意味着用户点了预设却什么都没变，而那正是最难查的
+    // 「点了没反应」。
+    remove(ThemeSettingsRepository.Keys.CUSTOM_ACCENT)
+}
+
+/**
+ * 「选中自定义强调色」对存储的全部影响，与 [applyAccentSelection] 一一对应。
+ *
+ * 两个取色开关的处置与选预设完全一致，理由也一样：只要它们还开着，用户拖完滑块
+ * 松手之后颜色不会变。
+ *
+ * 三处写入在同一次调用里完成（`edit {}` 本身就是一个事务），不会出现
+ * 「自定义色已存、封面取色还开着」的中间帧。
+ */
+internal fun MutablePreferences.applyCustomAccentSelection(accent: CustomAccent) {
+    this[ThemeSettingsRepository.Keys.CUSTOM_ACCENT] = CustomAccentCodec.encode(accent)
     this[ThemeSettingsRepository.Keys.DYNAMIC_COLOR] = false
     this[ThemeSettingsRepository.Keys.COLOR_FROM_ARTWORK] = false
 }

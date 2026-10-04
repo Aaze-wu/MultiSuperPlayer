@@ -18,6 +18,12 @@
     <!-- %1$d: file size in MB -->
     <string name="msp_subtitle_reason_file_too_large">File is too large (%1$d MB) and may not be a subtitle file</string>
 
+    <!-- ==== Subtitles: parse warnings ====
+         What the parsers themselves noticed lives in core:subtitle; this one is
+         something only the reader of the file can know - the encoding was guessed. ==== -->
+    <!-- %1$s: charset actually used, already normalised (e.g. GB18030 / Shift-JIS) -->
+    <string name="msp_subtitle_warn_charset_guessed">Not UTF-8; decoded as %1$s. If the text looks garbled, re-save the file as UTF-8.</string>
+
     <!-- ==== Media library ==== -->
     <!-- %1$s: name of the system exception class -->
     <string name="msp_library_scan_failed">Failed to scan the media library (%1$s)</string>
@@ -56,5 +62,49 @@
     <string name="msp_subtitle_style_margin_edge">Edge</string>
     <string name="msp_subtitle_style_margin_raised">Raised</string>
     <string name="msp_subtitle_style_margin_high">Very high</string>
+
+    <!-- ==== Export (recently played / playlists) ==== -->
+    <!-- 表头与类型名会被写进导出文件，所以必须跟着用户的语言走（见 values/strings.xml）。 -->
+    <string name="msp_export_format_csv">CSV</string>
+    <string name="msp_export_format_json">JSON</string>
+    <string name="msp_export_collection_recent">Recently played</string>
+    <string name="msp_export_collection_playlists">Playlists</string>
+
+    <string name="msp_export_column_list">List</string>
+    <string name="msp_export_column_index">#</string>
+    <string name="msp_export_column_title">Title</string>
+    <string name="msp_export_column_artist">Artist</string>
+    <string name="msp_export_column_kind">Type</string>
+    <string name="msp_export_column_duration">Duration</string>
+    <string name="msp_export_column_duration_ms">Duration (ms)</string>
+    <string name="msp_export_column_position">Position</string>
+    <string name="msp_export_column_position_ms">Position (ms)</string>
+    <string name="msp_export_column_played_at">Played at</string>
+    <string name="msp_export_column_file_state">File state</string>
+    <string name="msp_export_column_uri">Path</string>
+    <string name="msp_export_column_media_id">Media ID</string>
+
+    <string name="msp_export_kind_audio">Audio</string>
+    <string name="msp_export_kind_video">Video</string>
+    <string name="msp_export_kind_unknown">Unknown</string>
+    <string name="msp_export_file_ok">OK</string>
+    <string name="msp_export_file_missing">File is gone</string>
+
+    <!-- ==== Import (playlists) ==== 理由见 values/strings.xml 的同一段说明。 -->
+    <string name="msp_import_error_unrecognized">This file was not exported by this app</string>
+    <string name="msp_import_error_missing_column">The file has no %1$s column</string>
+    <string name="msp_import_error_broken_row">Row %1$d has a different number of columns than the header</string>
+
+    <string name="msp_import_result_created">Created %1$d list(s)</string>
+    <string name="msp_import_result_merged">Merged into %1$d list(s)</string>
+    <string name="msp_import_result_items">%1$d item(s)</string>
+    <string name="msp_import_result_with_notes">%1$s (%2$s)</string>
+    <string name="msp_import_result_nothing_happened">Nothing was imported (%1$s)</string>
+    <string name="msp_import_result_nothing">The file has no playlists to import</string>
+
+    <string name="msp_import_note_empty_playlists">%1$d list(s) had no usable items</string>
+    <string name="msp_import_note_items_without_id">%1$d item(s) had no media ID</string>
+    <string name="msp_import_note_duplicate_items">%1$d duplicate item(s)</string>
+    <string name="msp_import_note_full">The playlist limit (%1$d) was reached, %2$d not imported</string>
 
 </resources>

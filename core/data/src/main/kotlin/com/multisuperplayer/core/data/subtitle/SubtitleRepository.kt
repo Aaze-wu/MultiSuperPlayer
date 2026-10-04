@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.R
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.SubtitleDocument
@@ -12,6 +12,7 @@ import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleOrigin
 import com.multisuperplayer.core.model.SubtitleTrack
 import com.multisuperplayer.core.subtitle.ParseResult
+import com.multisuperplayer.core.subtitle.SubtitleParseException
 import com.multisuperplayer.core.subtitle.SubtitleParserRegistry
 import java.io.IOException
 import kotlinx.coroutines.sync.Mutex
@@ -308,25 +309,25 @@ class SubtitleRepository(
     /**
      * 那句给人看的说明。
      *
-     * 系统异常的 `message` 可能是 null（而且通常已经是系统语言），那就退回
-     * 我们自己的 [fallback] 句子；有内容就原样透出。
+     * 【我们自己造的失败】带的是可翻译的 [MspText]（[SubtitleReadException] /
+     * [SubtitleParseException]），直接取出来用；系统自己抛的异常只有 `message`
+     * （而且通常已经是系统语言），有内容就原样透出去，null 才退回 [fallback]。
+     *
+     * 两个自定义异常必须**先**判：它们的 `message` 只是 `text.toString()`
+     * （形如 `Res(id=…, args=…)`），把它当文案显示出来就是给用户看一串开发信息。
      */
-    private fun Throwable.detailOr(fallback: MspText): MspText =
-        message?.takeIf { it.isNotBlank() }?.let(MspText::Plain) ?: fallback
+    private fun Throwable.detailOr(fallback: MspText): MspText = when (this) {
+        is SubtitleReadException -> text
+        is SubtitleParseException -> text
+        else -> message?.takeIf { it.isNotBlank() }?.let(MspText::Plain) ?: fallback
+    }
 
     private fun buildDocument(
         source: SubtitleSource,
         decoded: SubtitleTextDecoding.Decoded,
         parsed: ParseResult,
     ): SubtitleDocument {
-        val warnings = buildList {
-            addAll(parsed.warnings)
-            // 编码是猜出来的时候必须说出来：Big5 文件会被按 GB18030 解出
-            // 「字形合法但内容全错」的汉字，界面上看起来只是乱，看不出原因。
-            if (decoded.guessed) {
-                add("文件不是 UTF-8，已按 ${decoded.charset} 解码；若显示为乱码请另存为 UTF-8 再试")
-            }
-        }
+        val warnings = subtitleWarnings(parsed, decoded)
 
         return SubtitleDocument(
             track = SubtitleTrack(
@@ -353,5 +354,33 @@ class SubtitleRepository(
     private companion object {
         /** 8 MB。正常字幕文件在几百 KB 量级，超过这个数基本是选错了文件。 */
         const val MAX_SOURCE_BYTES = 8L * 1024 * 1024
+    }
+}
+
+/**
+ * 解析告警的组装：解析器自己收集的告警 + 「编码是猜的」这条。
+ *
+ * ## 为什么摘成一个 `internal` 顶层函数，而不是留在 [SubtitleRepository] 里
+ *
+ * 因为它**不碰 Context / ContentResolver**，摘出来就能被单测直接调用。
+ * 「编码是猜的必须说出来」这条规则此前一行测试都没有，而它错起来的样子
+ * 恰好是**最不像 bug 的那种**：Big5 字幕会被按 GB18030 解出「字形合法、
+ * 内容全错」的汉字，界面上除了看起来乱没有任何提示，用户只会以为播放器坏了。
+ * 而真正要钉的不是那句话的措辞，是「它必须是一条能翻译的 [MspText]」——
+ * 一个硬编码的中文 `String` 在英文界面里是完全看不见的漏洞。
+ *
+ * ## 为什么用 `charset` 这个字符串而不是 Charset 对象
+ *
+ * [SubtitleTextDecoding.Decoded.charset] 已经是「给用户看的名字」
+ * （日语统一报 `Shift-JIS`，不漏出平台上的 `windows-31j`），
+ * 这里再传 [java.nio.charset.Charset] 就把那个决定重复实现了两遍。
+ */
+internal fun subtitleWarnings(
+    parsed: ParseResult,
+    decoded: SubtitleTextDecoding.Decoded,
+): List<MspText> = buildList {
+    addAll(parsed.warnings)
+    if (decoded.guessed) {
+        add(MspText.Res(R.string.msp_subtitle_warn_charset_guessed, decoded.charset))
     }
 }

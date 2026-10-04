@@ -26,6 +26,12 @@
     <string name="msp_settings_summary_tail_artwork">封面取色</string>
     <string name="msp_settings_summary_tail_dynamic">系統取色</string>
     <string name="msp_settings_summary_tail_dynamic_blocked">系統取色未生效</string>
+
+    <!--
+      自訂強調色只說「自訂」而不是預設名：說預設名會讓人以為自己的設定根本沒存下來，
+      而入口頁那一行正是他判斷「存沒存上」的唯一依據。
+    -->
+    <string name="msp_settings_summary_accent_custom">自訂</string>
     <string name="msp_settings_summary_tail_force_software">強制軟解</string>
     <string name="msp_settings_summary_tail_no_ffmpeg">本包無 FFmpeg</string>
     <string name="msp_settings_summary_tail_no_position">不記位置</string>
@@ -170,6 +176,17 @@
     <string name="msp_settings_theme_note_accent">強調色會立即套用到整個應用程式：標題、按鈕、進度條和歌詞高亮都跟隨它。</string>
 
     <string name="msp_settings_accent_label">強調色</string>
+
+    <string name="msp_settings_section_custom_accent">自訂強調色</string>
+    <string name="msp_settings_custom_accent_hue">色相</string>
+    <string name="msp_settings_custom_accent_saturation">飽和度</string>
+    <string name="msp_settings_custom_accent_lightness">明度</string>
+    <string name="msp_settings_custom_accent_preview">預覽</string>
+    <string name="msp_settings_custom_accent_revert">回到預設強調色</string>
+
+    <string name="msp_settings_custom_accent_hint_none">還沒有自訂顏色。拖動上面的滑桿即可建立。</string>
+
+    <string name="msp_settings_custom_accent_note">拖動滑桿時會即時預覽，放開才真正儲存並套用。明度只決定淺色模式下的主色——深色模式下的主色會自動取相反的明度，否則亮色強調色在深色背景上會糊掉。明度的可調範圍不是從純黑到純白：那兩個極端等於沒有強調色。</string>
 
     <string name="msp_settings_language_note_system">選中的語言由系統記錄。在系統的「設定 → 應用程式 → MultiSuperPlayer → 語言」裡改也同樣是這一項，兩邊始終一致。</string>
     <string name="msp_settings_language_note_app_only">選中的語言只影響本應用程式。系統的日期、數字格式不跟著變；日期的顯示語言由系統設定決定。</string>
@@ -339,6 +356,21 @@
     <string name="msp_settings_subtitle_reset">恢復預設樣式</string>
     <string name="msp_settings_subtitle_reset_desc">字號、行距、描邊、底部距離一起恢復</string>
     <string name="msp_settings_subtitle_reset_already">目前就是預設樣式</string>
+
+    <!--
+      「清空翻譯快取」那一行。
+
+      它是快取**磁碟佔用的唯一出口**（快取全域共用，沒有別的入口碰得到它），所以文案
+      要交代清楚兩件事：清完之後有什麼代價（下次翻譯要重新付費）、什麼**不會**被清掉
+      （手動改過的譯文在另一個檔案裡）。少了第二句，凡是改過譯文的人都不敢清快取，
+      而那正是最需要清的人。
+    -->
+    <string name="msp_settings_section_translation_cache">翻譯快取</string>
+    <string name="msp_settings_cache_clear">清空翻譯快取</string>
+    <string name="msp_settings_cache_clearing">正在清空…</string>
+    <string name="msp_settings_cache_clear_action">清空</string>
+    <string name="msp_settings_cache_clear_title">清空翻譯快取？</string>
+    <string name="msp_settings_cache_help">快取的是「原文 → 譯文」的對應關係，用來避免同一句話重複付費。清空只刪這份快取；你手動修改過的譯文保存在另一個檔案裡，不會被刪掉。</string>
 
     <!-- ===== 語音辨識（本機 ASR） ===== -->
 

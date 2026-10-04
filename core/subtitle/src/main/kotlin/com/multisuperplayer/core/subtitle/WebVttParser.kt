@@ -4,6 +4,7 @@ import com.multisuperplayer.core.model.CuePosition
 import com.multisuperplayer.core.model.KaraokeSegment
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.internal.Timecode
 
 /**
@@ -18,7 +19,7 @@ class WebVttParser : SubtitleParser {
     override val format: SubtitleFormat = SubtitleFormat.VTT
 
     override fun parse(content: String): ParseResult {
-        val warnings = mutableListOf<String>()
+        val warnings = mutableListOf<MspText>()
         val cues = mutableListOf<SubtitleCue>()
         val metadata = mutableMapOf<String, String>()
 
@@ -37,7 +38,7 @@ class WebVttParser : SubtitleParser {
                         ?.let { metadata["header"] = it }
                     // 头部块里可能紧跟 NOTE/STYLE，继续处理剩余行
                 } else if (firstLine.isNotEmpty()) {
-                    warnings += "缺少 WEBVTT 头，按无头 VTT 解析"
+                    warnings += MspText.Res(R.string.msp_subtitle_warn_vtt_no_header)
                     seenHeader = true
                 }
             }
@@ -57,7 +58,7 @@ class WebVttParser : SubtitleParser {
                     val timingLine = block[timingLineIndex]
                     val range = Timecode.parseRange(timingLine)
                     if (range == null) {
-                        warnings += "时间码无法解析：${timingLine.take(60)}"
+                        warnings += MspText.Res(R.string.msp_subtitle_warn_bad_range, timingLine.take(60))
                         continue
                     }
                     val (startMs, endMsRaw) = range

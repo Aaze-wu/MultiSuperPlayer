@@ -9,7 +9,7 @@ import com.multisuperplayer.core.asr.AsrModelStatus
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.permissions.AppPermissions
 import com.multisuperplayer.core.data.permissions.PermissionSnapshot
 import com.multisuperplayer.core.data.power.KeepAliveAccess
@@ -18,6 +18,7 @@ import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
+import com.multisuperplayer.core.data.settings.CustomAccent
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
@@ -42,15 +43,20 @@ import com.multisuperplayer.core.translate.ConnectivityResult
 import com.multisuperplayer.core.translate.FailureText
 import com.multisuperplayer.core.translate.Glossary
 import com.multisuperplayer.core.translate.ModelListResult
+import com.multisuperplayer.core.translate.TranslationCacheStats
+import com.multisuperplayer.core.translate.TranslationCacheStore
 import com.multisuperplayer.core.translate.TranslationProbe
 import com.multisuperplayer.core.translate.TranslationTarget
 import com.multisuperplayer.core.translate.describeTranslationFailure
+import com.multisuperplayer.core.ui.theme.ArtworkAccent
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
+import com.multisuperplayer.core.ui.theme.customAccentColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -93,6 +99,25 @@ data class AsrEntryState(
 ) {
     val model: AsrModelInfo get() = settings.model
 }
+
+/**
+ * 「清空翻译缓存」那一行的全部状态。
+ *
+ * 三个字段一起更新，理由和 [AsrEntryState] 一样：分开成两个 Flow 会在清空完成的那几帧
+ * 里拼出「还剩 128 条」+「清空成功」这种自相矛盾的组合。
+ */
+data class TranslationCacheState(
+    val stats: TranslationCacheStats = TranslationCacheStats(entries = 0, bytes = 0L),
+    val busy: Boolean = false,
+    /**
+     * 上一次清空是否失败。
+     *
+     * 成功时**不留任何提示**：条数自己变成 0 了，「已清空」这三个字没有额外信息。
+     * 失败则相反——界面上除此之外没有任何迹象（按钮又能点、数字又没变），
+     * 不说就等於静默失败。
+     */
+    val failed: Boolean = false,
+)
 
 /**
  * 「字幕与翻译」页上本地模型那一行要的两个数。与 [AsrEntryState] 同构，理由也一样：
@@ -159,6 +184,15 @@ class SettingsViewModel(
      * ViewModel 里没有代价。
      */
     private val localModelLocator: LlmModelLocator,
+    /**
+     * 译文缓存。
+     *
+     * 「字幕与翻译」页上多了一行「清空翻译缓存」：它是**磁盘占用**的唯一出口
+     * （缓存全局共享、没有别的入口能碰到它）。这里只用得上两项能力：
+     * 读一下多大（[TranslationCacheStore.stats]）、删掉它（[TranslationCacheStore.clear]）。
+     * 注意它**不碰** `translation_edits/`——那是用户手动改过的译文。
+     */
+    private val translationCache: TranslationCacheStore,
     /**
      * 构建信息。设置入口页的「关于」那一行要显示版本号。
      *
@@ -239,6 +273,40 @@ class SettingsViewModel(
      */
     fun selectAccent(accent: MspAccent) = persist("强调色=${accent.id}") {
         themeSettings.selectAccent(accent.id)
+    }
+
+    /**
+     * 自定义强调色推导出来的四个种子色。null = 用户没自定义过（用预设）。
+     *
+     * 界面**不**读它：[AppearanceSettingsScreen] 拿的是
+     * [ThemeSettings.customAccent] 那组滑块位置，预览由自己算（要预览的正是
+     * 「还没保存的那一版」）。真正需要种子色的是 `MspTheme`，而它在整棵树的
+     * 最外层，由 App 那一层读这个 Flow 传下去。
+     *
+     * 推导只发生在写入之后（松手一次算一次），所以 `Eagerly` + `map` 足够；
+     * 拖动过程中的那些中间值根本不落盘。
+     */
+    val customAccentSeeds: StateFlow<ArtworkAccent?> = themeSettings.settings
+        .map { settings ->
+            settings.customAccent?.let { accent ->
+                customAccentColors(accent.hueDegrees, accent.saturation, accent.lightness)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * 保存自定义强调色（滑块松手时调用）。
+     *
+     * 与 [selectAccent] 一样会关掉两个取色开关，理由完全相同：优先级更高的东西
+     * 还开着的话，用户拖完滑块松手之后颜色不会变。
+     */
+    fun selectCustomAccent(accent: CustomAccent) = persist("自定义强调色=${accent.hueDegrees}") {
+        themeSettings.selectCustomAccent(accent)
+    }
+
+    /** 「回到预设强调色」：只删自定义色这一个键，预设 id 与两个取色开关都不动。 */
+    fun clearCustomAccent() = persist("自定义强调色=清除") {
+        themeSettings.clearCustomAccent()
     }
 
     fun setDynamicColor(enabled: Boolean) = persist("系统取色=$enabled") {
@@ -595,6 +663,51 @@ class SettingsViewModel(
         withContext(dispatchers.io) {
             localModelLocator.statusOf(LlmModelCatalog.byId(modelId))
         }
+
+    // ------------------------------------------------------------------ 译文缓存
+
+    private val translationCacheState = MutableStateFlow(TranslationCacheState())
+
+    /** 「清空翻译缓存」那一行的状态。见 [TranslationCacheState]。 */
+    val cacheState: StateFlow<TranslationCacheState> = translationCacheState.asStateFlow()
+
+    /**
+     * 重新读一次缓存的规模。
+     *
+     * 初值故意是「空空如也」而不是「正在读」：这一行无论读到什么都只是一句话，
+     * 而先是空白、再跳出一个数字，比直接显示「还没有缓存」更像抽了一下。
+     * 真正的读盘发生在这里，由界面在进入这一页（`ON_RESUME`）时调——
+     * **不能放在构造里**：这个 ViewModel 是应用启动时就被创建的（入口页也要用），
+     * 在冷启动第一帧上多一次读盘是白付的代价。
+     */
+    fun refreshCacheStats() {
+        viewModelScope.launch {
+            val stats = translationCache.stats()
+            // 顺手把 failed 清掉：离开这一页再回来时，上一次的失败已经不代表现在的状态了。
+            translationCacheState.update { it.copy(stats = stats, failed = false) }
+        }
+    }
+
+    /**
+     * 清空译文缓存。
+     *
+     * 重入保护：清空期间**按钮仍然可以点**（[SettingActionButtonRow] 没有禁用态，
+     * 而把按钮撤掉又会让状态文字那一行自己跳一下），第二次点击会去删一个正在被删的
+     * 东西——删不掉就报「清空失败」，而实际上第一次是成功的。所以这里直接忽略重复调用。
+     *
+     * 结果读回来而不是自己拼：删除成功与否只有磁盘知道，而 [TranslationCacheState.failed]
+     * 要的就是这份「磁盘说的」而不是「我们以为的」。
+     */
+    fun clearTranslationCache() {
+        viewModelScope.launch {
+            if (translationCacheState.value.busy) return@launch
+            translationCacheState.update { it.copy(busy = true, failed = false) }
+            val removed = translationCache.clear()
+            translationCacheState.update {
+                it.copy(stats = translationCache.stats(), busy = false, failed = !removed)
+            }
+        }
+    }
 
     /**
      * 写盘失败不能只吞掉——那会表现为「点了没反应」，而且**下次启动又变回去**，

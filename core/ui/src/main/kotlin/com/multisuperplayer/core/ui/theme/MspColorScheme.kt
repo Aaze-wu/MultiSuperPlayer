@@ -5,7 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.ui.R
 
 /**

@@ -19,21 +19,29 @@ import androidx.compose.ui.unit.dp
  *
  * ## 强调色的优先级
  *
- * 封面取色 > 系统取色（莫奈）> 用户选的预设。
+ * 封面取色 > 系统取色（莫奈）> 自定义 > 用户选的预设。
+ *
+ * 「自定义」排在预设前面，而不是替掉预设：用户选了自定义色之后预设 id 仍然留在
+ * 设置里，因为「回到预设强调色」应该回到他之前选的那个，而不是默认值。
  *
  * 两个「取色」开关的默认值见 [MspThemeDefaults]：**都是关**。
  * 默认关不是保守，而是因为这两个开关一旦默认打开，最上面那个「强调色」
  * 选择器就变成一个点了没反应的死控件——系统取色的优先级高于它，
  * 而 Android 12+ 上它又永远可用。
  *
- * 补齐这件事的是设置页：**选强调色时会主动关掉这两个开关**，
+ * 补齐这件事的是设置页：**选强调色（预设或自定义）时会主动关掉这两个开关**，
  * 因为那是一个明确的「我要这个颜色」。
  *
  * @param baseTheme 浅色 / 深色 / 纯黑 / 跟随系统。
- * @param accent 强调色预设；被 [useDynamicColor] 或 [colorFromArtwork] 覆盖。
+ * @param accent 强调色预设；被 [customAccent]、[useDynamicColor] 或
+ *   [colorFromArtwork] 覆盖。
  * @param useDynamicColor 是否启用「莫奈取色」，默认见 [MspThemeDefaults]。
  *   纯黑模式除外：系统取色会给出一堆深灰，正好破坏纯黑省的像素。
  * @param colorFromArtwork 是否用当前封面（[LocalArtworkAccentState] 里的值）取色。
+ * @param customAccent 用户自己拖出来的强调色，null = 没自定义过。
+ *   形状与 [ArtworkAccent] 相同（四个种子色），但它不是「封面取色」——
+ *   理由见 [ArtworkAccent] 的类注释：两者都是「不属于预设列表的颜色」，
+ *   而列表里多一个条目会让「用户选了哪个」和「现在用的是哪个」混成一个枚举。
  * @param content 内容。
  */
 @Composable
@@ -42,6 +50,7 @@ fun MspTheme(
     accent: MspAccent = MspAccent.DEFAULT,
     useDynamicColor: Boolean = MspThemeDefaults.USE_DYNAMIC_COLOR,
     colorFromArtwork: Boolean = MspThemeDefaults.COLOR_FROM_ARTWORK,
+    customAccent: ArtworkAccent? = null,
     content: @Composable () -> Unit,
 ) {
     val isDark = when (baseTheme) {
@@ -56,12 +65,16 @@ fun MspTheme(
 
     val context = LocalContext.current
     val androidDynamic = useDynamicColor && artwork == null && !oledBlack && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val colorScheme = remember(baseTheme, accent, isDark, androidDynamic, artwork) {
+    val colorScheme = remember(baseTheme, accent, isDark, androidDynamic, artwork, customAccent) {
         when {
             androidDynamic ->
                 if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
 
             artwork != null -> composeColorScheme(artwork, baseTheme, isDark)
+
+            // 自定义色和封面取色走的是同一个函数：拿到四个种子之后的拼装只有一份，
+            // 所以两者在纯黑基底、按钮文字对比度上的行为天然一致。
+            customAccent != null -> composeColorScheme(customAccent, baseTheme, isDark)
 
             else -> composeColorScheme(accent, baseTheme, isDark)
         }

@@ -5,6 +5,7 @@ import com.multisuperplayer.core.model.KaraokeSegment
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleStyleDef
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.internal.Timecode
 
 /**
@@ -41,7 +42,7 @@ class AssParser : SubtitleParser {
     )
 
     override fun parse(content: String): ParseResult {
-        val warnings = mutableListOf<String>()
+        val warnings = mutableListOf<MspText>()
         val metadata = mutableMapOf<String, String>()
         val styles = mutableMapOf<String, SubtitleStyleDef>()
         val rawEvents = mutableListOf<RawEvent>()
@@ -73,7 +74,7 @@ class AssParser : SubtitleParser {
                     parseStyle(fields)?.let { style ->
                         val name = style.name ?: "Default"
                         styles[name] = style
-                    } ?: run { warnings += "样式行缺少 Name 字段，已跳过" }
+                    } ?: run { warnings += MspText.Res(R.string.msp_subtitle_warn_ass_style_no_name) }
                 }
 
                 section.contains("events") -> if (key == "dialogue" || key == "comment") {
@@ -88,7 +89,11 @@ class AssParser : SubtitleParser {
         val resolvedX = playResX ?: DEFAULT_PLAY_RES_X
         val resolvedY = playResY ?: DEFAULT_PLAY_RES_Y
         if (playResX == null || playResY == null) {
-            warnings += "缺少 PlayResX/PlayResY，按 ${DEFAULT_PLAY_RES_X.toInt()}x${DEFAULT_PLAY_RES_Y.toInt()} 估算位置"
+            warnings += MspText.Res(
+                R.string.msp_subtitle_warn_ass_no_play_res,
+                DEFAULT_PLAY_RES_X.toInt(),
+                DEFAULT_PLAY_RES_Y.toInt(),
+            )
         }
 
         val defaultStyle = styles["default"]
@@ -174,10 +179,12 @@ class AssParser : SubtitleParser {
     private fun parseEvent(
         fields: Map<String, String>,
         isComment: Boolean,
-        warnings: MutableList<String>,
+        warnings: MutableList<MspText>,
     ): RawEvent? {
         val startMs = Timecode.toMillis(fields["start"]) ?: run {
-            warnings += "事件缺少可解析的 Start：${fields["start"]}"
+            // `orEmpty()`：字段真的缺失时以前会在界面上显示一个字符串 "null"
+            // （`${fields["start"]}` 的产物）——这里顺手修掉。
+            warnings += MspText.Res(R.string.msp_subtitle_warn_ass_event_no_start, fields["start"].orEmpty())
             return null
         }
         val endMs = Timecode.toMillis(fields["end"]) ?: (startMs + CuePostProcess.MIN_CUE_DURATION_MS)

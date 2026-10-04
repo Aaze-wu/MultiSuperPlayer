@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.data.settings
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.R
 
 /**

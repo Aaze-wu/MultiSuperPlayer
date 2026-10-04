@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 见 values/strings.xml：这里只有 MspText 自带的两条文案。 -->
+<resources>
+
+    <string name="msp_value_unknown">Unknown</string>
+
+    <string name="msp_joined">%1$s%2$s%3$s</string>
+
+</resources>

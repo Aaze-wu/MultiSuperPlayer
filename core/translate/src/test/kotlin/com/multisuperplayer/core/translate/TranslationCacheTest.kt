@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -116,6 +117,59 @@ class TranslationCacheTest {
         assertEquals(0, store.size())
         assertTrue(!file.exists())
         assertTrue(store.lookup(listOf("k1")).isEmpty())
+    }
+
+    @Test
+    fun `统计同时给条数与磁盘占用`() = runTest {
+        val file = File(tempDir(), "c.jsonl")
+        val store = TranslationCacheStore(file, TestDispatchers(testScheduler))
+        assertEquals(TranslationCacheStats(entries = 0, bytes = 0L), store.stats())
+
+        store.store(listOf(CacheEntry("k1", "a", "甲", 1)))
+        val stats = store.stats()
+        assertEquals(1, stats.entries)
+        // 报的必须是**磁盘上真正占的地方**，而不是「条数 × 估计值」：
+        // 用户点清空就是为了腾空间，估出来的数字在这里毫无说服力。
+        assertEquals(file.length(), stats.bytes)
+        assertTrue(stats.bytes > 0L, "写完一条之后不可能还是 0 字节")
+    }
+
+    @Test
+    fun `清空之后统计也归零`() = runTest {
+        val file = File(tempDir(), "c.jsonl")
+        val store = TranslationCacheStore(file, TestDispatchers(testScheduler))
+        store.store(listOf(CacheEntry("k1", "a", "甲", 1)))
+        // 再伪造一个「上次压缩改名失败留下的半成品」。它和主文件加起来才是真正占的地方。
+        val leftover = File(file.parentFile, file.name + TranslationCacheStore.TEMP_SUFFIX)
+        leftover.writeText("半成品")
+
+        assertTrue(store.clear(), "真的删掉了才返回 true")
+        assertTrue(
+            !leftover.exists(),
+            "临时文件也要一并删掉，否则「已清空」之后统计里还挂着一块体积",
+        )
+        assertEquals(TranslationCacheStats(entries = 0, bytes = 0L), store.stats())
+    }
+
+    @Test
+    fun `删不掉时不能把内存索引也一起清掉`() = runTest {
+        // 真实世界里的「删不掉」：路径上已经不是一个普通文件了。
+        // 这里用非空目录代扮（Windows 上 delete() 对非空目录返回 false）。
+        val file = File(tempDir(), "c.jsonl")
+        val store = TranslationCacheStore(file, TestDispatchers(testScheduler))
+        store.store(listOf(CacheEntry("k1", "a", "甲", 1)))
+        assertEquals(1, store.stats().entries)
+
+        assertTrue(file.delete())
+        assertTrue(file.mkdirs())
+        File(file, "占位").writeText("x")
+
+        assertFalse(store.clear(), "删不掉就必须如实返回 false，不能静默成功")
+        // 索引留着，界面才能诚实地说「还剩 1 条」。
+        // 以前这里是「删不掉也把索引清空」，于是界面显示「还没有缓存」、
+        // 而磁盘上的缓存还在、下次翻译照旧命中——用户唯一的结论是「这个按钮是假的」。
+        assertEquals(1, store.stats().entries)
+        assertEquals(mapOf("k1" to "甲"), store.lookup(listOf("k1")))
     }
 
     @Test

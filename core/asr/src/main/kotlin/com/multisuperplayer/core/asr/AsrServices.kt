@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.asr
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 一个云端识别服务商的预设。

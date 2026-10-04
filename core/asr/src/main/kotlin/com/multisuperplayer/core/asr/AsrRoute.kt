@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.asr
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 语音识别走哪条路：本机还是云端。

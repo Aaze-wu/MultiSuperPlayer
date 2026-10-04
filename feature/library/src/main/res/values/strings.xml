@@ -156,4 +156,72 @@
     <string name="msp_browser_up">上一层</string>
     <string name="msp_browser_back_sources">返回来源列表</string>
 
+    <!-- ============================================================
+         导出（播放记录 / 播放列表）
+         ============================================================
+         这里只有「这一次操作」的文案：按钮说什么、结果怎么说。
+         要写进导出文件的文案（表头、类型名、集合名）在 core:data 的 `msp_export_*` 里，
+         因为编码器在那个模块。**两个模块不能定义同一个键**：Android 合并资源时
+         同名 string 会静默互相覆盖，覆盖之后只是界面上的字变了，编译和测试都不报错。
+         所以这里的键名一律带 `_result_` 或动作名，与 core:data 那批不重叠。
+         ============================================================ -->
+    <!--
+      两个播放列表入口的图标说明**故意不一样**：一个导当前列表，一个导全部。
+      同一个图标说两件事等于没说明，而这两个动作的结果文件完全不同，
+      用户按错的那个会发现「导出的东西比我想要的多」。
+    -->
+    <string name="msp_playlists_export_open">导出这个播放列表</string>
+    <string name="msp_playlists_export_all">导出全部播放列表</string>
+    <string name="msp_recent_export">导出播放记录</string>
+    <!--
+      格式菜单里的那一项。%1$s 是格式名（CSV / JSON）。
+      写「导出为 CSV」而不是只写「CSV」：菜单项里孤零零一个「CSV」看不出是按它,
+      而这一项点下去紧接着就会弹系统保存框，选错格式的人会一路选到保存才发现。
+    -->
+    <string name="msp_export_as">导出为 %1$s</string>
+
+    <!-- %1$s：文件名；%2$d：条数 -->
+    <string name="msp_export_result_saved">已保存：%1$s（%2$d 条）</string>
+    <!-- %3$d：其中指向的文件已经不在了的条数。这个数必须说出来：它是这份导出里唯一「现在播不了」的部分。 -->
+    <string name="msp_export_result_saved_missing">已保存：%1$s（%2$d 条，其中 %3$d 条文件已不在）</string>
+    <!-- %1$s：失败原因（系统异常的 message 或类名） -->
+    <string name="msp_export_result_failed">导出失败：%1$s</string>
+    <!-- 写入器只回 false，没有原因可报，所以这句要把可能的原因自己说出来。 -->
+    <string name="msp_export_result_write_failed">导出失败，文件没有写进去（可能是权限或存储空间不足）</string>
+    <!-- 空表不导出（见 PlaybackExportState）：这句话只在「确实没东西」时说。 -->
+    <string name="msp_export_result_empty">没有可导出的内容</string>
+
+    <!--
+      导入（播放列表）。和导出同一条思路：入口只有一个，但它做的事其实不小
+      （整个文件里的每个列表各建一个），所以文案要把「输进去的是什么」说清楚。
+    -->
+    <string name="msp_playlists_import">导入播放列表</string>
+    <!--
+      接不到文件名的兜底列表名（个别 provider 的 DISPLAY_NAME 是空的）。
+      不用「未命名」：用户导完之后得在一堆列表里认出它，而「导入的播放列表」
+      才看得出它从哪来。
+    -->
+    <string name="msp_import_default_name">导入的播放列表</string>
+
+    <!-- 重名对话框。%1$s：列表名 -->
+    <string name="msp_import_ask_title">已存在同名列表</string>
+    <string name="msp_import_ask_desc">播放列表「%1$s」已经存在。\n合并：把文件里的条目加进已有的那个列表。\n新建：另建一个同名的新列表。</string>
+    <!-- %1$d：本次导入里重名的列表总数（含当前这一个）。只在多于一个时显示。 -->
+    <string name="msp_import_ask_remaining">本次导入共有 %1$d 个同名列表需要处理。</string>
+    <string name="msp_import_merge">合并</string>
+    <string name="msp_import_new">新建</string>
+    <!-- 勾上之后剩下的重名都不再问，直接按这一次的选择处理。 -->
+    <string name="msp_import_apply_all">剩下的都这样处理</string>
+
+    <!--
+      读文件失败的三句话必须分开。三种情况下用户要做的事完全不同：
+      重新选一次（权限跟着新 Uri 走）、换一个文件、或者只是重试。
+    -->
+    <string name="msp_import_error_permission">没有读取这个文件的权限。重新选一次文件通常会重新授权。</string>
+    <string name="msp_import_error_not_found">找不到这个文件，可能已被删除或移动。</string>
+    <!-- %1$s：底层原因 -->
+    <string name="msp_import_error_read">读取文件失败：%1$s</string>
+    <!-- 方案已经算好、写盘时才失败。和上面的「读不了」不是一回事。 -->
+    <string name="msp_import_error_save">导入失败，播放列表没有写进去（可能是存储空间不足）</string>
+
 </resources>

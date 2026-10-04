@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.llm
 
 import com.multisuperplayer.core.common.format.TimeFormat
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 一条可以下载到手机上、在设备上跑的文本生成模型。

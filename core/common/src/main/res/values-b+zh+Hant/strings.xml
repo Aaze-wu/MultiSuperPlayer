@@ -5,8 +5,6 @@
 -->
 <resources>
 
-    <string name="msp_value_unknown">未知</string>
-
     <string name="msp_row_device">裝置</string>
     <string name="msp_row_system">系統</string>
     <string name="msp_row_abi">CPU 架構</string>
@@ -22,9 +20,6 @@
     <string name="msp_wrapped_in_parens">%1$s（%2$s）</string>
 
     <string name="msp_appended_with_comma">%1$s，%2$s</string>
-
-    <!-- 黏接模板：`%2$s` 是呼叫方傳進來的分隔符。 -->
-    <string name="msp_joined">%1$s%2$s%3$s</string>
 
     <string name="msp_dirty_suffix">含未提交變更</string>
 

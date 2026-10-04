@@ -62,11 +62,15 @@ private const val ORDER_KEY = "order"
  *
  * 这个类被 [com.multisuperplayer.core.data.di.dataModule] 注册成单例、
  * 由界面层的 ViewModel 直接注入，所以类型必须是 public。
+ *
+ * 同时它也是 [PlaylistImportSink] 的生产实现：导入编排要的三个动作
+ * （问一次名字表 + 新建并装满 + 往已有的里追加）在这里各有一个方法，
+ * 理由见那个接口的注释。
  */
 class PlaylistStore(
     context: Context,
     private val dispatchers: DispatcherProvider,
-) {
+) : PlaylistImportSink {
 
     private val appContext = context.applicationContext
     private val store: DataStore<Preferences> get() = appContext.mspPlaylistStore
@@ -168,6 +172,108 @@ class PlaylistStore(
     suspend fun playlist(id: String): Playlist? = withContext(dispatchers.io) {
         PlaylistCodec.decode(prefsSnapshot()[playlistKey(id)])
     }
+
+    // ---------------------------------------------------------- 导入要用的三个
+
+    /**
+     * 现有的「名字 → id」。重名时取**列表页上排在前面的**那一个：
+     * [decodeAll] 已经按用户拖出来的顺序排好，所以「第一个」就是用户眼里
+     * 最像「那个列表」的那一个。
+     *
+     * 空名字的记录**不进表**：导入的文件里不可能有一个空名字，
+     * 让它进表只会让「导入的默认名字」平白撞上一个用户看不见的空列表。
+     */
+    override suspend fun nameIndex(): Map<String, String> = withContext(dispatchers.io) {
+        val index = LinkedHashMap<String, String>()
+        decodeAll(prefsSnapshot()).forEach { playlist ->
+            val name = PlaylistRules.sanitizeName(playlist.name)
+            if (name.isNotEmpty()) index.putIfAbsent(name, playlist.id)
+        }
+        index
+    }
+
+    /**
+     * 按计划把整个导入**一次写完**（一个 `DataStore.edit`）。
+     *
+     * ## 为什么一次写完
+     *
+     * - 分批写会留下「导了一半」的中间状态，而那种状态在界面上和「导完了」
+     *   长得一样（列表都出现了），于是没有人会去补它；
+     * - 一次写完才谈得上原子：写完之前进程死掉，库里一条都不多。
+     *
+     * ## 上限拿的是「写进去这一刻」的条数
+     *
+     * 而不是编排算方案时读到的那一份：方案算完到真正落盘之间用户可能又建了
+     * 几个列表（读文件、问重名、写盘都不是一瞬间）。真正算数的是此刻还剩多少位置，
+     * 所以这里在每个新建之前重新判断一次。
+     *
+     * ## 新列表的位置
+     *
+     * 直接把它们的 id 接到顺序序列**末尾**。不能靠创建时间碰运气：同一个 `edit`
+     * 里建的几个列表时间戳可能落在同一毫秒，那样它们的先后由随机 id 决定，
+     * 用户看到的顺序和导出文件里的顺序就不一样了。
+     */
+    override suspend fun apply(plans: List<PlaylistPlan>): PlaylistApplyResult =
+        withContext(dispatchers.io) {
+            if (plans.isEmpty()) return@withContext PlaylistApplyResult.Applied(0, 0, 0)
+            var created = 0
+            var createdItems = 0
+            var appendedItems = 0
+            val createdIds = ArrayList<String>(plans.size)
+            try {
+                store.edit { prefs ->
+                    val existingIds = decodeAll(prefs).map { it.id }
+                    var count = existingIds.size
+                    plans.forEach { plan ->
+                        when (plan) {
+                            is PlaylistPlan.Create -> {
+                                if (count >= PlaylistRules.MAX_PLAYLISTS) {
+                                    MspLog.w(TAG) {
+                                        "播放列表数量已达上限 ${PlaylistRules.MAX_PLAYLISTS}，导入时不再新建：${plan.name}"
+                                    }
+                                    return@forEach
+                                }
+                                val playlist = Playlist(
+                                    id = newId(),
+                                    name = PlaylistRules.sanitizeName(plan.name),
+                                    createdAtMs = System.currentTimeMillis(),
+                                    items = PlaylistRules.withAdded(emptyList(), plan.items),
+                                )
+                                prefs[playlistKey(playlist.id)] = PlaylistCodec.encode(playlist)
+                                createdIds += playlist.id
+                                count++
+                                created++
+                                createdItems += playlist.items.size
+                            }
+
+                            is PlaylistPlan.Append -> {
+                                val current =
+                                    PlaylistCodec.decode(prefs[playlistKey(plan.playlistId)]) ?: return@forEach
+                                val merged = PlaylistRules.withAdded(current.items, plan.items)
+                                appendedItems += merged.size - current.items.size
+                                prefs[playlistKey(plan.playlistId)] = PlaylistCodec.encode(current.copy(items = merged))
+                            }
+                        }
+                    }
+                    if (createdIds.isNotEmpty()) {
+                        prefs[orderKey] = PlaylistRules.encodeOrder(existingIds + createdIds)
+                    }
+                }
+            } catch (error: IOException) {
+                // 和 update 一样只吞 IOException，而且这里连计数一起丢掉：
+                // 报「导入了 3 个列表」而实际一个都没落盘，比报失败糟得多。
+                MspLog.w(TAG, error) { "导入播放列表失败" }
+                return@withContext PlaylistApplyResult.Failed
+            }
+            MspLog.d(TAG) {
+                "导入：新建 $created 个列表共 $createdItems 条，并入已有列表 $appendedItems 条"
+            }
+            PlaylistApplyResult.Applied(
+                created = created,
+                createdItems = createdItems,
+                appendedItems = appendedItems,
+            )
+        }
 
     // -------------------------------------------------------------- 内部
 

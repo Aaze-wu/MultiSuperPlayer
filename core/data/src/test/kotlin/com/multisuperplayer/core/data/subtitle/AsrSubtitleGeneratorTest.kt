@@ -2,6 +2,7 @@ package com.multisuperplayer.core.data.subtitle
 
 import com.multisuperplayer.core.asr.AsrSegment
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.SrtParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,7 +37,7 @@ class AsrSubtitleGeneratorTest {
         val parsed = SrtParser().parse(text)
 
         assertEquals(SubtitleFormat.SRT, parsed.format)
-        assertEquals("解析器不该有警告：${parsed.warnings}", emptyList<String>(), parsed.warnings)
+        assertEquals("解析器不该有警告：${parsed.warnings}", emptyList<MspText>(), parsed.warnings)
         assertEquals(
             listOf("你好，世界", "第二句话", "hello world"),
             parsed.cues.map { it.text },

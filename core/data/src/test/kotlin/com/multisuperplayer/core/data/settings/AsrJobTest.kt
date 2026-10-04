@@ -5,7 +5,7 @@ import com.multisuperplayer.core.asr.AsrModelCatalog
 import com.multisuperplayer.core.asr.AsrRoute
 import com.multisuperplayer.core.asr.AsrServices
 import com.multisuperplayer.core.asr.describeAsrFailure
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows

@@ -3,7 +3,7 @@
     資料層的介面文案。
 
     這個模組**自己不說人話**：所有要顯示的文字都按 MspText 交出去，由介面在
-    正確的語言下解析（見 core:common 的 MspText）。資料層只挑「該說哪一句」。
+    正確的語言下解析（見 core:model 的 MspText）。資料層只挑「該說哪一句」。
 -->
 <resources>
 
@@ -20,6 +20,11 @@
     <string name="msp_subtitle_reason_unparsable">無法解析這個字幕檔</string>
     <!-- %1$d：檔案大小（MB） -->
     <string name="msp_subtitle_reason_file_too_large">檔案太大（%1$d MB），可能不是字幕檔</string>
+
+    <!-- ============================================================
+         字幕：解析警告
+         ============================================================ -->
+    <string name="msp_subtitle_warn_charset_guessed">檔案不是 UTF-8，已按 %1$s 解碼；若顯示為亂碼請另存為 UTF-8 再試</string>
 
     <!-- ============================================================
          媒體庫
@@ -65,5 +70,48 @@
     <string name="msp_subtitle_style_margin_edge">貼邊</string>
     <string name="msp_subtitle_style_margin_raised">抬高</string>
     <string name="msp_subtitle_style_margin_high">很高</string>
+
+    <!-- 導出（播放記錄 / 播放清單）。理由見 values/strings.xml 的同一段說明。 -->
+    <string name="msp_export_format_csv">CSV</string>
+    <string name="msp_export_format_json">JSON</string>
+    <string name="msp_export_collection_recent">播放記錄</string>
+    <string name="msp_export_collection_playlists">播放清單</string>
+
+    <string name="msp_export_column_list">清單</string>
+    <string name="msp_export_column_index">序號</string>
+    <string name="msp_export_column_title">標題</string>
+    <string name="msp_export_column_artist">演出者</string>
+    <string name="msp_export_column_kind">類型</string>
+    <string name="msp_export_column_duration">時長</string>
+    <string name="msp_export_column_duration_ms">時長（毫秒）</string>
+    <string name="msp_export_column_position">播放位置</string>
+    <string name="msp_export_column_position_ms">播放位置（毫秒）</string>
+    <string name="msp_export_column_played_at">播放時間</string>
+    <string name="msp_export_column_file_state">檔案狀態</string>
+    <string name="msp_export_column_uri">路徑</string>
+    <string name="msp_export_column_media_id">媒體 ID</string>
+
+    <string name="msp_export_kind_audio">音訊</string>
+    <string name="msp_export_kind_video">影片</string>
+    <string name="msp_export_kind_unknown">未知</string>
+    <string name="msp_export_file_ok">正常</string>
+    <string name="msp_export_file_missing">檔案已不在</string>
+
+    <!-- 匯入（播放清單）。理由見 values/strings.xml 的同一段說明。 -->
+    <string name="msp_import_error_unrecognized">這個檔案不是本應用程式匯出的播放清單</string>
+    <string name="msp_import_error_missing_column">檔案裡找不到「%1$s」這一欄</string>
+    <string name="msp_import_error_broken_row">檔案第 %1$d 列的欄數和表頭對不上</string>
+
+    <string name="msp_import_result_created">新建 %1$d 個清單</string>
+    <string name="msp_import_result_merged">併入 %1$d 個現有清單</string>
+    <string name="msp_import_result_items">%1$d 條</string>
+    <string name="msp_import_result_with_notes">%1$s（%2$s）</string>
+    <string name="msp_import_result_nothing_happened">沒有匯入任何內容（%1$s）</string>
+    <string name="msp_import_result_nothing">檔案裡沒有可以匯入的播放清單</string>
+
+    <string name="msp_import_note_empty_playlists">%1$d 個清單沒有可用項目</string>
+    <string name="msp_import_note_items_without_id">%1$d 條沒有媒體 ID</string>
+    <string name="msp_import_note_duplicate_items">%1$d 條重複</string>
+    <string name="msp_import_note_full">清單數量已達上限 %1$d，%2$d 個未匯入</string>
 
 </resources>

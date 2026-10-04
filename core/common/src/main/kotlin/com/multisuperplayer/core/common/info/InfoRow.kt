@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.common.info
 
 import android.content.res.Resources
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 「关于」页 / 日志抬头里的一行「标签 : 值」。

@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.player
 
 import androidx.media3.common.PlaybackException
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

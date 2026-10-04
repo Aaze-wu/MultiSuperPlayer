@@ -168,6 +168,44 @@ class AppLanguageTest {
         )
     }
 
+    @Test
+    fun `撇号必须转义`() {
+        // aapt2 的规则：`<string>` 的值里出现裸撇号（`don't`）会**编译失败**，
+        // 除非整段值被一对双引号包住，或者写成 `\'`。（裸的**双引号**是合法的，
+        // 仓库里 `msp_keep_alive_switch_help` 就有，v1.0 的正式包能打出来——
+        // 所以这里只查撇号，多查一条会把一堆正确的文案判成错的。）
+        //
+        // 这条守卫值钱的地方在于**报错位置与报错内容都是误导的**：真正报错的是
+        // `:app:mergeDebugResources`（要 build 到 app 模块才会碰库模块的 values
+        // 编译，`:feature:xxx:testDebugUnitTest` 一路绿灯），而它的原话是
+        // 「Invalid unicode escape sequence in string」——把一撇号说成 unicode
+        // 转义，于是人会去查 `\u`，而那句文案里根本没有 `\u`。
+        // 只有拿 aapt2 直接编那个文件才会看到真话：`unescaped apostrophe in string`。
+        //
+        // 单测里没有 aapt2，只能锁**写法**：裸撇号不许出现。
+        val offenders = mutableListOf<String>()
+
+        stringsFiles().forEach { file ->
+            STRING_ENTRY.findAll(file.readText()).forEach { match ->
+                val raw = match.groupValues[2]
+                if (raw.isEmpty() || raw.isQuoted()) return@forEach
+                if (unescaped(raw, '\'').isEmpty()) return@forEach
+
+                val label = file.relativeTo(repoRoot()).invariantSeparatorsPath
+                offenders += "$label:${match.groupValues[1]} 里有裸撇号（写成 \\' 或把整段值包在双引号里）"
+            }
+        }
+
+        assertEquals("以下文案会让 aapt2 编译失败（而报错文案与原因完全无关）：", emptyList<String>(), offenders.sorted())
+    }
+
+    /** 整段值是否被一对双引号包住——aapt2 的「保持原样」写法，这里同时也是撇号的免死金牌。 */
+    private fun String.isQuoted(): Boolean = length >= 2 && first() == '"' && last() == '"'
+
+    /** [raw] 里所有**没有**反斜杠在前面的 [char] 的下标。 */
+    private fun unescaped(raw: String, char: Char): List<Int> =
+        raw.indices.filter { index -> raw[index] == char && (index == 0 || raw[index - 1] != '\\') }
+
     // ---------------------------------------------------------------------
 
     /**

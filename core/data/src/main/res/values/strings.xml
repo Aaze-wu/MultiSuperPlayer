@@ -3,7 +3,7 @@
     数据层的界面文案。
 
     这个模块**自己不说人话**：所有要显示的文字都按 MspText 交出去，由界面在
-    正确的语言下解析（见 core:common 的 MspText）。数据层只挑「该说哪一句」。
+    正确的语言下解析（见 core:model 的 MspText）。数据层只挑「该说哪一句」。
 -->
 <resources>
 
@@ -20,6 +20,17 @@
     <string name="msp_subtitle_reason_unparsable">无法解析这个字幕文件</string>
     <!-- %1$d：文件大小（MB） -->
     <string name="msp_subtitle_reason_file_too_large">文件太大（%1$d MB），可能不是字幕文件</string>
+
+    <!-- ============================================================
+         字幕：解析告警
+         ============================================================
+         解析器自己发现的毛病（跳过的坏行、格式判错）在 core:subtitle 里，
+         这里只有一条**只有读文件的人才知道**的：编码是猜的。
+         为什么必须说出来：Big5 字幕会被按 GB18030 解成「字形合法、内容全错」
+         的汉字，界面上看起来只是乱，看不出原因。
+         ============================================================ -->
+    <!-- %1$s：实际使用的字符集名（已由 SubtitleTextDecoding 归一化，如 GB18030 / Shift-JIS） -->
+    <string name="msp_subtitle_warn_charset_guessed">文件不是 UTF-8，已按 %1$s 解码；若显示为乱码请另存为 UTF-8 再试</string>
 
     <!-- ============================================================
          媒体库
@@ -74,5 +85,148 @@
     <string name="msp_subtitle_style_margin_edge">贴边</string>
     <string name="msp_subtitle_style_margin_raised">抬高</string>
     <string name="msp_subtitle_style_margin_high">很高</string>
+
+    <!-- ============================================================
+         导出（播放记录 / 播放列表）
+         ============================================================
+         这里放的是**要写进导出文件**的文案：表头、媒体类型、文件状态、集合名。
+
+         为什么在数据层而不是界面层：编码器（`PlaybackExport`）按语言取这些句子，
+         而编码器就住在 core:data。把句子留在界面层，数据层就得反向依赖界面——
+         分层里最不该出现的那种依赖。
+
+         关于「这一次导出」的文案（按钮、结果提示）不在这里，它们在 feature:library：
+         那些句子描述的是**操作**，不是文件的内容。
+         ============================================================ -->
+    <string name="msp_export_format_csv">CSV</string>
+    <string name="msp_export_format_json">JSON</string>
+    <!-- 集合名。也是「导出全部播放列表」时的文件名基础名。 -->
+    <string name="msp_export_collection_recent">播放记录</string>
+    <string name="msp_export_collection_playlists">播放列表</string>
+
+    <!-- CSV 表头。只有多个集合一起导时才会出现「列表」这一列，它排在最前面。 -->
+    <string name="msp_export_column_list">列表</string>
+    <string name="msp_export_column_index">序号</string>
+    <string name="msp_export_column_title">标题</string>
+    <string name="msp_export_column_artist">艺术家</string>
+    <string name="msp_export_column_kind">类型</string>
+    <string name="msp_export_column_duration">时长</string>
+    <!--
+      毫秒列是给表格软件排序用的：`05:31` 是文本，Excel 排不了它的序。
+      两列都留是刻意的，见 PlaybackExport 的类注释。
+    -->
+    <string name="msp_export_column_duration_ms">时长（毫秒）</string>
+    <string name="msp_export_column_position">播放位置</string>
+    <string name="msp_export_column_position_ms">播放位置（毫秒）</string>
+    <string name="msp_export_column_played_at">播放时间</string>
+    <string name="msp_export_column_file_state">文件状态</string>
+    <string name="msp_export_column_uri">路径</string>
+    <string name="msp_export_column_media_id">媒体 ID</string>
+
+    <string name="msp_export_kind_audio">音频</string>
+    <string name="msp_export_kind_video">视频</string>
+    <string name="msp_export_kind_unknown">未知</string>
+    <string name="msp_export_file_ok">正常</string>
+    <!--
+      播放列表里指向的文件已经查不到了。**这一行不能被丢掉**：队列里本来就保留着
+      这些失效项（见 PlaylistRows.queue），导出时静默删掉会让文件里少东西，
+      而导出播放列表的人多半就是想知道「哪些还能播」。
+    -->
+    <string name="msp_export_file_missing">文件已不在</string>
+
+    <!-- ============================================================
+         导入（播放列表）
+         ============================================================
+         这里放的是**读文件**时要说的话：报错，以及导入完之后那句总结。
+
+         和导出那段同样的理由放在数据层：判断这些情况的代码（认不认得出表头、
+         缺哪一列、有几条没有媒体 ID、到没到列表数量上限）全在 core:data，
+         句子跟着判断走才不会两边漂。界面层只负责念出来。
+         ============================================================ -->
+    <string name="msp_import_error_unrecognized">这个文件不是本应用导出的播放列表</string>
+    <!-- 参数是列名（用当前语言说）。 -->
+    <string name="msp_import_error_missing_column">文件里找不到「%1$s」这一列</string>
+    <!-- 参数是行号（从 1 开始、含表头那一行）。 -->
+    <string name="msp_import_error_broken_row">文件第 %1$d 行的列数和表头对不上</string>
+
+    <!--
+      导入完成后的总结。几个数字刻意**分开说**：新建了几个和并进了几个，
+      用户接下来要做的事完全不一样（后者改到了他已有的列表）。
+    -->
+    <string name="msp_import_result_created">新建 %1$d 个列表</string>
+    <string name="msp_import_result_merged">并入 %1$d 个已有列表</string>
+    <string name="msp_import_result_items">%1$d 条</string>
+    <string name="msp_import_result_with_notes">%1$s（%2$s）</string>
+    <string name="msp_import_result_nothing_happened">没有导入任何内容（%1$s）</string>
+    <!-- 文件读出来了，但里面没有能导入的列表。和「文件读不出来」必须分开说。 -->
+    <string name="msp_import_result_nothing">文件里没有可以导入的播放列表</string>
+
+    <string name="msp_import_note_empty_playlists">%1$d 个列表没有可用条目</string>
+    <string name="msp_import_note_items_without_id">%1$d 条没有媒体 ID</string>
+    <string name="msp_import_note_duplicate_items">%1$d 条重复</string>
+    <!-- 参数一是列表数量上限，参数二是这一次没能导入进去的个数。 -->
+    <string name="msp_import_note_full">列表数量已达上限 %1$d，%2$d 个未导入</string>
+
+    <!--
+      读 CSV 时要认出来的列名与类型写法：**三种已发布语言的写法放在同一个数组里**。
+
+      为什么不是一个语言一个数组：文件是「上一次导出」的产物，而那次导出可能是
+      另一种语言做的（换语言、换设备、别人给的文件），所以三种写法都要认，
+      和当前界面语言无关。
+
+      为什么 `translatable="false"`：数组的内容**本身就是**多语言，
+      再按语言翻译一遍只会把它拆碎。`PlaybackImportTest` 会检查
+      「导出的列名」和这里的别名一一对上，漏一种语言会红。
+    -->
+    <string-array name="msp_import_alias_list" translatable="false">
+        <item>列表</item>
+        <item>List</item>
+        <item>清單</item>
+    </string-array>
+    <string-array name="msp_import_alias_title" translatable="false">
+        <item>标题</item>
+        <item>Title</item>
+        <item>標題</item>
+    </string-array>
+    <string-array name="msp_import_alias_artist" translatable="false">
+        <item>艺术家</item>
+        <item>Artist</item>
+        <item>演出者</item>
+    </string-array>
+    <string-array name="msp_import_alias_kind" translatable="false">
+        <item>类型</item>
+        <item>Type</item>
+        <item>類型</item>
+    </string-array>
+    <string-array name="msp_import_alias_uri" translatable="false">
+        <item>路径</item>
+        <item>Path</item>
+        <item>路徑</item>
+    </string-array>
+    <string-array name="msp_import_alias_media_id" translatable="false">
+        <item>媒体 ID</item>
+        <item>Media ID</item>
+        <item>媒體 ID</item>
+    </string-array>
+    <string-array name="msp_import_alias_duration_ms" translatable="false">
+        <item>时长（毫秒）</item>
+        <item>Duration (ms)</item>
+        <item>時長（毫秒）</item>
+    </string-array>
+    <string-array name="msp_import_alias_kind_audio" translatable="false">
+        <item>音频</item>
+        <item>Audio</item>
+        <item>音訊</item>
+    </string-array>
+    <string-array name="msp_import_alias_kind_video" translatable="false">
+        <item>视频</item>
+        <item>Video</item>
+        <item>影片</item>
+    </string-array>
+    <string-array name="msp_import_alias_kind_unknown" translatable="false">
+        <item>未知</item>
+        <item>Unknown</item>
+        <item>未知</item>
+    </string-array>
 
 </resources>

@@ -1,7 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
 import com.multisuperplayer.core.data.update.UpdateFailureText
@@ -88,9 +88,9 @@ class UpdateSummariesTest {
         // （「我该不该按左边那个按钮」）。
         Assert.assertEquals(
             MspText.Res(
-                // `msp_joined` 在 core:common 里（`MspText.join` 的实现），
+                // `msp_joined` 在 core:model 里（`MspText.join` 的实现与它的源码同住），
                 // 跨模块只能写全名——本文件的 `R` 是 feature:settings 自己的那个。
-                com.multisuperplayer.core.common.R.string.msp_joined,
+                com.multisuperplayer.core.model.R.string.msp_joined,
                 listOf(
                     MspText.Res(R.string.msp_update_status_not_checked),
                     MspText.Plain(" · "),

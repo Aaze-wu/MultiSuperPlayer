@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.player
 
 import androidx.media3.common.PlaybackException
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 把 Media3 的错误码翻译成「用户看得懂 + 能据此行动」的文案。

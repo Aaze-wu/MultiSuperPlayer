@@ -35,8 +35,10 @@ dependencies {
     api(project(":core:model"))
     // HttpURLConnection 是 JDK/android.jar 自带的，所以这个模块**不引入任何 HTTP 依赖**：
     // 只多一个 kotlinx-serialization-json（版本目录里已经有）用来读写请求体与缓存。
-    // api 而不是 implementation：TranslationService / FailureText / SubtitleExportFormat
-    // 的公开签名里都有 core:common 的 MspText，消费方得能看见它。
+    // api 而不是 implementation：TranslationEngine 的构造签名里有 core:common 的
+    // DispatcherProvider，消费方（core:data 在 DI 里装配它）得能看见它。
+    // （TranslationService / FailureText / SubtitleExportFormat 里的 MspText 现在由
+    // 上面那条 core:model 提供——它俩原来是同一条 api 在兼顾。）
     api(project(":core:common"))
     // 设备上的那一路。本模块**不认识** LiteRT，只认识 `:core:llm` 的公开接口
     // (LlmTextGenerator / LlmModelCatalog)，真实现由 core:data 在 DI 里装配。

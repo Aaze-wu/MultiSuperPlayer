@@ -148,4 +148,11 @@
     <string name="msp_translate_export_mode_translation_only">仅译文</string>
     <string name="msp_translate_export_mode_bilingual">原文 + 译文</string>
 
+    <!-- ===== 译文缓存（设置页那一行） ===== -->
+
+    <string name="msp_translate_cache_empty">还没有缓存</string>
+    <string name="msp_translate_cache_stats">已缓存 %1$d 条译文 · %2$s</string>
+    <string name="msp_translate_cache_clear_failed">清空失败，还剩 %1$d 条（%2$s）</string>
+    <string name="msp_translate_cache_clear_confirm">会删掉 %1$d 条已缓存的译文（%2$s）。下次翻译同一批字幕要重新向服务商付费。你手动改过的译文保存在另一个文件里，不会被删掉。</string>
+
 </resources>

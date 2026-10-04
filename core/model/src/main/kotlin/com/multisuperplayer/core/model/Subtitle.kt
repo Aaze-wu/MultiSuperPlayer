@@ -1,5 +1,7 @@
 package com.multisuperplayer.core.model
 
+import com.multisuperplayer.core.model.text.MspText
+
 /**
  * 字幕 / 歌词的容器格式。
  *
@@ -8,7 +10,8 @@ package com.multisuperplayer.core.model
  * 见 `core:subtitle` 的 `SubtitleFormatDetector`。
  *
  * [displayName] 刻意是**中立的 ASCII 名**（格式自己的名字），不是给用户看的文案：
- * 本模块为了能被其它模块零成本依赖，不引用任何资源与工具类，
+ * 本模块除 `text/MspText` 自带的两条通用文案（`msp_value_unknown` / `msp_joined`）
+ * 之外不带任何资源、也不引用任何工具类，
  * 于是「LRC 歌词」这种要跟着语言走的说法只能放在界面层。
  * 界面层用 `SubtitleFormat.label()`（`feature:player`）拿到本地化后的文本。
  */
@@ -202,8 +205,12 @@ data class SubtitleDocument(
     /**
      * 非致命问题（跳过的坏行、重叠时间轴…）。
      * 刻意收集而不是抛异常：一行坏掉不该让整部片子没字幕。
+     *
+     * 是 [MspText] 而不是 `String`：这些句子会被**逐条列给用户看**
+     * （见 `SubtitleTrackPicker` 的告警区），硬编码的中文在英文界面里
+     * 既翻不了、也测不出来。
      */
-    val warnings: List<String> = emptyList(),
+    val warnings: List<MspText> = emptyList(),
 ) {
     val isEmpty: Boolean get() = cues.isEmpty()
 

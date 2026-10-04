@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.player
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.SubtitleCue
@@ -23,7 +23,7 @@ class SubtitleStateResolutionTest {
 
     private fun document(
         vararg cues: SubtitleCue,
-        warnings: List<String> = emptyList(),
+        warnings: List<MspText> = emptyList(),
     ) = SubtitleDocument(
         track = SubtitleTrack(id = "test"),
         cues = cues.toList(),
@@ -224,15 +224,17 @@ class SubtitleStateResolutionTest {
 
     @Test
     fun `解析告警要透到界面`() {
+        // 用 Plain 而不是 Res：这条测的是「透传」，不是「资源 id 对不对」。
+        val warning = MspText.Plain("跳过了 3 行坏数据")
         val state = resolveSubtitleState(
             load = loaded(
-                document(cue(0, "Hello"), warnings = listOf("跳过了 3 行坏数据")),
+                document(cue(0, "Hello"), warnings = listOf(warning)),
                 hasTranslation = false,
             ),
             displayMode = SubtitleDisplayMode.ORIGINAL_ONLY,
         )
 
-        assertEquals(listOf("跳过了 3 行坏数据"), state.warnings)
+        assertEquals(listOf(warning), state.warnings)
     }
 
     // ------------------------------------------------------------ 译文判定

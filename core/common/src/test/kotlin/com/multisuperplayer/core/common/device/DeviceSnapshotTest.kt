@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.common.device
 
 import com.multisuperplayer.core.common.R
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -45,7 +45,8 @@ class DeviceSnapshotTest {
         languageTag = languageTag,
     )
 
-    private val unknown: MspText = MspText.Res(R.string.msp_value_unknown)
+    // 见 `AppBuildInfoTest.unknown`：那条资源在 core:model，所以直接拿共享的兜底词。
+    private val unknown: MspText = MspText.unknown()
 
     // ------------------------------------------------------------------ 机型
 

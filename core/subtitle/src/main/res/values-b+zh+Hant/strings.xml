@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    字幕解析器自己說的兩句話：**解析警告**（不致命，跳幾行照樣播）與
+    **解析失敗的原因**（致命，整份字幕讀不出來）。
+
+    key 必須與 values/ 和 values-en/ 完全一致（`SubtitleStringsTest` 的守衛）。
+-->
+<resources>
+
+    <!-- ============================================================
+         ASS / SSA
+         ============================================================ -->
+    <string name="msp_subtitle_warn_ass_style_no_name">樣式行缺少 Name 欄位，已略過</string>
+    <string name="msp_subtitle_warn_ass_no_play_res">缺少 PlayResX/PlayResY，按 %1$dx%2$d 估算位置</string>
+    <string name="msp_subtitle_warn_ass_event_no_start">事件缺少可解析的 Start：%1$s</string>
+
+    <!-- ============================================================
+         LRC / 增強型 LRC
+         ============================================================ -->
+    <string name="msp_subtitle_warn_lrc_unknown_line">無法辨識的行：%1$s</string>
+    <string name="msp_subtitle_warn_lrc_tag_not_first">時間標籤前有內容，已忽略該行：%1$s</string>
+    <string name="msp_subtitle_warn_lrc_merge_overflow">時間碼 %1$dms 上有 %2$d 行文字，未做雙語合併</string>
+
+    <!-- ============================================================
+         SRT / WebVTT
+         ============================================================ -->
+    <string name="msp_subtitle_warn_srt_unknown_block">略過無法辨識的時間碼區塊：%1$s</string>
+    <string name="msp_subtitle_warn_bad_range">時間碼無法解析：%1$s</string>
+    <string name="msp_subtitle_warn_srt_end_before_start">第 %1$d 條結束時間早於開始時間，已按開始時間 + 1 秒修正</string>
+    <string name="msp_subtitle_warn_vtt_no_header">缺少 WEBVTT 標頭，按無標頭 VTT 解析</string>
+
+    <!-- ============================================================
+         TTML / DFXP
+         ============================================================ -->
+    <string name="msp_subtitle_warn_ttml_root_not_tt">根元素是 &lt;%1$s&gt;，不是 &lt;tt&gt;，仍按 TTML 盡力解析</string>
+    <string name="msp_subtitle_warn_ttml_p_no_begin">略過缺少 begin 的 &lt;p&gt; 元素</string>
+    <string name="msp_subtitle_warn_ttml_p_no_end">&lt;p begin=%1$d&gt; 沒有有效結束時間，已按 2 秒頂替</string>
+    <string name="msp_subtitle_warn_ttml_xml_failed">XML 解析失敗：%1$s</string>
+
+    <!-- ============================================================
+         統一入口：格式判定與失敗原因
+         ============================================================ -->
+    <string name="msp_subtitle_warn_format_mismatch">格式判定為 %1$s 但內容更像 %2$s，已按 %2$s 解析</string>
+    <string name="msp_subtitle_error_empty">字幕內容為空</string>
+    <string name="msp_subtitle_error_unparsable">無法解析字幕（判定格式：%1$s；已嘗試：%2$s）</string>
+    <string name="msp_subtitle_error_lrc_no_timestamps">LRC 中沒有找到任何可解析的時間標籤</string>
+    <string name="msp_subtitle_error_ttml_no_root">TTML 檔案沒有根元素</string>
+    <string name="msp_subtitle_error_ttml_not_xml">TTML 不是合法 XML：%1$s</string>
+
+</resources>

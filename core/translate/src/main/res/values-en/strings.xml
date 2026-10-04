@@ -122,4 +122,11 @@
     <string name="msp_translate_export_mode_translation_only">Translation only</string>
     <string name="msp_translate_export_mode_bilingual">Original + translation</string>
 
+    <!-- ===== Translation cache (the row on the settings page) ===== -->
+
+    <string name="msp_translate_cache_empty">Nothing cached yet</string>
+    <string name="msp_translate_cache_stats">%1$d translations cached · %2$s</string>
+    <string name="msp_translate_cache_clear_failed">Could not clear: %1$d translations (%2$s) are still there</string>
+    <string name="msp_translate_cache_clear_confirm">This deletes %1$d cached translations (%2$s). Translating the same subtitles again will be billed again. Translations you edited by hand are stored in another file and are kept.</string>
+
 </resources>

@@ -17,6 +17,8 @@ import com.multisuperplayer.core.data.library.MediaStoreScanner
 import com.multisuperplayer.core.data.library.SafTreeScanner
 import com.multisuperplayer.core.data.library.SafTreeStore
 import com.multisuperplayer.core.data.permissions.AppPermissions
+import com.multisuperplayer.core.data.playlist.PlaylistImportSink
+import com.multisuperplayer.core.data.playlist.PlaylistImporter
 import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.data.power.KeepAliveAccess
 import com.multisuperplayer.core.data.settings.ApiKeyStore
@@ -30,7 +32,8 @@ import com.multisuperplayer.core.data.subtitle.AsrSubtitleGenerator
 import com.multisuperplayer.core.data.subtitle.FileSystemSubtitleLocator
 import com.multisuperplayer.core.data.subtitle.GeneratedSubtitleStore
 import com.multisuperplayer.core.data.subtitle.SafSubtitleLocator
-import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
+import com.multisuperplayer.core.data.export.TextExportWriter
+import com.multisuperplayer.core.data.export.TextImportReader
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import com.multisuperplayer.core.data.update.GitHubReleasesSource
@@ -120,6 +123,18 @@ val dataModule = module {
     // 混进 msp_settings 会拖慢用户设置的写入。
     single { PlaylistStore(context = androidContext(), dispatchers = get()) }
 
+    /**
+     * 导入那条路的入口（`PlaylistImporter` 收的是接口，为的是能单测，见它的类注释）。
+     *
+     * 显式绑一次接口，而不是指望「按实现类注册的也能按接口取到」——和
+     * `TranslateModule` 里 `TranslationRunner` 那条是同一条教训，这里就真踩了一脚：
+     * 少了这一行，点开「播放列表」页当场崩
+     * （`NoDefinitionFoundException: No definition found for type 'PlaylistImportSink'`），
+     * 而 `:feature:library:testDebugUnitTest` 全绿——单测注入的是 FakeSink，从不经过 Koin。
+     * 转发式注册（而不是再 new 一个）保证两条路拿到的是同一个实例。
+     */
+    single<PlaylistImportSink> { get<PlaylistStore>() }
+
     // API Key 加密存起来（AndroidKeyStore + AES/GCM），密文进 msp_settings 这个 DataStore。
     single { ApiKeyStore(context = androidContext(), dispatchers = get()) }
 
@@ -147,8 +162,18 @@ val dataModule = module {
     // 连 `Context` 都不需要，所以它也是这一层里唯一能真单测的。
     single { FileSystemSubtitleLocator() }
 
-    // 导出译文用。走 SAF，不申请存储权限。
-    single { SubtitleExportWriter(context = androidContext(), dispatchers = get()) }
+    // 所有「把一段文本存成文件」的出口都走它：导出译文、导出播放记录、导出播放列表。
+    // 走 SAF，不申请存储权限。做成一个单例而不是三个：写入器没有状态，
+    // 而三份实例的唯一区别只可能是「其中两份的 bug 还没修」。
+    single { TextExportWriter(context = androidContext(), dispatchers = get()) }
+
+    // 反过来那一个：把用户选中的文件读成一段文本（导入播放列表）。
+    // 和 TextExportWriter 分开、而不是合成一个读写类：失败分类完全不同
+    // （写只有「写不进去」，读有权限/找不到/其它三种），见它的类注释。
+    single { TextImportReader(context = androidContext(), dispatchers = get()) }
+
+    // 「文件里读出来的东西 → 怎么写下去」的编排。无状态，只是把 sink 包了一层判断。
+    single { PlaylistImporter(sink = get()) }
 
     // 应用自己生成的字幕（语音识别）存在这里，理由见类注释：
     // 放在私有目录而不是片子旁边，因为对那个目录没有写权限。

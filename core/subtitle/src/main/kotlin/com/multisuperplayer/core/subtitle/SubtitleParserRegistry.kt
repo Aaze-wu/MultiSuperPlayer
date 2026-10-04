@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.subtitle
 
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 统一入口：内容 → [ParseResult]。
@@ -29,7 +30,7 @@ class SubtitleParserRegistry(
     ): ParseResult {
         val normalized = SubtitleText.normalizeNewlines(content)
         if (normalized.isBlank()) {
-            throw SubtitleParseException("字幕内容为空")
+            throw SubtitleParseException(MspText.Res(R.string.msp_subtitle_error_empty))
         }
 
         val detected = hint
@@ -49,14 +50,22 @@ class SubtitleParserRegistry(
             val result = runCatching { parser.parse(normalized) }.getOrNull() ?: continue
             if (result.cues.isNotEmpty()) {
                 return result.copy(
-                    warnings = result.warnings + "格式判定为 $detected 但内容更像 ${result.format}，已按 ${result.format} 解析",
+                    warnings = result.warnings + MspText.Res(
+                        R.string.msp_subtitle_warn_format_mismatch,
+                        detected.name,
+                        result.format.name,
+                    ),
                 )
             }
             attempts += parser.format.name
         }
 
         throw SubtitleParseException(
-            "无法解析字幕（判定格式：$detected；已尝试：${(attempts + detected.name).joinToString()}）",
+            MspText.Res(
+                R.string.msp_subtitle_error_unparsable,
+                detected.name,
+                (attempts + detected.name).joinToString(),
+            ),
         )
     }
 

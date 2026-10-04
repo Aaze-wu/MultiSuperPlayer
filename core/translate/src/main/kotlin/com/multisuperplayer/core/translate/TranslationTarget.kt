@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.translate
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 译文的目标语言。

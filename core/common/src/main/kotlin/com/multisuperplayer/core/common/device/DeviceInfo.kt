@@ -6,7 +6,7 @@ import android.util.DisplayMetrics
 import android.view.WindowManager
 import com.multisuperplayer.core.common.R
 import com.multisuperplayer.core.common.info.InfoRow
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import java.util.Locale
 
 /**

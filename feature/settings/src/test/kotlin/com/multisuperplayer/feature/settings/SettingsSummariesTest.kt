@@ -7,9 +7,10 @@ import com.multisuperplayer.core.asr.AsrModelInfo
 import com.multisuperplayer.core.asr.AsrModelStatus
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.log.LogSummary
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
+import com.multisuperplayer.core.data.settings.CustomAccent
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -127,6 +128,39 @@ class SettingsSummariesTest {
         // 用户自己就没想要系统取色，说「未生效」是在报告一个不存在的问题。
         assertText(
             "深色 · 靛蓝",
+            SettingsSummaries.appearance(theme, systemColorSupported = true),
+        )
+    }
+
+    @Test
+    fun `外观 - 自定义强调色时报自定义而不是预设名`() {
+        // 用户拖完滑块回到设置首页，这一行是他判断「到底存下来没有」的唯一依据。
+        // 报预设名的话他会以为自己的设置没生效，然后再拖一遍。
+        val theme = ThemeSettings(
+            baseThemeId = "dark",
+            accentId = "teal",
+            customAccent = CustomAccent(210f, 0.6f, 0.5f),
+        )
+
+        assertText(
+            "深色 · 自定义",
+            SettingsSummaries.appearance(theme, systemColorSupported = true),
+        )
+    }
+
+    @Test
+    fun `外观 - 自定义色与取色开关同时开着时两者都说`() {
+        // 取色来源的优先级在自定义色之上，所以此刻真正生效的是封面取色。
+        // 两条都说才是诚实的：自定义色**存着**（不报它，用户会以为白拖了），
+        // 但此刻生效的是另一个（不报它，用户会对着一个没生效的颜色调一整天）。
+        // 这和「跟随系统 · 靛蓝 · 封面取色」写的是同一件事，只是颜色来自滑块。
+        val theme = ThemeSettings(
+            colorFromArtwork = true,
+            customAccent = CustomAccent(210f, 0.6f, 0.5f),
+        )
+
+        assertText(
+            "跟随系统 · 自定义 · 封面取色",
             SettingsSummaries.appearance(theme, systemColorSupported = true),
         )
     }
@@ -739,6 +773,8 @@ class SettingsSummariesTest {
         "feature/settings/src/main/res/values",
         "core/ui/src/main/res/values",
         "core/common/src/main/res/values",
+        // 连接符（`msp_joined`）跟着 `MspText` 住在 core:model
+        "core/model/src/main/res/values",
         "core/translate/src/main/res/values",
         "core/data/src/main/res/values",
         "core/player/src/main/res/values",
@@ -769,6 +805,7 @@ class SettingsSummariesTest {
             com.multisuperplayer.feature.settings.R.string::class.java,
             com.multisuperplayer.core.ui.R.string::class.java,
             com.multisuperplayer.core.common.R.string::class.java,
+            com.multisuperplayer.core.model.R.string::class.java,
             com.multisuperplayer.core.translate.R.string::class.java,
             com.multisuperplayer.core.data.R.string::class.java,
             com.multisuperplayer.core.player.R.string::class.java,

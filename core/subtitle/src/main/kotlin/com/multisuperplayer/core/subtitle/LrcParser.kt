@@ -3,6 +3,7 @@ package com.multisuperplayer.core.subtitle
 import com.multisuperplayer.core.model.KaraokeSegment
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.internal.Timecode
 
 /**
@@ -41,7 +42,7 @@ class LrcParser(
     )
 
     override fun parse(content: String): ParseResult {
-        val warnings = mutableListOf<String>()
+        val warnings = mutableListOf<MspText>()
         val metadata = mutableMapOf<String, String>()
         val rawPoints = mutableListOf<RawPoint>()
 
@@ -60,14 +61,14 @@ class LrcParser(
             val timeTags = TIME_TAG.findAll(line).toList()
             if (timeTags.isEmpty()) {
                 if (line.isNotEmpty() && !line.startsWith("[")) {
-                    warnings += "无法识别的行：${line.take(40)}"
+                    warnings += MspText.Res(R.string.msp_subtitle_warn_lrc_unknown_line, line.take(40))
                 }
                 continue
             }
             // 标签必须聚在行首，中间夹正文说明这不是 LRC 行。
             val bodyStart = timeTags.last().range.last + 1
             if (timeTags.first().range.first != 0) {
-                warnings += "时间标签前有内容，已忽略该行：${line.take(40)}"
+                warnings += MspText.Res(R.string.msp_subtitle_warn_lrc_tag_not_first, line.take(40))
                 continue
             }
 
@@ -80,7 +81,7 @@ class LrcParser(
         }
 
         if (rawPoints.isEmpty()) {
-            throw SubtitleParseException("LRC 中没有找到任何可解析的时间标签")
+            throw SubtitleParseException(MspText.Res(R.string.msp_subtitle_error_lrc_no_timestamps))
         }
 
         val offsetMs = metadata["offset"]?.let(::normalizeOffset) ?: 0L
@@ -184,7 +185,7 @@ class LrcParser(
      * 但列表**到此结束**时 `getOrNull` 返回 null，`null != startMs` 成立，
      * 于是三行里最后两行照样被合并——测试断言 `cues.size == 3` 才把它抓出来。
      */
-    private fun mergeTranslations(cues: List<SubtitleCue>, warnings: MutableList<String>): List<SubtitleCue> {
+    private fun mergeTranslations(cues: List<SubtitleCue>, warnings: MutableList<MspText>): List<SubtitleCue> {
         if (cues.size < 2) return cues
         val result = mutableListOf<SubtitleCue>()
         var i = 0
@@ -198,7 +199,11 @@ class LrcParser(
                     result += current.copy(translation = cues[i + 1].text)
                 }
                 runLength > 2 -> {
-                    warnings += "时间码 ${current.startMs}ms 上有 $runLength 行文本，未做双语合并"
+                    warnings += MspText.Res(
+                        R.string.msp_subtitle_warn_lrc_merge_overflow,
+                        current.startMs,
+                        runLength,
+                    )
                     for (k in i until runEnd) result += cues[k]
                 }
                 else -> result += current

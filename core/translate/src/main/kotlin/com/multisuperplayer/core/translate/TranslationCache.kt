@@ -1,8 +1,10 @@
 package com.multisuperplayer.core.translate
 
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
+import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.SubtitleCue
+import com.multisuperplayer.core.model.text.MspText
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -19,6 +21,60 @@ data class CacheEntry(
     val translation: String,
     val atMillis: Long,
 )
+
+/**
+ * 缓存的规模：条数 + 磁盘占用。
+ *
+ * 两个数一起给，而不是只给条数：用户点「清空」真正想知道的是「这东西占了我多少地方」，
+ * 而条数说不清这件事——同样 500 条，一句「嗯」和一句 40 字的台词差几十倍。
+ *
+ * 文案（[describe] / [describeClearFailure] / [describeClearConfirmation]）
+ * 和数字放在同一个类里，而不是搬到设置页去拼：这三句话的每个参数都由这两个数算出来，
+ * 分开之后「条数为 0 时说什么」这类分支就会在界面里再写一遍（然后写漏）。
+ * 这也意味着它们可以在一份纯 JVM 单测里被断言（见 `TranslationCacheTextTest`）。
+ */
+data class TranslationCacheStats(
+    val entries: Int,
+    val bytes: Long,
+) {
+
+    /** 没有缓存可清。界面据此**不显示**「清空」按钮，而不是把按钮置灰。 */
+    val isEmpty: Boolean get() = entries <= 0
+
+    /**
+     * 「已缓存 128 条译文 · 1.2 MB」/「还没有缓存」。
+     *
+     * 体积用 [TimeFormat.fileSize]（`1.2 GB` / `340 MB`）：和语音识别/本地模型那两页
+     * 的「模型多大」是同一个格式，用户在上下来回看时数字长得一样。
+     */
+    fun describe(): MspText = if (isEmpty) {
+        MspText.Res(R.string.msp_translate_cache_empty)
+    } else {
+        MspText.Res(R.string.msp_translate_cache_stats, entries, TimeFormat.fileSize(bytes))
+    }
+
+    /**
+     * 删除失败时的说法。
+     *
+     * **必须把「还剩多少」说出来**，而且必须和 [describe] 长得不一样：
+     * 只写「清空失败」的话，用户会把它当成一句无关痛痒的提示，而缓存其实还在、
+     * 下次翻译还会命中——真正的失败现象是「我明明清过了，怎么还是没花钱」。
+     */
+    fun describeClearFailure(): MspText =
+        MspText.Res(R.string.msp_translate_cache_clear_failed, entries, TimeFormat.fileSize(bytes))
+
+    /**
+     * 清空前的确认句：要删多少、删了有什么代价、什么不会被删。
+     *
+     * 三件事一件都不能少：
+     * - **代价**（下次要重新付费）——这是用户按下去之后会后悔的那个点；
+     * - **数量**（会删掉 N 条）——没有数字的确认对话框只是让人多点一下；
+     * - **不会被删的东西**（手动改过的译文）——这句话是用户敢不敢按的关键，
+     *   少了它，凡是改过译文的人都不敢清缓存（而那正是最需要清的人）。
+     */
+    fun describeClearConfirmation(): MspText =
+        MspText.Res(R.string.msp_translate_cache_clear_confirm, entries, TimeFormat.fileSize(bytes))
+}
 
 /**
  * 缓存文件（JSONL）的行编解码。纯函数。
@@ -181,14 +237,47 @@ class TranslationCacheStore(
         mutex.withLock { ensureLoaded().size }
     }
 
-    suspend fun clear() = withContext(dispatchers.io) {
+    /**
+     * 当前缓存规模。给设置页的「清空翻译缓存」那一行用。
+     *
+     * 走 [ensureLoaded]，顺带做一次「文件超大就重建」的自检：打开设置页时
+     * 就把它处理掉，比等下次翻译时才发现好。代价是把缓存读进内存
+     * （上限 [MAX_CACHE_BYTES]），而翻译过的会话里它本来就已经在内存里了。
+     */
+    suspend fun stats(): TranslationCacheStats = withContext(dispatchers.io) {
         mutex.withLock {
-            runCatching { if (file.exists()) file.delete() }
-                .onFailure { MspLog.w(TAG, it) { "清空缓存失败" } }
+            TranslationCacheStats(ensureLoaded().size, onDiskBytes())
+        }
+    }
+
+    /**
+     * 删掉缓存并清空内存索引。**返回是否真的删掉了。**
+     *
+     * 失败时**不清索引**：以前这里是「删不掉也照样把索引清空」，于是界面显示
+     * 「已清空」、下次翻译却全部命中旧缓存（钱是省了，但用户唯一的结论是
+     * 「这个按钮是假的」）。索引留着，界面才能诚实地告诉他「还剩 128 条」。
+     *
+     * 不碰 `translation_edits/`：那是用户手动改过的译文，是**内容**不是缓存。
+     * 清缓存顺便把人工校对的成果也清掉，等于把用户几小时的活一次抹平，
+     * 而他从确认对话框里的那句「清空缓存」根本想不到会这样。
+     */
+    suspend fun clear(): Boolean = withContext(dispatchers.io) {
+        mutex.withLock {
+            // 顺手删掉上次压缩失败留下的临时文件：它和主文件加起来才是真正占的地方，
+            // 留着它会让「已清空」之后统计里还挂着一块体积。
+            val removed = listOf(file, tempFile())
+                .filter { it.exists() }
+                .map { target ->
+                    runCatching { target.delete() }
+                        .onFailure { MspLog.w(TAG, it) { "清空缓存失败：${target.absolutePath}" } }
+                        .getOrDefault(false)
+                }
+                .all { it }
+            if (!removed) return@withLock false
             index = mutableMapOf()
             linesOnDisk = 0
+            true
         }
-        Unit
     }
 
     // ---------------------------------------------------------------- 内部
@@ -222,8 +311,13 @@ class TranslationCacheStore(
     private fun compactThreshold(size: Int): Int =
         maxOf(MIN_COMPACT_LINES, size + size / 2)
 
+    /** 真正占的字节数：主文件 + 上次压缩留下的临时文件（见 [compact]）。 */
+    private fun onDiskBytes(): Long = file.length() + tempFile().length()
+
+    private fun tempFile(): File = File(file.parentFile, file.name + TEMP_SUFFIX)
+
     private fun compact(entries: Collection<CacheEntry>) {
-        val temp = File(file.parentFile, file.name + ".tmp")
+        val temp = tempFile()
         temp.writeText(
             entries.joinToString(separator = "\n", postfix = "\n") {
                 TranslationCacheCodec.encodeLine(it)
@@ -243,6 +337,9 @@ class TranslationCacheStore(
 
     companion object {
         const val FILE_NAME = "translation_cache.jsonl"
+
+        /** 压缩时用的临时文件后缀（[compact] 与 [onDiskBytes] 必须用同一个）。 */
+        const val TEMP_SUFFIX = ".tmp"
 
         /** 超过这个体积就直接重建。8 MB ≈ 数万条译文，正常远达不到。 */
         const val MAX_CACHE_BYTES = 8L * 1024 * 1024

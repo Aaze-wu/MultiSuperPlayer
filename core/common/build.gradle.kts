@@ -35,6 +35,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.core.ktx)
 
+    // 设备/构建/时长这些纯函数返回的是 MspText，**它在 core:model 里**，
+    // 而 MspText 是对外可见的返回类型，所以必须是 api。
+    api(project(":core:model"))
+
     // 所有模块的 Koin module 都声明在这里依赖的 DSL 上，
     // 因此以 api 暴露，避免每个模块重复声明 DI 依赖。
     api(libs.koin.core)

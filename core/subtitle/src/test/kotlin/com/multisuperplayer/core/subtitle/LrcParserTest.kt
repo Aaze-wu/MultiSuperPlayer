@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.subtitle
 
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -108,9 +109,12 @@ class LrcParserTest {
 
         assertEquals(3, result.cues.size)
         assertTrue(result.cues.none { it.translation != null })
-        assertTrue(
-            result.warnings.any { it.contains("未做双语合并") },
-            "三行同时刻应当给出告警，实际：${result.warnings}",
+        // 告警现在是一条**能翻译**的 MspText（资源 id + 参数），不再是拼好的中文句子。
+        // 只断言「有告警」会漏掉「告警里又写回一句硬编码中文」这种退化——
+        // 那正是这次改造要消除的东西，所以这里钉死 id 与两个参数。
+        assertEquals(
+            MspText.Res(R.string.msp_subtitle_warn_lrc_merge_overflow, 10_000L, 3),
+            result.warnings.single(),
         )
     }
 

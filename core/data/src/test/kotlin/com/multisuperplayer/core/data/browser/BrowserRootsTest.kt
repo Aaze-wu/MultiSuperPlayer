@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.data.browser
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.model.SafTreeInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

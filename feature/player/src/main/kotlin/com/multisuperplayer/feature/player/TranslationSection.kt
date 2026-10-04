@@ -21,7 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
 import com.multisuperplayer.core.translate.describeMissingItems

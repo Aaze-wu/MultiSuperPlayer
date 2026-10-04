@@ -8,15 +8,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -32,10 +36,15 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,12 +56,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.settings.AppLanguage
+import com.multisuperplayer.core.data.settings.CustomAccent
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.ui.text.string
+import com.multisuperplayer.core.ui.theme.CustomAccentRanges
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
+import com.multisuperplayer.core.ui.theme.customAccentColors
 import org.koin.androidx.compose.koinViewModel
+import kotlin.math.roundToInt
 
 /**
  * 外观设置：主题基底、强调色、两个取色来源、界面语言。
@@ -76,6 +89,8 @@ fun AppearanceSettingsRoute(
         onBack = onBack,
         onSelectBaseTheme = viewModel::selectBaseTheme,
         onSelectAccent = viewModel::selectAccent,
+        onSelectCustomAccent = viewModel::selectCustomAccent,
+        onClearCustomAccent = viewModel::clearCustomAccent,
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
         onSelectLanguage = { selected ->
@@ -100,6 +115,8 @@ fun AppearanceSettingsScreen(
     language: AppLanguage = AppLanguage.DEFAULT,
     onSelectBaseTheme: (MspBaseTheme) -> Unit = {},
     onSelectAccent: (MspAccent) -> Unit = {},
+    onSelectCustomAccent: (CustomAccent) -> Unit = {},
+    onClearCustomAccent: () -> Unit = {},
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
     onSelectLanguage: (AppLanguage) -> Unit = {},
@@ -151,8 +168,20 @@ fun AppearanceSettingsScreen(
             item {
                 AccentPicker(
                     selected = accent,
+                    // 自定义色生效时预设那一排**不再勾选**：当前用的确实不是任何一项预设。
+                    // 但六个色块仍然可点——点下去就是「用回那个预设」（会顺手删掉自定义色）。
+                    customActive = theme.customAccent != null,
                     onSelect = onSelectAccent,
                     help = stringResource(R.string.msp_settings_theme_note_accent),
+                )
+            }
+
+            item {
+                CustomAccentSection(
+                    current = theme.customAccent,
+                    onSelect = onSelectCustomAccent,
+                    onClear = onClearCustomAccent,
+                    help = stringResource(R.string.msp_settings_custom_accent_note),
                 )
             }
 
@@ -279,6 +308,7 @@ private fun BaseThemeRow(
 @Composable
 private fun AccentPicker(
     selected: MspAccent,
+    customActive: Boolean,
     onSelect: (MspAccent) -> Unit,
     help: String,
 ) {
@@ -305,7 +335,9 @@ private fun AccentPicker(
             MspAccent.entries.forEach { candidate ->
                 AccentSwatch(
                     accent = candidate,
-                    selected = candidate == selected,
+                    // 自定义色生效时一个都不勾：当前用的确实不是任何一项预设，
+                    // 让某一项亮着会让人以为「我用的是它，只是颜色被改了」。
+                    selected = !customActive && candidate == selected,
                     onClick = { onSelect(candidate) },
                 )
             }
@@ -350,3 +382,212 @@ private fun AccentSwatch(
         }
     }
 }
+
+// ------------------------------------------------------------- 自定义强调色
+
+/**
+ * 自定义强调色：三根滑块 + 一块实时预览。
+ *
+ * 三件和「普通设置项」不一样的事都写在帮助问号里（`msp_settings_custom_accent_note`），
+ * 因为它们全部反直觉：
+ * - 拖动时**只改本地状态**，松手（`onValueChangeFinished`）才写 DataStore。每一帧都写盘
+ *   会给 DataStore 制造几十次写入，而且用户拖到一半退出去会留下一个他从没看过的颜色。
+ * - 明度只喂给**亮色**主色；深色主色由 [customAccentColors] 取相反的明度算出来。
+ * - 明度范围是 10%~80%，不是 0~100%（纯黑/纯白强调色等于没有强调色）。
+ *
+ * 滑块的初始位置取的是**已保存的自定义色**，而不是当前生效预设的颜色：预设色转 HSL 是一个
+ * 有损的反函数（要在色域边界上求最近点），做出来只会是「看起来差不多、拖一下就跳」。
+ */
+@Composable
+private fun CustomAccentSection(
+    current: CustomAccent?,
+    onSelect: (CustomAccent) -> Unit,
+    onClear: () -> Unit,
+    help: String,
+) {
+    val active = current != null
+    // 只在「有没有自定义色」翻转时重新取值，而不是每次 current 变化都重置：
+    // 保存成功的那一刻和用户松手是同一个瞬间，按值重置会把正在拖的另一根滑块拽回去。
+    // 清除之后 `active` 变回 false，滑块回到默认位置——此时确实没有颜色可以显示了。
+    var hue by remember(active) {
+        mutableFloatStateOf(current?.hueDegrees ?: CustomAccentRanges.DEFAULT_HUE)
+    }
+    var saturation by remember(active) {
+        mutableFloatStateOf(current?.saturation ?: CustomAccentRanges.DEFAULT_SATURATION)
+    }
+    var lightness by remember(active) {
+        mutableFloatStateOf(current?.lightness ?: CustomAccentRanges.DEFAULT_LIGHTNESS)
+    }
+    // 落盘前统一收敛一次：滑块的 range 已经在边界上，但「存进去的一定合法」这件事
+    // 不能只靠 UI 的 range 保证——DataStore 里躺着一个越界值的话，读回来的配色会直接崩。
+    val commit = {
+        onSelect(
+            CustomAccent(
+                hueDegrees = CustomAccentRanges.normalizeHue(hue),
+                saturation = CustomAccentRanges.clampSaturation(saturation),
+                lightness = CustomAccentRanges.clampLightness(lightness),
+            ),
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.msp_settings_section_custom_accent),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            SettingHelpIcon(
+                title = stringResource(R.string.msp_settings_section_custom_accent),
+                text = help,
+            )
+        }
+
+        if (!active) {
+            // 没说这句的话，这一块就是三根「拖了也不知道发生了什么」的滑块。
+            Text(
+                text = stringResource(R.string.msp_settings_custom_accent_hint_none),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+
+        // 预览的两个底板颜色**写死**，不跟当前主题走：它要回答的正是
+        // 「这个颜色换到另一种基底上会是什么样」，跟着当前主题就只能看到自己这一种。
+        val preview = customAccentColors(hue, saturation, lightness)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AccentPreviewChip(
+                background = Color.White,
+                onBackground = Color(0xFF1B1B1B),
+                primary = preview.lightPrimary,
+                container = preview.lightContainer,
+                label = MspBaseTheme.LIGHT.label.string(),
+            )
+            AccentPreviewChip(
+                background = Color(0xFF121212),
+                onBackground = Color(0xFFE6E6E6),
+                primary = preview.darkPrimary,
+                container = preview.darkContainer,
+                label = MspBaseTheme.DARK.label.string(),
+            )
+        }
+
+        AccentSlider(
+            label = stringResource(R.string.msp_settings_custom_accent_hue),
+            value = hue,
+            valueText = "${hue.roundToInt()}°",
+            range = CustomAccentRanges.HUE_MIN..CustomAccentRanges.HUE_MAX,
+            onValueChange = { hue = it },
+            onCommit = commit,
+        )
+        AccentSlider(
+            label = stringResource(R.string.msp_settings_custom_accent_saturation),
+            value = saturation,
+            valueText = saturation.toPercentText(),
+            range = CustomAccentRanges.SATURATION_MIN..CustomAccentRanges.SATURATION_MAX,
+            onValueChange = { saturation = it },
+            onCommit = commit,
+        )
+        AccentSlider(
+            label = stringResource(R.string.msp_settings_custom_accent_lightness),
+            value = lightness,
+            valueText = lightness.toPercentText(),
+            range = CustomAccentRanges.LIGHTNESS_MIN..CustomAccentRanges.LIGHTNESS_MAX,
+            onValueChange = { lightness = it },
+            onCommit = commit,
+        )
+
+        if (active) {
+            TextButton(onClick = onClear, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.msp_settings_custom_accent_revert))
+            }
+        }
+    }
+}
+
+/**
+ * 一块预览底板：一个主色圆点 + 一条容器色横条，画在指定的背景色上。
+ *
+ * 主色和容器色要一起露出来是因为它们在主题里承担不同的活：主色负责吸引注意（按钮、进度、
+ * 歌词高亮），容器色负责承载内容（卡片、选中的条目）。只看主色无法判断这个颜色放到界面上
+ * 会不会「一大块糊在一起」。
+ */
+@Composable
+private fun AccentPreviewChip(
+    background: Color,
+    onBackground: Color,
+    primary: Color,
+    container: Color,
+    label: String,
+) {
+    Column(
+        modifier = Modifier
+            .width(132.dp)
+            .background(background, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(22.dp).background(primary, CircleShape))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = onBackground,
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .background(container, RoundedCornerShape(5.dp)),
+        )
+    }
+}
+
+@Composable
+private fun AccentSlider(
+    label: String,
+    value: Float,
+    valueText: String,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    onCommit: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = valueText,
+                // 等宽数字：不然拖动时数字位数一变（9% → 10%），整行会跟着左右抖。
+                // `fontFeatureSettings` 是 TextStyle 上的属性，没有直接开在 Text 上的重载，
+                // 所以要在 typography 上 copy 一份。
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = range,
+            // 只有这里才落盘，见 [CustomAccentSection] 的注释。
+            onValueChangeFinished = onCommit,
+        )
+    }
+}
+
+/**
+ * 滑块上的百分比。
+ *
+ * 用 `roundToInt()` 而不是 `toInt()`：截断会把 0.799 显示成「79%」，而它的四舍五入结果是
+ * 80%——一个显示着「79%」却已经拖到头的滑块只会让人以为控件坏了。
+ */
+private fun Float.toPercentText(): String = "${(this * 100f).roundToInt()}%"

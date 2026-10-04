@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.common.appinfo
 
 import com.multisuperplayer.core.common.R
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -43,8 +43,15 @@ class AppBuildInfoTest {
         versionChannel,
     )
 
-    /** 「未知」这条文案在多个断言里出现，抽出来免得写错 id。 */
-    private val unknown: MspText = MspText.Res(R.string.msp_value_unknown)
+    /**
+     * 「未知」这条文案在多个断言里出现，抽出来免得写错 id。
+     *
+     * 用 [MspText.unknown] 而不是自己拼 `Res(R.string.msp_value_unknown)`：
+     * 那条资源跟着 `MspText` 搬到 core:model 了，而本文件的 `R` 是 core:common 的，
+     * 写全名会同时引入两个 `R`。而这里要断言的本来就是「退化成共享的那个兜底词」，
+     * 直接拿它更贴近意图（`unknown()` 就是那条资源，由 MspTextTest 钉着）。
+     */
+    private val unknown: MspText = MspText.unknown()
 
     private val dirty: MspText = MspText.Res(R.string.msp_dirty_suffix)
 

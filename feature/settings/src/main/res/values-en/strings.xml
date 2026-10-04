@@ -26,6 +26,12 @@
     <string name="msp_settings_summary_tail_artwork">Artwork colour</string>
     <string name="msp_settings_summary_tail_dynamic">System colours</string>
     <string name="msp_settings_summary_tail_dynamic_blocked">System colours inactive</string>
+
+    <!--
+      A custom accent says "Custom" rather than the preset name: naming a preset would make
+      the user think their setting never got saved, and the entry row is their only evidence.
+    -->
+    <string name="msp_settings_summary_accent_custom">Custom</string>
     <string name="msp_settings_summary_tail_force_software">Forced software decoding</string>
     <string name="msp_settings_summary_tail_no_ffmpeg">No FFmpeg in this build</string>
     <string name="msp_settings_summary_tail_no_position">Position not saved</string>
@@ -162,6 +168,17 @@
     <string name="msp_settings_theme_note_accent">The accent colour applies to the whole app immediately: titles, buttons, progress bars and lyric highlighting all follow it.</string>
 
     <string name="msp_settings_accent_label">Accent colour</string>
+
+    <string name="msp_settings_section_custom_accent">Custom accent colour</string>
+    <string name="msp_settings_custom_accent_hue">Hue</string>
+    <string name="msp_settings_custom_accent_saturation">Saturation</string>
+    <string name="msp_settings_custom_accent_lightness">Lightness</string>
+    <string name="msp_settings_custom_accent_preview">Preview</string>
+    <string name="msp_settings_custom_accent_revert">Back to a preset accent</string>
+
+    <string name="msp_settings_custom_accent_hint_none">No custom colour yet. Drag a slider above to create one.</string>
+
+    <string name="msp_settings_custom_accent_note">Dragging previews the palette live; the colour is saved and applied when you let go. Lightness only sets the primary colour in light mode — in dark mode the primary automatically uses the opposite lightness, otherwise a bright accent would smear into a dark background. The lightness range does not go from pure black to pure white: either extreme would be no accent at all.</string>
 
     <string name="msp_settings_language_note_system">The selected language is recorded by the system. Changing it in Settings → Apps → MultiSuperPlayer → Language is the same setting; the two always agree.</string>
     <string name="msp_settings_language_note_app_only">The selected language only affects this app. The system date and number formats do not change; the language used for dates comes from the system settings.</string>
@@ -337,6 +354,18 @@
     <string name="msp_settings_subtitle_reset">Reset subtitle style</string>
     <string name="msp_settings_subtitle_reset_desc">Restores text size, line spacing, outline and bottom margin together</string>
     <string name="msp_settings_subtitle_reset_already">Already using the default style</string>
+
+    <!--
+      The "Clear the translation cache" row. See the Chinese file for the full reasoning:
+      the row must state both the cost (translating again is billed again) and what is
+      NOT removed (translations you edited by hand live in another file).
+    -->
+    <string name="msp_settings_section_translation_cache">Translation cache</string>
+    <string name="msp_settings_cache_clear">Clear the translation cache</string>
+    <string name="msp_settings_cache_clearing">Clearing…</string>
+    <string name="msp_settings_cache_clear_action">Clear</string>
+    <string name="msp_settings_cache_clear_title">Clear the translation cache?</string>
+    <string name="msp_settings_cache_help">The cache stores "source → translation" pairs so the same line is never paid for twice. Clearing removes only this cache; translations you edited by hand are kept in a separate file.</string>
 
     <!-- ===== Speech recognition (on-device ASR) ===== -->
 

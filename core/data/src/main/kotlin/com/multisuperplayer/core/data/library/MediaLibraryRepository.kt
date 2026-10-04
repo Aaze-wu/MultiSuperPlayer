@@ -9,7 +9,7 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.R
 import com.multisuperplayer.core.model.SafTreeInfo
 import kotlinx.coroutines.CoroutineName

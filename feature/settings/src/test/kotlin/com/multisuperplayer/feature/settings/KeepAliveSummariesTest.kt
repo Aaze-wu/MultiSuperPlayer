@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.settings
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.power.DeviceVendor
 import com.multisuperplayer.core.data.power.KeepAliveState
 import java.io.File

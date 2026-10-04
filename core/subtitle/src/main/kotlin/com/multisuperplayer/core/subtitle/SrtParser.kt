@@ -3,6 +3,7 @@ package com.multisuperplayer.core.subtitle
 import com.multisuperplayer.core.model.CuePosition
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.internal.Timecode
 
 /**
@@ -23,7 +24,7 @@ class SrtParser : SubtitleParser {
     override val format: SubtitleFormat = SubtitleFormat.SRT
 
     override fun parse(content: String): ParseResult {
-        val warnings = mutableListOf<String>()
+        val warnings = mutableListOf<MspText>()
         val cues = mutableListOf<SubtitleCue>()
         val blocks = SubtitleText.splitBlocks(content)
 
@@ -33,7 +34,7 @@ class SrtParser : SubtitleParser {
             if (timingLineIndex < 0) {
                 // 允许块内全是注释/空行；有正文才是问题。
                 if (block.any { it.isNotBlank() && it.toIntOrNull() == null }) {
-                    warnings += "跳过无法识别的时间码块：${block.first().take(40)}"
+                    warnings += MspText.Res(R.string.msp_subtitle_warn_srt_unknown_block, block.first().take(40))
                 }
                 continue
             }
@@ -41,7 +42,7 @@ class SrtParser : SubtitleParser {
             val timingLine = block[timingLineIndex]
             val range = Timecode.parseRange(timingLine)
             if (range == null) {
-                warnings += "时间码无法解析：${timingLine.take(60)}"
+                warnings += MspText.Res(R.string.msp_subtitle_warn_bad_range, timingLine.take(60))
                 continue
             }
             val (startMs, endMsRaw) = range
@@ -55,7 +56,7 @@ class SrtParser : SubtitleParser {
             val position = parseCoordinateTail(timingLine)
 
             val endMs = if (endMsRaw < startMs) {
-                warnings += "第 $autoIndex 条结束时间早于开始时间，已按开始时间 + 1 秒修正"
+                warnings += MspText.Res(R.string.msp_subtitle_warn_srt_end_before_start, autoIndex)
                 startMs + 1_000
             } else {
                 endMsRaw

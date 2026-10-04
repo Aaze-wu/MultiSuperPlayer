@@ -44,4 +44,17 @@ data class ThemeSettings(
      * 是不对称的。
      */
     val colorFromArtwork: Boolean? = null,
+    /**
+     * 用户自定义的强调色（三根滑块的位置）。null = 从没自定义过，此时强调色走
+     * [accentId] 那个预设。
+     *
+     * 它与 [accentId] 是**互补**关系而不是覆盖关系，所以两个字段都要留着：
+     * 自定义只影响「当前用哪个颜色」，一旦用户选择「回到预设强调色」，
+     * 他之前选的预设还在（见 [ThemeSettingsRepository.clearCustomAccent]）。
+     * 同理，用户「选中某个预设」时也只会删掉这个字段，另两个取色开关的处置
+     * 与选中预设完全一致（见 [ThemeSettingsRepository.selectCustomAccent]）。
+     *
+     * 这里存的是三根滑块的位置而不是一个色值，理由见 [CustomAccent]。
+     */
+    val customAccent: CustomAccent? = null,
 )

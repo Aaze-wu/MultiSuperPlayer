@@ -51,6 +51,12 @@
     <!-- 开关开着但没生效（系统不支持 / 纯黑模式自动关掉）。不说出来的话用户只能怀疑开关坏了 -->
     <string name="msp_settings_summary_tail_dynamic_blocked">系统取色未生效</string>
 
+    <!--
+      自定义强调色只说「自定义」而不是预设名：说预设名会让用户以为自己的设置根本没存下来，
+      而入口页那一行正是他判断「存没存上」的唯一依据。
+    -->
+    <string name="msp_settings_summary_accent_custom">自定义</string>
+
     <!-- 播放摘要的两条尾巴 -->
     <string name="msp_settings_summary_tail_force_software">强制软解</string>
 
@@ -225,6 +231,24 @@
     <string name="msp_settings_theme_note_accent">强调色会立即应用到整个应用：标题、按钮、进度条和歌词高亮都跟随它。</string>
 
     <string name="msp_settings_accent_label">强调色</string>
+
+    <!-- ===== 外观：自定义强调色 ===== -->
+
+    <string name="msp_settings_section_custom_accent">自定义强调色</string>
+    <string name="msp_settings_custom_accent_hue">色相</string>
+    <string name="msp_settings_custom_accent_saturation">饱和度</string>
+    <string name="msp_settings_custom_accent_lightness">明度</string>
+    <string name="msp_settings_custom_accent_preview">预览</string>
+    <string name="msp_settings_custom_accent_revert">回到预设强调色</string>
+
+    <!-- 只在从没自定义过时出现：否则用户看到的是一片「拖了没反应」的滑块 -->
+    <string name="msp_settings_custom_accent_hint_none">还没有自定义颜色。拖动上面的滑块即可创建。</string>
+
+    <!--
+      这段话长度不短，但它必须写着：一个能拖的东西，用户默认会预期「拖到哪就到哪」，
+      而这里的明度有三件反直觉的事（松手才生效、只决定浅色主色、范围不是 0~100%）。
+    -->
+    <string name="msp_settings_custom_accent_note">拖动滑块时会实时预览，松手才真正保存并应用。明度只决定浅色模式下的主色——深色模式下的主色会自动取一个相反的明度，否则亮色强调色在深色背景上会糊掉。明度的可调范围不是从纯黑到纯白：那两个极端等于没有强调色。</string>
 
     <!--
       Android 13 起语言由系统记录（系统的「应用语言」就是这一项），
@@ -446,6 +470,24 @@
     <string name="msp_settings_subtitle_reset">恢复默认样式</string>
     <string name="msp_settings_subtitle_reset_desc">字号、行距、描边、底部距离一起恢复</string>
     <string name="msp_settings_subtitle_reset_already">当前就是默认样式</string>
+
+    <!--
+      「清空翻译缓存」那一行。
+
+      它是缓存**磁盘占用的唯一出口**（缓存全局共享，没有别的入口碰得到它），所以文案
+      要交代清楚两件事：清完之后有什么代价（下次翻译要重新付费）、什么**不会**被清掉
+      （手动改过的译文在另一个文件里）。少了第二句，凡是改过译文的人都不敢清缓存，
+      而那正是最需要清的人。
+
+      规模与确认句在 `core:translate` 的 `TranslationCacheStats` 里（需要把数字填进去），
+      这里只放这一行和对话框自己的标题、按钮。
+    -->
+    <string name="msp_settings_section_translation_cache">翻译缓存</string>
+    <string name="msp_settings_cache_clear">清空翻译缓存</string>
+    <string name="msp_settings_cache_clearing">正在清空…</string>
+    <string name="msp_settings_cache_clear_action">清空</string>
+    <string name="msp_settings_cache_clear_title">清空翻译缓存？</string>
+    <string name="msp_settings_cache_help">缓存的是「原文 → 译文」的对应关系，用来避免同一句话重复付费。清空只删这份缓存；你手动修改过的译文保存在另一个文件里，不会被删掉。</string>
 
     <!-- ===== 语音识别（本机 ASR） ===== -->
 

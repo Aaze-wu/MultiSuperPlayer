@@ -68,7 +68,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.multisuperplayer.core.common.format.TimeFormat
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.player.AbRepeatState
 import com.multisuperplayer.core.player.MspDecoderKind

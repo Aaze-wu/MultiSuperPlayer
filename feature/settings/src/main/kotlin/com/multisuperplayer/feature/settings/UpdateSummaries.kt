@@ -1,7 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
 import com.multisuperplayer.core.data.update.UpdateFailureText

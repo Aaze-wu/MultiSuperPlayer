@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.subtitle
 
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.text.MspText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -74,7 +75,14 @@ class SubtitleParserRegistryTest {
     fun `空内容抛出解析异常`() {
         val error = runCatching { registry.parse("   \n\n  ") }.exceptionOrNull()
         assertTrue(error is SubtitleParseException)
-        assertTrue(error.message!!.contains("空"))
+        // 断言的是**资源 id**，不是拼好的句子：`message` 现在只是 `text.toString()`
+        // （形如 `Res(id=…, args=[])`），只用来写日志。以前那句
+        // `message!!.contains("空")` 能过，恰恰是因为文案被硬编码在解析器里——
+        // 也就是「英文界面下这句话永远是中文」的另一面。
+        assertEquals(
+            MspText.Res(R.string.msp_subtitle_error_empty),
+            (error as SubtitleParseException).text,
+        )
     }
 
     @Test
@@ -82,7 +90,17 @@ class SubtitleParserRegistryTest {
         val error = runCatching { registry.parse("\u0001\u0002\u0003 这不是任何字幕") }.exceptionOrNull()
         assertNotNull(error)
         assertTrue(error is SubtitleParseException)
-        assertTrue(error.message!!.contains("无法解析"), "实际消息：${error.message}")
+
+        val text = (error as SubtitleParseException).text
+        assertTrue(text is MspText.Res, "异常带的应当是一条资源文案，实际：$text")
+        val res = text as MspText.Res
+        assertEquals(R.string.msp_subtitle_error_unparsable, res.id)
+
+        // 第 2 个参数就是「尝试过的格式」。只断它非空，不断具体内容：
+        // 上面那个 `runCatching { … }.getOrNull() ?: continue` 会把**抛异常**的
+        // 解析器直接跳过、不计入候选列表，所以这里能列出来的格式天生是不全的。
+        val listed = res.args[1] as String
+        assertTrue(listed.isNotBlank(), "候选格式列表不该是空的")
     }
 
     @Test

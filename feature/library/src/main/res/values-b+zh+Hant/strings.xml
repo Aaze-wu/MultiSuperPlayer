@@ -156,4 +156,31 @@
     <string name="msp_browser_up">上一層</string>
     <string name="msp_browser_back_sources">返回來源清單</string>
 
+    <!-- 導出（播放記錄 / 播放清單）。理由見 values/strings.xml 的同一段說明。 -->
+    <string name="msp_playlists_export_open">匯出這個播放清單</string>
+    <string name="msp_playlists_export_all">匯出全部播放清單</string>
+    <string name="msp_recent_export">匯出播放記錄</string>
+    <string name="msp_export_as">匯出為 %1$s</string>
+
+    <string name="msp_export_result_saved">已儲存：%1$s（%2$d 條）</string>
+    <string name="msp_export_result_saved_missing">已儲存：%1$s（%2$d 條，其中 %3$d 條檔案已不在）</string>
+    <string name="msp_export_result_failed">匯出失敗：%1$s</string>
+    <string name="msp_export_result_write_failed">匯出失敗，檔案沒有寫進去（可能是權限或儲存空間不足）</string>
+    <string name="msp_export_result_empty">沒有可匯出的內容</string>
+
+    <string name="msp_playlists_import">匯入播放清單</string>
+    <string name="msp_import_default_name">匯入的播放清單</string>
+
+    <string name="msp_import_ask_title">已存在同名清單</string>
+    <string name="msp_import_ask_desc">播放清單「%1$s」已經存在。\n合併：把檔案裡的條目加進已有的那個清單。\n新建：另建一個同名的新清單。</string>
+    <string name="msp_import_ask_remaining">本次匯入共有 %1$d 個同名清單需要處理。</string>
+    <string name="msp_import_merge">合併</string>
+    <string name="msp_import_new">新建</string>
+    <string name="msp_import_apply_all">剩下的都這樣處理</string>
+
+    <string name="msp_import_error_permission">沒有讀取這個檔案的權限。重新選一次檔案通常會重新授權。</string>
+    <string name="msp_import_error_not_found">找不到這個檔案，可能已被刪除或移動。</string>
+    <string name="msp_import_error_read">讀取檔案失敗：%1$s</string>
+    <string name="msp_import_error_save">匯入失敗，播放清單沒有寫進去（可能是儲存空間不足）</string>
+
 </resources>

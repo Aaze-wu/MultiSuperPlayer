@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.data.browser
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.model.BrowserEntry
 import com.multisuperplayer.core.model.MediaKind
 import org.junit.Assert.assertEquals

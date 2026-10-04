@@ -35,7 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.ui.chrome.AppChromeState
@@ -86,6 +86,13 @@ fun MspApp() {
     // 主题包在最外层：它要覆盖底部导航栏，也要覆盖以后可能出现的对话框。
     val settingsViewModel: SettingsViewModel = koinViewModel()
     val theme by settingsViewModel.theme.collectAsStateWithLifecycle()
+
+    // 自定义强调色：设置里存的是「三根滑块的位置」，而主题要的是四个颜色，
+    // 换算放在 ViewModel 里（`customAccentSeeds`）。不在这边现算的原因是
+    // 「三根滑块的位置→四个颜色」只有 `customAccentColors` 一处规则，
+    // 而它属于 `core:ui` 的配色词汇；`null` 表示用户从没自定义过，
+    // 此时强调色走用户选的预设。
+    val customAccentSeeds by settingsViewModel.customAccentSeeds.collectAsStateWithLifecycle()
 
     // 首次启动（安装后第一次进来）的那一次权限申请。
     //
@@ -179,6 +186,7 @@ fun MspApp() {
             // null = 用户没设置过，用 [MspThemeDefaults] 里的默认值（两个都是关）。
             useDynamicColor = theme.useDynamicColor ?: MspThemeDefaults.USE_DYNAMIC_COLOR,
             colorFromArtwork = theme.colorFromArtwork ?: MspThemeDefaults.COLOR_FROM_ARTWORK,
+            customAccent = customAccentSeeds,
         ) {
             MspAppScaffold(updateViewModel = updateViewModel)
         }

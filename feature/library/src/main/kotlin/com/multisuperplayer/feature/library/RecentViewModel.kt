@@ -1,15 +1,24 @@
 package com.multisuperplayer.feature.library
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.multisuperplayer.core.data.export.PlaybackExport
+import com.multisuperplayer.core.data.export.PlaybackExportCollection
+import com.multisuperplayer.core.data.export.PlaybackExportFormat
+import com.multisuperplayer.core.data.export.PlaybackExportTrack
+import com.multisuperplayer.core.data.export.TextExportWriter
 import com.multisuperplayer.core.data.history.RecentPlayRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.model.RecentPlay
+import com.multisuperplayer.core.model.text.MspText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
@@ -85,7 +94,17 @@ class RecentViewModel(
     private val recent: RecentPlayRepository,
     private val library: MediaLibraryRepository,
     playbackSettings: PlaybackSettingsRepository,
+    context: Context,
+    private val exportWriter: TextExportWriter,
 ) : ViewModel() {
+
+    /**
+     * 导出时要用的 `Resources`。
+     *
+     * 只留 applicationContext：ViewModel 活得比 Activity 久，握住 Activity 的
+     * context 就是泄漏它。（和 `AboutViewModel` 里的做法一样。）
+     */
+    private val appContext = context.applicationContext
 
     private val cached = MutableStateFlow<List<RecentPlay>?>(null)
 
@@ -163,6 +182,73 @@ class RecentViewModel(
             cached.value = emptyList()
         }
     }
+
+    // ------------------------------------------------------------------ 导出
+
+    private val mutableExport = MutableStateFlow<PlaybackExportState>(PlaybackExportState.Idle)
+
+    /** 导出进度。界面订阅它，在 [PlaybackExportState.message] 非空时弹一句提示。 */
+    val export: StateFlow<PlaybackExportState> = mutableExport.asStateFlow()
+
+    /**
+     * SAF 对话框里预填的文件名。
+     *
+     * 界面在弹选择器**之前**就要它（`CreateDocument` 的入参），所以它是个普通函数。
+     * 导出完成后回显的那个名字也来自这里（[exportTo] 里再算一次），两边必须是
+     * 同一个来源——否则用户可能看到「已保存：播放记录-20250101-120000.csv」，
+     * 而磁盘上那个文件叫别的名字。
+     */
+    fun suggestedExportName(format: PlaybackExportFormat): String =
+        PlaybackExport.suggestedFileName(resolve(PlaybackExport.recentName()), format)
+
+    /**
+     * 把**当前屏幕上这一份**记录写进 [uri]。
+     *
+     * 读的是 [cached] 而不是重新去 `recent.recent()`：用户点了导出，他期望拿到的
+     * 就是眼前这几条。重读会引入一个时间差——设备刚播完一条、或者库发生了一次
+     * 刷新——那些变化会出现在导出文件里但他没见过。
+     *
+     * 空的时候也照样走一遍：[exportPlaybackTo] 会把它变成
+     * [PlaybackExportState.Empty]，而不是写一个只有表头的文件（那种文件和
+     * 正常的导出在文件管理器里长得一模一样）。
+     */
+    fun exportTo(uri: Uri, format: PlaybackExportFormat) {
+        // 重入闸门：两次写都会以 `"wt"` 清空同一个目标文件，交叉起来就是半个文件。
+        if (mutableExport.value == PlaybackExportState.Running) return
+        mutableExport.value = PlaybackExportState.Running
+        val rows = cached.value.orEmpty()
+        val fileName = suggestedExportName(format)
+        viewModelScope.launch {
+            mutableExport.value = exportPlaybackTo(
+                writer = exportWriter,
+                uri = uri,
+                format = format,
+                collections = rows.toExportCollections(),
+                fileName = fileName,
+                resolve = ::resolve,
+            )
+        }
+    }
+
+    /** 用户看完了那句提示。 */
+    fun dismissExport() {
+        mutableExport.value = PlaybackExportState.Idle
+    }
+
+    private fun List<RecentPlay>.toExportCollections(): List<PlaybackExportCollection> =
+        if (isEmpty()) {
+            emptyList()
+        } else {
+            listOf(
+                PlaybackExportCollection(
+                    name = resolve(PlaybackExport.recentName()),
+                    tracks = map(PlaybackExportTrack::of),
+                ),
+            )
+        }
+
+    /** 导出出来的文件里也会出现中文表头，所以要能解析字符串（见 [appContext]）。 */
+    private fun resolve(text: MspText): String = text.resolve(appContext.resources)
 
     private fun reload() {
         viewModelScope.launch { readRows() }

@@ -2,7 +2,7 @@ package com.multisuperplayer.core.common.appinfo
 
 import com.multisuperplayer.core.common.R
 import com.multisuperplayer.core.common.info.InfoRow
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 版本号后缀里会出现的那几个通道名。**唯一**一处定义。

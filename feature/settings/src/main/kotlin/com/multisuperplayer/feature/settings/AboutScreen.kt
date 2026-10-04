@@ -58,7 +58,7 @@ import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.device.DeviceSnapshot
 import com.multisuperplayer.core.common.info.InfoRow
 import com.multisuperplayer.core.common.log.LogSummary
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 

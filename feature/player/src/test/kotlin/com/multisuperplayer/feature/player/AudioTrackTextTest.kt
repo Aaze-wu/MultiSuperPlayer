@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.player
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.player.MspTrackInfo
 import com.multisuperplayer.core.player.MspTrackKind
 import java.io.File
@@ -175,6 +175,9 @@ class AudioTrackTextTest {
         listOf(
             com.multisuperplayer.feature.player.R.string::class.java,
             com.multisuperplayer.core.common.R.string::class.java,
+            // `msp_joined` 跟着 `MspText` 搬到了 core:model，漏掉它这一行就会
+            // 直接报「认不出的资源 id」
+            com.multisuperplayer.core.model.R.string::class.java,
         ).flatMap { resourceClass ->
             resourceClass.declaredFields.mapNotNull { field ->
                 if (field.type != Int::class.java) return@mapNotNull null
@@ -184,11 +187,12 @@ class AudioTrackTextTest {
         }.toMap()
     }
 
-    /** 键名 → 文本。音轨文案在本模块，`msp_joined` 在 core:common。 */
+    /** 键名 → 文本。音轨文案在本模块，`msp_joined` 在 core:model（`MspText` 的家）。 */
     private val STRINGS: Map<String, String> by lazy {
         listOf(
             "feature/player/src/main/res/values/strings.xml",
             "core/common/src/main/res/values/strings.xml",
+            "core/model/src/main/res/values/strings.xml",
         ).flatMap { relative ->
             val file = File(repoRoot(), relative)
             assertTrue("找不到资源文件 $file", file.isFile)

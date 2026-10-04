@@ -1,7 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import android.Manifest
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.permissions.PermissionKind
 import com.multisuperplayer.core.data.permissions.PermissionRules
 import com.multisuperplayer.core.data.permissions.PermissionSnapshot

@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.player
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.subtitle.SubtitleScan
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.subtitleSourceOf

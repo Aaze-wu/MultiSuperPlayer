@@ -36,8 +36,9 @@ kotlin {
 
 dependencies {
     api(project(":core:model"))
-    // api 而不是 implementation：公开签名里用到 core:common 的 MspText 与
-    // DispatcherProvider，消费方（core:data / feature:settings）得能看见它们。
+    // api 而不是 implementation：LlmTextGenerator 的装配签名里有 core:common 的
+    // DispatcherProvider（还有 MspLog / TimeFormat），消费方（core:data / feature:settings）
+    // 得能看见它们。MspText 原来的家也是 core:common，现已随它搬去 core:model。
     api(project(":core:common"))
 
     // -----------------------------------------------------------------------

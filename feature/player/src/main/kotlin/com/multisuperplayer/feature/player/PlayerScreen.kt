@@ -55,7 +55,7 @@ import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.subtitleSourceOfDocument
 import com.multisuperplayer.core.common.format.TimeFormat
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind

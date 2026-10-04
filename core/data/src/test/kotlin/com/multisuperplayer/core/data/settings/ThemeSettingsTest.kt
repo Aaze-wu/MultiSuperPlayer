@@ -24,6 +24,7 @@ class ThemeSettingsTest {
         assertNull(settings.accentId)
         assertNull(settings.useDynamicColor)
         assertNull(settings.colorFromArtwork)
+        assertNull(settings.customAccent)
     }
 
     @Test
@@ -49,12 +50,14 @@ class ThemeSettingsTest {
             stringPreferencesKey("theme.accent") to "rose",
             booleanPreferencesKey("theme.dynamic_color") to false,
             booleanPreferencesKey("theme.color_from_artwork") to true,
+            stringPreferencesKey("theme.custom_accent") to "210.0,0.55,0.45",
         ).toThemeSettings()
 
         assertEquals("dark", keys.baseThemeId)
         assertEquals("rose", keys.accentId)
         assertEquals(false, keys.useDynamicColor)
         assertEquals(true, keys.colorFromArtwork)
+        assertEquals(CustomAccent(210f, 0.55f, 0.45f), keys.customAccent)
     }
 
     @Test
@@ -136,5 +139,59 @@ class ThemeSettingsTest {
 
         assertEquals("light", settings.baseThemeId)
         assertNull(settings.accentId)
+    }
+
+    // --------------------------------------------------------- 自定义强调色
+
+    @Test
+    fun `保存自定义强调色会同时关掉两个取色开关`() {
+        // 和「选预设强调色」同一个道理：封面取色和系统取色的优先级都在自定义之上，
+        // 它们还开着的话用户拖完滑块等于什么都没发生。
+        // 三件事必须在**同一个**事务里完成，否则 Flow 会先吐出一个「自定义色已存、
+        // 但封面取色还开着」的中间态，那一帧仍然是旧色。
+        val settings = emptyPreferences().toMutablePreferences().apply {
+            this[booleanPreferencesKey("theme.dynamic_color")] = true
+            this[booleanPreferencesKey("theme.color_from_artwork")] = true
+            applyCustomAccentSelection(CustomAccent(120f, 0.5f, 0.4f))
+        }.toThemeSettings()
+
+        assertEquals(CustomAccent(120f, 0.5f, 0.4f), settings.customAccent)
+        assertEquals(false, settings.useDynamicColor)
+        assertEquals(false, settings.colorFromArtwork)
+    }
+
+    @Test
+    fun `选中预设强调色会删掉自定义色`() {
+        // 两者是互补关系而不是覆盖关系：留着自定义色的话，它虽然此刻被预设盖住，
+        // 但只要用户再开一次封面取色/系统取色就又会赢回来（优先级在预设之上），
+        // 于是「我明明选了预设」和「过两天主题自己变了」会同时成立。
+        val settings = emptyPreferences().toMutablePreferences().apply {
+            applyCustomAccentSelection(CustomAccent(120f, 0.5f, 0.4f))
+            applyAccentSelection("teal")
+        }.toThemeSettings()
+
+        assertEquals("teal", settings.accentId)
+        assertNull(settings.customAccent)
+    }
+
+    @Test
+    fun `清除自定义色只删那一个键`() {
+        // 「回到预设强调色」只是取消自定义色，不该顺手把用户之前的选择也翻掉：
+        // 用户可能想要的是「先别用我这个自定义色，回去看看封面取色」。
+        val preferences = emptyPreferences().toMutablePreferences().apply {
+            applyCustomAccentSelection(CustomAccent(120f, 0.5f, 0.4f))
+        }
+        // 先确认它真的存下了（否则下面删的是个本来就不存在的键，测试会假绿）。
+        assertEquals(CustomAccent(120f, 0.5f, 0.4f), preferences.toThemeSettings().customAccent)
+        // 手动摆成「自定义色生效之前」的开关状态，再只删自定义色那一个键
+        // ——这正是 `clearCustomAccent()` 做的事。
+        preferences[booleanPreferencesKey("theme.color_from_artwork")] = true
+        preferences[booleanPreferencesKey("theme.dynamic_color")] = true
+        preferences.remove(ThemeSettingsRepository.Keys.CUSTOM_ACCENT)
+
+        val settings = preferences.toThemeSettings()
+        assertNull(settings.customAccent)
+        assertEquals(true, settings.colorFromArtwork)
+        assertEquals(true, settings.useDynamicColor)
     }
 }

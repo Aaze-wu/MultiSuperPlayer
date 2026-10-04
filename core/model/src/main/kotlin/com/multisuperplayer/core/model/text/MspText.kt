@@ -1,11 +1,20 @@
-package com.multisuperplayer.core.common.text
+package com.multisuperplayer.core.model.text
 
 import android.content.res.Resources
 import androidx.annotation.StringRes
-import com.multisuperplayer.core.common.R
+import com.multisuperplayer.core.model.R
 
 /**
  * 一段**还没被解析**的界面文案。
+ *
+ * ## 为什么住在 `core:model` 而不是某个 UI 模块
+ *
+ * 因为**解析器也要用它**。字幕解析（`core:subtitle`）会产出一批「这一行有问题」的告警，
+ * 那些告警必须能翻译，而这个模块是解析器唯一能安全依赖的地方——它没有依赖任何东西，
+ * 谁都能引用它，不会有环。
+ *
+ * 代价是这个「纯数据模型」模块多了两个字符串资源和一条 `androidx.annotation`
+ * （全部依赖），换掉的是「换一种语言要改一遍解析器的代码」这件事。
  *
  * ## 为什么要多这一层，而不直接返回 `String`
  *

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.FormatColorText
 import androidx.compose.material.icons.outlined.FormatLineSpacing
 import androidx.compose.material.icons.outlined.FormatSize
@@ -49,7 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
 import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
 import com.multisuperplayer.core.data.settings.SubtitleOutline
@@ -92,14 +93,21 @@ fun TranslationSettingsRoute(
     val modelList by viewModel.modelList.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val localModel by viewModel.localModelEntry.collectAsStateWithLifecycle()
+    val cacheState by viewModel.cacheState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 本页会显示「本地模型下了没有」，而那件事是在**另一个页面**（本地模型页）改变的。
     // 那一步没有任何回调会通知这里，所以从那边退回来时重读一次磁盘。
     // 与 `SettingsScreen` 刷新 ASR 状态是同一个套路。
+    //
+    // 「缓存有多大」用同一个时机重读：缓存不是在这页长大的（这页一次翻译都不跑），
+    // 而是在播放页看字幕时长的，那更是完全另一个页面。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshLocalModelStatus()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshLocalModelStatus()
+                viewModel.refreshCacheStats()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -130,6 +138,8 @@ fun TranslationSettingsRoute(
         onSetSubtitleOutline = viewModel::setSubtitleOutline,
         onSetSubtitleBottomMargin = viewModel::setSubtitleBottomMargin,
         onResetSubtitleStyle = viewModel::resetSubtitleStyle,
+        cacheState = cacheState,
+        onClearCache = viewModel::clearTranslationCache,
         modifier = modifier,
     )
 }
@@ -164,6 +174,8 @@ fun TranslationSettingsScreen(
     onSetSubtitleOutline: (SubtitleOutline) -> Unit = {},
     onSetSubtitleBottomMargin: (SubtitleBottomMargin) -> Unit = {},
     onResetSubtitleStyle: () -> Unit = {},
+    cacheState: TranslationCacheState = TranslationCacheState(),
+    onClearCache: () -> Unit = {},
 ) {
     // 当前打开的字幕样式对话框（null = 没开）。
     //
@@ -172,6 +184,11 @@ fun TranslationSettingsScreen(
     // 一屏能看完四项比少点一下更重要——四排芯片摆开之后，反而要事先弄清楚
     // 「这一排是字号还是行距」。
     var openStyleDialog: SubtitleStyleDialog? by remember { mutableStateOf(null) }
+
+    // 「清空缓存」的二次确认。和字幕样式那四组分开：那几个对话框是**选一个值**
+    // （选完即生效），这个是**执行一次不可逆操作**，所以不能用 `ChoiceDialog`
+    // （它只有一个取消按钮，因为「选择」本身不需要确认）。
+    var confirmClearCache by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -336,9 +353,9 @@ fun TranslationSettingsScreen(
                 }
             }
 
-            // 字幕外观放在**最后**：这一页的两个入口里，一个是设置页的「字幕与翻译」，
-            // 另一个是播放页字幕面板里翻译没配好时的「去设置」——后者带着
-            // 「我要填密钥」进来，把外观摆到他第一眼看到的地方等于让他多绕一步。
+            // 字幕外观放在这一页配置项的**最后**：这一页的两个入口里，一个是设置页的
+            // 「字幕与翻译」，另一个是播放页字幕面板里翻译没配好时的「去设置」——
+            // 后者带着「我要填密钥」进来，把外观摆到他第一眼看到的地方等于让他多绕一步。
             // 而上面服务商 → 密钥 → 翻译 → 测试连接是一条完整的诊断链，也不该被切断。
             item { SectionHeader(stringResource(R.string.msp_settings_section_subtitle_style)) }
             item {
@@ -391,6 +408,35 @@ fun TranslationSettingsScreen(
                     ),
                     onClick = onResetSubtitleStyle,
                     enabled = !isDefault,
+                )
+            }
+
+            // 清缓存是**维护**，不是配置：没人是为了它进这一页的，所以压在最后。
+            // 也不放在字幕外观之前——那会把「服务商 → 密钥 → 翻译 → 测试连接」
+            // 这条诊断链和外观之间硬塞进一个不可逆的按钮。
+            item { SectionHeader(stringResource(R.string.msp_settings_section_translation_cache)) }
+            item {
+                val stats = cacheState.stats
+                // 没缓存时**不显示按钮**，而不是把按钮置灰：按下去不会有任何变化的按钮，
+                // 唯一的作用是让人怀疑「是不是没生效」（同上面「恢复默认字幕样式」那一行）。
+                // 而副标题照样给一句「还没有缓存」，让这一行看上去是空的、不是没加载出来。
+                SettingActionButtonRow(
+                    icon = Icons.Outlined.DeleteSweep,
+                    title = stringResource(R.string.msp_settings_cache_clear),
+                    subtitle = when {
+                        cacheState.busy -> stringResource(R.string.msp_settings_cache_clearing)
+                        // 失败时说的是「还剩多少」，而不是「清空失败」四个字：
+                        // 后者会让人以为已经清掉了（而缓存还在，下次翻译依旧命中）。
+                        cacheState.failed -> stats.describeClearFailure().string()
+                        else -> stats.describe().string()
+                    },
+                    action = if (stats.isEmpty || cacheState.busy) {
+                        null
+                    } else {
+                        stringResource(R.string.msp_settings_cache_clear_action)
+                    },
+                    onAction = { confirmClearCache = true },
+                    help = stringResource(R.string.msp_settings_cache_help),
                 )
             }
         }
@@ -455,6 +501,32 @@ fun TranslationSettingsScreen(
         )
 
         null -> Unit
+    }
+
+    if (confirmClearCache) {
+        val stats = cacheState.stats
+        AlertDialog(
+            onDismissRequest = { confirmClearCache = false },
+            title = { Text(stringResource(R.string.msp_settings_cache_clear_title)) },
+            // 确认句里三个数都要有：删多少、下次会付多少、什么不会被删
+            // （见 `TranslationCacheStats.describeClearConfirmation`）。
+            text = { Text(stats.describeClearConfirmation().string()) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClearCache = false
+                        onClearCache()
+                    },
+                ) {
+                    Text(stringResource(R.string.msp_settings_cache_clear_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearCache = false }) {
+                    Text(stringResource(R.string.msp_settings_cancel))
+                }
+            },
+        )
     }
 }
 

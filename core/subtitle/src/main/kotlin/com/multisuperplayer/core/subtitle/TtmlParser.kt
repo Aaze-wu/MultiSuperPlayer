@@ -5,6 +5,7 @@ import com.multisuperplayer.core.model.KaraokeSegment
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleStyleDef
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.internal.Timecode
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -36,18 +37,18 @@ class TtmlParser : SubtitleParser {
     override val supportedFormats: Set<SubtitleFormat> = setOf(SubtitleFormat.TTML)
 
     override fun parse(content: String): ParseResult {
-        val warnings = mutableListOf<String>()
+        val warnings = mutableListOf<MspText>()
         val metadata = mutableMapOf<String, String>()
         val styles = mutableMapOf<String, SubtitleStyleDef>()
         val regions = mutableMapOf<String, CuePosition>()
 
         val document = parseXml(content, warnings)
         val root = document.documentElement
-            ?: throw SubtitleParseException("TTML 文件没有根元素")
+            ?: throw SubtitleParseException(MspText.Res(R.string.msp_subtitle_error_ttml_no_root))
 
         val rootName = localNameOf(root)
         if (!rootName.equals("tt", ignoreCase = true)) {
-            warnings += "根元素是 <$rootName>，不是 <tt>，仍按 TTML 尽力解析"
+            warnings += MspText.Res(R.string.msp_subtitle_warn_ttml_root_not_tt, rootName)
         }
 
         val tickRate = attr(root, "tickRate")?.toDoubleOrNull()?.takeIf { it > 0 } ?: DEFAULT_TICK_RATE
@@ -67,12 +68,12 @@ class TtmlParser : SubtitleParser {
             val duration = parseTime(attr(element, "dur"), effectiveFrameRate, tickRate)
 
             if (begin == null) {
-                warnings += "跳过缺少 begin 的 <p> 元素"
+                warnings += MspText.Res(R.string.msp_subtitle_warn_ttml_p_no_begin)
                 return@forEachElement
             }
             if (end == null && duration != null) end = begin + duration
             if (end == null || end <= begin) {
-                warnings += "<p begin=$begin> 没有有效结束时间，已按 2 秒兜底"
+                warnings += MspText.Res(R.string.msp_subtitle_warn_ttml_p_no_end, begin)
                 end = begin + DEFAULT_CUE_DURATION_MS
             }
 
@@ -116,7 +117,7 @@ class TtmlParser : SubtitleParser {
     // XML
     // -----------------------------------------------------------------------
 
-    private fun parseXml(content: String, warnings: MutableList<String>): Document {
+    private fun parseXml(content: String, warnings: MutableList<MspText>): Document {
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
             isExpandEntityReferences = false
@@ -131,8 +132,10 @@ class TtmlParser : SubtitleParser {
             builder.setEntityResolver { _, _ -> InputSource(StringReader("")) }
             builder.parse(InputSource(StringReader(content)))
         } catch (error: Exception) {
-            warnings += "XML 解析失败：${error.message}"
-            throw SubtitleParseException("TTML 不是合法 XML：${error.message}")
+            warnings += MspText.Res(R.string.msp_subtitle_warn_ttml_xml_failed, error.message.orEmpty())
+            throw SubtitleParseException(
+                MspText.Res(R.string.msp_subtitle_error_ttml_not_xml, error.message.orEmpty()),
+            )
         }
     }
 

@@ -2,7 +2,7 @@ package com.multisuperplayer.core.ui.text
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 在 Compose 里把 [MspText] 解析成字符串。

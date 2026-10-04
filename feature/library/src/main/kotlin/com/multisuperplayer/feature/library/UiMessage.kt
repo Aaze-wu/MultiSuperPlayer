@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.library
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 一条**一次性**的提示（Snackbar）。

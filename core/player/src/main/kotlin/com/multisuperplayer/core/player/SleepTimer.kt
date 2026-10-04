@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.player
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 睡眠定时当前处在什么状态。

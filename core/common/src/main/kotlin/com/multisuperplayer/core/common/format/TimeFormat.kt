@@ -1,7 +1,7 @@
 package com.multisuperplayer.core.common.format
 
 import com.multisuperplayer.core.common.R
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 时间 / 体积格式化。

@@ -4,7 +4,7 @@ import com.multisuperplayer.core.asr.AsrModelInfo
 import com.multisuperplayer.core.asr.AsrModelProgress
 import com.multisuperplayer.core.asr.AsrProgress
 import com.multisuperplayer.core.asr.AsrService
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 「生成字幕」（语音识别）在界面上要表达的状态。

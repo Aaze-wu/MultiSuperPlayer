@@ -3,6 +3,7 @@ package com.multisuperplayer.core.subtitle
 import com.multisuperplayer.core.model.SubtitleCue
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleStyleDef
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.subtitle.internal.Timecode
 
 /**
@@ -20,12 +21,23 @@ data class ParseResult(
     /**
      * 非致命问题（跳过的坏行、时间轴倒挂…）。
      * 收集而不抛异常：一行坏掉不该让整部片子没字幕。
+     *
+     * 类型是 [MspText] 而不是 `String`：这些句子会**原样列给用户看**
+     * （字幕列表里逐条显示），而它们以前是硬编码的中文——切到英文界面
+     * 就是一句中文，而且没有任何机制能让译者看见它。
      */
-    val warnings: List<String> = emptyList(),
+    val warnings: List<MspText> = emptyList(),
 )
 
-/** 解析不了（格式判错、文件被截断到没有一条完整 cue）。 */
-class SubtitleParseException(message: String) : Exception(message)
+/**
+ * 解析不了（格式判错、文件被截断到没有一条完整 cue）。
+ *
+ * 带的是 [MspText] 而不是 `message: String`：这句话会显示给用户（见
+ * `SubtitleRepository.detailOr`），必须能翻译，而 `message` 只能是一个
+ * 已经定死的字符串。这里的 `message` 是 `text.toString()` 的结果，
+ * **只用来写日志**，不要拿去显示。
+ */
+class SubtitleParseException(val text: MspText) : Exception(text.toString())
 
 interface SubtitleParser {
     val format: SubtitleFormat

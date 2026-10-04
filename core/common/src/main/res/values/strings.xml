@@ -12,11 +12,6 @@
 -->
 <resources>
 
-    <!-- ===== 通用 ===== -->
-
-    <!-- 「取不到这个值」。设备/构建信息里每个字段的兜底，绝不能显示成空白 -->
-    <string name="msp_value_unknown">未知</string>
-
     <!-- ===== 关于页 / 日志的标签 ===== -->
 
     <string name="msp_row_device">设备</string>
@@ -39,12 +34,6 @@
 
     <!-- 通用并列：`tag，含未提交改动`。两个短片段之间的关系，译者可以换标点 -->
     <string name="msp_appended_with_comma">%1$s，%2$s</string>
-
-    <!--
-      通用拼接：把若干段接成一句。分隔符（`%2$s`）由调用方传进来，所以「用 · 还是用、」
-      由文案决定，而「两两拼接」这件事不必每个模块各写一遍，也不用拼 `String`。
-    -->
-    <string name="msp_joined">%1$s%2$s%3$s</string>
 
     <!-- 工作区有未提交改动时必须说出来，否则本地包和 tag 包长得一模一样 -->
     <string name="msp_dirty_suffix">含未提交改动</string>

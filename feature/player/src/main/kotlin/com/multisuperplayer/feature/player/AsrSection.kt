@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.multisuperplayer.core.asr.AsrModelProgress
 import com.multisuperplayer.core.asr.AsrProgress
 import com.multisuperplayer.core.common.format.TimeFormat
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.ui.text.string
 
 /**

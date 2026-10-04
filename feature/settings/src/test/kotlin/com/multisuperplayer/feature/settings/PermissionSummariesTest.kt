@@ -1,7 +1,7 @@
 package com.multisuperplayer.feature.settings
 
 import android.Manifest
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.permissions.PermissionKind
 import com.multisuperplayer.core.data.permissions.PermissionRules
 import com.multisuperplayer.core.data.permissions.PermissionSnapshot
@@ -391,6 +391,8 @@ class PermissionSummariesTest {
         "feature/settings/src/main/res/values",
         "core/ui/src/main/res/values",
         "core/common/src/main/res/values",
+        // 连接符（`msp_joined`）跟着 `MspText` 住在 core:model
+        "core/model/src/main/res/values",
         "core/data/src/main/res/values",
     )
 
@@ -414,6 +416,7 @@ class PermissionSummariesTest {
             com.multisuperplayer.feature.settings.R.string::class.java,
             com.multisuperplayer.core.ui.R.string::class.java,
             com.multisuperplayer.core.common.R.string::class.java,
+            com.multisuperplayer.core.model.R.string::class.java,
             com.multisuperplayer.core.data.R.string::class.java,
         ).flatMap { resourceClass ->
             resourceClass.declaredFields.mapNotNull { field ->

@@ -37,6 +37,36 @@ internal object PlaylistRules {
     fun sanitizeName(raw: String): String = raw.trim().take(MAX_NAME_LENGTH)
 
     /**
+     * 给 [wanted] 找一个还没被用过的名字：重名就往后缀「 (2)」「 (3)」上加。
+     *
+     * 用在导入上：文件里有一个列表和现有的重名、用户选的是「新建」，
+     * 那就得新建一份**另一个名字**的——两个一模一样的名字在列表页上
+     * 是根本分不清的（哪一个是刚导入的？删哪个？）。
+     *
+     * ## 先给后缀留位置再截断
+     *
+     * [MAX_NAME_LENGTH] 是 80，如果先把 80 个字的名字截满、再往后缀，
+     * 后缀会被截掉、候选名又变回原样——于是「重名 → 加后缀 → 还是重名」
+     * 永远退不出去，**死循环**。所以顺序必须是「先按后缀长度缩短基名，
+     * 再接后缀」。
+     *
+     * 极端情况（100 个候选名全被占）下返回最后一个候选而不是继续找：
+     * 名字本来就可以重复，宁可给一个重复的名字，也不能在这里转不出去。
+     */
+    fun uniqueName(wanted: String, taken: Set<String>): String {
+        val base = sanitizeName(wanted)
+        if (base.isEmpty() || base !in taken) return base
+        var attempt = 2
+        while (true) {
+            val suffix = " ($attempt)"
+            val candidate = base.take(MAX_NAME_LENGTH - suffix.length) + suffix
+            if (candidate !in taken) return candidate
+            if (attempt > MAX_PLAYLISTS) return candidate
+            attempt++
+        }
+    }
+
+    /**
      * 追加条目，返回新的条目列表（原来的顺序不变，新的接在后面）。
      *
      * 三件事必须一起做对：

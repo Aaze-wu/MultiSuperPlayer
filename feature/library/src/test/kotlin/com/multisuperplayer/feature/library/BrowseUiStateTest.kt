@@ -1,6 +1,6 @@
 package com.multisuperplayer.feature.library
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.browser.BrowserContent
 import com.multisuperplayer.core.data.browser.BrowserSort
 import com.multisuperplayer.core.data.browser.BrowserSourceKind

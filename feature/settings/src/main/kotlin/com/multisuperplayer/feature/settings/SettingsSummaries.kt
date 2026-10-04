@@ -5,7 +5,7 @@ import com.multisuperplayer.core.asr.AsrModelStatus
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.log.LogSummary
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
@@ -73,14 +73,23 @@ internal object SettingsSummaries {
         val dynamicBlockedByOled = baseTheme == MspBaseTheme.BLACK
         val dynamicActive = dynamicWanted && systemColorSupported && !dynamicBlockedByOled && !artworkColor
 
-        // 覆盖优先级：封面取色 > 系统取色 > 强调色。同时说两个是自相矛盾的：实际生效的只有一个。
+        // 自定义色生效时**绝不能**报预设的名字：用户自己拖了个绿色，这一行却写着「靛蓝」，
+        // 而入口页的这一行正是他判断「我的设置到底存下来没有」的唯一依据。
+        val accentLabel =
+            if (theme.customAccent != null) {
+                MspText.Res(R.string.msp_settings_summary_accent_custom)
+            } else {
+                accent.label
+            }
+
+        // 覆盖优先级：封面取色 > 系统取色 > 自定义 > 强调色。同时说两个是自相矛盾的：实际生效的只有一个。
         val tail = when {
             artworkColor -> MspText.Res(R.string.msp_settings_summary_tail_artwork)
             dynamicActive -> MspText.Res(R.string.msp_settings_summary_tail_dynamic)
             dynamicWanted -> MspText.Res(R.string.msp_settings_summary_tail_dynamic_blocked)
             else -> null
         }
-        return join(baseTheme.label, accent.label, tail)
+        return join(baseTheme.label, accentLabel, tail)
     }
 
     /**

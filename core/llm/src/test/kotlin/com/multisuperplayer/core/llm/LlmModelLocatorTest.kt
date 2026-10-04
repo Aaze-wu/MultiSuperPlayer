@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.llm
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

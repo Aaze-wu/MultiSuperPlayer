@@ -9,7 +9,7 @@ import com.multisuperplayer.core.asr.AsrModelLocator
 import com.multisuperplayer.core.asr.AsrRoute
 import com.multisuperplayer.core.asr.describeAsrFailure
 import com.multisuperplayer.core.common.log.MspLog
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrJob
 import com.multisuperplayer.core.data.settings.AsrSettings
@@ -24,7 +24,7 @@ import com.multisuperplayer.core.data.settings.SubtitleTextSize
 import com.multisuperplayer.core.data.settings.TranslationSettingsRepository
 import com.multisuperplayer.core.data.settings.assembleJob
 import com.multisuperplayer.core.data.subtitle.AsrSubtitleGenerator
-import com.multisuperplayer.core.data.subtitle.SubtitleExportWriter
+import com.multisuperplayer.core.data.export.TextExportWriter
 import com.multisuperplayer.core.data.subtitle.SubtitleLoadResult
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
 import com.multisuperplayer.core.data.subtitle.SubtitleScan
@@ -107,7 +107,7 @@ class SubtitleViewModel(
     translationRunner: TranslationRunner,
     translationCache: TranslationCacheStore,
     translationEdits: TranslationEditsStore,
-    private val exportWriter: SubtitleExportWriter,
+    private val exportWriter: TextExportWriter,
     /** 语音识别的偏好（走哪条路、用哪条模型/服务商、从哪个源下载）。 */
     private val asrSettings: AsrSettingsRepository,
     /** 云端识别要的密钥。键名带 `asr-` 前缀，不会与翻译那边共用同一把钥匙。 */
@@ -1031,8 +1031,13 @@ data class SubtitleUiState(
     val document: SubtitleDocument? = null,
     val candidates: List<SubtitleSource> = emptyList(),
     val issue: SubtitleIssue? = null,
-    /** 解析时的非致命问题（跳过坏行、编码是猜的…），在字幕列表里展示。 */
-    val warnings: List<String> = emptyList(),
+    /**
+     * 解析时的非致命问题（跳过坏行、编码是猜的…），在字幕列表里展示。
+     *
+     * [MspText] 而不是 `String`：这些句子直接就是用户看到的文案，
+     * 做成 `String` 就只剩「在解析器里写死一句中文」这一种可能。
+     */
+    val warnings: List<MspText> = emptyList(),
     /** 用户选了「仅译文」但没译文——界面要解释一句，否则看起来像降级失败了。 */
     val translationUnavailable: Boolean = false,
     /** 当前用的是自动挑选还是手选的那一条，供选择面板画单选框。 */

@@ -59,6 +59,68 @@ class PlaylistRulesTest {
         assertFalse(PlaylistRules.hasUsableName(Playlist(id = "pl-1", name = "   ", createdAtMs = 0L)))
     }
 
+    // --------------------------------------------------------------- 起名字
+
+    @Test
+    fun `名字没被占用时原样返回`() {
+        assertEquals("旅行", PlaylistRules.uniqueName("旅行", emptySet()))
+        assertEquals("旅行", PlaylistRules.uniqueName("旅行", setOf("工作", "学习")))
+    }
+
+    @Test
+    fun `比对重名之前先去掉首尾空白`() {
+        // 界面上「旅行 」和「旅行」看着一样，所以去掉空白后重名就必须加后缀，
+        // 否则导入出来两个永远分不清的列表。
+        assertEquals("旅行 (2)", PlaylistRules.uniqueName("  旅行  ", setOf("旅行")))
+    }
+
+    @Test
+    fun `后缀里的数字会一直跳到第一个空位`() {
+        assertEquals("旅行 (2)", PlaylistRules.uniqueName("旅行", setOf("旅行")))
+        assertEquals("旅行 (3)", PlaylistRules.uniqueName("旅行", setOf("旅行", "旅行 (2)")))
+        assertEquals("旅行 (6)", PlaylistRules.uniqueName("旅行", setOf("旅行", "旅行 (2)", "旅行 (3)", "旅行 (4)", "旅行 (5)")))
+    }
+
+    @Test
+    fun `已经带后缀的名字再加一层后缀`() {
+        // 文件里本来就有「旅行 (2)」这种名字是很正常的，不能再生成一个同名的。
+        assertEquals("旅行 (2) (2)", PlaylistRules.uniqueName("旅行 (2)", setOf("旅行", "旅行 (2)")))
+    }
+
+    @Test
+    fun `空名字不加后缀`() {
+        // 空名字是「留给界面决定怎么显示」的状态，加后缀会把它变成一个像名字的名字，
+        // 反而绕过了调用方对空值的处理。
+        assertEquals("", PlaylistRules.uniqueName("", setOf("旅行")))
+        assertEquals("", PlaylistRules.uniqueName("   ", setOf("", "旅行")))
+    }
+
+    @Test
+    fun `超长的名字加后缀之后仍然不超上限`() {
+        val long = "あ".repeat(PlaylistRules.MAX_NAME_LENGTH)
+
+        val named = PlaylistRules.uniqueName(long, setOf(long))
+
+        // 先截满 80 再接后缀是**死循环**：`take(80)` 会把后缀削掉、候选名又等于原名字，
+        // 于是「重名 → 加后缀 → 还是重名」永远退不出去。所以后缀先占位置、基名再截短。
+        val suffix = " (2)"
+        assertEquals(long.dropLast(suffix.length) + suffix, named)
+        assertTrue(named.length <= PlaylistRules.MAX_NAME_LENGTH)
+        assertTrue(named.endsWith(suffix))
+    }
+
+    @Test
+    fun `候选名被占满时返回最后一个而不是转不出去`() {
+        // 100 个候选名全被占用是理论上到得了的状态（导入 100 个同名的列表）。
+        val taken = buildSet {
+            add("旅行")
+            for (n in 2..PlaylistRules.MAX_PLAYLISTS + 1) add("旅行 ($n)")
+        }
+
+        // 名字本来就可以重复：宁可返回一个重复的名字，也不能在这里转不出去。
+        assertEquals("旅行 (${PlaylistRules.MAX_PLAYLISTS + 1})", PlaylistRules.uniqueName("旅行", taken))
+    }
+
     // --------------------------------------------------------------- 追加
 
     @Test

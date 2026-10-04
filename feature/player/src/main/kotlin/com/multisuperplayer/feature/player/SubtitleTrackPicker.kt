@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.SubtitleBottomMargin
 import com.multisuperplayer.core.data.settings.SubtitleDisplayMode
 import com.multisuperplayer.core.data.settings.SubtitleLineSpacing
@@ -310,7 +310,7 @@ private fun StatusBlock(state: SubtitleUiState) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             state.warnings.forEach { warning ->
                 Text(
-                    text = warning,
+                    text = warning.string(),
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
                 )

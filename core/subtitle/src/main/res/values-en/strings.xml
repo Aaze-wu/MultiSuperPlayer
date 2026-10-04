@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Subtitle parser messages: warnings (non-fatal, a few skipped lines still play)
+    and fatal reasons (the whole file could not be parsed).
+
+    The key set must match values/ and values-b+zh+Hant/ exactly (guarded by
+    SubtitleStringsTest). A missing key does not crash or log anything - it
+    silently falls back to Simplified Chinese, which only shows up when someone
+    switches the app language and stares at that one screen.
+-->
+<resources>
+
+    <!-- ============================================================
+         ASS / SSA
+         ============================================================ -->
+    <string name="msp_subtitle_warn_ass_style_no_name">Style line has no Name field; skipped</string>
+    <!-- %1$d / %2$d: canvas width and height used when the script declares neither. -->
+    <string name="msp_subtitle_warn_ass_no_play_res">No PlayResX/PlayResY; estimating positions on a %1$dx%2$d canvas</string>
+    <!-- %1$s: the raw Start field from the file. -->
+    <string name="msp_subtitle_warn_ass_event_no_start">Event has no readable Start: %1$s</string>
+
+    <!-- ============================================================
+         LRC / enhanced LRC
+         ============================================================ -->
+    <string name="msp_subtitle_warn_lrc_unknown_line">Unrecognised line: %1$s</string>
+    <string name="msp_subtitle_warn_lrc_tag_not_first">Text before the timestamp tag; line ignored: %1$s</string>
+    <!-- %1$d: timestamp in ms; %2$d: how many lines share it. -->
+    <string name="msp_subtitle_warn_lrc_merge_overflow">%2$d lines share timestamp %1$dms; bilingual merge skipped</string>
+
+    <!-- ============================================================
+         SRT / WebVTT
+         ============================================================ -->
+    <string name="msp_subtitle_warn_srt_unknown_block">Skipped an unrecognised timing block: %1$s</string>
+    <string name="msp_subtitle_warn_bad_range">Cannot parse this timestamp: %1$s</string>
+    <!-- %1$d: cue ordinal in file order, not the number written in the file. -->
+    <string name="msp_subtitle_warn_srt_end_before_start">Cue %1$d ends before it starts; corrected to start + 1 second</string>
+    <string name="msp_subtitle_warn_vtt_no_header">No WEBVTT header; parsing as headerless VTT</string>
+
+    <!-- ============================================================
+         TTML / DFXP
+         ============================================================ -->
+    <string name="msp_subtitle_warn_ttml_root_not_tt">Root element is &lt;%1$s&gt;, not &lt;tt&gt;; trying TTML anyway</string>
+    <string name="msp_subtitle_warn_ttml_p_no_begin">Skipped a &lt;p&gt; element without begin</string>
+    <string name="msp_subtitle_warn_ttml_p_no_end">&lt;p begin=%1$d&gt; has no valid end time; used the 2 second fallback</string>
+    <string name="msp_subtitle_warn_ttml_xml_failed">XML parsing failed: %1$s</string>
+
+    <!-- ============================================================
+         Registry: format detection and fatal reasons
+         ============================================================ -->
+    <string name="msp_subtitle_warn_format_mismatch">Detected %1$s but the content looks like %2$s; parsed as %2$s</string>
+    <string name="msp_subtitle_error_empty">The subtitle file is empty</string>
+    <string name="msp_subtitle_error_unparsable">Cannot parse these subtitles (detected: %1$s; tried: %2$s)</string>
+    <string name="msp_subtitle_error_lrc_no_timestamps">No readable timestamps found in this LRC file</string>
+    <string name="msp_subtitle_error_ttml_no_root">This TTML file has no root element</string>
+    <string name="msp_subtitle_error_ttml_not_xml">TTML is not well-formed XML: %1$s</string>
+
+</resources>

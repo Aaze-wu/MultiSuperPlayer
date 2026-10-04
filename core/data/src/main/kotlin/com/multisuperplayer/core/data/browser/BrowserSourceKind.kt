@@ -1,6 +1,6 @@
 package com.multisuperplayer.core.data.browser
 
-import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.text.MspText
 
 /**
  * 文件浏览器里一个「目录来源」的类型。

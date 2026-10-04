@@ -116,4 +116,11 @@
     <string name="msp_translate_export_mode_translation_only">僅譯文</string>
     <string name="msp_translate_export_mode_bilingual">原文 + 譯文</string>
 
+    <!-- ===== 譯文快取（設定頁那一行） ===== -->
+
+    <string name="msp_translate_cache_empty">還沒有快取</string>
+    <string name="msp_translate_cache_stats">已快取 %1$d 條譯文 · %2$s</string>
+    <string name="msp_translate_cache_clear_failed">清空失敗，還剩 %1$d 條（%2$s）</string>
+    <string name="msp_translate_cache_clear_confirm">會刪掉 %1$d 條已快取的譯文（%2$s）。下次翻譯同一批字幕要重新向服務商付費。你手動改過的譯文保存在另一個檔案裡，不會被刪掉。</string>
+
 </resources>
