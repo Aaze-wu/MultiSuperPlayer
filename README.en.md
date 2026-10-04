@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.8.1**
+- Current version: **0.9.0-beta.1** (public beta)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -709,8 +709,9 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.7.0-alpha.2** | **Embedded-subtitle wording fixes: the title slot now reads *Embedded subtitle 1* instead of a bare language tag, a *No line read yet* hint covers the window before the first cue arrives, and *This file has subtitle tracks; pick one above.* replaces the blanket *nothing is attached* claim; a selected embedded text track is now claimed as soon as the track list arrives instead of waiting for its first cue** | Done |
 | **v0.8.0-alpha.1** | **Subtitle rate (proportional nudging: five presets plus ±0.01 / ±0.10, the counterpart to the timeline offset's *shift*) + a full read-ahead of the embedded subtitle track (the prerequisite for the rate to work in both directions, and for subtitles to be there the moment you open a file) + a rework of the lyrics space on the audio page (the portrait artwork gives way to the lyrics, and the chips and transport controls move into the left column in landscape)** | Done |
 | **v0.8.0-alpha.2** | **Drag-to-reorder auto-scroll (one implementation shared by the queue panel and playlists: it starts within 72dp of the edge and speeds up the closer you get, computed as *speed x frame interval* so the device's refresh rate does not change the feel) + an equalizer (a switch / 8 built-in presets / 5 gain sliders / a reset; the curve is stored by frequency so it stays the same curve on another device); also fixes "long-press dragging does nothing at all" (`positionChange()` is a constant 0 when there are no MotionEvent history samples)** | Done |
-| **v0.8.1** | **Artwork: lists, the grid and the player page now show covers (audio reads its embedded cover; video reads an embedded cover or, failing that, has a frame extracted at 10% of the duration, retrying at 40% when that frame is too dark); a disk cache of our own with a 512px cap and at most 2 concurrent decodes; also fixes the three-state colouring in the built-in browser (playable / subtitle / other)** | **Current** |
-| Later | **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
+| **v0.8.1** | **Artwork: lists, the grid and the player page now show covers (audio reads its embedded cover; video reads an embedded cover or, failing that, has a frame extracted at 10% of the duration, retrying at 40% when that frame is too dark); a disk cache of our own with a 512px cap and at most 2 concurrent decodes; also fixes the three-state colouring in the built-in browser (playable / subtitle / other)** | Done |
+| **v0.9.0-beta.1** | **Embedded bitmap subtitles (PGS / VobSub / DVB) get a bitmap layer of their own (the layout arithmetic is copied line for line from Media3, and Media3's built-in `SubtitleView` stays covered so text subtitles are never painted twice); a bitmap track honours only the display mode, while delay / rate / styling and whole-track pre-reading do nothing for it and the panel says why; in-app updates split into a stable and a beta channel (the channel is decided by the tag, not by GitHub's prerelease flag, and alpha builds become internal only, accepted by no channel)** | **Current (beta)** |
+| Later | **0.9.0** stable (drop the suffix once the beta has been tested) -> **1.0**; audio translation (dubbing) lands after stable | Planned |
 
 ---
 
