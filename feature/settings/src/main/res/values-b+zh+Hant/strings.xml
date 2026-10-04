@@ -226,7 +226,7 @@
 
     <string name="msp_settings_about_link_failed">無法開啟瀏覽器：%1$s</string>
 
-    <string name="msp_settings_about_whats_new_body">本版為內嵌點陣字幕開了一條通路，並把應用內更新分成兩條通道。\n\n· 內嵌點陣字幕（PGS / VobSub / DVB）能畫出來了：這類軌帶的是圖、沒有字，以前只會被當成「這條軌讀不出來」，現在走單獨的一層點陣圖層，擺放公式逐行照拄 Media3 自己的排版；Media3 內建的字幕檢視仍然遮著，所以內嵌文字字幕不會被畫兩份\n· 點陣軌只認「顯示模式」這一個開關：字幕延遲 / 字幕速率 / 字幕樣式 / 整軌預讀對它一律不生效（字已經畫在圖裡了，也沒有字可以翻），面板會寫明原因，而不是讓它看起來像一條壞軌\n· VobSub / DVB 的畫形依賴片源初始化段裡的調色盤與尺寸，按「能用就用、認不出來就當這條軌沒有」處理，目前有實測樣本的只有 PGS\n· 更新分成「正式版 / 測試版」兩條通道：正式版通道只收不帶後綴的版本，測試版通道兩條都收；alpha 從這一版起只作內部建置，任何通道都不收——本版就是測試版，預設停在正式版通道的人不會自動收到它\n· 此前一版：0.8.1 封面增強（清單 / 格狀 / 播放頁顯示封面；自建磁碟快取 + 最長邊 512px + 同時最多解 2 張）\n\n已知限制：點陣字幕的延遲 / 速率 / 樣式 / 雙語 / 翻譯一律不生效，這是刻意取捨不是沒做完；VobSub / DVB 只在片源帶夠初始化資料時才畫得出來；封面仍是自動取的，沒有「手動換一張」的入口；不含 32 位元原生程式庫。</string>
+    <string name="msp_settings_about_whats_new_body">本版為內嵌點陣字幕開了一條通路，把應用內更新分成兩條通道，並讓更新真的會在啟動時提醒你。\n\n· 內嵌點陣字幕（PGS / VobSub / DVB）能畫出來了：這類軌帶的是圖、沒有字，以前只會被當成「這條軌讀不出來」，現在走單獨的一層點陣圖層，擺放公式逐行照拄 Media3 自己的排版；Media3 內建的字幕檢視仍然遮著，所以內嵌文字字幕不會被畫兩份\n· 點陣軌只認「顯示模式」這一個開關：字幕延遲 / 字幕速率 / 字幕樣式 / 整軌預讀對它一律不生效（字已經畫在圖裡了，也沒有字可以翻），面板會寫明原因，而不是讓它看起來像一條壞軌\n· VobSub / DVB 的畫形依賴片源初始化段裡的調色盤與尺寸，按「能用就用、認不出來就當這條軌沒有」處理，目前有實測樣本的只有 PGS\n· 更新分成「正式版 / 測試版」兩條通道：正式版通道只收不帶後綴的版本，測試版通道兩條都收；alpha 只作內部建置，任何通道都不收\n· 啟動時自動查一次更新：有更新彈窗三鍵「立即更新 / 稍後再說 / 忽略此版本」，沒有更新什麼都不提示，檢查失敗也只記日誌不打擾；「自動檢查更新」開關現在真的生效了——以前它只寫不讀，是個純裝飾\n· 此前一版：0.8.1 封面增強（清單 / 格狀 / 播放頁顯示封面；自建磁碟快取 + 最長邊 512px + 同時最多解 2 張）\n\n已知限制：點陣字幕的延遲 / 速率 / 樣式 / 雙語 / 翻譯一律不生效，這是刻意取捨不是沒做完；VobSub / DVB 只在片源帶夠初始化資料時才畫得出來；封面仍是自動取的，沒有「手動換一張」的入口；更新提示可能每隔 12 小時再出現一次，安靜下來用「忽略此版本」；不含 32 位元原生程式庫。</string>
 
     <string name="msp_settings_view">檢視</string>
 
@@ -461,7 +461,7 @@
     <string name="msp_update_channel_stable_desc">只接收正式版，最穩定</string>
     <string name="msp_update_channel_beta_desc">正式版和測試版都接收，比正式版早一步</string>
     <string name="msp_update_auto_check">自動檢查更新</string>
-    <string name="msp_update_auto_check_desc">打開這一頁時順手查一次，最快 12 小時一次</string>
+    <string name="msp_update_auto_check_desc">每次啟動時查一次，進這一頁也會查一次，最快 12 小時一次</string>
     <string name="msp_update_token">GitHub 權杖</string>
     <string name="msp_update_token_set">已填寫</string>
     <string name="msp_update_token_unset">未填寫，也能檢查</string>
@@ -496,4 +496,7 @@
     <string name="msp_update_undo_ignore">撤銷忽略</string>
     <string name="msp_update_need_unknown_source">系統還沒有允許本應用安裝應用。允許之後才能裝上更新。</string>
     <string name="msp_update_open_unknown_source">去允許</string>
+    <string name="msp_update_startup_now">立即更新</string>
+    <string name="msp_update_startup_later">稍後再說</string>
+    <string name="msp_update_startup_hint">點「立即更新」會進入更新頁面，那裡可以看到完整的更新說明並下載安裝。</string>
 </resources>

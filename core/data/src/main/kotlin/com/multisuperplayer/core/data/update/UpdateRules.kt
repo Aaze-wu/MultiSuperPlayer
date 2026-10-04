@@ -52,6 +52,30 @@ enum class UpdateChannel {
 }
 
 /**
+ * 这一次检查是**谁**发起的。
+ *
+ * 只有两档，而第二档刻意涵盖两种场景（**启动时一次 + 进更新页一次**）：
+ * 界面上只有一个「自动检查更新」开关，两处检查受它管、也共用同一段节流窗口。
+ * 如果给两处各留一档，就会出现「开关关掉之后启动不查、进页面还查」这种
+ * 只有读代码才看得出来、界面上完全说不通的分裂。
+ *
+ * 那为什么不用一个 `manual: Boolean`：`false` 只说得清「不是用户点的」，
+ * 而这两处对**失败**的处理正好相反（启动检查失败要完全静默、进页面那次要把
+ * 失败写在页面上），调用点读一个布尔值看不出自己属于哪一边。
+ */
+enum class UpdateCheckTrigger {
+    /** 用户亲手点的「检查更新」。跳过节流——点了就得真的去问。 */
+    MANUAL,
+
+    /**
+     * 自动检查：启动时一次、进更新页一次。
+     *
+     * 受「自动检查更新」开关与 [UpdateRules.AUTO_CHECK_INTERVAL_MS] 限制。
+     */
+    AUTO,
+}
+
+/**
  * 一次检查的结论。
  *
  * 四态而不是一个布尔：界面要说的话至少有四句不同的，而把它们压成一个
@@ -84,6 +108,49 @@ sealed interface UpdateAvailability {
 }
 
 object UpdateRules {
+
+    /**
+     * 自动检查的最小间隔：12 小时。
+     *
+     * 为什么是「顺手查」而不是「后台定时查」：后台定时要一个常驻的调度器和一个
+     * 长命的状态容器，而那两样东西的代价（多一个进程级的生命周期、多一个
+     * 「这份状态是谁在管」的问题）换来的只是「用户会发现新版早了几个小时」。
+     * 12 小时对应「一天里最多两次」，而 GitHub 对未认证请求的限制是每小时 60 次
+     * ——量级上完全够用，也远不至于被当成滥用。
+     *
+     * **启动检查和进页面检查共用这一个窗口**（见 [skipsAutoCheck]）：一次启动就是
+     * 一次检查，紧接着进更新页不该再问同一个问题。
+     */
+    const val AUTO_CHECK_INTERVAL_MS: Long = 12L * 60 * 60 * 1000
+
+    /**
+     * 这一次自动检查该不该**直接跳过**（跳过 = 什么都不做，见 `UpdateManager.check`）。
+     *
+     * 两条闸门，顺序不能换：
+     * 1. **开关**——用户在设置里关掉「自动检查更新」之后，启动和进更新页都不该再问。
+     *    这一条以前**根本没人读**（开关写进 DataStore，之后没有任何地方看它，
+     *    是个纯装饰品）：界面上关掉它，启动时照样请求；
+     * 2. **节流**——[AUTO_CHECK_INTERVAL_MS] 之内不重复问。
+     *
+     * [MANUAL][UpdateCheckTrigger.MANUAL] 一律不跳：用户点了「检查」就得真的去问，
+     * 哪怕他十秒前刚点过一次。
+     *
+     * 单独提成一个纯函数，是因为它有两个必须钉住的反例（开关关掉、窗口没到），
+     * 而它们很容易被「顺手把 `markChecked` 也记了」这类改动悄悄改掉——
+     * 那会让「被跳过的检查」占用掉 12 小时的窗口，用户关一下开关再打开，
+     * 第一次启动检查就没了。
+     */
+    fun skipsAutoCheck(
+        trigger: UpdateCheckTrigger,
+        autoCheck: Boolean,
+        lastCheckAtEpochMs: Long?,
+        atEpochMs: Long,
+    ): Boolean {
+        if (trigger == UpdateCheckTrigger.MANUAL) return false
+        if (!autoCheck) return true
+        val last = lastCheckAtEpochMs ?: return false
+        return atEpochMs - last < AUTO_CHECK_INTERVAL_MS
+    }
 
     /**
      * 从候选里挑出「该提示的那一条」。

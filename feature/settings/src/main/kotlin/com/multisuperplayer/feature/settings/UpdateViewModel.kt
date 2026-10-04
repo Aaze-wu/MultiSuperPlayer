@@ -8,6 +8,7 @@ import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.data.update.InstallLaunch
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
+import com.multisuperplayer.core.data.update.UpdateCheckTrigger
 import com.multisuperplayer.core.data.update.UpdateException
 import com.multisuperplayer.core.data.update.UpdateFailureText
 import com.multisuperplayer.core.data.update.UpdateInstaller
@@ -42,6 +43,18 @@ data class UpdateUiState(
     val progress: UpdateProgress? = null,
     val failure: UpdateFailureText? = null,
     val canInstallPackages: Boolean = true,
+    /**
+     * 启动检查查到的、**该弹窗提示**的那一版（`null` = 不弹）。
+     *
+     * 只有 [UpdateAvailability.Available] 会填进这里：「已是最新」不提示（用户要求
+     * 「无更新不提示」），「已忽略」也不提示（那正是忽略的意思）。
+     *
+     * 它和 [availability] 是两件事，不是同一份数据的两种写法：[availability] 说的是
+     * 「更新页上该写什么」——那是[永久]的（用户下次进来还得看得见），而这个是
+     * 「这一刻有没有一个框挂在屏幕上」——关掉就没了。合成一个字段的话，
+     * 用户点「以后再说」就等于把「有新版本」也一起擦掉了，更新页会变回「还没有检查过」。
+     */
+    val startupPrompt: UpdateRelease? = null,
 )
 
 /**
@@ -59,6 +72,20 @@ data class UpdateUiState(
  * 「打开未知来源授权页」「拉起安装器」都是一次性动作。做成状态的话，
  * 每次重组都会重新触发（旋转屏幕就能弹出第二个安装器）；做成 Channel
  * 则每个事件只会被消费一次。
+ *
+ * ## 启动时的那一次检查为什么也住在这里
+ *
+ * 因为「启动检查」和「进更新页检查」是**同一个问题**：查的是同一个数据源、判的是
+ * 同一份设置、认的是同一段节流，结果还要落在同一个位置上（用户点了「以后再说」，
+ * 下次进更新页不该又冒出另一个版本号）。拆成两个 ViewModel 的话，两份
+ * `availability` 会各自演进，而它们在界面上说的是同一句话。
+ *
+ * 代价是生命周期变长了：它现在由应用根（`MspApp`）创建，挂在 Activity 上，
+ * 更新页里拿到的是**同一个实例**。这一点是必须的——更新页在自己的 `composable`
+ * 里 `koinViewModel()` 会拿到挂在 `NavBackStackEntry` 上的**另一个**实例，
+ * 那一份不知道启动检查查到过什么、也不知道包已经下好了，用户会看到
+ * 「弹窗说有新版本、更新页说还没有检查过」（`PermissionsViewModel` 的类注释里
+ * 记着同一个坑的另一种表现）。
  */
 class UpdateViewModel(
     private val manager: UpdateManager,
@@ -86,6 +113,16 @@ class UpdateViewModel(
     /** 「去开未知来源」→ 用户回来后自动接着装，但只自动接一次。 */
     private var autoResumedInstall = false
 
+    /**
+     * 启动检查做过了没有。
+     *
+     * 只记在内存里（每个进程一次），**不落盘**：需要它的正是「同一个进程里
+     * `LaunchedEffect` 重跑了」这一种情况，而跨进程该不该再查是
+     * `UpdateRules.skipsAutoCheck` 的 12 小时节流负责的。落盘会多出一份
+     * 与节流重复、且更容易写歪的状态。
+     */
+    private var launchCheckDone = false
+
     fun refresh() {
         val allowed = installer.canInstall()
         val wasBlocked = !_state.value.canInstallPackages
@@ -104,16 +141,17 @@ class UpdateViewModel(
     /**
      * 查一次。
      *
-     * @param manual 用户亲手点的（true）还是进页面顺手查的（false，受 12 小时节流）。
+     * @param trigger 用户亲手点的（[UpdateCheckTrigger.MANUAL]）还是自动检查
+     *   （[UpdateCheckTrigger.AUTO]，受「自动检查更新」开关与 12 小时节流限制）。
      */
-    fun check(manual: Boolean = true) {
+    fun check(trigger: UpdateCheckTrigger = UpdateCheckTrigger.MANUAL) {
         if (_state.value.checking || _state.value.progress != null) return
         _state.update { it.copy(checking = true, failure = null) }
         viewModelScope.launch {
             try {
-                // null = 被节流跳过。**必须什么都不改**：把它当成「已是最新」
+                // null = 被开关或节流跳过。**必须什么都不改**：把它当成「已是最新」
                 // 会让每次进这一页都把「有新版」擦掉一次。
-                val result = manager.check(manual) ?: return@launch
+                val result = manager.check(trigger) ?: return@launch
                 // 用户可能在这一次请求期间按了「忽略」，那时判定结果已经过时。
                 if (_state.value.availability is UpdateAvailability.Ignored && result is UpdateAvailability.Available) {
                     return@launch
@@ -136,6 +174,76 @@ class UpdateViewModel(
                 _state.update { it.copy(failure = UpdateFailureText.Network) }
             } finally {
                 _state.update { it.copy(checking = false) }
+            }
+        }
+    }
+
+    /**
+     * 应用启动时那一次检查（每个进程只做一次）。
+     *
+     * 与 [check] 的三处区别，每一处都是「用户没有主动要这件事」带来的：
+     * 1. **失败完全静默**——只写日志，不设 [UpdateUiState.failure]。后台干的事失败了
+     *    却弹一个「检查更新失败」给用户，是替自己的活找他的麻烦；而且那个失败横幅
+     *    会一直挂在更新页上，看起来像是他刚才点出来的。
+     * 2. **只写日志不写状态**，所以更新页此时显示的是「还没有检查过」而不是错误。
+     * 3. 查到了才填 [UpdateUiState.startupPrompt]——弹窗的**唯一**来源。
+     *
+     * 「只做一次」由 [launchCheckDone] 保证：`LaunchedEffect` 在配置变更（旋转屏幕、
+     * 切深色模式）时会重跑，而 ViewModel 活得比它久。没有这个闸，转一次屏幕就多问
+     * 一次 GitHub，多转几次就被限流了——症状是「更新检查时好时坏」。
+     *
+     * 节流与开关都在 `UpdateManager.check` 里判，不在这里判：这里读到的
+     * `settings` 首帧是默认值（很可能和用户设的相反），拿它做判断等于用
+     * 「还没读到的设置」替用户做决定。
+     */
+    fun checkAtLaunch() {
+        if (launchCheckDone) return
+        launchCheckDone = true
+        // 正在检查或正在下载时不插手：前者已经有一个请求在飞，后者更不该被抢。
+        if (_state.value.checking || _state.value.progress != null) return
+        _state.update { it.copy(checking = true) }
+        viewModelScope.launch {
+            try {
+                val result = manager.check(UpdateCheckTrigger.AUTO) ?: return@launch
+                // 用户可能在这一次请求期间按了「忽略」（他手速很快地点进了更新页），
+                // 那时判定结果已经过时——照写就会把刚忽略掉的那一版又捧回来。
+                if (_state.value.availability is UpdateAvailability.Ignored && result is UpdateAvailability.Available) {
+                    return@launch
+                }
+                _state.update {
+                    it.copy(
+                        availability = result,
+                        startupPrompt = (result as? UpdateAvailability.Available)?.release,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                MspLog.w(TAG, e) { "启动时检查更新失败（不打扰用户）" }
+            } finally {
+                _state.update { it.copy(checking = false) }
+            }
+        }
+    }
+
+    /** 「以后再说」：只关掉这一次的弹窗，不改判定。下次启动过了节流还会再提示。 */
+    fun dismissStartupPrompt() {
+        _state.update { it.copy(startupPrompt = null) }
+    }
+
+    /**
+     * 「忽略此版本」：和更新页上那个按钮**是同一件事**，所以也走同一个落点
+     * （[UpdateManager.setIgnoredTag]），只是顺手把弹窗收掉。
+     *
+     * 不另写一条「启动弹窗自己的忽略」：两份忽略会有一份忘了写 DataStore，
+     * 而那一份的表现是「忽略之后下次启动又来」。
+     */
+    fun ignoreStartupPrompt() {
+        val release = _state.value.startupPrompt ?: return
+        viewModelScope.launch {
+            manager.setIgnoredTag(release.tagName)
+            _state.update {
+                it.copy(startupPrompt = null, availability = UpdateAvailability.Ignored(release))
             }
         }
     }
@@ -204,7 +312,8 @@ class UpdateViewModel(
         _state.update { it.copy(failure = UpdateFailureText.NoInstaller) }
     }
 
-    fun ignore() {        val release = availableRelease() ?: return
+    fun ignore() {
+        val release = availableRelease() ?: return
         viewModelScope.launch {
             manager.setIgnoredTag(release.tagName)
             _state.update { it.copy(availability = UpdateAvailability.Ignored(release)) }
@@ -217,7 +326,7 @@ class UpdateViewModel(
             // 撤销之后必须重新问一次，而不是直接把状态改成「已是最新」——
             // 被忽略的那一版（以及它之后发布的版本）到底算不算更新，只有规则层知道。
             _state.update { it.copy(availability = UpdateAvailability.NotChecked) }
-            check(manual = true)
+            check(UpdateCheckTrigger.MANUAL)
         }
     }
 
@@ -227,7 +336,7 @@ class UpdateViewModel(
             // 换了通道之后原来的判定就不成立了：
             // 从「预发行版」切到「正式版」时，界面上那个预发行版必须消失。
             _state.update { it.copy(availability = UpdateAvailability.NotChecked) }
-            check(manual = true)
+            check(UpdateCheckTrigger.MANUAL)
         }
     }
 

@@ -36,20 +36,37 @@ class UpdateManager(
      * 狂点是最常见的反应。只在成功时记，节流就正好在最需要它的场景失效。
      * 代价是失败后 12 小时内不再自动检查——用户仍然可以手动点（手动那条路不看节流）。
      *
-     * @param manual 用户亲手点的。true 跳过节流（点了就得真的去问），
-     *   false 是「打开这一页顺手查一下」，受 [AUTO_CHECK_INTERVAL_MS] 限制。
-     * @return 判定结果；被节流跳过时返回 null——**null 不是「已经是最新」**，
+     * **被开关或节流跳过的检查什么都不记**（见下）。跳过和失败是两件事：
+     * 前者是「这一次请求压根没发出去」，后者是「发出去了、没成」。
+     *
+     * @param trigger 谁发起的。用户在界面上点的那次传 [UpdateCheckTrigger.MANUAL]
+     *   （跳过节流，点了就得真的去问）；启动时和进更新页时传
+     *   [UpdateCheckTrigger.AUTO]（受「自动检查更新」开关与
+     *   [UpdateRules.AUTO_CHECK_INTERVAL_MS] 限制）。
+     * @return 判定结果；被跳过时返回 null——**null 不是「已经是最新」**，
      *   界面在拿到 null 时必须保持原样，否则每次进这一页都会把「有新版」擦成「已是最新」。
      * @throws UpdateException 网络/HTTP/解析失败。界面用 [describeUpdateFailure] 转成文案。
      */
-    suspend fun check(manual: Boolean = true): UpdateAvailability? {
+    suspend fun check(
+        trigger: UpdateCheckTrigger = UpdateCheckTrigger.MANUAL,
+    ): UpdateAvailability? {
         // 时钟只读一次：它同时决定「要不要跳过」和「记下什么时候查的」。
         // 读两次的话注入的测试时钟会变成一个被观察的计数器（同一件事两个答案）。
         val at = now()
         val snapshot = settings.first()
-        if (!manual) {
-            val last = snapshot.lastCheckAtEpochMs
-            if (last != null && at - last < AUTO_CHECK_INTERVAL_MS) return null
+        if (
+            UpdateRules.skipsAutoCheck(
+                trigger = trigger,
+                autoCheck = snapshot.autoCheck,
+                lastCheckAtEpochMs = snapshot.lastCheckAtEpochMs,
+                atEpochMs = at,
+            )
+        ) {
+            // **连 `markChecked` 都不记**，直接返回。记了的话，「压根没发生的一次检查」
+            // 会占用掉那 12 小时的窗口：用户把开关关掉、过一会儿再打开，
+            // 第一次启动检查就会被上一次没发生的检查挡掉 12 小时——
+            // 一个自己造成的、界面上完全看不出来的静默失效。
+            return null
         }
         return try {
             val releases = source.listReleases()
@@ -111,17 +128,6 @@ class UpdateManager(
         const val TAG = "UpdateManager"
     }
 }
-
-/**
- * 自动检查的最小间隔：12 小时。
- *
- * 为什么是「打开页面时顺手查」而不是「后台定时查」：后台定时要一个常驻的
- * 调度器和一个长命的状态容器，而那两样东西的代价（多一个进程级的生命周期、
- * 多一个「这份状态是谁在管」的问题）换来的只是「用户会发现新版早了几个小时」。
- * 12 小时这个数字对应的是「一天里最多两次」，而 GitHub 对未认证请求的限制是
- * 每小时 60 次——量级上完全够用，也远不至于被当成滥用。
- */
-private const val AUTO_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000
 
 /**
  * 把失败说成人话。

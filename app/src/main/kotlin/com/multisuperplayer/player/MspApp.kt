@@ -3,6 +3,7 @@ package com.multisuperplayer.player
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import com.multisuperplayer.core.common.text.MspText
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.model.MediaEntry
@@ -61,7 +64,9 @@ import com.multisuperplayer.feature.settings.PermissionsViewModel
 import com.multisuperplayer.feature.settings.PlaybackSettingsRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
+import com.multisuperplayer.feature.settings.StartupUpdateDialog
 import com.multisuperplayer.feature.settings.TranslationSettingsRoute
+import com.multisuperplayer.feature.settings.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -118,10 +123,35 @@ fun MspApp() {
         permissionsViewModel.onRequestLaunched(activity)
     }
 
-    // 需求③：安装后的第一次启动申请一次权限。
+    // 启动时那一次自动检查更新用的实例。
+    //
+    // 建在这一层（而不是更新页里）是刻意的：它要活得比任何一个页面久，
+    // 因为查到的东西会变成一个浮在整个界面之上的弹窗，而那个弹窗和用户
+    // 当前在哪一页无关。理由与作用域问题见 `UpdateViewModel` 的类注释。
+    val updateViewModel: UpdateViewModel = koinViewModel()
+
+    // 需求③：安装后的第一次启动申请一次权限；紧接着（等权限框处理完）查一次更新。
+    //
+    // 两件事写在同一个 `LaunchedEffect` 里，是因为它们之间有一条**顺序**要求：
+    // 更新弹窗必须等权限流程走完。两个框同时挂在屏幕上时，权限框是系统的、
+    // 更新框是本应用自己的，谁盖住谁不由我们决定，而用户看到的是
+    // 「刚打开就一堆框、而且不知道它们在问什么」。
+    //
+    // `requestAtStartup()` 是同步的（记账和排队都在返回前做完），所以它返回之后
+    // `pending.value` 就是确定的：非空 = 有一个权限框正在等系统回答。
+    // 不能靠「等一会儿看看」——那个间隔要多少是个纯猜的值。
     LaunchedEffect(Unit) {
         delay(STARTUP_PERMISSION_DELAY_MS)
         permissionsViewModel.requestAtStartup()
+        if (permissionsViewModel.pending.value != null) {
+            // 等系统框被回答（`onRequestLaunched` 会把待办清成 null）。
+            // **带上限**：等不到也不能干脆不查——那会让「每次启动查一次」
+            // 在最需要它的时候静默失效，而且不留下任何痕迹。
+            withTimeoutOrNull(PERMISSION_SETTLE_TIMEOUT_MS) {
+                permissionsViewModel.pending.first { it == null }
+            }
+        }
+        updateViewModel.checkAtLaunch()
     }
 
     // 待办一旦出现就交给 launcher（首次启动那一次也走这条路，所以它同样会被弹出来）。
@@ -150,7 +180,7 @@ fun MspApp() {
             useDynamicColor = theme.useDynamicColor ?: MspThemeDefaults.USE_DYNAMIC_COLOR,
             colorFromArtwork = theme.colorFromArtwork ?: MspThemeDefaults.COLOR_FROM_ARTWORK,
         ) {
-            MspAppScaffold()
+            MspAppScaffold(updateViewModel = updateViewModel)
         }
     }
 }
@@ -247,6 +277,16 @@ private const val UPDATE_ROUTE = "settings/update"
 private const val STARTUP_PERMISSION_DELAY_MS = 1200L
 
 /**
+ * 等权限框被回答的最长时间（毫秒）。
+ *
+ * 权限框一般几秒内就有答案（点「允许」/「不允许」，或者在框外点一下把它关掉）。
+ * 这条上限防的是**永远等不到**：系统框在某些设备上可能既不回调也不关闭
+ * （用户把应用切到后台、框还挂在系统那边），那样一来更新检查就整次启动都不会发生。
+ * 30 秒之后再查——此时可能和权限框重叠，但重叠比「永远不查」好。
+ */
+private const val PERMISSION_SETTLE_TIMEOUT_MS = 30_000L
+
+/**
  * 本地翻译模型的下载与删除。
  *
  * 比 [TRANSLATION_SETTINGS_ROUTE] 多一层（挂在翻译设置下面）：它从那一页的
@@ -260,12 +300,15 @@ private const val STARTUP_PERMISSION_DELAY_MS = 1200L
 private const val LOCAL_MODEL_ROUTE = "settings/translation/local"
 
 @Composable
-private fun MspAppScaffold() {
+private fun MspAppScaffold(updateViewModel: UpdateViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val playbackViewModel: AppPlaybackViewModel = koinViewModel()
     val chrome = LocalAppChrome
+    // 启动弹窗的数据源。读的是 `MspApp` 建的那个实例（同一个 Activity 作用域），
+    // 所以用户在弹窗上点「忽略此版本」之后，更新页立刻也知道这一版被忽略了。
+    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
 
     // 切标签只在这里定义一次。播放页里的「去设置」也要走同一条路径：
     // 先摘掉播放页、再导航，否则返回栈里会叠成「播放页 → 设置」，
@@ -465,7 +508,14 @@ private fun MspAppScaffold() {
             }
 
             composable(UPDATE_ROUTE) {
-                UpdateRoute(onBack = { navController.popBackStack() })
+                // **显式传进去**，不用默认的 `koinViewModel()`：
+                // 默认那个会把实例挂在 `NavBackStackEntry` 上，于是更新页看到的
+                // 是一份全新的状态（「还没有检查过」），而启动弹窗说的是另一个实例
+                // 查到的东西。用户看到的就是「弹窗说有新版本、进去说没检查过」。
+                UpdateRoute(
+                    onBack = { navController.popBackStack() },
+                    viewModel = updateViewModel,
+                )
             }
             composable(APPEARANCE_SETTINGS_ROUTE) {
                 AppearanceSettingsRoute(onBack = { navController.popBackStack() })
@@ -477,5 +527,34 @@ private fun MspAppScaffold() {
                 AboutRoute(onBack = { navController.popBackStack() })
             }
         }
+    }
+
+    // 启动检查查到新版本时挂在屏幕上的那个框。
+    //
+    // 写在 `Scaffold` **外面**、`NavHost` 之外：它说的是一件和「用户当前在哪一页」
+    // 无关的事。放进导航图里（比如让设置页去渲染）的话，用户一按返回、或者自己进
+    // 设置页看了一眼又退出来，这个框就跟着那一页一起没了——而那正是用户还没做决定
+    // 的时候。放在这里，它一直挂到用户选中三个按钮里的一个。
+    updateState.startupPrompt?.let { release ->
+        StartupUpdateDialog(
+            release = release,
+            onUpdateNow = {
+                // 三步的顺序是有理由的：
+                // - **先关框**：不清掉 `startupPrompt` 的话，用户从更新页返回时会看到
+                //   一个已经过时的框（那时包可能正在下、或者已经下好了）；
+                // - **再跳页**：进度、失败重试、未知来源授权全在更新页上，用户得看着
+                //   它们；而安装那一刻要拉起系统安装器，那件事只能由一个**活着的**
+                //   页面来接（见 `StartupUpdateDialog` 的注释）；
+                // - **最后才开始下载**：`download()` 只写 ViewModel 状态，和跳页没有
+                //   竞争关系，但放在后面读起来就是「先让他看到进度条，再让它转起来」。
+                updateViewModel.dismissStartupPrompt()
+                // `launchSingleTop`：用户本来就停在更新页上时（弹窗是上一次启动留下的、
+                // 还没关掉），再压一页进去只会让返回键多按一次。
+                navController.navigate(UPDATE_ROUTE) { launchSingleTop = true }
+                updateViewModel.download()
+            },
+            onLater = updateViewModel::dismissStartupPrompt,
+            onIgnore = updateViewModel::ignoreStartupPrompt,
+        )
     }
 }

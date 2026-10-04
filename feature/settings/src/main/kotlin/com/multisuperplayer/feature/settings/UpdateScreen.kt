@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
+import com.multisuperplayer.core.data.update.UpdateCheckTrigger
 import com.multisuperplayer.core.data.update.UpdateRelease
 import com.multisuperplayer.core.data.update.UpdateSettings
 import com.multisuperplayer.core.ui.text.string
@@ -69,6 +70,13 @@ import kotlin.math.roundToInt
  * 不解析。GitHub 的发行说明是 Markdown，而渲染 Markdown 要引一个库、
  * 一套排版规则和一堆回归面；纯文本在这里是**够用**的——用户要看的是
  * 「这一版改了什么」，`- 修了「上一首」` 这种原始写法一眼也能读。
+ *
+ * ## [viewModel] 的默认值是给「单独用这一页」留的
+ *
+ * 正常路径上应用根（`MspApp`）会把它**显式传进来**，于是启动检查、启动弹窗和
+ * 这一页共享同一个实例。默认值（`koinViewModel()`）在这里会拿到挂在
+ * `NavBackStackEntry` 上的另一个实例，而那一份不知道启动时查到了什么、
+ * 也不知道包已经下好了——保留它只是为了让这个函数缺少外部接线时也能单独构造。
  */
 @Composable
 fun UpdateRoute(
@@ -94,7 +102,9 @@ fun UpdateRoute(
     // 进页面顺手查一次。**「自动检查」开关和 12 小时节流都在 `UpdateManager.check`
     // 里判**，不在这里判：这一层的 `settings` 首帧是默认值（很可能和用户设的不一样），
     // 拿它做判断等于用「还没读到的设置」替用户作决定。
-    LaunchedEffect(Unit) { viewModel.check(manual = false) }
+    // 启动时那一次检查走在前面（见 `UpdateViewModel.checkAtLaunch`），所以这里
+    // 绝大多数时候会被节流直接跳过——那是对的，不该为同一个问题问两遍。
+    LaunchedEffect(Unit) { viewModel.check(UpdateCheckTrigger.AUTO) }
 
     LaunchedEffect(viewModel) {
         viewModel.launch.collect { intent ->
@@ -110,7 +120,7 @@ fun UpdateRoute(
         settings = settings,
         buildInfo = viewModel.buildInfo,
         onBack = onBack,
-        onCheck = { viewModel.check(manual = true) },
+        onCheck = { viewModel.check(UpdateCheckTrigger.MANUAL) },
         onDownload = viewModel::download,
         onIgnore = viewModel::ignore,
         onUndoIgnore = viewModel::undoIgnore,

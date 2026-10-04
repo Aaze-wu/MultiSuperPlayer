@@ -346,6 +346,9 @@ class UpdateSummariesTest {
             "msp_update_undo_ignore",
             "msp_update_need_unknown_source",
             "msp_update_open_unknown_source",
+            "msp_update_startup_now",
+            "msp_update_startup_later",
+            "msp_update_startup_hint",
         )
     }
 }

@@ -305,7 +305,7 @@
       本版更新说明的正文。**每次发版都要改这一条，三份语言文件一起改**。
       `\n` 是换行；以「· 」开头的行在界面上按条目排版。
     -->
-    <string name="msp_settings_about_whats_new_body">本版给内嵌位图字幕开了一条通路，并把应用内更新分成两条通道。\n\n· 内嵌位图字幕（PGS / VobSub / DVB）能画出来了：这类轨带的是图、没有字，以前只会被当成「这条轨读不出来」，现在走单独的一层位图层，摆放公式逐行照抄 Media3 自己的排版；Media3 内置的字幕视图仍然遮着，所以内嵌文本字幕不会被画两份\n· 位图轨只认「显示模式」这一个开关：字幕延迟 / 字幕速率 / 字幕样式 / 整轨预读对它一律不生效（字已经画在图里了，也没有字可以翻），面板会写明原因，而不是让它看起来像一条坏轨\n· VobSub / DVB 的画形依赖片源初始化段里的调色板与尺寸，按「能用就用、认不出来就当这条轨没有」处理，目前有实测样本的只有 PGS\n· 更新分成「正式版 / 测试版」两条通道：正式版通道只收不带后缀的版本，测试版通道两条都收；alpha 从这一版起只作内部构建，任何通道都不收——本版就是测试版，默认停在正式版通道的人不会自动收到它\n· 此前一版：0.8.1 封面增强（列表 / 网格 / 播放页显示封面；自建磁盘缓存 + 最长边 512px + 同时最多解 2 张）\n\n已知限制：位图字幕的延迟 / 速率 / 样式 / 双语 / 翻译一律不生效，这是刻意取舍不是没做完；VobSub / DVB 只在片源带够初始化数据时才画得出来；封面仍是自动取的，没有「手动换一张」的入口；不含 32 位原生库。</string>
+    <string name="msp_settings_about_whats_new_body">本版给内嵌位图字幕开了一条通路，把应用内更新分成两条通道，并让更新真的会在启动时提醒你。\n\n· 内嵌位图字幕（PGS / VobSub / DVB）能画出来了：这类轨带的是图、没有字，以前只会被当成「这条轨读不出来」，现在走单独的一层位图层，摆放公式逐行照抄 Media3 自己的排版；Media3 内置的字幕视图仍然遮着，所以内嵌文本字幕不会被画两份\n· 位图轨只认「显示模式」这一个开关：字幕延迟 / 字幕速率 / 字幕样式 / 整轨预读对它一律不生效（字已经画在图里了，也没有字可以翻），面板会写明原因，而不是让它看起来像一条坏轨\n· VobSub / DVB 的画形依赖片源初始化段里的调色板与尺寸，按「能用就用、认不出来就当这条轨没有」处理，目前有实测样本的只有 PGS\n· 更新分成「正式版 / 测试版」两条通道：正式版通道只收不带后缀的版本，测试版通道两条都收；alpha 只作内部构建，任何通道都不收\n· 启动时自动查一次更新：有更新弹窗三键「立即更新 / 以后再说 / 忽略此版本」，没有更新什么都不提示，检查失败也只记日志不打扰；「自动检查更新」开关现在真的生效了——以前它只写不读，是个纯装饰\n· 此前一版：0.8.1 封面增强（列表 / 网格 / 播放页显示封面；自建磁盘缓存 + 最长边 512px + 同时最多解 2 张）\n\n已知限制：位图字幕的延迟 / 速率 / 样式 / 双语 / 翻译一律不生效，这是刻意取舍不是没做完；VobSub / DVB 只在片源带够初始化数据时才画得出来；封面仍是自动取的，没有「手动换一张」的入口；更新提示可能每隔 12 小时再出现一次，安静下来用「忽略此版本」；不含 32 位原生库。</string>
 
     <string name="msp_settings_view">查看</string>
 
@@ -578,7 +578,7 @@
     <string name="msp_update_channel_stable_desc">只接收正式版，最稳</string>
     <string name="msp_update_channel_beta_desc">正式版和测试版都接收，比正式版早一步</string>
     <string name="msp_update_auto_check">自动检查更新</string>
-    <string name="msp_update_auto_check_desc">打开这一页时顺手查一次，最快 12 小时一次</string>
+    <string name="msp_update_auto_check_desc">每次启动时查一次，进这一页也会查一次，最快 12 小时一次</string>
     <string name="msp_update_token">GitHub 令牌</string>
     <string name="msp_update_token_set">已填写</string>
     <string name="msp_update_token_unset">未填写，也能检查</string>
@@ -613,4 +613,7 @@
     <string name="msp_update_undo_ignore">撤销忽略</string>
     <string name="msp_update_need_unknown_source">系统还没有允许本应用安装应用。允许之后才能装上更新。</string>
     <string name="msp_update_open_unknown_source">去允许</string>
+    <string name="msp_update_startup_now">立即更新</string>
+    <string name="msp_update_startup_later">以后再说</string>
+    <string name="msp_update_startup_hint">点「立即更新」会进入更新页面，那里可以看到完整的更新说明并下载安装。</string>
 </resources>

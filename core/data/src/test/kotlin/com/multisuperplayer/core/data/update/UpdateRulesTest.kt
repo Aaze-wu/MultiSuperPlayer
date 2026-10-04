@@ -232,4 +232,90 @@ class UpdateRulesTest {
         assertTrue(UpdateChannel.BETA.allows(missed))
         assertFalse(UpdateChannel.STABLE.allows(missed))
     }
+
+    // ---- 自动检查的两条闸门（开关 + 节流）------------------------------------
+
+    private val now = 1_800_000_000_000L
+
+    @Test
+    fun `用户亲手点的那次检查永远不被跳过`() {
+        // 这一条同时覆盖了两个闸门都「该拦」的极端：开关关掉 + 十秒前刚查过。
+        // 用户点了「检查更新」，唯一的正确答案就是真的去问——否则界面会卡在
+        // 「还没有检查过」而他会一直点。
+        assertFalse(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.MANUAL,
+                autoCheck = false,
+                lastCheckAtEpochMs = now - 10_000,
+                atEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun `关掉自动检查后启动与进页面都不再查`() {
+        // 「自动检查更新」这个开关以前**只有人写、没有人读**：界面上关掉它，
+        // 启动时照样请求。这一条钉的就是那个读者存在。
+        assertTrue(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = false,
+                lastCheckAtEpochMs = null,
+                atEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun `开关没关但从未查过时要查`() {
+        // 首启动：`lastCheckAtEpochMs` 是 null，不能把 null 当成「刚查过」。
+        assertFalse(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = true,
+                lastCheckAtEpochMs = null,
+                atEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun `十二小时窗口内跳过`() {
+        assertTrue(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = true,
+                lastCheckAtEpochMs = now - (UpdateRules.AUTO_CHECK_INTERVAL_MS - 1),
+                atEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun `满十二小时之后要查`() {
+        // 边界取在「刚好等于」而不是「超过」：判据写的是 `< 间隔`，
+        // 而这条边界正好是「差一毫秒」的邻居——两边都钉住，改符号才会红。
+        assertFalse(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = true,
+                lastCheckAtEpochMs = now - UpdateRules.AUTO_CHECK_INTERVAL_MS,
+                atEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun `时钟回拨不当作已经查过很久`() {
+        // 用户手动改了系统时间（或时区跳到未来再调回来）之后 `at - last` 会是负数，
+        // 那依然落在「窗口内」——跳过是安全的一侧，查询次数少而不是多。
+        assertTrue(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = true,
+                lastCheckAtEpochMs = now + 60_000,
+                atEpochMs = now,
+            ),
+        )
+    }
 }
