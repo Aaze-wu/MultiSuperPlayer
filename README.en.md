@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.9.0-beta.1** (public beta)
+- Current version: **0.9.0** (stable)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -543,6 +543,9 @@ Row 8 of the Settings hub is *Check for updates*, which opens a page with three 
 **Update available** (only shown when one is really found: tag, publish time, the full release notes,
 *Download and install* / *Ignore this version*), and **Update settings**
 (update channel / check automatically / GitHub token).
+**That single *check automatically* switch governs both the check at launch and the check when you
+open this page** — turning it off turns both off, while pressing *Check* yourself always works; with
+it off not a single network request is sent.
 
 - **Source:** GitHub Releases (`Aaze-wu/MultiSuperPlayer`) over the anonymous API.
 - **The token is optional.** It works without one; supplying one only raises the limit from
@@ -587,6 +590,36 @@ feature:
 
 The step-by-step operations for this ladder (which line to edit, which command to run, what to
 verify afterwards) are in [`docs/release-process.md`](docs/release-process.md) (Chinese).
+
+#### The check at launch
+
+The app checks once for updates when it starts (after the permissions flow that follows a fresh
+install, so two dialogs never stack). If an update is found it shows a three-button dialog; **if
+nothing is found it says nothing at all** — and a failed launch check only writes one log line,
+never a "network error" popup: the user merely opened the app and asked for nothing.
+
+| Button | What it does | Next launch |
+| --- | --- | --- |
+| Update now | Closes the dialog, opens the update page, and only then starts the download | Checks as usual |
+| Later | Closes **this** dialog only | Will show up again |
+| Ignore this version | Remembers the tag (persisted) | Stays quiet as long as that is still the newest |
+
+Three of those deserve a reason:
+
+- **"Later" deliberately is not persisted.** It means "not now", not "never mention it again" —
+  the button next to it is the one for that.
+- **"Update now" does not download from inside the dialog.** The download ends by launching the
+  system installer, and that `Intent` needs a **resident** screen to receive it — once the dialog is
+  gone there is nowhere to deliver it, so the user would see "download complete" and never see the
+  installer. Hence: navigate to the update page first, start the download there.
+- **There is exactly one `UpdateViewModel`** (created at the app root) and it is passed explicitly
+  to both the update page and the dialog. Otherwise "the instance the page got" and "the instance the
+  dialog uses" are two different objects (each `NavBackStackEntry` scope has its own), producing
+  "I pressed ignore in the dialog and the page still says an update is available".
+
+As long as a newer version exists the verdict stays `Available`, so the dialog **may** reappear every
+12 hours. That is on purpose: staying quiet is a better way to make someone miss an update than
+mentioning it once too often — and *Ignore this version* is there when you want quiet.
 
 #### The check layer does not know about GitHub
 
@@ -710,8 +743,9 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.8.0-alpha.1** | **Subtitle rate (proportional nudging: five presets plus ±0.01 / ±0.10, the counterpart to the timeline offset's *shift*) + a full read-ahead of the embedded subtitle track (the prerequisite for the rate to work in both directions, and for subtitles to be there the moment you open a file) + a rework of the lyrics space on the audio page (the portrait artwork gives way to the lyrics, and the chips and transport controls move into the left column in landscape)** | Done |
 | **v0.8.0-alpha.2** | **Drag-to-reorder auto-scroll (one implementation shared by the queue panel and playlists: it starts within 72dp of the edge and speeds up the closer you get, computed as *speed x frame interval* so the device's refresh rate does not change the feel) + an equalizer (a switch / 8 built-in presets / 5 gain sliders / a reset; the curve is stored by frequency so it stays the same curve on another device); also fixes "long-press dragging does nothing at all" (`positionChange()` is a constant 0 when there are no MotionEvent history samples)** | Done |
 | **v0.8.1** | **Artwork: lists, the grid and the player page now show covers (audio reads its embedded cover; video reads an embedded cover or, failing that, has a frame extracted at 10% of the duration, retrying at 40% when that frame is too dark); a disk cache of our own with a 512px cap and at most 2 concurrent decodes; also fixes the three-state colouring in the built-in browser (playable / subtitle / other)** | Done |
-| **v0.9.0-beta.1** | **Embedded bitmap subtitles (PGS / VobSub / DVB) get a bitmap layer of their own (the layout arithmetic is copied line for line from Media3, and Media3's built-in `SubtitleView` stays covered so text subtitles are never painted twice); a bitmap track honours only the display mode, while delay / rate / styling and whole-track pre-reading do nothing for it and the panel says why; in-app updates split into a stable and a beta channel (the channel is decided by the tag, not by GitHub's prerelease flag, and alpha builds become internal only, accepted by no channel)** | **Current (beta)** |
-| Later | **0.9.0** stable (drop the suffix once the beta has been tested) -> **1.0**; audio translation (dubbing) lands after stable | Planned |
+| **v0.9.0-beta.1** | **Embedded bitmap subtitles (PGS / VobSub / DVB) get a bitmap layer of their own (the layout arithmetic is copied line for line from Media3, and Media3's built-in `SubtitleView` stays covered so text subtitles are never painted twice); a bitmap track honours only the display mode, while delay / rate / styling and whole-track pre-reading do nothing for it and the panel says why; in-app updates split into a stable and a beta channel (the channel is decided by the tag, not by GitHub's prerelease flag, and alpha builds become internal only, accepted by no channel)** | Done |
+| **v0.9.0** | **An update check at launch (a newer version brings a three-button dialog - *Update now* / *Later* / *Ignore this version* - while no update says nothing at all, and a failure stays completely silent with a single log line), plus the previously decorative *check automatically* switch is now real: the value was written to settings but read by nobody, and it is now judged by `UpdateRules.skipsAutoCheck`, so with it off not one network request is sent** | **Current (stable)** |
+| Later | **1.0**; audio translation (dubbing) lands after 1.0 | Planned |
 
 ---
 
