@@ -288,6 +288,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 
+    // 封面：`MspApp` 要在这里注册应用级单例 ImageLoader（`SingletonImageLoader.Factory`），
+    // 把 core:data 的抽帧 Fetcher 装进去。**只在这里注册一次**：每个模块各造一个
+    // ImageLoader 会得到多个互不可见的内存缓存，同一张封面在列表与播放页各解码一遍。
+    implementation(libs.coil.compose)
+
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
 

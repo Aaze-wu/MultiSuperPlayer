@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.Close
@@ -38,8 +40,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.multisuperplayer.core.common.format.TimeFormat
+import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.ui.artwork.ArtworkImage
 import com.multisuperplayer.core.ui.text.displayTitle
 import com.multisuperplayer.core.ui.text.string
 
@@ -109,7 +113,19 @@ internal fun MediaEntryRow(
                     // 否则会出现「点空白处进多选、点勾选框没反应」这种不一致。
                     Checkbox(checked = selected, onCheckedChange = null)
                 } else {
-                    Icon(imageVector = entry.kind.icon, contentDescription = entry.kind.label())
+                    // 封面槽位。取不到封面（内嵌封面、损坏的文件、非本地来源）时
+                    // 它自己会退回到下面这个类型图标，所以这一行不用管「有没有图」——
+                    // 这也是 [ArtworkImage] 把图标垫在底层的原因：
+                    // 列表滚动时一行会经历「无图 → 有图」，垫着的图标让这个过渡
+                    // 只表现为图片淡入，而不是先闪一块空白。
+                    ArtworkImage(
+                        request = ArtworkSourceRules.requestFor(entry),
+                        fallbackIcon = entry.kind.icon,
+                        contentDescription = entry.kind.label(),
+                        modifier = Modifier.size(ArtworkSizes.LIST),
+                        shape = ArtworkSizes.LIST_SHAPE,
+                        fallbackIconSize = ArtworkSizes.LIST_ICON,
+                    )
                 }
             },
             trailingContent = trailing ?: { EntryDuration(entry) },
@@ -301,11 +317,35 @@ internal fun MediaKind.label(): String = stringResource(
 /**
  * 类型图标。
  *
- * 项目里没有图片加载库（也不打算为了封面再引一个），所以封面位置画类型图标：
- * 它至少能回答「这条是音频还是视频」，而一个永远空着的占位图什么都回答不了。
+ * 现在它是 [ArtworkImage] 的**回退图标**，不再是封面的替代品：
+ * 能不能拿到真封面由 `core:data` 的取图仓库决定（内嵌封面、视频抽帧、磁盘缓存），
+ * 这里只负责「真的没有图的时候画什么」。
+ * 图标至少能回答「这条是音频还是视频」，而一个永远空着的占位图什么都回答不了。
  */
 internal val MediaKind.icon: ImageVector
     get() = when (this) {
         MediaKind.VIDEO -> Icons.Outlined.Movie
         MediaKind.AUDIO, MediaKind.UNKNOWN -> Icons.Outlined.MusicNote
     }
+
+/**
+ * 封面的尺寸规格。
+ *
+ * 只存在于界面层：`ArtworkLoader` 一律出 512 长边的图，用多大的框显示是
+ * 调用方的事（而且同一个磁盘文件要同时服务列表里的小方框和播放页的大圆图，
+ * 尺寸进缓存键的话它们就各存一份了）。
+ */
+internal object ArtworkSizes {
+
+    /** 列表行左槽的宽高。比 Material 默认的 40dp 图标位略大，正好装满不挤文字。 */
+    val LIST = 44.dp
+
+    /** 小圆角方框：方形封面裁成圆角比正圆多留住一圈画面，行列对齐也更整齐。 */
+    val LIST_SHAPE = RoundedCornerShape(6.dp)
+
+    /** 回退图标在 44dp 框里的尺寸，沿用列表图标的视觉重量。 */
+    val LIST_ICON = 22.dp
+
+    /** 网格视图的封面是整格大小，回退图标也得跟着变大，否则一格中央一个小音符。 */
+    val TILE_ICON = 32.dp
+}

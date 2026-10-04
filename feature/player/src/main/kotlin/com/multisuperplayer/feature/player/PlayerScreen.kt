@@ -40,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -57,6 +56,7 @@ import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.subtitleSourceOfDocument
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.common.text.MspText
+import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.player.MspDecoderKind
@@ -66,6 +66,7 @@ import com.multisuperplayer.core.player.SleepTimerState
 import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
+import com.multisuperplayer.core.ui.artwork.ArtworkImage
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
 import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
@@ -1675,10 +1676,17 @@ private fun AudioStage(
 }
 
 /**
- * 音频封面占位。
+ * 音频封面。
  *
- * TODO(封面): 拿到 `entry.artworkUri` 后用 `ContentResolver.loadThumbnail()` 取内嵌封面，
- * 再用 palette-ktx 从封面里取主题色。现在先只画一个音符。
+ * 取图这一层完全是 [ArtworkImage] 的事：内嵌封面优先、没有就退回音符图标，
+ * 而且它自己管内存缓存与失败降级。这个函数只剩一个职责——
+ * 「把这个封面画成多大的圆」。
+ *
+ * 圆形会裁掉正方形封面的四个角。这是刻意的：音频页的封面在视觉上一直是唱片，
+ * 而且回退的那张（音符 + 灰底圆）只有在圆形轮廓下才看着像是设计过的，
+ * 而不是一张没加载出来的图。
+ *
+ * 从封面里取主题色（palette）是另一件事，归主题系统管，不在这条路径上。
  */
 @Composable
 private fun AudioArtwork(
@@ -1686,21 +1694,15 @@ private fun AudioArtwork(
     size: Dp = 220.dp,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            // 图标跟着封面等比缩：写死 96dp 的话，缩小的封面里会被音符撑满。
-            modifier = Modifier.size(size * 0.44f),
-        )
-    }
+    ArtworkImage(
+        request = ArtworkSourceRules.requestFor(entry),
+        fallbackIcon = Icons.Filled.MusicNote,
+        contentDescription = null,
+        modifier = modifier.size(size),
+        shape = CircleShape,
+        // 图标跟着封面等比缩：写死 96dp 的话，缩小的封面里会被音符撑满。
+        fallbackIconSize = size * 0.44f,
+    )
 }
 
 @Composable

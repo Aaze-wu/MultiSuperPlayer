@@ -66,6 +66,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -77,9 +78,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.model.Playlist
+import com.multisuperplayer.core.ui.artwork.ArtworkImage
 import com.multisuperplayer.core.ui.text.displayTitle
 import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
@@ -638,10 +641,18 @@ private fun MediaEntryTile(
             modifier = Modifier.fillMaxWidth().aspectRatio(1f),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = entry.kind.icon,
+                // 网格视图里封面就是这一格的全部内容，所以它铺满整格；
+                // 圆角由外面那个 Surface 裁（连选中底色一起裁），
+                // 所以这里不重复画背景，也不重复裁一遍。
+                ArtworkImage(
+                    request = ArtworkSourceRules.requestFor(entry),
+                    fallbackIcon = entry.kind.icon,
                     contentDescription = entry.kind.label(),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.matchParentSize(),
+                    fallbackIconSize = ArtworkSizes.TILE_ICON,
+                    // 底色留给 Surface：选中态的 secondaryContainer 画在这里会漏掉，
+                    // 而它正是「已选中」在网格视图里的唯一提示。
+                    fallbackContainer = Color.Transparent,
                 )
                 if (selectionMode) {
                     Checkbox(

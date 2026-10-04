@@ -63,6 +63,10 @@ dependencies {
 
     // 从封面里量化出种子色（ArtworkPaletteRepository）
     implementation(libs.androidx.palette.ktx)
+    // 封面的取图与落盘缓存（ArtworkFetcher / ArtworkLoader）。
+    // 用 `coil-core` 而不是 `coil-compose`：这里只需要 Fetcher / Keyer / ImageSource，
+    // 界面的那部分（AsyncImage）在 core:ui。
+    implementation(libs.coil.core)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.koin.android)

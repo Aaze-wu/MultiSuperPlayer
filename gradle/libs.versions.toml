@@ -74,6 +74,23 @@ nextlib = "1.11.1-0.16.0"
 # 所以不受 `minCompileSdk` / `minAndroidGradlePluginVersion` 那两条例约束缚。
 litertlm = "0.17.1"
 
+# 图片加载（封面）。
+#
+# 🔴 **不要升到 3.6.x。** 3.6.0 / 3.6.3 的 `coil-core-android` AAR 元数据里
+#    `minCompileSdk=37`（本项目 36），而且它的 Compose 构件是按 JetBrains Compose
+#    Multiplatform 1.12.0 构建的：`org.jetbrains.compose.foundation:foundation:1.12.0`
+#    会把整条 androidx compose 栈从 BOM 给的 1.11.4 顶到 1.12.0（报错说“requires
+#    Android Gradle plugin 9.1.0”，但真正的元凶不是 AGP 而是这条传递依赖）。
+#    AAR 元数据在这里是唯一可信的判据：Maven 页面不写这两个键，版本目录更不会报。
+#
+# 3.5.0 实测可过：`minCompileSdk=36`、JB compose 1.11.1（低于 BOM 的 1.11.4，
+# 不会向上顶）。升版本之前先跑一次 `:core:data:checkDebugAarMetadata`。
+#
+# ⚠️ **不要**加 `coil-network-okhttp` / `coil-network-ktor`：本项目只从本机
+#    （`content://` / `file://`）取图，网络封面是明确不做的（见 `ArtworkSourceRules`）。
+#    多一个网络模块就多一个 OkHttp 版本要和 media3-datasource-okhttp 对齐。
+coil = "3.5.0"
+
 # KotlinX
 coroutines = "1.11.0"
 serialization = "1.11.0"
@@ -128,6 +145,14 @@ nextlib-media3ext = { module = "io.github.anilbeesetti:nextlib-media3ext", versi
 # 只在 `:core:llm` 里以 `implementation` 引入：`Engine` / `Conversation` 这些类型
 # 不该出现在任何别的模块的公开签名里（否则换引擎要改一大片）。
 litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
+
+# --- 图片加载（封面）---
+# `coil-core`：只做取图/解码/缓存，不含单例与 Compose 组件。数据层只需要它
+# （自定义 Fetcher 与 Keyer 都在这个构件里），不需要把 Compose 拖进 core:data。
+coil-core = { module = "io.coil-kt.coil3:coil-core", version.ref = "coil" }
+# `coil-compose`：`AsyncImage` / `ImageRequest` 以及单例 `SingletonImageLoader`
+# （后者在它的传递依赖 `io.coil-kt.coil3:coil` 里，声明这一个就够）。
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 
 # --- KotlinX ---
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

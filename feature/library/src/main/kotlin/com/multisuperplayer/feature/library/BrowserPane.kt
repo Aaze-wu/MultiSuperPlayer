@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -46,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,7 +55,9 @@ import com.multisuperplayer.core.data.browser.BrowserContent
 import com.multisuperplayer.core.data.browser.BrowserSort
 import com.multisuperplayer.core.data.browser.BrowserTrail
 import com.multisuperplayer.core.data.subtitle.subtitleFileExtensions
+import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.BrowserEntry
+import com.multisuperplayer.core.ui.artwork.ArtworkImage
 import com.multisuperplayer.core.ui.text.string
 
 /**
@@ -345,23 +349,49 @@ private fun BrowserEntryRow(
                 if (selectionMode) {
                     Checkbox(checked = selected, onCheckedChange = null, enabled = selectable)
                 } else {
-                    Icon(
-                        // 目录用文件夹图标；文件按类型画（视频/音频/字幕/其他）。
-                        // 三种一眼可分，比统一的文件图标多一层信息，代价只有一个 `when`。
-                        imageVector = when {
-                            directory -> Icons.Outlined.FolderOpen
-                            // 字幕图标只有 Filled 一种变体（Material Icons 没给 Outlined）。
-                            // 与播放页控制栏上的字幕按钮用同一个，用户一眼能对上。
-                            subtitle -> Icons.Filled.Subtitles
-                            else -> entry.kind?.icon ?: Icons.AutoMirrored.Outlined.Article
-                        },
-                        contentDescription = null,
-                        tint = if (directory || entry.playable || subtitle) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
+                    // 目录用文件夹图标；文件按类型画（视频/音频/字幕/其他）。
+                    // 三种一眼可分，比统一的文件图标多一层信息，代价只有一个 `when`。
+                    val icon = when {
+                        directory -> Icons.Outlined.FolderOpen
+                        // 字幕图标只有 Filled 一种变体（Material Icons 没给 Outlined）。
+                        // 与播放页控制栏上的字幕按钮用同一个，用户一眼能对上。
+                        subtitle -> Icons.Filled.Subtitles
+                        else -> entry.kind?.icon ?: Icons.AutoMirrored.Outlined.Article
+                    }
+                    // 目录/可播放/字幕用 primary，其余用 onSurfaceVariant。
+                    // 有真封面的时候不再套这层颜色（那只会让图看着发暗），
+                    // 所以它只用在回退图标上。
+                    val tint = if (directory || entry.playable || subtitle) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    // 只有可播放的音视频能拿到请求（`requestFor` 内部要求 `playable`），
+                    // 所以目录行和字幕行走的一定还是上面那个图标，
+                    // 它们在文件浏览器里的样子和以前完全一样。
+                    val request = ArtworkSourceRules.requestFor(entry)
+                    if (request == null) {
+                        Icon(imageVector = icon, contentDescription = null, tint = tint)
+                    } else {
+                        ArtworkImage(
+                            request = request,
+                            fallbackIcon = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(ArtworkSizes.LIST),
+                            shape = ArtworkSizes.LIST_SHAPE,
+                            fallbackIconSize = ArtworkSizes.LIST_ICON,
+                            // 这一行的底色跟着选中态变（surface / secondaryContainer），
+                            // 这里画不出正确的那个，所以底色留给行自己。
+                            fallbackContainer = Color.Transparent,
+                            // `tint` 必须一起传下来。可播放的文件**一定**走这个分支
+                            // （`request` 不为空 = 它可播放），所以不传就等于把
+                            // 「紫色 = 能播」这条提示从恰好没有封面的文件上抹掉：
+                            // 它们会退回 `ArtworkImage` 的默认色（onSurfaceVariant），
+                            // 和旁边不能播的文件长得一模一样。取不到真图时垫在底层
+                            // 的正是这个图标，所以它才是这条颜色唯一的落点。
+                            fallbackTint = tint,
+                        )
+                    }
                 }
             },
             headlineContent = {

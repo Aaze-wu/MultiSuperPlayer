@@ -6,6 +6,7 @@ import com.multisuperplayer.core.asr.AsrModelLocator
 import com.multisuperplayer.core.asr.AsrTranscriber
 import com.multisuperplayer.core.asr.CloudAsrTranscriber
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
+import com.multisuperplayer.core.data.artwork.ArtworkLoader
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.browser.BrowserRepository
 import com.multisuperplayer.core.data.browser.StorageAccess
@@ -131,6 +132,11 @@ val dataModule = module {
     }
 
     single { ArtworkPaletteRepository(context = androidContext(), dispatchers = get()) }
+
+    // 封面取图（列表缩略图 + 播放页大图）。和上面那个取色仓库看着像、其实不是一条路：
+    // 那个要 96×96 的取色种子，这个要 512 长边的图、视频抽帧、亮度重试和磁盘缓存。
+    // 为什么不合并、为什么要自己的磁盘缓存，见 ArtworkLoader 的类注释。
+    single { ArtworkLoader(context = androidContext(), dispatchers = get()) }
 
     single { SubtitleFileLocator(context = androidContext()) }
 
