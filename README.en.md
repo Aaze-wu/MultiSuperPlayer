@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.8.0-alpha.1** (pre-release)
+- Current version: **0.8.0-alpha.2** (pre-release)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -27,6 +27,11 @@ Release notes: [docs/release-notes](docs/release-notes/)
   horizontal drag seeks, double-tap on either side seeks ±10 s.
 - **Speed**: 10 steps from 0.25x to 4x, plus a separate "long-press speed" you can trigger by holding the screen.
 - **A-B repeat** with three states (set A, set B, clear).
+- **Equalizer**: a switch, 8 built-in presets (flat / bass / treble / vocal / rock / pop / jazz /
+  classical), 5 gain sliders (±12 dB, intersected with what the device reports) and a one-tap reset;
+  the sound follows the slider while you drag it. The curve is stored by frequency, so it stays the
+  same curve on another device; a device that cannot create the effect (an emulator, for instance)
+  says so instead of pretending.
 - **Resume position** for both audio and video. Reaching 95% counts as "finished", so the next
   play starts from the beginning (the record is **kept**, not deleted); playback shorter than
   15 seconds records "it was played" but no position.
@@ -265,8 +270,13 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
   reordered by **long-pressing a whole row**. The order is saved (it survives killing and reopening the
   app). A playlist list's order is stored separately as a string of ids and **not written into the
   playlists themselves**, so the storage format is unchanged and upgrading needs no migration; playlists
-  missing from that order fall back to creation time, which puts **a new playlist at the end**. Dragging
-  does **not auto-scroll**: when a list is longer than one screen, scroll near the target first.
+  missing from that order fall back to creation time, which puts **a new playlist at the end**.
+  **Dragging near the top or bottom edge scrolls the list by itself** (it starts within 72dp of the
+  edge and speeds up the closer you get, capping at roughly one screen per second), so a list longer
+  than one screen can be dragged all the way in one go. The scroll is *speed × this frame's actual
+  interval* rather than a fixed number of pixels per frame (a fixed step would scroll twice as fast on
+  a 120Hz device), and however far the list really scrolled is folded into the drop-target arithmetic
+  — so "the list scrolled but the drop target stayed put" cannot happen.
 
 ### 1.7 Built-in file browser
 
@@ -642,8 +652,9 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.6.8** | **Background keep-alive: a new *Background keep-alive* page in Settings requests the battery-optimisation exemption with one tap (the switch re-reads the system state every time the page is resumed instead of keeping a local copy) and opens the vendor's own background-management page (Xiaomi / Huawei / Honor / OPPO / vivo / Meizu / Samsung / OnePlus, falling back to the app info page for unknown vendors); the permissions page's collapsible section gains *ignore battery optimizations*** | Done |
 | **v0.7.0-alpha.1** | **App updates: a new *Check for updates* page in Settings checks, downloads and installs new versions from GitHub Releases (the source sits behind an interface so more channels can be added); sha256 plus package-name and signature verification; the APK is handed to the installer through a `FileProvider`; an optional GitHub token stored on-device and encrypted; eight failure classes reported separately** | Done |
 | **v0.7.0-alpha.2** | **Embedded-subtitle wording fixes: the title slot now reads *Embedded subtitle 1* instead of a bare language tag, a *No line read yet* hint covers the window before the first cue arrives, and *This file has subtitle tracks; pick one above.* replaces the blanket *nothing is attached* claim; a selected embedded text track is now claimed as soon as the track list arrives instead of waiting for its first cue** | Done |
-| **v0.8.0-alpha.1** | **Subtitle rate (proportional nudging: five presets plus ±0.01 / ±0.10, the counterpart to the timeline offset's *shift*) + a full read-ahead of the embedded subtitle track (the prerequisite for the rate to work in both directions, and for subtitles to be there the moment you open a file) + a rework of the lyrics space on the audio page (the portrait artwork gives way to the lyrics, and the chips and transport controls move into the left column in landscape)** | **Current** |
-| Later | drag-to-reorder auto-scroll / equalizer (**not scheduled yet**) -> **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
+| **v0.8.0-alpha.1** | **Subtitle rate (proportional nudging: five presets plus ±0.01 / ±0.10, the counterpart to the timeline offset's *shift*) + a full read-ahead of the embedded subtitle track (the prerequisite for the rate to work in both directions, and for subtitles to be there the moment you open a file) + a rework of the lyrics space on the audio page (the portrait artwork gives way to the lyrics, and the chips and transport controls move into the left column in landscape)** | Done |
+| **v0.8.0-alpha.2** | **Drag-to-reorder auto-scroll (one implementation shared by the queue panel and playlists: it starts within 72dp of the edge and speeds up the closer you get, computed as *speed x frame interval* so the device's refresh rate does not change the feel) + an equalizer (a switch / 8 built-in presets / 5 gain sliders / a reset; the curve is stored by frequency so it stays the same curve on another device); also fixes "long-press dragging does nothing at all" (`positionChange()` is a constant 0 when there are no MotionEvent history samples)** | **Current** |
+| Later | **0.8.1** artwork improvements -> **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
 
 ---
 
@@ -979,11 +990,16 @@ These are deliberate for this release, not oversights:
     and **none of that is corrected automatically** — the sheet cannot even show "this line had low
     confidence", because the result is just an ordinary SRT. Improving it means running recognition
     again, switching models, or overriding it with an external subtitle.
-15. **Dragging does not auto-scroll.** Dragging a row to the very edge of the screen does not scroll
-    the list, so a target off screen means scrolling near it first. A "keep scrolling while near the
-    edge" loop is the obvious fix, but it feeds back into `LazyListState`'s visible-items callback
-    (scroll a bit, row height changes, the drop target changes) and that cycle has to be broken
-    cleanly first. Left for a later release.
+15. **Whether the equalizer works, and how far you can push it, depends on the device and the current
+    audio session.** Band count, per-band centre frequency and gain range all come from
+    `android.media.audiofx.Equalizer` *on this device*: an emulator and some devices cannot create the
+    effect at all (the sheet says so outright — a quiet degradation, never a crash) and others report
+    only half the range. The slider span is the **intersection** of our own ±12 dB and the device's, so
+    unreachable values are clamped rather than "drag it and nothing happens" (which is extremely hard
+    to recognise on a real device). The sheet always draws five sliders on the standard frequencies:
+    the device's band count is only known once playback starts, and following it would make the sheet
+    change from 5 to 10 sliders under the user's eyes. The curve is stored by frequency and
+    interpolated when applied, so the same setting stays the same curve on another device.
 16. **The on-device translation model is not bundled either, and it runs on the CPU only.** It is about
     345 MB, the same trade as the speech recognition models: bundling it would make everyone who does not
     want the feature wait through an extra download. The cost is that the first run needs the download
