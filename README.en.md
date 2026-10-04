@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.9.0** (stable)
+- Current version: **1.0.0** (stable)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -175,6 +175,11 @@ Release notes: [docs/release-notes](docs/release-notes/)
 device)*, where the model runs on the phone and the subtitle text never leaves it (see section 1.9).
 - **Batching and caching** with context lines and a glossary. Results are cached by a hash of
   (content, target language, model), so identical content is never paid for twice.
+- **The cache can be cleared**: Settings → Translation → clear cache. It deletes the cache file only
+  (the next translation simply regenerates it) and **never touches hand-edited translations** — those
+  live in a separate directory, one file per media file, and they are the user's own work rather than a
+  record of "what the model said once". Merging two buttons that look alike would cost the user their
+  edits the first time they tapped it.
 - **Glossary**: names and proper nouns are replaced with placeholders before the request and restored
   afterwards, so the model cannot silently rewrite them.
 - **The example in the prompt follows the target language**: the "input / output" sample is generated for
@@ -193,8 +198,16 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
 ### 1.4 Theme
 
 - **Base theme**: follow system / light / dark / pure black (OLED).
-- **Color source**: system dynamic color (Android 12+), artwork color extraction, or a fixed accent
-  (6 presets).
+- **Color source**: system dynamic color (Android 12+), artwork color extraction, a fixed accent
+  (6 presets), or a **custom accent**.
+- **The custom accent is three sliders** — hue / saturation / lightness — with a live preview of both
+  bases (light and dark) above them; the value is written to disk when you let go, not on every frame.
+  Lightness is clamped to 10%-80%: a pure black or pure white accent means "the user has broken the UI
+  and there is no way back", while the UI is at that very moment using that colour to say which controls
+  are tappable. The sliders **do not preload the current colour**: converting an existing colour back to
+  HSL loses information (clamp it once and it never returns), so a defensible starting point beats a fake
+  pretence of precision. The custom colour and the preset accents are **mutually exclusive** — picking a
+  custom colour unticks every preset, and going back to any preset deletes the custom colour.
 - The difference between dark and pure black only shows up on a real device: pure black is `#000000`,
   which is what OLED power saving and contrast actually need.
 - The theme swaps the **entire tree**, not just the widgets the app draws itself: `MspTheme` sits at the
@@ -293,6 +306,38 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
   interval* rather than a fixed number of pixels per frame (a fixed step would scroll twice as fast on
   a 120Hz device), and however far the list really scrolled is folded into the drop-target arithmetic
   — so "the list scrolled but the drop target stayed put" cannot happen.
+- **Exporting the play history and playlists**: the Recent page exports every recent entry, the
+  playlist list page exports **all** playlists, and the playlist detail page exports only the one you
+  opened. Two formats, for two different reasons: **CSV** is for people and spreadsheets (Chinese
+  headers, duration given both as `mm:ss` and as milliseconds so it can actually be sorted, and a
+  UTF-8 BOM, without which a double-click in a Simplified-Chinese environment shows mojibake), while
+  **JSON** is for programs and backups (it keeps the "which playlist holds which tracks" structure and
+  distinguishes `0` from "absent"). **M3U8 is deliberately not offered**: that is a "hand this to a
+  player and press play" format, and mixing it in would make users expect the exported file to open
+  elsewhere.
+  Three trade-offs worth stating: **missing entries are exported anyway** (playlists deliberately keep
+  them, and dropping them would make the file disagree with "what this player would actually play" —
+  which is probably the one thing the user wanted to know, so each row carries a "file is gone" column
+  and lets the receiver decide); **the export writes the data that is on screen**, it does not re-read
+  the repository (re-reading introduces a time gap in which deleted entries come back and titles change,
+  and the user outside the app has no way to explain that); and **an empty result is not a failure**
+  (a user who has not created a single playlist yet does not deserve a red error for tapping export).
+  The file is written through the system picker, so no storage permission is needed.
+- **Export runs both ways: playlists can be imported.** The playlist list page has an *Import* action;
+  pick a file you exported earlier and **every playlist inside it becomes one playlist** (play history
+  is out of scope — that is a log, not a list). Four deliberate decisions: **the format is recognised
+  from the content, not the extension** (a `playlists.txt` holding JSON still reads correctly, since
+  renaming files is far too common); **columns are matched by header name, in all three languages**
+  (CSV headers follow the interface language, so import looks columns up through an alias table —
+  `List` / `列表` / `清單` — rather than by position, which is what makes a file exported under another
+  language, or one somebody sent you, still readable); **a single-collection CSV has no "playlist"
+  column at all**, so the **file name** becomes the playlist name (minus the `-yyyyMMdd-HHmmss`
+  suffix) — that is exactly what the play history exported from the Recent page looks like; and
+  **a name clash is never decided for you**: when a playlist in the file already exists, a dialog asks
+  *merge* or *new*, with a "do this for the rest" checkbox when several clash (merging **appends and
+  de-duplicates**, so an entry already in the list does not become two).
+  Imported entries go through the same "not in the library ⇒ mark it, keep its place" rules, so
+  importing a file full of tracks this device does not have cannot break the playlist.
 
 ### 1.7 Built-in file browser
 
@@ -744,8 +789,9 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.8.0-alpha.2** | **Drag-to-reorder auto-scroll (one implementation shared by the queue panel and playlists: it starts within 72dp of the edge and speeds up the closer you get, computed as *speed x frame interval* so the device's refresh rate does not change the feel) + an equalizer (a switch / 8 built-in presets / 5 gain sliders / a reset; the curve is stored by frequency so it stays the same curve on another device); also fixes "long-press dragging does nothing at all" (`positionChange()` is a constant 0 when there are no MotionEvent history samples)** | Done |
 | **v0.8.1** | **Artwork: lists, the grid and the player page now show covers (audio reads its embedded cover; video reads an embedded cover or, failing that, has a frame extracted at 10% of the duration, retrying at 40% when that frame is too dark); a disk cache of our own with a 512px cap and at most 2 concurrent decodes; also fixes the three-state colouring in the built-in browser (playable / subtitle / other)** | Done |
 | **v0.9.0-beta.1** | **Embedded bitmap subtitles (PGS / VobSub / DVB) get a bitmap layer of their own (the layout arithmetic is copied line for line from Media3, and Media3's built-in `SubtitleView` stays covered so text subtitles are never painted twice); a bitmap track honours only the display mode, while delay / rate / styling and whole-track pre-reading do nothing for it and the panel says why; in-app updates split into a stable and a beta channel (the channel is decided by the tag, not by GitHub's prerelease flag, and alpha builds become internal only, accepted by no channel)** | Done |
-| **v0.9.0** | **An update check at launch (a newer version brings a three-button dialog - *Update now* / *Later* / *Ignore this version* - while no update says nothing at all, and a failure stays completely silent with a single log line), plus the previously decorative *check automatically* switch is now real: the value was written to settings but read by nobody, and it is now judged by `UpdateRules.skipsAutoCheck`, so with it off not one network request is sent** | **Current (stable)** |
-| Later | **1.0**; audio translation (dubbing) lands after 1.0 | Planned |
+| **v0.9.0** | **An update check at launch (a newer version brings a three-button dialog - *Update now* / *Later* / *Ignore this version* - while no update says nothing at all, and a failure stays completely silent with a single log line), plus the previously decorative *check automatically* switch is now real: the value was written to settings but read by nobody, and it is now judged by `UpdateRules.skipsAutoCheck`, so with it off not one network request is sent** | Done |
+| **v1.0.0** | **Localization finished (`MspText` moves down from `core:common` into the dependency-free `core:model`; `core:subtitle` parse warnings change from `List<String>` to `List<MspText>`, so the English and Traditional Chinese UIs no longer show Simplified Chinese warnings) + custom accent colour (hue / saturation / lightness sliders with a live preview, mutually exclusive with the presets) + a clear button for the translation cache (deletes the cache only, never hand-edited translations) + exporting the play history and playlists (CSV + JSON; missing entries are exported and flagged; both an all and a single entry point) + importing playlists (both exported formats read back; the format is recognised from the content and columns from their names in any of the three languages; a name clash asks merge or new)** | **Current (stable)** |
+| Later | Audio translation (dubbing) | Planned |
 
 ---
 
@@ -840,7 +886,7 @@ The version lives in `appVersionName` at the top of `app/build.gradle.kts`; `ver
 are both derived from it:
 
 ```text
-versionCode = major * 10000 + minor * 100 + patch      // 0.6.0 -> 600
+versionCode = major * 10000 + minor * 100 + patch      // 0.6.0 -> 600; 1.0.0 -> 10000
 ```
 
 Do not write a second copy of the number in `defaultConfig`. That was how it used to work, and the result
@@ -869,8 +915,8 @@ Output goes to `%TEMP%` by default and is not committed.
 ```text
 app/                     App shell: theme wiring, bottom navigation, nav graph, Application/Activity
 core/
-  common/                Utilities, logging, Result, dispatchers, formatting, MspText
-  model/                 Domain models (media entries, subtitles, tracks, playback state) - no module deps
+  common/                Utilities, logging, Result, dispatchers, formatting
+  model/                 Domain models (media entries, subtitles, tracks, playback state) + MspText - no module deps
   data/                  Data sources (MediaStore scanning, SAF, settings persistence)
   subtitle/              Subtitle/lyrics parsing engine (pure logic, unit-testable)
   translate/             Subtitle translation (provider presets, batching/cache/glossary, export)
@@ -971,13 +1017,19 @@ every `android.*` call return 0/null. If the pure-logic layers returned `String`
 sentence look like in another language" could only be inspected on a device, and not a single assertion
 about it could be written.
 
-So the pure-logic layers (`core:common` / `core:player` / `core:translate` / `core:data` / the ViewModels)
-return `MspText`: either `Plain` (language-independent by nature, e.g. the format name `SubRip`), or
-`Res(id, args)`, which is resolved **at the UI boundary only**. Compose code always goes through
+So the pure-logic layers (`core:model` / `core:common` / `core:player` / `core:translate` / `core:data` /
+`core:subtitle` / the ViewModels) return `MspText`: either `Plain` (language-independent by nature, e.g. the
+format name `SubRip`), or `Res(id, args)`, which is resolved **at the UI boundary only**. Compose code always
+goes through
 
 ```kotlin
 Text(row.label.string())          // import com.multisuperplayer.core.ui.text.string
 ```
+
+`MspText` itself lives in **`core:model`** (moved down from `core:common` in v1.0.0): it has zero
+dependencies besides `androidx.annotation`'s `@StringRes`. It describes *how to look a sentence up*, not
+*how to render it*, so every module should be able to use it directly — including `core:subtitle`, which
+only parses subtitles and should not have to depend on a general-purpose utilities module to do so.
 
 When a sentence is assembled from several parts, do **not** use `buildString` or `"$a · $b"` — the
 separator itself is part of the language (Chinese uses `·`, English uses `,`), and the order of the parts
@@ -996,8 +1048,10 @@ MspText.join(SEPARATOR, listOf(partA, partB, partC))
 ```
 
 - Everything is a **JVM unit test** (JUnit 4); no device or emulator is needed.
-- What is covered: subtitle parsers, translation failure classification, batching and caching, export,
-  theme enums, settings summary text, and a few **repository-level guards** — for instance "every module
+- What is covered: subtitle parsers, translation failure classification, batching and caching,
+  export and import (header recognition in three languages, the same-name decision, de-duplication,
+  the limits), theme enums, settings summary text, and a few **repository-level guards** — for instance
+  "every module
   with a `values/strings.xml` must also have `values-en/` and `values-b+zh+Hant/`". That guard exists
   because the symptom of a missing directory is that switching the app language simply **does nothing**,
   with no error anywhere, and the compiler cannot see it.
@@ -1024,22 +1078,19 @@ These are deliberate for this release, not oversights:
    ABIs as well**: the other two (about 57 MB) can never reach the APK, so there is no reason to carry
    them in the repository. To support 32-bit devices, extract them from `sherpa-onnx-1.13.8.aar`
    (`jni/<abi>/`) and put them back — directory and file names must match upstream, JNI loads by name.
-4. **`core:subtitle` parse warnings are still Chinese.** The warning type is `List<String>`, tied to the
-   **dependency-free `core:model`**. The right fix is to move `MspText` into `core:model` (which is itself
-   dependency-free, so it fits that module's role) and make the warnings `List<MspText>`. Deferred.
-5. **Machine-readable skeletons in the log report and in exported subtitles are deliberately not
+4. **Machine-readable skeletons in the log report and in exported subtitles are deliberately not
    translated.** The log report's header lines (produced by the UI) follow the UI language, but the
    `===== ... =====` and `导出时间:` skeleton stays fixed: it exists to be searched by keyword while
    debugging, and mixing translations in would defeat that. For the same reason the `; 由
    MultiSuperPlayer 导出` provenance line in an exported ASS file is not UI text.
-6. **The translation target's "name shown to the model" is fixed to Chinese**
+5. **The translation target's "name shown to the model" is fixed to Chinese**
    (`TranslationTarget.promptName`). It describes *what to translate into*, is independent of the UI
    language, and pinning it is what keeps the cache key stable.
-7. **Sorting the library by title uses Unicode code points for Chinese, not pinyin order.** Pinyin
+6. **Sorting the library by title uses Unicode code points for Chinese, not pinyin order.** Pinyin
    ordering needs an extra mapping table (otherwise 张 sorts after 王), and the cost is out of proportion
    to the benefit. Equal titles fall back to sorting by id, which at least keeps the order **stable** —
    it does not change on every refresh.
-8. **Artwork is picked automatically and cannot be replaced by hand.** Audio reads the cover embedded in
+7. **Artwork is picked automatically and cannot be replaced by hand.** Audio reads the cover embedded in
    the file (on Android 10+ it first asks the media library for a thumbnail, which avoids reading the whole
    file into memory); video reads an embedded cover or extracts a frame. **There is no "use that other
    frame instead" or "pick my own image" action**, and no "clear this cover" either. One direct
@@ -1047,24 +1098,24 @@ These are deliberate for this release, not oversights:
    the deliberate trade-off - a black picture still tells you which file it is, while drawing nothing falls
    back to a type icon and makes users believe the feature never ran. The threshold (average luminance
    below 0.12 counts as too dark) is a heuristic, not a definition of black.
-9. **Library entries on Android 9 and below do not auto-discover sibling subtitles.** `RELATIVE_PATH`
+8. **Library entries on Android 9 and below do not auto-discover sibling subtitles.** `RELATIVE_PATH`
    only exists from Android 10, and without it auto-discovery has no starting point for those entries.
    The UI **states the reason** ("cannot tell which folder this file is in, so same-name
    subtitles cannot be found automatically") instead of pretending "this folder has no subtitles"; you
    can still pick a sibling `.srt` / `.ass` by hand in the sheet, and that path works.
    (Media opened through the built-in browser is **not affected**: it takes the "list the directory"
    route, see section 1.7.)
-10. **The built-in browser writes nothing to the media library.** Browsing is browsing: files opened
+9. **The built-in browser writes nothing to the media library.** Browsing is browsing: files opened
     this way do not enter the library or the Recent list. Since v0.5.9 it **does take part in
     multi-select** (it can "add to playlist" exactly like the library), but the selected entries still
     are not written back to the library — "add to playlist" writes to the playlist table, a different
     table.
-11. **Playlist entries do not keep a "display name".** Entries are stored by id key, so restoring one
+10. **Playlist entries do not keep a "display name".** Entries are stored by id key, so restoring one
     only brings back the title / artist / duration snapshot fields. What this costs is the **subtitle
     discovery log line**: it writes "looking for subtitles for xxx", and for an entry restored from a
     playlist that one field is missing (everything else is there). Fixing it means changing the storage
     format and writing a migration, which is disproportionate for one name in one log line.
-12. **Embedded bitmap subtitles (PGS / VobSub / DVB) are drawn now, but every subtitle tweak and style
+11. **Embedded bitmap subtitles (PGS / VobSub / DVB) are drawn now, but every subtitle tweak and style
     setting is deliberately ignored for them.** A bitmap cue carries a picture and no text (`Cue.text` is
     empty), so it takes a **second rendering path**: the player page overlays a dedicated layer on the
     video rect (`BitmapSubtitleLayer`) whose layout arithmetic is copied line for line from Media3's
@@ -1080,7 +1131,7 @@ These are deliberate for this release, not oversights:
     initialisation data (`VobsubParser` has quite strict preconditions); only PGS has been verified
     against a real sample, and those two are treated as "use it if it works, act as if the track is
     absent if it does not".
-13. **The on-device speech recognition models are not bundled into the APK; the user downloads them.**
+12. **The on-device speech recognition models are not bundled into the APK; the user downloads them.**
     The two models are about 78.1 MB and 189.8 MB, and putting 78 MB into the installer would make
     everyone who does not want this feature wait through an extra download, so the flow is "pick a model,
     then download it". The cost is that the first run needs a download first (measured: 78.1 MB from the
@@ -1088,12 +1139,12 @@ These are deliberate for this release, not oversights:
     itself needs no network). Recognition runs on the CPU, so speed depends on the phone (about 8 seconds
     for a 33-second clip on an x86_64 emulator) and scales with length; the result is computed **in one
     go** — there is no "stream the first half while playback continues" mode.
-14. **Recognition quality is entirely a property of the source audio.** Pure music, heavy background
+13. **Recognition quality is entirely a property of the source audio.** Pure music, heavy background
     noise, several people talking over each other and strong dialects can come out empty or misspelled,
     and **none of that is corrected automatically** — the sheet cannot even show "this line had low
     confidence", because the result is just an ordinary SRT. Improving it means running recognition
     again, switching models, or overriding it with an external subtitle.
-15. **Whether the equalizer works, and how far you can push it, depends on the device and the current
+14. **Whether the equalizer works, and how far you can push it, depends on the device and the current
     audio session.** Band count, per-band centre frequency and gain range all come from
     `android.media.audiofx.Equalizer` *on this device*: an emulator and some devices cannot create the
     effect at all (the sheet says so outright — a quiet degradation, never a crash) and others report
@@ -1103,34 +1154,36 @@ These are deliberate for this release, not oversights:
     the device's band count is only known once playback starts, and following it would make the sheet
     change from 5 to 10 sliders under the user's eyes. The curve is stored by frequency and
     interpolated when applied, so the same setting stays the same curve on another device.
-16. **The on-device translation model is not bundled either, and it runs on the CPU only.** It is about
+15. **The on-device translation model is not bundled either, and it runs on the CPU only.** It is about
     345 MB, the same trade as the speech recognition models: bundling it would make everyone who does not
     want the feature wait through an extra download. The cost is that the first run needs the download
     to finish first (measured: about 83 seconds from the mirror), and **without a network the model
     cannot be installed** (the translation itself needs no network). Inference is fixed to the CPU
     backend, which means no per-device tuning and reproducible output at the cost of speed. There is also
-    currently **only one model to choose from**, and the translation cache has **no "clear" action** —
-    forcing a re-translation means editing the subtitle content, or switching target language / model.
+    currently **only one model to choose from**. The translation cache can now be cleared in Settings,
+    but **clearing it never touches hand-edited translations** — those live under `translation_edits/`,
+    one file per media file, and they are the user's own work rather than a record of what the model
+    said once.
     Note that **"the model is not bundled" does not mean "the installer did not grow"**: to make the
     on-device inference run at all, the installer went from about 88.6 MiB in v0.6.3 to about 134.7 MiB
     (that is `liblitertlm_jni.so`, about 45.6 MiB across both ABIs, stored uncompressed).
-17. **Cloud recognition supports OpenAI-compatible `/audio/transcriptions` only.** Services such as
+16. **Cloud recognition supports OpenAI-compatible `/audio/transcriptions` only.** Services such as
     Alibaba Cloud Qwen-ASR, which push the audio through `…/compatible-mode/v1/chat/completions`, are
     **not supported in this release**: the request shape is a different one and would need its own
     request-building path. Any other service with the same interface shape can be hooked up through
     *Custom*.
-18. **Chunking is by fixed length, so a chunk boundary can cut a sentence in half.** In practice that
+17. **Chunking is by fixed length, so a chunk boundary can cut a sentence in half.** In practice that
     means one truncated cue every five minutes. Overlapping chunks would fix it, but the overlap then has
     to be de-duplicated (the same sentence recognised twice with timestamps half a character apart), which
     this release does not do. There is also **no resumable upload** — cancelling mid-run loses the chunks
     already sent (and the quota is spent), and there is no "stream the first half" partial output; the
     result is assembled in one piece at the end.
-19. **A container that does not declare its duration cannot use the cloud path.** Chunking needs the
+18. **A container that does not declare its duration cannot use the cloud path.** Chunking needs the
     total length up front, and bare ADTS AAC and some streaming containers do not write one. In that case
     the app **does not** degrade into "send the whole thing as one chunk" (a two-hour video would first
     produce a 230 MB temporary WAV and most likely fill the phone's storage) — it reports the problem and
     suggests switching to on-device recognition instead.
-20. **Pre-reading an embedded subtitle track walks the whole file in order, and only works for local
+19. **Pre-reading an embedded subtitle track walks the whole file in order, and only works for local
     files.** Subtitle samples are interleaved with the audio and video in the container, so "read the
     whole text track" means reading the file from end to end. A network stream cannot be downloaded for
     the sake of its subtitles, so it is reported as not applicable, and a very large file takes a while.
