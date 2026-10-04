@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **0.8.0-alpha.2** (pre-release)
+- Current version: **0.8.1**
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -221,6 +221,18 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
   4 groupings (none / artist / album / folder). Group headers always sort by title and do not jitter
   with the sort order; entries with no artist/album/folder fall into an "unknown" group that always
   sorts last.
+- **Artwork**: library rows, grid tiles and the player page (a round cover in portrait, the left column
+  in landscape) **share one set of rules**. Audio reads the cover embedded in the file (on Android 10+
+  it first asks the media library for a thumbnail, which avoids reading the whole file into memory);
+  video reads an embedded cover or, failing that, has a frame extracted at **10% of the duration**. If
+  that frame is too dark (average luminance below 0.12) it retries at 40%, and if both are dark the last
+  one is **still used** - a black cover at least tells you which file this is, while drawing nothing
+  makes users believe the feature never ran. The result is capped at 512px on its longest edge and
+  written to a disk cache in the app's private directory (keyed by kind + file, so re-entering a list
+  does not decode again), with at most 2 decodes running at once; a failed decode quietly falls back to
+  the type icon and never breaks the list. When there is no image at all, the icon underneath **keeps
+  the colour that row already had**: purple for playable files, purple for subtitles, grey for archives
+  and text files - the colour itself tells you what is tappable.
 - **Multi-select**: long-press to enter selection mode, then select all / clear / add to playlist / play.
   Actions follow the **order you tapped the items in**: "add to playlist" appends in that order and
   "play" starts from the first one tapped, so tapping in reverse really does give you a reversed queue.
@@ -653,8 +665,9 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.7.0-alpha.1** | **App updates: a new *Check for updates* page in Settings checks, downloads and installs new versions from GitHub Releases (the source sits behind an interface so more channels can be added); sha256 plus package-name and signature verification; the APK is handed to the installer through a `FileProvider`; an optional GitHub token stored on-device and encrypted; eight failure classes reported separately** | Done |
 | **v0.7.0-alpha.2** | **Embedded-subtitle wording fixes: the title slot now reads *Embedded subtitle 1* instead of a bare language tag, a *No line read yet* hint covers the window before the first cue arrives, and *This file has subtitle tracks; pick one above.* replaces the blanket *nothing is attached* claim; a selected embedded text track is now claimed as soon as the track list arrives instead of waiting for its first cue** | Done |
 | **v0.8.0-alpha.1** | **Subtitle rate (proportional nudging: five presets plus ±0.01 / ±0.10, the counterpart to the timeline offset's *shift*) + a full read-ahead of the embedded subtitle track (the prerequisite for the rate to work in both directions, and for subtitles to be there the moment you open a file) + a rework of the lyrics space on the audio page (the portrait artwork gives way to the lyrics, and the chips and transport controls move into the left column in landscape)** | Done |
-| **v0.8.0-alpha.2** | **Drag-to-reorder auto-scroll (one implementation shared by the queue panel and playlists: it starts within 72dp of the edge and speeds up the closer you get, computed as *speed x frame interval* so the device's refresh rate does not change the feel) + an equalizer (a switch / 8 built-in presets / 5 gain sliders / a reset; the curve is stored by frequency so it stays the same curve on another device); also fixes "long-press dragging does nothing at all" (`positionChange()` is a constant 0 when there are no MotionEvent history samples)** | **Current** |
-| Later | **0.8.1** artwork improvements -> **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
+| **v0.8.0-alpha.2** | **Drag-to-reorder auto-scroll (one implementation shared by the queue panel and playlists: it starts within 72dp of the edge and speeds up the closer you get, computed as *speed x frame interval* so the device's refresh rate does not change the feel) + an equalizer (a switch / 8 built-in presets / 5 gain sliders / a reset; the curve is stored by frequency so it stays the same curve on another device); also fixes "long-press dragging does nothing at all" (`positionChange()` is a constant 0 when there are no MotionEvent history samples)** | Done |
+| **v0.8.1** | **Artwork: lists, the grid and the player page now show covers (audio reads its embedded cover; video reads an embedded cover or, failing that, has a frame extracted at 10% of the duration, retrying at 40% when that frame is too dark); a disk cache of our own with a 512px cap and at most 2 concurrent decodes; also fixes the three-state colouring in the built-in browser (playable / subtitle / other)** | **Current** |
+| Later | **0.9.0** bitmap subtitle formats (PGS / VobSub / DVB) -> **1.0** stable; audio translation (dubbing) lands after stable | Planned |
 
 ---
 
@@ -948,9 +961,14 @@ These are deliberate for this release, not oversights:
    ordering needs an extra mapping table (otherwise 张 sorts after 王), and the cost is out of proportion
    to the benefit. Equal titles fall back to sorting by id, which at least keeps the order **stable** —
    it does not change on every refresh.
-8. **No artwork in lists, only type icons (audio / video).** Doing it properly means adding an image
-   loading library and owning decode, caching and OOM; this release chooses not to, rather than shipping
-   a version that OOMs.
+8. **Artwork is picked automatically and cannot be replaced by hand.** Audio reads the cover embedded in
+   the file (on Android 10+ it first asks the media library for a thumbnail, which avoids reading the whole
+   file into memory); video reads an embedded cover or extracts a frame. **There is no "use that other
+   frame instead" or "pick my own image" action**, and no "clear this cover" either. One direct
+   consequence: **a clip that really is black (a voice-only recording, say) gets a black cover.** That is
+   the deliberate trade-off - a black picture still tells you which file it is, while drawing nothing falls
+   back to a type icon and makes users believe the feature never ran. The threshold (average luminance
+   below 0.12 counts as too dark) is a heuristic, not a definition of black.
 9. **Library entries on Android 9 and below do not auto-discover sibling subtitles.** `RELATIVE_PATH`
    only exists from Android 10, and without it auto-discovery has no starting point for those entries.
    The UI **states the reason** ("cannot tell which folder this file is in, so same-name
