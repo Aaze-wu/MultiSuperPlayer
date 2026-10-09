@@ -111,6 +111,11 @@ data class PlaylistItem(
          * 一律算媒体库——不能因为「看起来不像数字」就下结论，
          * 猜错会把 SAF 条目送去按文件路径查字幕（同样是查不到）。
          *
+         * 浏览页这一支里面还要**再分一层**：`file:` 后面可能是绝对路径，也可能是
+         * SAF 的 `content://…` document uri（见 `BrowserEntry.sourceOfRef`）。
+         * 一律当成文件系统的话，那串 uri 会被「取上一级目录」，于是整个目录的字幕
+         * 一条都找不到——和上面那句「同样是查不到」是同一个症状的第二个来源。
+         *
          * ## 为什么是 `when` 而不是 `if / else`
          *
          * 这里原本只有两个分支（浏览页前缀 / 其余），于是「新增一个来源」
@@ -125,7 +130,8 @@ data class PlaylistItem(
         fun sourceOf(mediaId: String): MediaSource = when {
             ExternalMediaIds.isRemoteId(mediaId) -> MediaSource.REMOTE
             ExternalMediaIds.isSharedId(mediaId) -> MediaSource.SHARED
-            BrowserEntry.isBrowserMediaId(mediaId) -> MediaSource.FILE_SYSTEM
+            BrowserEntry.isBrowserMediaId(mediaId) ->
+                BrowserEntry.sourceOfRef(BrowserEntry.refOf(mediaId))
             else -> MediaSource.MEDIA_STORE
         }
     }

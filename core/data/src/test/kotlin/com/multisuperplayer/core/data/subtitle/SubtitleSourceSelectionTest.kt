@@ -70,6 +70,16 @@ class SubtitleSourceSelectionTest {
     }
 
     @Test
+    fun `带发行标记的长文件名也够得着自动挂载门槛`() {
+        // 用户报的「长文件名（含中文和空格）无法自动识别字幕」在链路上就是这一条：
+        // 分数掉到门槛以下时字幕仍然在手动列表里，但界面上一句话都不会说，
+        // 看起来就是「没找到字幕」。装饰段与集号写法是分数的两个坑（见
+        // `SubtitleFileNamingTest` 的「发行标记与跨写法」一节）。
+        assertTrue(score("【高清影视】某某电影 2023 1080P.mp4", "某某电影.srt") >= AUTO_MATCH_SCORE)
+        assertTrue(score("[电影天堂www.dygod.net]流浪地球2.HD1080p.国语中字.mp4", "流浪地球2.chs.srt") >= AUTO_MATCH_SCORE)
+    }
+
+    @Test
     fun `比这一档更弱的匹配分数确实低于门槛`() {
         // 反向锁：确认「名字更长的字幕」这一档是**最低的**自动挂载资格，
         // 再弱的关联（比如音频旁边的普通字幕）必须落在门槛之下。

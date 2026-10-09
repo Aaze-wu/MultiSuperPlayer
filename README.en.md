@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **1.2.0** (stable)
+- Current version: **1.2.1** (stable)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -93,6 +93,22 @@ Release notes: [docs/release-notes](docs/release-notes/)
 
   The route is chosen by the **source itself**, never by "which field happens to be populated" — keying
   on a field would route browser entries down the media-library path and silently find nothing.
+  There is a second split inside that route: behind the `file:` prefix there may be an absolute path or a
+  `content://…` document uri handed out by the system file picker; the latter has to be asked through SAF,
+  because taking "the parent directory" of that string yields something that is not a directory at all.
+- **How a title is recognised**: every name is generated in **two writings** (as-is, and with release tags
+  stripped) and all pairs are compared, **taking the highest score** — the same bracket holds the title
+  in a video name (`[Avatar.The.Way.of.Water].2160p.mkv`) and the release group in a subtitle name
+  (`[SomeGroup]Some.Movie.2023.chs.srt`), and a file name offers no reliable way to tell which, so guessing
+  one side loses the other. Two cases are **kept whole**: a bracket holding **nothing but a year**
+  (`The.Thing.(1982)` and `(2011)` are two different films) and a pair of parentheses holding a **Chinese
+  phrase** (`（上）`, `（剧场版）` — release tags are almost always ASCII). Episode numbers are
+  **asymmetric**: the subtitle side always ignores them (`Show.mkv` pairs with `Show 第01集.srt`), while the
+  media side ignores them **only when both sides point at the same episode** — the media name is the only
+  evidence of which episode this is, and a wrong episode is worse than no subtitle at all. When both sides
+  carry an episode in different notations (`S01E01` vs `第01集`) one more comparison drops it from both.
+  **Simplified and traditional Chinese are not matched against each other yet**: `某某电影.chs.srt` does
+  not currently pair with `某某電影.mkv`; that is left for a later release.
 - **Encoding fallback**: non-UTF-8 subtitles are tried against a list of candidate encodings, and the
   parse warnings state which one was used. Chinese falls back to GB18030; Japanese files, which are
   commonly **Shift-JIS (CP932)**, get a separate decision — and it is **not** "whichever candidate comes
@@ -289,7 +305,10 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
   action and says why. An entry restored from a playlist derives its source from the id prefix
   (browser entries carry `file:`), so a file played *from a playlist* still finds its sibling
   subtitles — otherwise it would be looked up as media-library media and hit the "cannot tell which
-  folder this file is in" wall again. "Is this entry still there?" is decided **per source** too:
+  folder this file is in" wall again. There is a second split inside that prefix: the `ref` behind
+  `file:` decides the source by the same rule (`content://` means SAF, anything else the file system),
+  otherwise opening a folder granted through the system file picker from a playlist reproduces the same
+  failure. "Is this entry still there?" is decided **per source** too:
   the library is consulted first, and only when that misses *and* the id carries the `file:` prefix
   (added from the browser) is the absolute path it recorded checked against the file system. A
   library-only check mislabels **every** browser entry as "file is gone", because the library does
@@ -792,7 +811,8 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v0.9.0** | **An update check at launch (a newer version brings a three-button dialog - *Update now* / *Later* / *Ignore this version* - while no update says nothing at all, and a failure stays completely silent with a single log line), plus the previously decorative *check automatically* switch is now real: the value was written to settings but read by nobody, and it is now judged by `UpdateRules.skipsAutoCheck`, so with it off not one network request is sent** | Done |
 | **v1.0.0** | **Localization finished (`MspText` moves down from `core:common` into the dependency-free `core:model`; `core:subtitle` parse warnings change from `List<String>` to `List<MspText>`, so the English and Traditional Chinese UIs no longer show Simplified Chinese warnings) + custom accent colour (hue / saturation / lightness sliders with a live preview, mutually exclusive with the presets) + a clear button for the translation cache (deletes the cache only, never hand-edited translations) + exporting the play history and playlists (CSV + JSON; missing entries are exported and flagged; both an all and a single entry point) + importing playlists (both exported formats read back; the format is recognised from the content and columns from their names in any of the three languages; a name clash asks merge or new)** | Done |
 | **v1.1.0** | **External sources: the player can, for the first time, take in something that did not come from its own library - Open with (pick this app in a file manager or a browser), sharing (single or multiple `content://` / `file://` items are both accepted, queued as a whole and played from the first), and network addresses (a new entry on the Browse tab plays an `http` / `https` address directly and remembers the last 20); `<data>` is declared in scheme + mimeType pairs, so an untyped http/https link is not registered and the app never grabs a plain web link; a beta.1 went out first, and two problems only visible on a real device were fixed for the stable release (accent colour moved into a dialog; a self-signed or untrusted certificate is no longer reported as a plain network failure, and a new Allow untrusted certificates switch - off by default - was added)** | Done |
-| **v1.2.0** | **Two small features: (1) generated subtitles can be cleared in one go (the end of the Speech recognition page shows how many are cached and how much space they take, with a Clear button and a confirmation that says how many will go, that recognition has to be run again and that the model is not deleted; only the subtitle files this device produced are removed, never the model or your translations) and (2) keep the screen on while playing (a new switch under Settings - Playback, on by default, plus a temporary toggle on the player control bar that flips between *Screen stays on* and *Screen may sleep* for the current playback only; it applies while audio or video is actually playing, and pausing, entering picture-in-picture or leaving the player hands the screen back to the system)** | **Current (stable)** |
+| **v1.2.0** | **Two small features: (1) generated subtitles can be cleared in one go (the end of the Speech recognition page shows how many are cached and how much space they take, with a Clear button and a confirmation that says how many will go, that recognition has to be run again and that the model is not deleted; only the subtitle files this device produced are removed, never the model or your translations) and (2) keep the screen on while playing (a new switch under Settings - Playback, on by default, plus a temporary toggle on the player control bar that flips between *Screen stays on* and *Screen may sleep* for the current playback only; it applies while audio or video is actually playing, and pausing, entering picture-in-picture or leaving the player hands the screen back to the system)** | Done |
+| **v1.2.1** | **Subtitle-matching fixes: (1) file names carrying release tags (`[SomeGroup.com]Some.Movie.2023.1080p.WEB-DL.mkv`) now pair with a clean subtitle name (there is no reliable way to tell how a bracket should be read, so both writings - as-is and with tags stripped - are used as candidates and the best score wins; a bracket holding only a year, and parentheses holding a Chinese phrase, are kept whole; an episode number is ignored only when both sides point at the same episode, because a wrong episode is worse than no subtitle; simplified and traditional Chinese are not matched against each other) and (2) subtitles inside a folder added with the system file picker are found again (the source of an entry is derived from its `ref` - `content://` means SAF, anything else the file system - and the playlist playback path is fixed as well); it also fixes a crash only seen on a device, caused by an unescaped brace in a regular expression (JVM accepts a lone `}`, Android's ICU does not; a structural guard test now covers it)** | **Current (stable)** |
 | Later | Audio translation (dubbing) | Planned |
 
 ---

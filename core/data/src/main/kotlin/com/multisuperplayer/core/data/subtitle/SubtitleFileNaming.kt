@@ -117,17 +117,58 @@ internal object SubtitleFileNaming {
     /** 方括号包裹的标记：`[CHS]`、`【简中】`、`(eng)` 都很常见。 */
     private const val BRACKETS = "[](){}<>【】〖〗（）《》"
 
+    /** 圆括号的两种写法：里面的内容要再按「是不是 ASCII」判一次，见 [keepDecoration]。 */
+    private const val PAREN_BRACKETS = "(（"
+
+    /**
+     * 整段被一对括号包住的「装饰段」：`[YYeTs]`、`【高清影视】`、`(2023)`、`《片名》`…
+     *
+     * 逐对写清楚而不是用一个「所有括号」的字符类：这样配对不完整时（`[a.b`）
+     * 整段保持原样，而不会只吃掉半截（只吃掉半截等于把片名改了）。
+     *
+     * ⚠️ **花括号两个都要转义，字符类里面也一样**：JVM 的 `Pattern` 接受裸的 `}`，
+     * Android 的正则引擎（ICU）不接受，会在**类初始化**时抛 `PatternSyntaxException`，
+     * 表现为「一播放就闪退」而**单测全绿**——因为单测跑在 JVM 上，那个 `}` 是合法的。
+     * 花括号在正则里是量词符号（`{1,3}`），要当字面量就必须转义。
+     * 这条由 `KotlinRegexBracesTest` 盯着（它按「只允许量词」这条规则扫全仓库）。
+     */
+    private val decorationGroup = Regex(
+        """\[[^\[\]]*]|【[^【】]*】|〖[^〖〗]*〗|\{[^\{\}]*\}|《[^《》]*》|<[^<>]*>|\([^()]*\)|（[^（）]*）""",
+    )
+
     private val seasonEpisode = Regex("""(?i)(?:^|[^a-z0-9])s(\d{1,2})[\s._\-]*e(\d{1,3})(?![0-9])""")
     private val crossEpisode = Regex("""(?i)(?:^|[^0-9])(\d{1,2})x(\d{1,3})(?![0-9])""")
     private val cjkEpisode = Regex("""(?:^|[^a-z0-9])第\s*(\d{1,3})\s*[集话話]?""")
     private val animeEpisode = Regex("""(?i)(?:^|[^a-z0-9])(?:ep|e)(\d{1,3})(?![0-9])""")
 
+    /**
+     * [episodeOf] 用到的全部写法，顺序即优先级。
+     *
+     * 另有一份列表专供 [stripEpisodeMarkers] 用。两者必须一致，否则会出现
+     * 「认得出是两个不同的集、却认不出是同一个集」的自相矛盾（已在
+     * `SubtitleFileNamingTest` 里按四种写法各钉了一条用例）。
+     */
+    private val episodePatterns = listOf(seasonEpisode, crossEpisode, cjkEpisode, animeEpisode)
+
     // ------------------------------------------------------------------ 结果类型
 
-    /** 文件名解析结果。 */
+    /**
+     * 文件名解析结果。
+     *
+     * 这里**只带出片名的原文**，不带「比较用的写法」：写法有几种（见 [coreVariants]），
+     * 而「试哪几种」是 [matchScore] 的决定——把归一化后的片名也存一份，
+     * 就会有第二个地方在决定「装饰段要不要去掉」。
+     */
     data class NameInfo(
-        /** 归一化后的片名，用于和媒体名做相等/前缀比较。 */
-        val title: String,
+        /**
+         * 片名原文：分词后用空格重新拼起来，**装饰段与季集号都还在**、语言标记已经切掉。
+         *
+         * 必须用空格拼回来（而不是直接用 `fileName` 或归一化后的文本）：
+         * [coreVariants] 里找季集号的正则靠的就是「前面的字符不是字母数字」这条边界，
+         * 而 [normalize] 会把分隔符全删掉——`某某电视剧 S01E01 1080p` 归一化之后是
+         * `某某电视剧s01e011080p`，集号跟分辨率粘成一串数字，再也认不出边界了。
+         */
+        val rawTitle: String,
         /** BCP-47；认不出来时为 null。 */
         val languageTag: String?,
         val isForced: Boolean,
@@ -172,6 +213,82 @@ internal object SubtitleFileNaming {
      */
     fun normalize(raw: String): String = raw.lowercase().filter { it.isLetterOrDigit() }
 
+    /**
+     * 一个名字**可能写成**的几种「核心名」，比较时两两试一遍、取最高分。
+     *
+     * ## 为什么是「几种写法」而不是一种
+     *
+     * 同一段方括号，在视频名里常常装的是**片名**，在字幕名里常常装的是**发布组**：
+     *
+     * - `[阿凡达：水之道].Avatar.The.Way.of.Water.2160p.mkv` ← 删掉就再也认不出是哪部片
+     * - `[某某字幕组]某某电影.chs.srt` ← 不删就永远对不上 `某某电影.mkv`
+     *
+     * 而「这段括号里到底是不是片名」在文件名里**没有可靠判据**
+     * （`[电影天堂www.dygod.net]` 与 `[阿凡达：水之道]` 的结构一模一样）。
+     * 所以这里不猜：两种写法都是候选，能对上就是对上。
+     *
+     * 顺带解决兜底问题：去装饰段之后什么都不剩时（`《片名》.srt` 这种整段被包起来的），
+     * 不去装饰的那一份仍然在候选里——片名空了会让这条文件从候选里静默消失
+     * （它至少还能出现在手动列表里）。
+     *
+     * @param withEpisodeStripped 是否**额外**把季集号也去掉再生成一遍。
+     *   字幕名那一侧**总是**开着：`某某电视剧.mkv` 配 `某某电视剧 第01集.srt` 是最常见的
+     *   用法，字幕多写一个集号不该让匹配降一格。
+     *   媒体名那一侧只在**两侧都写了集号、且指向同一集**时才开（见 [matchScore]）：
+     *   媒体名是「这一条到底是第几集」的唯一来源，凭空去掉会把 `Show.other.srt`
+     *   变成 `Show.S01E01.mkv` 的匹配。
+     */
+    private fun coreVariants(raw: String, withEpisodeStripped: Boolean = false): List<String> {
+        val texts = if (withEpisodeStripped) listOf(raw, stripEpisodeMarkers(raw)) else listOf(raw)
+        return texts
+            .flatMap { listOf(normalize(it), normalize(stripDecorations(it))) }
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
+
+    /**
+     * 去掉「装饰段」：整段被一对括号包住的发行标记。
+     *
+     * ## 为什么必须去掉
+     *
+     * 归一化（[normalize]）只是把分隔符丢掉，而这些段落**会被粘连到片名上**：
+     * `[某某字幕组]某某电影` 归一化成 `某某字幕组某某电影`，于是和 `某某电影`
+     * 既不相等也不互为前缀——两条明明对得上的文件被判成「不是它的字幕」。
+     * 中文发布组的习惯正好全踩在这上面：片名前后挂 `【高清影视】`、`[电影天堂xxx]`、
+     * `[YYeTs]`，而字幕名往往是干净的 `某某电影.chs.srt`。
+     * 名字越长、空格越多，这种「多出来的段」就越多——所以它的症状看起来
+     * 像「长文件名不认识」，其实与长度无关，只与是否带装饰段有关。
+     *
+     * 媒体名那一侧同样要去（视频才是常带装饰段的那一个）。
+     */
+    private fun stripDecorations(raw: String): String = decorationGroup.replace(raw) { match ->
+        val open = match.value.first()
+        if (keepDecoration(open, match.value.substring(1, match.value.lastIndex))) {
+            match.value
+        } else {
+            // 换成空白：归一化会把分隔符全去掉，所以用什么都一样。
+            " "
+        }
+    }
+
+    /**
+     * 这一段括号里的内容是不是「片名的一部分」，是的话不能删。
+     *
+     * - **光是年份的**（`The.Thing.(1982)` / `(2011)`）：那正是区分翻拍片的东西，
+     *   删掉两份不同电影会变成同一个核心名；
+     * - **圆括号里的纯中文短语**（`（上）`、`（下）`、`（剧场版）`）：发行标记几乎
+     *   全是 ASCII（`(Uncut)`、`(1080p)`、`(Director's Cut)`），中文短语则多半是片名，
+     *   删掉「上/下」会让上下两部互相匹配。
+     *
+     * 方括号与书名号里的一律当标记（`[YYeTs]`、`【高清影视】`、`《片名》`）——
+     * 中文发布组的组名就写在方括号里，那是必须删掉的那一类。
+     */
+    private fun keepDecoration(open: Char, body: String): Boolean {
+        if (body.length == 4 && body.all { it.isDigit() }) return true
+        val asciiOrDigit = body.any { it.isDigit() || it in 'a'..'z' || it in 'A'..'Z' }
+        return open in PAREN_BRACKETS && !asciiOrDigit
+    }
+
     /** 由后缀推断格式；认不出来时返回 [SubtitleFormat.UNKNOWN]（交给内容嗅探）。 */
     fun formatOf(fileName: String): SubtitleFormat {
         // 先小写：MediaStore 的 LIKE 匹配不分大小写，所以 `.SRT` 也会进候选列表，
@@ -186,6 +303,10 @@ internal object SubtitleFileNaming {
      * 从**末尾往前**读，遇到第一个不认识的词就停——这正是发布组的书写习惯
      * （`片名.语言.强制.srt`），而片名本身可能恰好包含像语言标记的词
      * （电影《It》），所以只在末尾连续的一段里找标记。
+     *
+     * 认不出来的词（`1080p`、`WEB-DL`、`【高清影视】`）归属于片名，所以片名里还会夹着
+     * 发行标记与季集号——它们都在比较那一步处理（见 [coreVariants]）；
+     * 语言标记本身则在分词这一步就认掉了（与装饰段无关）。
      */
     fun analyze(fileName: String): NameInfo {
         val tokens = tokenSeparator.split(baseName(fileName)).filter { it.isNotEmpty() }
@@ -209,11 +330,11 @@ internal object SubtitleFileNaming {
         // 会把这条字幕从候选里彻底删掉。退回「全部当片名」：宁可丢掉语言标记，
         // 也不能让文件消失——它至少还能出现在手动列表里。
         if (cut == 0 && tokens.isNotEmpty()) {
-            return NameInfo(normalize(tokens.joinToString(".")), null, false, false)
+            return NameInfo(tokens.joinToString(" "), null, false, false)
         }
 
         return NameInfo(
-            title = normalize(tokens.subList(0, cut).joinToString(".")),
+            rawTitle = tokens.subList(0, cut).joinToString(" "),
             languageTag = language,
             isForced = forced,
             isBilingual = bilingual,
@@ -277,6 +398,24 @@ internal object SubtitleFileNaming {
         return null
     }
 
+    /**
+     * 去掉季集号，**只用于比较**；认出来的写法与 [episodeOf] 完全一致。
+     *
+     * 四个正则都带一个「吃掉前一个字符」的组 `(?:^|[^a-z0-9])`，为的是让紧跟在
+     * 汉字后面的写法（`某剧第01集`）也能命中。替换时必须把这个字符**放回去**：
+     * 否则 `某某电视剧第01集` 会被删成 `某某电视`——那是另一个片名了。
+     * 匹配从 0 开始时那个组是零宽的 `^`（前面没有字符），否则它就是第 0 位那一个字符。
+     */
+    private fun stripEpisodeMarkers(raw: String): String {
+        var text = raw
+        for (regex in episodePatterns) {
+            text = regex.replace(text) { match ->
+                if (match.range.first == 0) "" else match.value.take(1)
+            }
+        }
+        return text
+    }
+
     // ------------------------------------------------------------------ 关联打分
 
     /**
@@ -286,9 +425,13 @@ internal object SubtitleFileNaming {
      * @param subtitleFileName 字幕文件名（带后缀）。
      */
     fun matchScore(mediaFileName: String, subtitleFileName: String): Int {
-        val media = normalize(baseName(mediaFileName))
         val info = analyze(subtitleFileName)
-        if (media.isEmpty() || info.title.isEmpty()) return NO_MATCH
+        val mediaName = baseName(mediaFileName)
+        val mediaVariants = coreVariants(mediaName)
+        // 字幕名这一侧**总是**把集号也去掉：`某某电视剧.mkv` 配
+        // `某某电视剧 第01集.srt` 是最常见的用法，字幕多写一个集号不该降一格。
+        val titleVariants = coreVariants(info.rawTitle, withEpisodeStripped = true)
+        if (mediaVariants.isEmpty() || titleVariants.isEmpty()) return NO_MATCH
 
         // 季集号不同的两份字幕长得**极其**相似（共同前缀往往只差最后一位），
         // 但挂错集比完全没有字幕更糟：用户会以为播放器把字幕串台了，
@@ -303,21 +446,56 @@ internal object SubtitleFileNaming {
         // （`Show.srt` / `Show.chs.srt` / `Show.bilingual.srt`）会并列满分，
         // 谁被自动挂上由 `SubtitleSource` 的排序规则解决——那是「多个都对时挑哪个」
         // 的问题，塞进打分只会让同一件事有两个表达。
-        return when {
-            media == info.title -> SCORE_EXACT
+        val direct = bestScore(mediaVariants, titleVariants)
+        if (direct != NO_MATCH) return direct
 
-            // 字幕名没写分辨率/编码（`Show.S01E01.srt` 配 `Show.S01E01.1080p.mkv`）；
-            // 反过来则是字幕名多了后缀。两个方向都只接受**前缀**关系。
-            //
-            // 这里刻意不做「共同前缀足够长就算匹配」那类模糊匹配：
-            // `The.Thing.1982` 与 `The.Thing.2011` 的共同前缀长达 8 个字符，
-            // 那是两部不同的电影。宁可漏配让用户手选——漏配只是多一步操作，
-            // 错配的症状是「字幕时间轴完全对不上」，而且用户看不出原因。
-            info.title.length >= MIN_TITLE_LENGTH && media.startsWith(info.title) -> SCORE_PREFIX
-            info.title.length >= MIN_TITLE_LENGTH && info.title.startsWith(media) -> SCORE_PREFIX_REVERSED
+        // 只有一边写了集号时**不看下一步**：`Show.S01E01.mkv` 旁边的 `Show.other.srt`
+        // 谁也不知道它是哪一集，留在手动列表里让用户选才对。
+        if (mediaEpisode == null || subtitleEpisode == null) return NO_MATCH
 
-            else -> NO_MATCH
-        }
+        // 退一步：两边都写了季集号、而且指向同一集（冲突的那种上面已经否决过），
+        // 那「集号」本身就不再有任何区分力了，把它从比较里去掉再比一次。
+        // 这一步专门为**跨写法**准备：视频是 `Show.S01E01.1080p.mkv`、字幕是
+        // `Show 第01集.chs.srt`（两者常常来自不同的发布组），片名明明一样，
+        // 却因为一个写 `S01E01`、一个写 `第01集` 而互相不认识。
+        //
+        // 两侧都从**原始名字**上再去一遍集号（而不是从上面归一化过的候选上）：
+        // 与片名同理，集号的边界只有在带分隔符的文本里才认得出。
+        return bestScore(
+            coreVariants(mediaName, withEpisodeStripped = true),
+            coreVariants(info.rawTitle, withEpisodeStripped = true),
+        )
+    }
+
+    /**
+     * 两组写法两两比一遍，取最高分；全都对不上才是 [NO_MATCH]。
+     *
+     * 取最高而不是平均/累加：这些写法是**同一个东西的几种叫法**，不是几条独立证据。
+     * 一种叫法完全相等（[SCORE_EXACT]）就足以断定是同一条；再拿别的写法去平均，
+     * 只会把满分拉下来，反而丢掉「这条字幕就是它」这个事实。
+     */
+    private fun bestScore(mediaVariants: List<String>, titleVariants: List<String>): Int =
+        mediaVariants
+            .maxOfOrNull { media -> titleVariants.maxOfOrNull { compare(media, it) } ?: NO_MATCH }
+            ?: NO_MATCH
+
+    /**
+     * 相等 / 互为前缀的判定，取舍见 [matchScore]。
+     *
+     * 刻意不做「共同前缀足够长就算匹配」那类模糊匹配：`The.Thing.1982` 与
+     * `The.Thing.2011` 的共同前缀长达 8 个字符，那是两部不同的电影。
+     * 宁可漏配让用户手选——漏配只是多一步操作，错配的症状是「字幕时间轴完全
+     * 对不上」，而且用户看不出原因。
+     */
+    private fun compare(media: String, title: String): Int = when {
+        media == title -> SCORE_EXACT
+
+        // 字幕名没写分辨率/编码（`Show.S01E01.srt` 配 `Show.S01E01.1080p.mkv`）；
+        // 反过来则是字幕名多了后缀。两个方向都只接受**前缀**关系。
+        title.length >= MIN_TITLE_LENGTH && media.startsWith(title) -> SCORE_PREFIX
+        title.length >= MIN_TITLE_LENGTH && title.startsWith(media) -> SCORE_PREFIX_REVERSED
+
+        else -> NO_MATCH
     }
 
     /**

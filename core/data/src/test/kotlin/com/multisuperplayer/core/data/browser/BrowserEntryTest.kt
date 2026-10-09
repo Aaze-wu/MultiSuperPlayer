@@ -145,6 +145,46 @@ class BrowserEntryTest {
         assertFalse(BrowserEntry.isBrowserMediaId("saf:primary:Music/a.mp3"))
     }
 
+    // ------------------------------------------------------------ 来源
+
+    @Test
+    fun `SAF 目录里的文件来源是 SAF 而不是文件系统`() {
+        // 系统文件选择器授权的目录，ref 是 `content://…` 的 document uri，不是路径。
+        // 当成文件系统的话，「取上一级目录」取到的是那串 uri 本身（一个不存在的
+        // 目录），于是这个文件夹里的字幕一条都找不到——而且整个目录都这样，
+        // 看起来像「这个目录的字幕功能坏了」，与文件名无关。
+        val entry = BrowserEntry(
+            ref = SAF_DOCUMENT_URI,
+            name = "movie.mp4",
+            isDirectory = false,
+            kind = MediaKind.VIDEO,
+        )
+
+        val media = requireNotNull(entry.toMediaEntry())
+
+        assertEquals(MediaSource.SAF_TREE, media.source)
+        // id 仍然带 `file:` 前缀：「这条来自浏览页」与来源是哪一支是两件事，
+        // 前缀（[BrowserEntry.MEDIA_ID_PREFIX]）只管前者。
+        assertEquals(BrowserEntry.MEDIA_ID_PREFIX + entry.ref, media.id)
+    }
+
+    @Test
+    fun `本地路径的来源是文件系统`() {
+        // 与上一条互为对照：两种 ref 都带 `file:` 前缀，只能看 ref 自己。
+        assertEquals(MediaSource.FILE_SYSTEM, BrowserEntry.sourceOfRef("/storage/emulated/0/Movies/movie.mp4"))
+        assertEquals(MediaSource.SAF_TREE, BrowserEntry.sourceOfRef(SAF_DOCUMENT_URI))
+        assertEquals(MediaSource.FILE_SYSTEM, requireNotNull(file("movie.mp4").toMediaEntry()).source)
+    }
+
+    @Test
+    fun `id 前缀能被原样取回来`() {
+        // 回放时要从持久化的 id 还原来源：先取回 ref，再按 ref 判分支。
+        // 两件事分在两个函数里，中间那一步（去前缀）错了会把一个路径变成
+        // `ile:/…`，而它看上去仍然「像一个路径」。
+        assertEquals(SAF_DOCUMENT_URI, BrowserEntry.refOf(BrowserEntry.mediaIdOf(SAF_DOCUMENT_URI)))
+        assertEquals("/x/a.mp4", BrowserEntry.refOf(BrowserEntry.mediaIdOf("/x/a.mp4")))
+    }
+
     // ------------------------------------------------------------ 工具
 
     private fun file(name: String, kind: MediaKind? = MediaKind.VIDEO): BrowserEntry = BrowserEntry(
@@ -159,4 +199,16 @@ class BrowserEntryTest {
         name = name,
         isDirectory = true,
     )
+
+    private companion object {
+        /**
+         * 系统文件选择器给出的 document uri，**带 tree 段**——浏览页里的 SAF 条目
+         * 就是用 `DocumentsContract.buildDocumentUriUsingTree` 拼出来的（见
+         * `SafDocumentSource`），没有 tree 段的那种在字幕查找那一步会被判成
+         * 「无法列目录」，所以测试数据必须用带 tree 段的真实形状。
+         */
+        const val SAF_DOCUMENT_URI =
+            "content://com.android.externalstorage.documents/tree/primary%3AMovies" +
+                "/document/primary%3AMovies%2Fmovie.mp4"
+    }
 }

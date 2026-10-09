@@ -108,9 +108,10 @@ data class BrowserEntry(
      * 加个前缀就等于把「这条记录来自文件浏览器」写进主键，代价是两个字符。
      *
      * 这个前缀也是**事后认出「这条记录是浏览页给的」的唯一依据**：写进播放列表之后
-     * 就只剩一个字符串了，回放时得靠它把来源还原成 [MediaSource.FILE_SYSTEM]
+     * 就只剩一个字符串了，回放时得靠它把来源还原成「浏览页」这一支
      * （见 `PlaylistItem.sourceOf`）——按媒体库那条路去查同目录字幕必然查不到。
-     * 所以前缀只有 [mediaIdOf] 一个出处，读写两侧都走它。
+     * 所以前缀只有 [mediaIdOf] 一个出处，读写两侧都走它；前缀里面再分本地路径与
+     * SAF 两种 [ref]，那是 [sourceOfRef] 的事。
      *
      * ## `relativePath` 故意留空
      *
@@ -121,9 +122,17 @@ data class BrowserEntry(
      * 需要目录时直接从 [ref] 上取最后一段——那才是它真实的样子。
      *
      * 外挂字幕也是照这个说法找的：`core:data` 的 `subtitleLookupOf` 按 [source]
-     * 决定去哪儿查，[MediaSource.FILE_SYSTEM] 一支直接把 [ref] 的上一级目录拿去列，
-     * **不经过 `relativePath`，也不经过 MediaStore**——这条来源存在的理由正是
-     * 「MediaStore 看不见的地方」。
+     * 决定去哪儿查——文件系统那一支把 [ref] 的上一级目录拿去列，SAF 那一支拿
+     * [ref] 去问 provider 要兄弟文件，两支**都不经过 `relativePath`，也不经过
+     * MediaStore**。这条来源存在的理由正是「MediaStore 看不见的地方」。
+     *
+     * ## 来源不能写死成文件系统
+     *
+     * 浏览页里能点开的目录有两种：本地卷（[ref] 是绝对路径）和用户用系统文件
+     * 选择器授权的 SAF 目录（[ref] 是 `content://…` 的 document uri）。后者当成
+     * 文件系统去「取上一级目录」，取到的是 `content://…/document` 这串**字符串**
+     * 而不是任何真实目录：字幕就在同一个文件夹里躺着，面板也会一路说找不到，
+     * 而且**整个目录都是这样**（与文件名无关，所以很难联想到是来源判错）。
      */
     fun toMediaEntry(): MediaEntry? {
         if (isDirectory) return null
@@ -133,7 +142,7 @@ data class BrowserEntry(
             uri = ref,
             title = displayTitle,
             kind = mediaKind,
-            source = MediaSource.FILE_SYSTEM,
+            source = sourceOfRef(ref),
             sizeBytes = sizeBytes,
             mimeType = mimeType,
             displayName = name,
@@ -157,5 +166,24 @@ data class BrowserEntry(
 
         /** 这个 [MediaEntry.id] 是不是浏览页给的。 */
         fun isBrowserMediaId(id: String): Boolean = id.startsWith(MEDIA_ID_PREFIX)
+
+        /** [mediaIdOf] 的逆运算：把 `file:` 前缀去掉，拿回 [ref]。 */
+        fun refOf(mediaId: String): String = mediaId.removePrefix(MEDIA_ID_PREFIX)
+
+        /**
+         * 浏览页条目的 [ref] 属于哪条来源。
+         *
+         * 判据只能是**前缀**（决定去哪儿找字幕的必须是来源本身，理由见
+         * [toMediaEntry]），不能是「哪个字段恰好有值」。
+         *
+         * `content://` 一律算 SAF：浏览页里的 document uri 都是
+         * `DocumentsContract.buildDocumentUriUsingTree` 拼出来的（带着 tree 段），
+         * 这正是 [MediaSource.SAF_TREE] 那一支需要的东西；把它当文件路径，
+         * `content://…/document` 会被当成一个「目录」。
+         */
+        fun sourceOfRef(ref: String): MediaSource =
+            if (ref.startsWith(CONTENT_SCHEME)) MediaSource.SAF_TREE else MediaSource.FILE_SYSTEM
+
+        private const val CONTENT_SCHEME = "content://"
     }
 }

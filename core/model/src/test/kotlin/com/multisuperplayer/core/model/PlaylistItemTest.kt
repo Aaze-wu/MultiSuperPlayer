@@ -95,4 +95,20 @@ class PlaylistItemTest {
         // SAF 的 id 里带 `:`，但它不带任何前缀 ⇒ 落到最保守的分支。
         assertEquals(MediaSource.MEDIA_STORE, PlaylistItem.sourceOf("saf:primary:Music/a.flac"))
     }
+
+    @Test
+    fun `浏览页里的 SAF 条目按 ref 回到 SAF 来源`() {
+        // 浏览页的 id 一律带 `file:` 前缀，但前缀后面可能是绝对路径、也可能是
+        // 系统文件选择器给的 document uri。前者直接列上一级目录，后者要去问
+        // provider 要兄弟文件——混为一谈的后果是**整个目录**的字幕都找不到，
+        // 而且不报任何错（与文件名无关，所以很难联想到是来源判错）。
+        val safRef = "content://com.android.externalstorage.documents/tree/primary%3AMovies" +
+            "/document/primary%3AMovies%2Fmovie.mp4"
+
+        assertEquals(MediaSource.SAF_TREE, PlaylistItem.sourceOf(BrowserEntry.mediaIdOf(safRef)))
+        assertEquals(
+            MediaSource.SAF_TREE,
+            PlaylistItem(mediaId = BrowserEntry.mediaIdOf(safRef), uri = safRef, title = "movie").toEntry().source,
+        )
+    }
 }

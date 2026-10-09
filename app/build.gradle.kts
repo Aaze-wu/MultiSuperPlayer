@@ -54,7 +54,11 @@ plugins {
 // 1.2.0 这一档**不发 beta**：两个新功能（语音识别缓存整体清空、播放时禁止熄屏）
 // 都是纯应用层改动，不碰系统 intent 解析 / 清单匹配那一类「只有真机才看得见」的东西，
 // 所以走 1.0.0 那条路直接发正式版。
-val appVersionName: String = "1.2.0"
+//
+// 1.2.1 同理不发 beta：两条都是「静默失效」类 bug（字幕匹配不到、SAF 目录的字幕查不到），
+// 改的是纯函数与来源判定，没有清单/权限变化。与 1.2.0 **共用 user-visible 功能集**，
+// 只是修 bug —— 所以 README 的功能清单不动，只补「本版更新说明」。
+val appVersionName: String = "1.2.1"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

@@ -229,9 +229,10 @@ class BrowseViewModel(
      * 把多选中的条目追加到某个已有播放列表。
      *
      * 这里传的是 [MediaEntry]（渲染时由 `BrowserEntry.toMediaEntry()` 得到）而不是
-     * 浏览条目本身：写进列表的就是它们，而它们带着 `file:` 前缀的 id 与
-     * [com.multisuperplayer.core.model.MediaSource.FILE_SYSTEM]——回放时靠这两个字段
-     * 才能还原成「这是个文件系统里的文件」（见 `PlaylistItem.sourceOf`）。
+     * 浏览条目本身：写进列表的就是它们，而它们带着 `file:` 前缀的 id、
+     * 以及**按 ref 推导出来的来源**（本地路径 ⇒ `FILE_SYSTEM`，SAF document uri ⇒
+     * `SAF_TREE`）——回放时靠这两个字段才能还原成「该去哪儿找同目录的字幕」
+     * （见 `PlaylistItem.sourceOf` 与 `BrowserEntry.sourceOfRef`）。
      */
     fun addToPlaylist(playlistId: String, entries: List<MediaEntry>) {
         if (entries.isEmpty()) return
