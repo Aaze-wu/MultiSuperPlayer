@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +61,7 @@ fun PlaybackSettingsRoute(
         onSetBoostSpeed = viewModel::setBoostSpeed,
         onSetRememberPosition = viewModel::setRememberPosition,
         onSetRecordRecentPlays = viewModel::setRecordRecentPlays,
+        onSetKeepScreenOnWhilePlaying = viewModel::setKeepScreenOnWhilePlaying,
         onSetTrustUntrustedCertificates = viewModel::setTrustUntrustedCertificates,
         modifier = modifier,
     )
@@ -78,6 +80,7 @@ fun PlaybackSettingsScreen(
     onSetBoostSpeed: (Float) -> Unit = {},
     onSetRememberPosition: (Boolean) -> Unit = {},
     onSetRecordRecentPlays: (Boolean) -> Unit = {},
+    onSetKeepScreenOnWhilePlaying: (Boolean) -> Unit = {},
     onSetTrustUntrustedCertificates: (Boolean) -> Unit = {},
 ) {
     // 当前打开的选择对话框（null = 没开）。
@@ -211,6 +214,29 @@ fun PlaybackSettingsScreen(
                     enabled = true,
                     onCheckedChange = onSetRecordRecentPlays,
                     help = stringResource(R.string.msp_settings_record_recent_help),
+                )
+            }
+
+            item {
+                // 和上面两行是同一组（都是「播放器在播放时会做什么」），而上面那一栏
+                // 「画面与速度」讲的是「怎么播」。
+                //
+                // 默认值是 true，所以这里没有写成 `== true`，而是 `?: true`：
+                // 跟别处那些「开关默认关」的项相反，这一个的默认值是**开**，
+                // 写成 `== true` 会把「没设置过」显示成「关着」。
+                val keepOn = playback.keepScreenOnWhilePlaying ?: true
+                SettingsSwitchRow(
+                    icon = { Icon(Icons.Outlined.Visibility, contentDescription = null) },
+                    title = stringResource(R.string.msp_settings_keep_screen_on),
+                    subtitle = if (keepOn) {
+                        stringResource(R.string.msp_settings_keep_screen_on_on)
+                    } else {
+                        stringResource(R.string.msp_settings_keep_screen_on_off)
+                    },
+                    checked = keepOn,
+                    enabled = true,
+                    onCheckedChange = onSetKeepScreenOnWhilePlaying,
+                    help = stringResource(R.string.msp_settings_keep_screen_on_help),
                 )
             }
 

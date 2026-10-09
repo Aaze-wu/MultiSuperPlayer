@@ -249,6 +249,21 @@
     <!-- 控制条上的入口。英文用 PiP 缩写：写成 “Picture in picture” 会把芯片撑得比别的都长。 -->
     <string name="msp_player_pip">画中画</string>
 
+    <!-- ===== 屏幕常亮 ===== -->
+    <!--
+      控制条上的入口。三句话各司其职，不要合并：
+
+      - `msp_player_keep_screen_on` 是**开关的名字**，只给无障碍用：TalkBack 会把它
+        和芯片上的当前状态拼成一句「播放时禁止熄屏，屏幕常亮，已启用」；
+      - `_on` / `_off` 是芯片上显示的文字，写的是**现在屏幕会怎样**，不是功能名。
+
+      `_on` 和开关名字恰好用词相近（中文里都是「不熄屏」那一族）是故意的：用户看到
+      的功能名和状态名指向同一件事，才不会以为是两个开关。
+    -->
+    <string name="msp_player_keep_screen_on">播放时禁止熄屏</string>
+    <string name="msp_player_keep_screen_on_on">屏幕常亮</string>
+    <string name="msp_player_keep_screen_on_off">允许熄屏</string>
+
     <!--
       均衡器。
 

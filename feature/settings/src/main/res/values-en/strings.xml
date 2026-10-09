@@ -36,6 +36,7 @@
     <string name="msp_settings_summary_tail_no_ffmpeg">No FFmpeg in this build</string>
     <string name="msp_settings_summary_tail_no_position">Position not saved</string>
     <string name="msp_settings_summary_tail_no_recent">No play history</string>
+    <string name="msp_settings_summary_tail_no_keep_screen_on">Screen may sleep</string>
     <string name="msp_settings_summary_tail_trust_certificates">Untrusted certs allowed</string>
 
     <string name="msp_settings_summary_long_press">Long-press %1$s</string>
@@ -219,6 +220,21 @@
 <string name="msp_settings_record_recent_on">What you play shows up on the Recent page, and opening it continues from where you stopped</string>
 <string name="msp_settings_record_recent_off">Stops recording new play history</string>
 
+    <!--
+      "Keep the screen on while playing".
+
+      Grouped with the two switches above it (remember position, record recent plays):
+      all three are "what the player does while playing", whereas the picture/speed
+      section above is "how it plays".
+
+      The sublines describe the effect rather than "on/off": the title is a negative
+      ("prevent sleeping") that is not obvious on its own, and once it is off, the
+      symptom — the screen going dark by itself — is hard to trace back to a switch.
+    -->
+    <string name="msp_settings_keep_screen_on">Keep the screen on while playing</string>
+    <string name="msp_settings_keep_screen_on_on">The system timeout will not turn the screen off during playback</string>
+    <string name="msp_settings_keep_screen_on_off">The screen sleeps on the system timeout</string>
+
     <string name="msp_settings_section_network">Network</string>
 
     <string name="msp_settings_trust_certificates">Allow untrusted certificates</string>
@@ -253,7 +269,7 @@
       Body of the \"what's new\" dialog. **Update this on every release, in all three
       language files.** `\n` is a line break; lines starting with a bullet are laid out as items.
     -->
-    <string name="msp_settings_about_whats_new_body">This release lets the player take in media handed to it from outside: Open with from another app, shared audio and video, and network addresses you type in yourself. Two problems that only showed up on a real device were fixed as well.\n\n· Open with: pick MultiSuperPlayer for an audio or video item in a file manager or a browser and it starts playing right away; the request is still handled when the app is already running, so it is never dropped silently\n· Sharing: single or multiple items from another app are both accepted, and several items are queued as a whole with playback starting from the first; a content:// item is resolved to its real file name and size, so lists show the name instead of an opaque id\n· Network addresses: a new Network URLs entry on the Browse tab plays an http / https address directly, including a NAS or media server on your LAN; the scheme may be left out (just type the domain), and the last 20 addresses are remembered\n· The Open with filter only covers audio and video: http/https links appear only when the type is stated explicitly, so the app never grabs a plain web link\n· Accent colour is now picked from a dialog: the row no longer stretches the layout, and it opens a list whose last entry is Custom; the hue, saturation and brightness sliders appear only while Custom is selected\n· A self-hosted server no longer reports the wrong reason: an untrusted certificate (a self-signed NAS or openlist box, a hostname mismatch, an expired certificate) used to be reported as a plain network failure. It is now named as a certificate problem, and there is a new Allow untrusted certificates switch under Settings - Playback (off by default; a warning stays on screen while it is on)\n· Previous release: 1.0.0 moved translation text to MspText (no more Chinese leaking through), custom accent colour, clearing the translation cache, and export/import for playback history and playlists\n\nKnown limits: network playback has no custom header or User-Agent hook, so an address behind a login or hotlink protection will not play; only http / https is supported (no rtsp, ftp or magnet links); items opened from outside or shared in do not show up under Recent, and playing the same address a second time resumes from where you stopped; the same file played via Open with and from the library counts as two different identities that do not share a resume position; with Allow untrusted certificates on, no HTTPS certificate is verified at all, so avoid leaving it on over an untrusted network; no 32-bit native libraries.</string>
+    <string name="msp_settings_about_whats_new_body">This release adds two small things: generated speech-to-text subtitles can be cleared in one go, and playback can keep the screen from following the system timeout.\n\n· Clearing the recognition cache: the end of the Speech recognition page under Settings now has a Generated subtitles row showing how many are cached and how much space they take, with a Clear button next to it; the confirmation says up front how many will go, that recognition has to be run again, and that the recognition model is not deleted\n· Keep the screen on while playing: a new switch under Settings - Playback (on by default) stops the screen from following the system timeout while something is playing; the player control bar also carries a temporary toggle that flips between Screen stays on and Screen may sleep for the current playback only\n· Pausing still lets the screen sleep: this is not an always-on setting, so pausing, entering picture-in-picture or leaving the player hands the screen straight back to the system\n· Previous release: 1.1.0 opened media from other apps and shares, played network addresses, moved accent colour into a dialog and added the Allow untrusted certificates switch\n\nKnown limits: clearing generated subtitles only removes the subtitle files this device produced; a downloaded recognition model and any translations you already have are untouched (remove a model with Delete model above); keeping the screen on only applies while audio or video is actually playing, so pausing or entering picture-in-picture hands the screen back, and the temporary toggle in the player covers the current playback only (it is not written back to the setting and a rotation returns to the value in Settings). From 1.1.0: network playback has no custom header or User-Agent hook, so an address behind a login or hotlink protection will not play; only http / https is supported (no rtsp, ftp or magnet links); items opened from outside or shared in do not show up under Recent, and playing the same address a second time resumes from where you stopped; the same file played via Open with and from the library counts as two different identities that do not share a resume position; with Allow untrusted certificates on, no HTTPS certificate is verified at all, so avoid leaving it on over an untrusted network; no 32-bit native libraries.</string>
 
     <string name="msp_settings_view">View</string>
 
@@ -442,6 +458,22 @@
     <!-- Must differ from the translation page's wording: "translation stops working" would suggest recognition is unaffected. -->
     <string name="msp_settings_asr_delete_key_confirm">After deleting it, this provider can no longer be used for recognition — you will need to paste the key again.</string>
 
+    <!--
+      Clearing generated subtitles.
+
+      The title says "generated subtitles" rather than "recognition cache": the nearest
+      delete button on this page removes a **model** (190 MB, must be downloaded again),
+      and the two actions cost very different things, so the titles must differ too.
+      Sizes and the confirmation sentence live in `GeneratedSubtitleCacheStats`; only the
+      row, the dialog title and the button are here.
+    -->
+    <string name="msp_settings_section_asr_cache">Generated subtitles</string>
+    <string name="msp_settings_asr_cache_clear">Clear generated subtitles</string>
+    <string name="msp_settings_asr_cache_clearing">Clearing…</string>
+    <string name="msp_settings_asr_cache_clear_action">Clear</string>
+    <string name="msp_settings_asr_cache_clear_title">Clear generated subtitles?</string>
+    <string name="msp_settings_asr_cache_help">Recognized subtitles are kept in the app private folder: nothing is written next to the video and nothing is uploaded. Clearing removes only those subtitles; downloaded models are kept.</string>
+
     <!-- ===== On-device translation model ===== -->
 
     <string name="msp_settings_local_model">On-device model</string>
@@ -485,6 +517,7 @@
     <string name="msp_settings_default_speed_help">Kept across files: changing the speed in the player changes this too. Long-press speed is a separate setting and is not affected.</string>
     <string name="msp_settings_remember_position_help">With this off, every file starts from the beginning. Positions already remembered are not deleted; turning it back on makes them available again.</string>
     <string name="msp_settings_record_recent_help">With this off, no new play history is recorded. Resume positions are controlled separately by Remember playback position. What is already recorded is not deleted and reappears when you turn this back on.</string>
+    <string name="msp_settings_keep_screen_on_help">Only applies while playback is actually running: once paused, the screen sleeps on the system timeout (which is exactly when you want to put the phone down). The control bar on the player has a separate switch that applies to the current playback only and never changes this default.</string>
     <string name="msp_settings_trust_certificates_help">Self-hosted servers (NAS, openlist/AList, reverse proxies) often use self-signed certificates that the system does not trust, and playback then fails with a certificate error. Turning this on skips certificate verification for every HTTPS address, including hostname mismatches and expired certificates. Turn it on only when you are sure the server is your own.</string>
     <string name="msp_settings_base_url_help">A URL ending in /v1 gets /chat/completions appended automatically. Point this at your own proxy if you use one, as long as its API is OpenAI-compatible.</string>
     <string name="msp_settings_test_help">The test really translates one sample line. It verifies the URL, the key, the model name and whether the vendor accepts the request format this app sends, at the cost of a tiny number of tokens.</string>

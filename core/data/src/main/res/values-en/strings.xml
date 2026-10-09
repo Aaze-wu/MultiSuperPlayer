@@ -107,4 +107,20 @@
     <string name="msp_import_note_duplicate_items">%1$d duplicate item(s)</string>
     <string name="msp_import_note_full">The playlist limit (%1$d) was reached, %2$d not imported</string>
 
+    <!-- ===== Generated subtitle cache (speech recognition results) ===== -->
+
+    <!--
+      Shown only on the speech-recognition settings page, so it skips the technical
+      meaning of "cache" and answers two questions: how much is there, and what does
+      deleting it cost. The numbers and the full sentences live in
+      `GeneratedSubtitleCacheStats`; these are only the templates.
+    -->
+    <string name="msp_asr_cache_empty">Nothing cached yet</string>
+    <!-- e.g. `3 subtitles cached · 1.2 MB` -->
+    <string name="msp_asr_cache_stats">%1$d subtitles cached · %2$s</string>
+    <!-- Must say how many are left: a bare "could not clear" reads as a harmless notice -->
+    <string name="msp_asr_cache_clear_failed">Could not clear: %1$d are still there (%2$s)</string>
+    <!-- "Models are kept" must be said out loud: the nearest button on this page deletes models -->
+    <string name="msp_asr_cache_clear_confirm">This deletes %1$d generated subtitle files (%2$s). They come from speech recognition, so recognition has to run again to get them back (about as long as the audio). Downloaded models are kept.</string>
+
 </resources>

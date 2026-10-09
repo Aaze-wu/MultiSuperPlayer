@@ -143,6 +143,8 @@ fun PlayerRoute(
     val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
     val queue by viewModel.queue.collectAsStateWithLifecycle()
     val currentIndex by viewModel.currentIndex.collectAsStateWithLifecycle()
+    // 播放时是否禁止熄屏（设置里的全局默认值）。只在用户改设置时才变。
+    val keepScreenOnPref by viewModel.keepScreenOnWhilePlaying.collectAsStateWithLifecycle()
 
     val subtitleViewModel: SubtitleViewModel = koinViewModel()
     val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
@@ -264,6 +266,28 @@ fun PlayerRoute(
     }
 
     PlayerFullscreenEffect(fullscreen = ui.fullscreen, inPip = ui.inPip)
+
+    // ------------------------------------------------------------------ 屏幕常亮
+
+    // 「屏幕常亮」= 设置里的默认值经播放页临时开关覆盖之后的那个值。
+    //
+    // 算在这里一次性算完，因为下面两个地方必须用**同一个值**：改窗口 flag 的那个
+    // effect、以及控制条上那个芯片的亮/灭。分开算就会出现「芯片写着关闭、屏幕却不熄」
+    // （或者反过来），而那种偏差在屏幕上要等几十秒、还得什么都不动才能看出来。
+    val keepScreenOn = ui.keepScreenOn(keepScreenOnPref)
+
+    // 窗口级效果，而不是给 `PlayerView` 设 `keepScreenOn`（见 [PlayerKeepScreenOnEffect]）：
+    // 音频页根本没有那层视图，而「听歌时屏幕该不该黑」是同一个问题。
+    //
+    // 判据（正在播放 + 用户没关掉 + 不在画中画里）在 `PlayerKeepScreenOnRules` 里，
+    // 这样「暂停之后该不该放开」这类边界能跑单测。
+    PlayerKeepScreenOnEffect(
+        keepOn = PlayerKeepScreenOnRules.shouldKeepScreenOn(
+            isPlaying = state.isPlaying,
+            preference = keepScreenOn,
+            inPip = ui.inPip,
+        ),
+    )
 
     // ------------------------------------------------------------------ 画中画
 
@@ -469,12 +493,31 @@ fun PlayerRoute(
         onClick = { ui.openSheet(PlayerSheet.EQUALIZER) },
     )
 
-    // 四个会话级入口打包成一个对象再往下穿（见 `PlayerSessionChipSet` 的 KDoc：
-    // 平铺四个参数要穿过五层，以后加第五个入口就得改十处）。
+    // 屏幕常亮入口。
+    //
+    // 芯片上的字写的是**现在屏幕会怎样**（「屏幕常亮」/「允许熄屏」），而不是
+    // 「禁止熄屏」这个功能名：这个开关的后果完全发生在屏幕外面（停止触摸几十秒后
+    // 才看得到），用户唯一能当场确认的就是这句话，而「禁止熄屏」既没说现在到底禁没禁，
+    // 也没说关掉之后会怎样。
+    //
+    // 点一下写的是**目标值**而不是「翻转一下」：能翻转的前提是这个函数知道当前生效值，
+    // 而当前生效值 = 临时开关 ?? 设置里的值（另一个仓库里的 Flow）。这里恰好就知道，
+    // 所以在这里算好再传下去，也让这段逻辑不用往 `PlayerUiState` 里塞一个只读一份的设置。
+    val keepScreenOnChip = PlayerBarChip(
+        label = stringResource(
+            if (keepScreenOn) R.string.msp_player_keep_screen_on_on else R.string.msp_player_keep_screen_on_off,
+        ),
+        active = keepScreenOn,
+        onClick = { ui.applyKeepScreenOn(!keepScreenOn) },
+    )
+
+    // 会话级入口打包成一个对象再往下穿（见 `PlayerSessionChipSet` 的 KDoc：
+    // 平铺参数要穿过五层，以后加入口就得改十几处）。
     val sessionChips = PlayerSessionChipSet(
         sleepTimer = sleepTimerChip,
         queue = queueChip,
         equalizer = equalizerChip,
+        keepScreenOn = keepScreenOnChip,
         pip = pipChip,
     )
 
@@ -717,7 +760,6 @@ fun PlayerScreen(
             player = player,
             mode = aspectRatio,
             videoSize = state.videoSize,
-            isPlaying = state.isPlaying,
             modifier = layerModifier.then(gestureModifier),
         ) {
             // 位图字幕（PGS / VobSub / DVB）单独一层，铺满**画面矩形**。

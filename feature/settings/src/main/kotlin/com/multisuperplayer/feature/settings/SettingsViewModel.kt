@@ -433,6 +433,11 @@ class SettingsViewModel(
         playbackSettingsRepository.setTrustUntrustedCertificates(enabled)
     }
 
+    /** 播放时屏幕常亮（默认开，见 [PlaybackSettings.keepScreenOnWhilePlaying]）。 */
+    fun setKeepScreenOnWhilePlaying(enabled: Boolean) = persist("播放时禁止熄屏=$enabled") {
+        playbackSettingsRepository.setKeepScreenOnWhilePlaying(enabled)
+    }
+
     // ------------------------------------------------------------------ 字幕翻译
 
     /**

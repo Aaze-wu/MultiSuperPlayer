@@ -202,6 +202,18 @@
     <!-- ===== 子母畫面 ===== -->
     <string name="msp_player_pip">子母畫面</string>
 
+    <!-- ===== 螢幕恆亮 ===== -->
+    <!--
+      控制條上的入口。三句話各司其職，不要合併：
+
+      - `msp_player_keep_screen_on` 是**開關的名字**，只給無障礙用：TalkBack 會把它
+        和晶片上的目前狀態拼成一句「播放時禁止熄屏，螢幕恆亮，已啟用」；
+      - `_on` / `_off` 是晶片上顯示的文字，寫的是**現在螢幕會怎樣**，不是功能名。
+    -->
+    <string name="msp_player_keep_screen_on">播放時禁止熄屏</string>
+    <string name="msp_player_keep_screen_on_on">螢幕恆亮</string>
+    <string name="msp_player_keep_screen_on_off">允許螢幕熄滅</string>
+
     <!--
       等化器。
 

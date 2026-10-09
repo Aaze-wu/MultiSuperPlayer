@@ -65,13 +65,21 @@ import com.multisuperplayer.core.player.MspVideoSize
  * `clipToBounds()` 是给 [AspectRatioMode.CROP] 用的：那个模式下 `PlayerView` 被撑满，
  * 画面按 `RESIZE_MODE_ZOOM` 放大后**会溢出**自己的边界，不裁的话它会盖到
  * 上下的控制条上去。
+ *
+ * ## 这里不再管屏幕常亮
+ *
+ * 以前这一层在 `update` 里写 `view.keepScreenOn = isPlaying`，那条路已经搬到窗口级
+ * 的 [PlayerKeepScreenOnEffect] 上了。两个原因，都不是「写法不好看」：
+ *
+ * - **音频页根本没有这一层**，所以那个写法让「播放时不让屏幕熄灭」对听歌完全不生效；
+ * - 视图级的要求和**我们自己**想放开屏幕的时刻不是一回事（暂停、或者用户在控制条上
+ *   把它关掉），两边各写一份就是两个入口各自决定同一件事。
  */
 @Composable
 fun PlayerVideoSurface(
     player: Player?,
     mode: AspectRatioMode,
     videoSize: MspVideoSize,
-    isPlaying: Boolean,
     modifier: Modifier = Modifier,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
@@ -122,7 +130,6 @@ fun PlayerVideoSurface(
                     if (view.player !== player) view.player = player
                     // `setResizeMode` 内部对同值有短路，所以这里不必自己比。
                     view.resizeMode = VideoFit.resizeModeOf(mode)
-                    view.keepScreenOn = isPlaying
                 },
                 modifier = Modifier.fillMaxSize(),
             )
