@@ -8,7 +8,8 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Current version: **1.2.3** (stable)
 - License: [GPL-3.0](LICENSE)
 
-Release notes: [docs/release-notes](docs/release-notes/)
+Release notes (user-facing): [docs/release-notes](docs/release-notes/)
+Developer changelog (design notes, file list, tests): [docs/changelogs](docs/changelogs/)
 
 中文文档：[README.md](README.md)
 
@@ -658,7 +659,8 @@ feature:
   Calling both *Preview* would describe a perfectly usable public build as an experiment.
 
 The step-by-step operations for this ladder (which line to edit, which command to run, what to
-verify afterwards) are in [`docs/release-process.md`](docs/release-process.md) (Chinese).
+verify afterwards) are in [`docs/release-process.md`](docs/release-process.md) (Chinese), and the
+per-version engineering notes are in [`docs/changelogs/`](docs/changelogs/) (Chinese).
 
 #### The check at launch
 

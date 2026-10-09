@@ -8,7 +8,8 @@
 - 当前版本：**1.2.3**（正式版）
 - 许可证：[GPL-3.0](LICENSE)
 
-发行说明：[docs/release-notes](docs/release-notes/)
+发行说明（给用户）：[docs/release-notes](docs/release-notes/)
+开发记录（设计取舍、文件清单、测试与验证）：[docs/changelogs](docs/changelogs/)
 
 English documentation: [README.en.md](README.en.md)
 
@@ -476,7 +477,8 @@ English documentation: [README.en.md](README.en.md)
 - **关于页的徽章分两种词**。`beta` 写「测试版」，`alpha` 写「预览版」：前者是「可以用了，
   帮忙看看」，后者是「随时会变，别当回事」。一律写「预览版」等于把一个正常可用的公开版本说成实验品。
 
-具体的操作步骤（改哪一行、敲哪条命令、发布完对什么）见 [`docs/release-process.md`](docs/release-process.md)。
+具体的操作步骤（改哪一行、敲哪条命令、发布完对什么）见 [`docs/release-process.md`](docs/release-process.md)；
+每一版的内部记录（设计取舍、文件清单、测试与验证）见 [`docs/changelogs/`](docs/changelogs/)。
 
 #### 启动时的那一次检查
 
