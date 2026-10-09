@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.data.subtitle
 
 import com.multisuperplayer.core.model.SubtitleFormat
+import com.multisuperplayer.core.model.localFilePath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -40,6 +41,18 @@ class SubtitleFilesTest {
 
         val file = "file:///storage/emulated/0/Show.srt"
         assertEquals(file, subtitleSourceOf(path = file, fileName = "Show.srt").uri)
+    }
+
+    @Test
+    fun `路径里的井号与百分号不会被 uri 语法吐掉`() {
+        // 直接拼 `"file://$path"` 时：`#` 之后变成 fragment（路径被截短）、`%` 变成转义
+        // 开头（后两个字符不是十六进制就报 `Invalid file path`）。两者的症状一模一样——
+        // 「文件就在那儿，应用说打不开」——所以这里反解一遍钉住它。
+        val path = "/storage/emulated/0/Download/字幕#1 100%.srt"
+
+        val source = subtitleSourceOf(path = path, fileName = "字幕#1 100%.srt")
+
+        assertEquals(path, localFilePath(source.uri))
     }
 
     @Test

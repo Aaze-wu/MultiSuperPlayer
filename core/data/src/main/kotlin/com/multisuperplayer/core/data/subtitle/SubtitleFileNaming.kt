@@ -504,6 +504,10 @@ internal object SubtitleFileNaming {
      * 加减分**只在本来就对得上时才生效**。不这样写的话，一首歌旁边完全不相干的
      * `.lrc` 会因为 `+25` 而变成「有匹配」，于是自动挂上一份别人的歌词——
      * 而且界面上看起来一切正常，没有任何地方会报错。
+     *
+     * 返回值**只用于排序与展示**（同为命中时对口的那条排前面）。能不能自动挂
+     * 由 [matchScore] 单独决定，见 `SubtitleSource.titleMatchScore` 与
+     * `isAutoMatchable`。
      */
     fun associationScore(
         mediaFileName: String,

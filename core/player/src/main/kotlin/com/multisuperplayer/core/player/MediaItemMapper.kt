@@ -5,6 +5,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.model.localFileUri
 
 /**
  * [MediaEntry] → Media3 [MediaItem] 的唯一转换点。
@@ -22,7 +23,11 @@ object MediaItemMapper {
             // 重扫后同一个文件的 uri 可能变（SAF 授权刷新），mediaId 变了会让
             // 「记住播放位置」「当前播放项高亮」全部失效。
             .setMediaId(entry.id)
-            .setUri(entry.uri)
+            // 裸路径（内置文件浏览器给的就是这个）必须先经 [localFileUri] 编码。
+            // Media3 内部对字符串 uri 做 `Uri.parse`，文件名里的 `#` 会把后面整段当成
+            // fragment、`%` 会被当成转义开头——两种都表现为「点开就报播放失败」，
+            // 而文件本身好好的。`content://` / `http://` 条目的字符串原样透传。
+            .setUri(localFileUri(entry.uri))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(entry.title.takeIf { it.isNotBlank() })

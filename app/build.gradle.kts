@@ -58,7 +58,12 @@ plugins {
 // 1.2.1 同理不发 beta：两条都是「静默失效」类 bug（字幕匹配不到、SAF 目录的字幕查不到），
 // 改的是纯函数与来源判定，没有清单/权限变化。与 1.2.0 **共用 user-visible 功能集**，
 // 只是修 bug —— 所以 README 的功能清单不动，只补「本版更新说明」。
-val appVersionName: String = "1.2.1"
+//
+// 1.2.2 同样是 bug 修复版：一条是「磁盘路径直接拼 `file://`，文件名里的 `#` / `%`
+// 被当成 uri 语法吃掉」，一条是「音视频对口度的加减分同时参与自动挂载门槛」。
+// 两条都落在纯函数与地址编码上，没有清单/权限变化 ⇒ 也不发 beta，直接发正式版，
+// 与 1.2.0 / 1.2.1 **共用 user-visible 功能集**。
+val appVersionName: String = "1.2.2"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

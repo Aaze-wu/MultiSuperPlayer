@@ -1,5 +1,6 @@
 package com.multisuperplayer.core.data.subtitle
 
+import com.multisuperplayer.core.model.localFilePath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -51,9 +52,32 @@ class FileSystemSubtitleLocatorTest {
         val row = found.subtitles.single { it.fileName == "movie.srt" }
         // 必须补 scheme：读字幕走的是 ContentResolver.openInputStream，
         // 它只认 file: / content: ——裸路径会被当成 content uri 去问 ContentProvider。
-        assertEquals("file://${File(download, "movie.srt").absolutePath}", row.uri)
+        assertTrue("uri 少了 file scheme：${row.uri}", row.uri.startsWith("file://"))
+        // 而且必须**能反解回磁盘上的真实路径**。用反解比较而不是拼字符串：
+        // 临时目录在 Windows 上带反斜杠、可能带空格，拿字符串拼出来的期望值等于
+        // 把实现拄一遍，编码写漏了也照样通过。
+        assertEquals(File(download, "movie.srt").absolutePath, localFilePath(row.uri))
         // 大小要取真实值：面板上会显示它，0 会让每一行看起来都是空文件。
         assertEquals("subtitle".length.toLong(), row.sizeBytes)
+    }
+
+    @Test
+    fun `文件名含井号或百分号时产出的 uri 仍指向那个文件`() {
+        // `#` 之后会变成 fragment、`%` 会被当成转义开头，两种都会让路径**被截短或变形**，
+        // 而症状仅仅是「读不到」。判据不是 uri 长什么样，而是**反解出来的路径真的存在**。
+        val download = dir()
+        // 不含 `?`：Windows 上建不出这种文件名（`LocalPathUriTest` 在纯字符串那一层测它）。
+        val tricky = listOf("字幕#1.srt", "100% 完成.srt", "我的 字幕.srt")
+        tricky.forEach { File(download, it).writeText("x") }
+
+        val found = locator.scanDirectory(download.absolutePath) as DirectoryScan.Found
+
+        tricky.forEach { name ->
+            val row = found.subtitles.single { it.fileName == name }
+            val path = requireNotNull(localFilePath(row.uri))
+            assertEquals(name, File(path).name)
+            assertTrue("$name 的 uri 没能还原成存在的文件：${row.uri}", File(path).exists())
+        }
     }
 
     @Test

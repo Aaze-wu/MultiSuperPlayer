@@ -27,8 +27,14 @@ const val AUTO_MATCH_SCORE = 85
  *
  * 注意它比 [SubtitleSource.matchesMedia] 严得多：后者只回答「对得上吗」，
  * 用于列表里排序和分组；前者回答「够不够格不看用户一眼就用」。
+ *
+ * 比的是 [SubtitleSource.titleMatchScore]（只看名字），**不是**
+ * [SubtitleSource.matchScore]：后者含「格式与媒体类型对不对口」的 ±25，
+ * 拿它当门槛会让不对口的候选连**名字一字不差**都够不着——症状是音频旁边的
+ * 同名字幕（`歌.mp3` + `歌.mp3.srt`）永远不自动挂，而那一份正是用户自己
+ * 放进同一个文件夹的。±25 只该决定「多个候选里谁排前面」。
  */
-val SubtitleSource.isAutoMatchable: Boolean get() = matchScore >= AUTO_MATCH_SCORE
+val SubtitleSource.isAutoMatchable: Boolean get() = titleMatchScore >= AUTO_MATCH_SCORE
 
 /**
  * 候选的统一排序：**列表顺序和「自动挑哪一条」用的是同一套规则**。
@@ -40,7 +46,10 @@ val SubtitleSource.isAutoMatchable: Boolean get() = matchScore >= AUTO_MATCH_SCO
  *
  * ## 四层，从「对不对」到「稳不稳」
  *
- * 1. **关联分降序**——这是唯一衡量「是不是这条片子的字幕」的量。
+ * 1. **关联分降序**——这是唯一衡量「是不是这条片子的字幕」的量。它里面已经含了
+ *    「格式与媒体类型对不对口」的 ±25，所以「同为命中时对口的那条靠前」不必另开
+ *    一层。注意它只决定**先后**：够不够格自动挂看
+ *    [SubtitleSource.titleMatchScore]，见 [isAutoMatchable]。
  * 2. **优先人工、其次应用自己生成的**。分数相同意味着「都是这条片子的字幕」，
  *    此时唯一有意义的问题就是「谁更可信」：外挂文件是人做的（有断句、有标点、
  *    专有名词也对），语音识别的结果只是「没有更好选择」时的保底。
@@ -128,8 +137,23 @@ data class SubtitleSource(
      * 关联打分：`0` 表示和这条媒体对不上（只能手动选），越大越像。
      *
      * 已经包含「格式与媒体类型是否对口」的加减分，所以直接拿它排序即可。
+     * 但它**只用于排序与展示**，不能拿来判「够不够格自动挂」——
+     * 那个判据是 [titleMatchScore]。
      */
     val matchScore: Int,
+    /**
+     * 只由文件名算出来的分，不含「格式与媒体类型对不对口」的 ±25。
+     *
+     * [isAutoMatchable] 看的是它。±25 的用途是「同一个目录里有多个候选时，
+     * 对口的那条排前面」（音频旁边 `.lrc` 优先于 `.srt`），而不是「名字对上了
+     * 也不算数」。两者混用时的症状是**音频旁边的同名字幕永远不自动挂**：
+     * `歌.srt` 是 `100 - 25 = 75`、`歌.mp3.srt` 是 `85 - 25 = 60`，两个都在
+     * 门槛 85 之下，而它们恰恰是用户亲手放进同一个文件夹的那一份。
+     *
+     * 默认值取 [matchScore]：手工构造候选的调用点（测试、内嵌轨、生成的 ASR
+     * 字幕）不传它就等于「没有对口问题」，与改造前的行为一致。
+     */
+    val titleMatchScore: Int = matchScore,
     /**
      * 文件名里片名之外还带了几段标记（`chs`、`forced`、`双语`…）。
      *
@@ -147,7 +171,13 @@ data class SubtitleSource(
      */
     val origin: SubtitleOrigin = SubtitleOrigin.EXTERNAL_FILE,
 ) {
-    /** 是否可以自动挂上（而不是只能出现在手动列表里）。 */
+    /**
+     * 和这条媒体对得上吗——用于候选列表的分组与排序。
+     *
+     * 和 [isAutoMatchable] 不是一回事：这一条只回答「像不像」，后者回答
+     * 「够不够格不看用户一眼就用」。名字对得上但音视频不对口
+     * （音频旁边的 `.srt`）在两边都是 true；只有名字真的对不上才是 false。
+     */
     val matchesMedia: Boolean get() = matchScore > SubtitleFileNaming.NO_MATCH
 }
 

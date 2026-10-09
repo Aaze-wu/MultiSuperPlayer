@@ -34,10 +34,16 @@ class SubtitleSourceSelectionTest {
      * [trailingTagCount] 默认**从文件名真实推导**而不是写死 0：写死的话测试里的数据
      * 和真实链路对不上（文件名叫 `Show.chs.srt` 却声称「片名之外没有标记」），
      * 新加的排序规则就会在一堆「看起来很真」的假数据上通过。
+     *
+     * [titleMatchScore] 默认随 [matchScore]（与 `SubtitleSource` 的默认值一致）：
+     * 这一层大多测「谁排前面」，需要单独验「够不够格自动挂」的用例自己传，
+     * 见「音频旁边的同名字幕会被自动挂上」。
      */
     private fun source(
         fileName: String,
         matchScore: Int,
+        titleMatchScore: Int = matchScore,
+        format: SubtitleFormat = SubtitleFormat.SRT,
         languageTag: String? = null,
         isForced: Boolean = false,
         isBilingual: Boolean = false,
@@ -47,12 +53,13 @@ class SubtitleSourceSelectionTest {
     ) = SubtitleSource(
         uri = uri,
         fileName = fileName,
-        format = SubtitleFormat.SRT,
+        format = format,
         languageTag = languageTag,
         isForced = isForced,
         isBilingual = isBilingual,
         sizeBytes = sizeBytes,
         matchScore = matchScore,
+        titleMatchScore = titleMatchScore,
         trailingTagCount = trailingTagCount,
     )
 
@@ -80,16 +87,74 @@ class SubtitleSourceSelectionTest {
     }
 
     @Test
-    fun `比这一档更弱的匹配分数确实低于门槛`() {
-        // 反向锁：确认「名字更长的字幕」这一档是**最低的**自动挂载资格，
-        // 再弱的关联（比如音频旁边的普通字幕）必须落在门槛之下。
+    fun `排序分比这一档更弱只决定先后，不再决定资格`() {
+        // ⚠️ 这条测试原来断言的是「音频旁边的 .srt 分数低于门槛 ⇒ 不该自动挂上」。
+        // 那个取舍被用户推翻了：他手上的音乐文件旁边放的就是同名 .srt 歌词，
+        // 而**名字一字不差**却被判为不可信，只能每次手动选。
+        //
+        // 现在「不对口」只表现为排序分低 25（同目录有对口候选时让位），
+        // 不再剥夺资格。资格判定见 `SubtitleSource.titleMatchScore`。
         val subtitleForAudio = score("song.mp3", "song.srt", MediaKind.AUDIO, SubtitleFormat.SRT)
 
         assertTrue("名字一样就是对得上，必须能在手动列表里选到", subtitleForAudio > 0)
         assertTrue(
-            "音频旁边的 .srt 多半是放错了文件夹，不该自动挂上",
+            "排序分带 -25，目的是让对口的歌词排前面（而不是让这条失去资格）",
             subtitleForAudio < AUTO_MATCH_SCORE,
         )
+        assertTrue(
+            "同一对文件名，纯名字分够门槛",
+            SubtitleFileNaming.matchScore("song.mp3", "song.srt") >= AUTO_MATCH_SCORE,
+        )
+    }
+
+    @Test
+    fun `音频旁边的同名字幕会被自动挂上`() {
+        // 用户报的 bug：音乐文件旁边放一份同名字幕（`歌.mp3.srt` / `歌.srt`），
+        // 播放时永远不自动挂，只能在列表里手动选。
+        //
+        // 两个候选的名字分都够门槛（100 与 85），只是 `matchScore` 被
+        // 「音频配非歌词字幕 -25」减到 75 与 60。门槛不能再拿含加减分的分数判，
+        // 否则用户亲手放进同一个文件夹的那份字幕永远挂不上。
+        //
+        // 这里走的是**真实链路**：两个分数都从文件名现算，不是手填的假数据——
+        // 这两个字段将来要是被人重新合并成一个，这条会红。
+        fun candidate(media: String, subtitle: String, format: SubtitleFormat, kind: MediaKind) =
+            source(
+                fileName = subtitle,
+                matchScore = score(media, subtitle, kind, format),
+                titleMatchScore = SubtitleFileNaming.matchScore(media, subtitle),
+                format = format,
+            )
+
+        val plain = candidate("歌.mp3", "歌.srt", SubtitleFormat.SRT, MediaKind.AUDIO)
+        val extended = candidate("歌.mp3", "歌.mp3.srt", SubtitleFormat.SRT, MediaKind.AUDIO)
+
+        assertTrue("音频 + 同名 .srt 要够格", plain.isAutoMatchable)
+        assertTrue("音频 + 「媒体全名 + 字幕后缀」也要够格", extended.isAutoMatchable)
+
+        // 旁边有对口的歌词时仍然优先挂歌词——那 25 分的意义全在「谁排前面」上。
+        val lyrics = candidate("歌.mp3", "歌.lrc", SubtitleFormat.LRC, MediaKind.AUDIO)
+
+        assertEquals("歌.lrc", listOf(extended, lyrics).bestAutoMatch()?.fileName)
+        assertEquals("歌.lrc", listOf(extended, plain, lyrics).bestAutoMatch()?.fileName)
+    }
+
+    @Test
+    fun `名字对不上时连门槛都不沾边`() {
+        // 反向锁：放宽门槛不能连带把「不相干的文件」放进来。名字分与排序分同为 0，
+        // 因为 `associationScore` 在 base 为 0 时直接返回 0（见 `SubtitleFileNamingTest`
+        // 的「无关文件不会被亲和度加分变成匹配」）。
+        val unrelated = source(
+            fileName = "Another Song.lrc",
+            matchScore = score("song.mp3", "Another Song.lrc", MediaKind.AUDIO, SubtitleFormat.LRC),
+            titleMatchScore = SubtitleFileNaming.matchScore("song.mp3", "Another Song.lrc"),
+            format = SubtitleFormat.LRC,
+        )
+
+        assertEquals(0, unrelated.titleMatchScore)
+        assertFalse(unrelated.matchesMedia)
+        assertFalse(unrelated.isAutoMatchable)
+        assertNull(listOf(unrelated).bestAutoMatch())
     }
 
     @Test

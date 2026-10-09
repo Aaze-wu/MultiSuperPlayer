@@ -12,6 +12,7 @@ import com.multisuperplayer.core.model.SubtitleDocument
 import com.multisuperplayer.core.model.SubtitleFormat
 import com.multisuperplayer.core.model.SubtitleOrigin
 import com.multisuperplayer.core.model.SubtitleTrack
+import com.multisuperplayer.core.model.localFileUri
 import com.multisuperplayer.core.translate.SubtitleExportFormat
 import com.multisuperplayer.core.translate.SubtitleExportMode
 import com.multisuperplayer.core.translate.buildExportedSubtitle
@@ -78,7 +79,12 @@ class AsrSubtitleGenerator(
         onProgress: (AsrProgress) -> Unit = {},
     ): GeneratedSubtitleRef {
         val generatedUri = store.uriFor(mediaUri)
-        val media = Uri.parse(mediaUri)
+        // 取媒体的这一步要过 [localFileUri]：`mediaUri` 可能是不带 scheme 的裸路径，
+        // 而 `Uri.parse` 对含 `#` 的路径会从 `#` 处截断（拿到的路径少一截）——
+        // 症状是「点转写，报打不开这个文件」。
+        // 注意 `store.uriFor` 继续拿**原始** uri：那是这条生成字幕的身份，
+        // [SubtitleRepository] 扫描回来时用的是同一个值，两边不一致就会「生成完了但列表里没有」。
+        val media = Uri.parse(localFileUri(mediaUri))
         val segments = when (job) {
             is AsrJob.OnDevice -> transcriber.transcribe(media, job.model, onProgress)
             is AsrJob.Cloud -> cloud.transcribe(media, job.config, onProgress)

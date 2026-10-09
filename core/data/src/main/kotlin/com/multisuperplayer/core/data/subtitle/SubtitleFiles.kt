@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import com.multisuperplayer.core.common.log.MspLog
+import com.multisuperplayer.core.model.localFileUri
 
 private const val TAG = "SubtitleFiles"
 
@@ -190,6 +191,12 @@ private fun Cursor.longOrNull(columnName: String): Long? {
  * 调用方有两个，而且**必须共用这一处规则**：用户手选的那条（[subtitleSourceOf]）
  * 与自动发现的同目录字幕（[FileSystemSubtitleLocator]）。`uri` 是解析缓存的键，
  * 同一个文件按两条路拼出两个不同的 uri，就等于同一个文件被解析两次、缓存白建。
+ *
+ * ## 为什么不是 `"file://$path"`
+ *
+ * 那样拼出来的 uri 在文件名含 `#` 或 `%` 时是**坏的**：`#` 之后被当 fragment（路径被截短）、
+ * `%` 被当转义开头（后两个字符不是十六进制就抛 `Invalid file path`）。两者都表现为
+ * 「文件就在那儿，应用说打不开」——[SubtitleRepository] 拿它去 `openInputStream` 时才发现。
+ * 编码规则与理由统一放在 [localFileUri]，这里只负责「补 scheme」这一件事。
  */
-internal fun readableUri(path: String): String =
-    if (path.contains("://")) path else "file://$path"
+internal fun readableUri(path: String): String = localFileUri(path)

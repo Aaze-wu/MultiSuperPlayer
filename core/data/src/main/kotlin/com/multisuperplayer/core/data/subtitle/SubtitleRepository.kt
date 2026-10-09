@@ -263,6 +263,12 @@ class SubtitleRepository(
                 subtitleFormat = format,
                 mediaKind = entry.kind,
             ),
+            // 门槛判据单独再算一遍：`associationScore` 里含「音视频对不对口」的 ±25，
+            // 那是排序用的，不能让它决定「够不够格自动挂」。见 `SubtitleSource`。
+            titleMatchScore = SubtitleFileNaming.matchScore(
+                mediaFileName = mediaName,
+                subtitleFileName = row.fileName,
+            ),
             trailingTagCount = info.trailingTagCount,
         )
     }
@@ -282,6 +288,10 @@ class SubtitleRepository(
         if (source.sizeBytes > MAX_SOURCE_BYTES) {
             throw SubtitleReadException(tooLargeText(source.sizeBytes))
         }
+        // 这里的 `Uri.parse` 之所以能开，全靠 [SubtitleSource.uri] 由 [readableUri] 产出：
+        // 文件名里的 `#`（fragment）与 `%`（转义开头）都已经编码掉了、`getPath()` 取值时
+        // 会解码回去。手工拼一个 `file://$path` 塞进来就会在这里抛
+        // `FileNotFoundException`，而那句话看起来像「文件不存在」。
         val stream = appContext.contentResolver.openInputStream(Uri.parse(source.uri))
             ?: throw SubtitleReadException(MspText.Res(R.string.msp_subtitle_reason_file_unopenable))
         return stream.use { input ->

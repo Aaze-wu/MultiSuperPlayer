@@ -309,4 +309,46 @@ class SubtitleFileNamingTest {
         assertTrue(extensions.contains("lrc"))
         assertTrue(extensions.contains("ttml"))
     }
+
+    // ------------------------------------------- 媒体全名 + 字幕后缀（用户报的写法）
+
+    @Test
+    fun `字幕名是媒体全名加字幕后缀时按「互为前缀」这一档算`() {
+        // 磁盘上很常见的一种命名：把字幕存成 `片名.mp4.srt`（媒体全名 + 字幕扩展名）。
+        // 它落到 `compare` 的第三档——片名解析结果是 `片名 mp4`，比媒体名 `片名` 长，
+        // 于是 `title.startsWith(media)` 成立。
+        //
+        // 这一档**正好等于自动挂载门槛**，所以它必须稳定：再低一点，这类文件就会
+        // 全部变成「只能在列表里手选」。
+        assertEquals(AUTO_MATCH_SCORE, score("片名.mp4", "片名.mp4.srt"))
+        assertEquals(AUTO_MATCH_SCORE, score("英雄.mp4", "英雄.mp4.chs.srt"))
+        assertEquals(AUTO_MATCH_SCORE, score("剧集.S01E02.mkv", "剧集.S01E02.mkv.srt"))
+        assertEquals(AUTO_MATCH_SCORE, score("普通片名.mp4", "普通片名.mp4.srt"))
+        // 音频配歌词是对口的 ⇒ 加 25，所以比门槛高。那 25 分不参与门槛判定。
+        assertTrue(score("a.mp3", "a.mp3.lrc", MediaKind.AUDIO, SubtitleFormat.LRC) > AUTO_MATCH_SCORE)
+    }
+
+    @Test
+    fun `音频旁边的同名字幕名字分够门槛，只是排序上让位给对口格式`() {
+        // ⚠️ 用户报的 bug 的核心：音频（`歌.mp3`）旁边放着同名 `.srt` 歌词时
+        // **永远不自动挂**。根因是 `associationScore` 的 -25 参与了门槛判定：
+        // `100 - 25 = 75`（`歌.srt`）和 `85 - 25 = 60`（`歌.mp3.srt`）双双落在门槛之下，
+        // 而它们恰恰是用户亲手放进同一个文件夹的那一份。
+        //
+        // 现在门槛看 `matchScore`（纯名字分），两条都够格；`associationScore`
+        // 只剩「同分排序」这一个用途。
+        val plainName = SubtitleFileNaming.matchScore("歌.mp3", "歌.srt")
+        val extendedName = SubtitleFileNaming.matchScore("歌.mp3", "歌.mp3.srt")
+
+        assertTrue("音频 + 同名 .srt：名字分必须够门槛", plainName >= AUTO_MATCH_SCORE)
+        assertTrue("带媒体扩展名的写法也必须够门槛", extendedName >= AUTO_MATCH_SCORE)
+
+        // 排序分里那 25 分的差别要留住：和一份对口的歌词放在一起时，歌词仍然排前面。
+        val plain = score("歌.mp3", "歌.srt", MediaKind.AUDIO, SubtitleFormat.SRT)
+        val extended = score("歌.mp3", "歌.mp3.srt", MediaKind.AUDIO, SubtitleFormat.SRT)
+        val lyrics = score("歌.mp3", "歌.lrc", MediaKind.AUDIO, SubtitleFormat.LRC)
+
+        assertTrue("对口的歌词要排在不对口的字幕前面", lyrics > plain)
+        assertTrue("同样不对口时，名字更贴的排前面", plain > extended)
+    }
 }
