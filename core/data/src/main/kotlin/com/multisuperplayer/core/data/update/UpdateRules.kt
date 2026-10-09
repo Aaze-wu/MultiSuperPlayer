@@ -110,18 +110,18 @@ sealed interface UpdateAvailability {
 object UpdateRules {
 
     /**
-     * 自动检查的最小间隔：12 小时。
+     * 自动检查的冷却窗口在这里没有常量：它是**用户的设置项**，规则、默认值和上下界
+     * 都在 [UpdateCooldown] 里（v1.2.3 起可改，之前写死 12 小时），[skipsAutoCheck]
+     * 由调用方把当前值传进来。
      *
-     * 为什么是「顺手查」而不是「后台定时查」：后台定时要一个常驻的调度器和一个
-     * 长命的状态容器，而那两样东西的代价（多一个进程级的生命周期、多一个
-     * 「这份状态是谁在管」的问题）换来的只是「用户会发现新版早了几个小时」。
-     * 12 小时对应「一天里最多两次」，而 GitHub 对未认证请求的限制是每小时 60 次
-     * ——量级上完全够用，也远不至于被当成滥用。
+     * 为什么是「顺手查」而不是「后台定时查」（这一点没因为可配置而改变）：后台定时
+     * 要一个常驻的调度器和一个长命的状态容器，而那两样东西的代价（多一个进程级的
+     * 生命周期、多一个「这份状态是谁在管」的问题）换来的只是「用户会发现新版早了
+     * 几个小时」。
      *
      * **启动检查和进页面检查共用这一个窗口**（见 [skipsAutoCheck]）：一次启动就是
      * 一次检查，紧接着进更新页不该再问同一个问题。
      */
-    const val AUTO_CHECK_INTERVAL_MS: Long = 12L * 60 * 60 * 1000
 
     /**
      * 这一次自动检查该不该**直接跳过**（跳过 = 什么都不做，见 `UpdateManager.check`）。
@@ -130,26 +130,31 @@ object UpdateRules {
      * 1. **开关**——用户在设置里关掉「自动检查更新」之后，启动和进更新页都不该再问。
      *    这一条以前**根本没人读**（开关写进 DataStore，之后没有任何地方看它，
      *    是个纯装饰品）：界面上关掉它，启动时照样请求；
-     * 2. **节流**——[AUTO_CHECK_INTERVAL_MS] 之内不重复问。
+     * 2. **节流**——[intervalMs] 之内不重复问。
      *
      * [MANUAL][UpdateCheckTrigger.MANUAL] 一律不跳：用户点了「检查」就得真的去问，
      * 哪怕他十秒前刚点过一次。
      *
      * 单独提成一个纯函数，是因为它有两个必须钉住的反例（开关关掉、窗口没到），
      * 而它们很容易被「顺手把 `markChecked` 也记了」这类改动悄悄改掉——
-     * 那会让「被跳过的检查」占用掉 12 小时的窗口，用户关一下开关再打开，
+     * 那会让「被跳过的检查」占用掉一整个窗口，用户关一下开关再打开，
      * 第一次启动检查就没了。
+     *
+     * @param intervalMs 冷却窗口。调用方从设置里取（已经过 [UpdateCooldown.normalize]），
+     *   **不在这里读默认值**：这个函数要保持成纯的算术，而「用户设了多久」是调用方
+     *   那一层的事实。
      */
     fun skipsAutoCheck(
         trigger: UpdateCheckTrigger,
         autoCheck: Boolean,
+        intervalMs: Long,
         lastCheckAtEpochMs: Long?,
         atEpochMs: Long,
     ): Boolean {
         if (trigger == UpdateCheckTrigger.MANUAL) return false
         if (!autoCheck) return true
         val last = lastCheckAtEpochMs ?: return false
-        return atEpochMs - last < AUTO_CHECK_INTERVAL_MS
+        return atEpochMs - last < intervalMs
     }
 
     /**

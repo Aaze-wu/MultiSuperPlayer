@@ -34,15 +34,17 @@ class UpdateManager(
      *
      * **失败时也会记下这次检查的时刻**：节流挡的是「同一分钟内点十次」，而失败之后
      * 狂点是最常见的反应。只在成功时记，节流就正好在最需要它的场景失效。
-     * 代价是失败后 12 小时内不再自动检查——用户仍然可以手动点（手动那条路不看节流）。
+     * 代价是失败后**一个窗口**（默许 12 小时）内不再自动检查——用户仍然可以手动
+     * 点（手动那条路不看节流）。
      *
      * **被开关或节流跳过的检查什么都不记**（见下）。跳过和失败是两件事：
      * 前者是「这一次请求压根没发出去」，后者是「发出去了、没成」。
      *
      * @param trigger 谁发起的。用户在界面上点的那次传 [UpdateCheckTrigger.MANUAL]
      *   （跳过节流，点了就得真的去问）；启动时和进更新页时传
-     *   [UpdateCheckTrigger.AUTO]（受「自动检查更新」开关与
-     *   [UpdateRules.AUTO_CHECK_INTERVAL_MS] 限制）。
+     *   [UpdateCheckTrigger.AUTO]（受「自动检查更新」开关与用户设的冷却时长
+     *   ——[UpdateSettings.checkIntervalMs]，默认见 [UpdateCooldown.DEFAULT_MS]
+     *   ——限制）。
      * @return 判定结果；被跳过时返回 null——**null 不是「已经是最新」**，
      *   界面在拿到 null 时必须保持原样，否则每次进这一页都会把「有新版」擦成「已是最新」。
      * @throws UpdateException 网络/HTTP/解析失败。界面用 [describeUpdateFailure] 转成文案。
@@ -58,13 +60,16 @@ class UpdateManager(
             UpdateRules.skipsAutoCheck(
                 trigger = trigger,
                 autoCheck = snapshot.autoCheck,
+                // 已经从设置里夹过一次（见 `UpdateSettings.checkIntervalMs`）：
+                // 这里拿到的就是那个能直接比大小的窗口。
+                intervalMs = snapshot.checkIntervalMs,
                 lastCheckAtEpochMs = snapshot.lastCheckAtEpochMs,
                 atEpochMs = at,
             )
         ) {
             // **连 `markChecked` 都不记**，直接返回。记了的话，「压根没发生的一次检查」
-            // 会占用掉那 12 小时的窗口：用户把开关关掉、过一会儿再打开，
-            // 第一次启动检查就会被上一次没发生的检查挡掉 12 小时——
+            // 会占用掉整个窗口（默许 12 小时）：用户把开关关掉、过一会儿再打开，
+            // 第一次启动检查就会被上一次没发生的检查挡掉一个窗口——
             // 一个自己造成的、界面上完全看不出来的静默失效。
             return null
         }
@@ -84,6 +89,9 @@ class UpdateManager(
     suspend fun setChannel(channel: UpdateChannel) = settingsRepository.setChannel(channel)
 
     suspend fun setAutoCheck(enabled: Boolean) = settingsRepository.setAutoCheck(enabled)
+
+    /** 写入自动检查的冷却窗口（毫秒）。越界/非正值由仓库层夹回默认，见 [UpdateCooldown.normalize]。 */
+    suspend fun setCheckInterval(intervalMs: Long) = settingsRepository.setCheckInterval(intervalMs)
 
     /** 忽略某一版。传 null 撤销忽略。 */
     suspend fun setIgnoredTag(tag: String?) = settingsRepository.setIgnoredTag(tag)

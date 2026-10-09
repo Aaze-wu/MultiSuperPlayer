@@ -118,7 +118,7 @@ class UpdateViewModel(
      *
      * 只记在内存里（每个进程一次），**不落盘**：需要它的正是「同一个进程里
      * `LaunchedEffect` 重跑了」这一种情况，而跨进程该不该再查是
-     * `UpdateRules.skipsAutoCheck` 的 12 小时节流负责的。落盘会多出一份
+     * `UpdateRules.skipsAutoCheck` 的冷却窗口负责的（用户可改，默认 12 小时）。落盘会多出一份
      * 与节流重复、且更容易写歪的状态。
      */
     private var launchCheckDone = false
@@ -142,7 +142,7 @@ class UpdateViewModel(
      * 查一次。
      *
      * @param trigger 用户亲手点的（[UpdateCheckTrigger.MANUAL]）还是自动检查
-     *   （[UpdateCheckTrigger.AUTO]，受「自动检查更新」开关与 12 小时节流限制）。
+     *   （[UpdateCheckTrigger.AUTO]，受「自动检查更新」开关与冷却窗口限制）。
      */
     fun check(trigger: UpdateCheckTrigger = UpdateCheckTrigger.MANUAL) {
         if (_state.value.checking || _state.value.progress != null) return
@@ -342,6 +342,17 @@ class UpdateViewModel(
 
     fun setAutoCheck(enabled: Boolean) {
         viewModelScope.launch { manager.setAutoCheck(enabled) }
+    }
+
+    /**
+     * 改自动检查的冷却窗口。
+     *
+     * 与 [setAutoCheck] 一样，改完**不立刻重查**：窗口是「以后多久查一次」的规则，
+     * 不是一个「现在去查一次」的动作。改完就查会得到「设成 7 天后又被查了一次」，
+     * 而用户刚表达的正好是相反的意图。
+     */
+    fun setCheckInterval(intervalMs: Long) {
+        viewModelScope.launch { manager.setCheckInterval(intervalMs) }
     }
 
     fun putToken(input: String) {

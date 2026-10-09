@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **1.2.2** (stable)
+- Current version: **1.2.3** (stable)
 - License: [GPL-3.0](LICENSE)
 
 Release notes: [docs/release-notes](docs/release-notes/)
@@ -606,10 +606,15 @@ Row 8 of the Settings hub is *Check for updates*, which opens a page with three 
 **Current version** (a *Check* button on the right, and it also checks once when you enter the page),
 **Update available** (only shown when one is really found: tag, publish time, the full release notes,
 *Download and install* / *Ignore this version*), and **Update settings**
-(update channel / check automatically / GitHub token).
+(update channel / check automatically / automatic check interval / GitHub token).
 **That single *check automatically* switch governs both the check at launch and the check when you
 open this page** — turning it off turns both off, while pressing *Check* yourself always works; with
 it off not a single network request is sent.
+**The automatic check interval is the cooling-off window for those automatic checks** (it matters
+while the switch is on, and the row stays editable while it is off): six presets — 1 / 6 / 12 hours,
+1 / 3 / 7 days — plus *Custom...* with an hours field and a minutes field (15 minutes minimum,
+7 days maximum; an out-of-range or non-numeric value is reported on the spot and *Save* stays
+disabled). It only throttles the two automatic checks: pressing *Check* yourself ignores it.
 
 - **Source:** GitHub Releases (`Aaze-wu/MultiSuperPlayer`) over the anonymous API.
 - **The token is optional.** It works without one; supplying one only raises the limit from
@@ -681,9 +686,10 @@ Three of those deserve a reason:
   dialog uses" are two different objects (each `NavBackStackEntry` scope has its own), producing
   "I pressed ignore in the dialog and the page still says an update is available".
 
-As long as a newer version exists the verdict stays `Available`, so the dialog **may** reappear every
-12 hours. That is on purpose: staying quiet is a better way to make someone miss an update than
-mentioning it once too often — and *Ignore this version* is there when you want quiet.
+As long as a newer version exists the verdict stays `Available`, so the dialog **may** reappear once
+per cooling-off window (12 hours by default, changeable in Settings). That is on purpose: staying
+quiet is a better way to make someone miss an update than mentioning it once too often — and
+*Ignore this version* is there when you want quiet.
 
 #### The check layer does not know about GitHub
 
@@ -716,7 +722,8 @@ Android dependencies**:
 Two of these are not arbitrary:
 
 - **"Not checked yet" and "up to date" are not the same thing.** The automatic check is
-  throttled to **12 hours**; when it is skipped it returns `null` and the page **changes nothing**.
+  throttled by a **cooling-off window** (12 hours by default, changeable in Settings; see
+  `UpdateCooldown`); when it is skipped it returns `null` and the page **changes nothing**.
   Treating a skip as "up to date" would wipe out the "an update is available" you found last
   time every time you open this page — and that is the single most important line on it.
 - **When the current version will not parse, do not guess.** `UpdateVersion.parse` failing means
@@ -813,7 +820,8 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v1.1.0** | **External sources: the player can, for the first time, take in something that did not come from its own library - Open with (pick this app in a file manager or a browser), sharing (single or multiple `content://` / `file://` items are both accepted, queued as a whole and played from the first), and network addresses (a new entry on the Browse tab plays an `http` / `https` address directly and remembers the last 20); `<data>` is declared in scheme + mimeType pairs, so an untyped http/https link is not registered and the app never grabs a plain web link; a beta.1 went out first, and two problems only visible on a real device were fixed for the stable release (accent colour moved into a dialog; a self-signed or untrusted certificate is no longer reported as a plain network failure, and a new Allow untrusted certificates switch - off by default - was added)** | Done |
 | **v1.2.0** | **Two small features: (1) generated subtitles can be cleared in one go (the end of the Speech recognition page shows how many are cached and how much space they take, with a Clear button and a confirmation that says how many will go, that recognition has to be run again and that the model is not deleted; only the subtitle files this device produced are removed, never the model or your translations) and (2) keep the screen on while playing (a new switch under Settings - Playback, on by default, plus a temporary toggle on the player control bar that flips between *Screen stays on* and *Screen may sleep* for the current playback only; it applies while audio or video is actually playing, and pausing, entering picture-in-picture or leaving the player hands the screen back to the system)** | Done |
 | **v1.2.1** | **Subtitle-matching fixes: (1) file names carrying release tags (`[SomeGroup.com]Some.Movie.2023.1080p.WEB-DL.mkv`) now pair with a clean subtitle name (there is no reliable way to tell how a bracket should be read, so both writings - as-is and with tags stripped - are used as candidates and the best score wins; a bracket holding only a year, and parentheses holding a Chinese phrase, are kept whole; an episode number is ignored only when both sides point at the same episode, because a wrong episode is worse than no subtitle; simplified and traditional Chinese are not matched against each other) and (2) subtitles inside a folder added with the system file picker are found again (the source of an entry is derived from its `ref` - `content://` means SAF, anything else the file system - and the playlist playback path is fixed as well); it also fixes a crash only seen on a device, caused by an unescaped brace in a regular expression (JVM accepts a lone `}`, Android's ICU does not; a structural guard test now covers it)** | Done |
-| **v1.2.2** | **Two fixes for names that were "close enough" but failed silently: (1) a file whose name contains `#` or `%` now plays from the built-in browser and its same-named subtitles / lyrics can be read (the address used to be built by string concatenation as `file://$path`, where `#` was taken as a fragment and `%` as the start of an escape sequence; a pure-Kotlin `LocalPathUri` encodes every code point that is not URI-safe and decodes it back, wired into the player's media URI, subtitle file reading and the speech-recognition media lookup) and (2) same-named subtitles / lyrics next to an audio file (`song.mp3` with `song.srt`, `song.mp3` with `song.mp3.srt`) now attach automatically (the ±25 format-affinity value used to take part in the auto-attach threshold too, pushing a same-named candidate below it; eligibility is now `titleMatchScore` and ordering is `matchScore`, so with both `.lrc` and `.srt` in the same folder the `.lrc` still wins)** | **Current (stable)** |
+| **v1.2.2** | **Two fixes for names that were "close enough" but failed silently: (1) a file whose name contains `#` or `%` now plays from the built-in browser and its same-named subtitles / lyrics can be read (the address used to be built by string concatenation as `file://$path`, where `#` was taken as a fragment and `%` as the start of an escape sequence; a pure-Kotlin `LocalPathUri` encodes every code point that is not URI-safe and decodes it back, wired into the player's media URI, subtitle file reading and the speech-recognition media lookup) and (2) same-named subtitles / lyrics next to an audio file (`song.mp3` with `song.srt`, `song.mp3` with `song.mp3.srt`) now attach automatically (the ±25 format-affinity value used to take part in the auto-attach threshold too, pushing a same-named candidate below it; eligibility is now `titleMatchScore` and ordering is `matchScore`, so with both `.lrc` and `.srt` in the same folder the `.lrc` still wins)** | Done |
+| **v1.2.3** | **The automatic update-check interval is now configurable: on the *Check for updates* page a new row sits between the *check automatically* switch and the update channel, with six presets - 1 / 6 / 12 hours, 1 / 3 / 7 days - plus *Custom...* with an hours field and a minutes field (15 minutes minimum, 7 days maximum; out-of-range or non-numeric input is reported on the spot and *Save* stays disabled); that window is the cooling-off period of the automatic check, previously hard-wired to 12 hours and now defined once in `UpdateCooldown` and stored in DataStore, while pressing *Check* yourself is never affected by it; the row stays editable with the switch off (a setting is not locked behind a switch); the default is still 12 hours, so upgrading changes nothing** | **Current (stable)** |
 | Later | Audio translation (dubbing) | Planned |
 
 ---

@@ -2,8 +2,12 @@ package com.multisuperplayer.feature.settings
 
 import android.content.Context
 import android.text.format.Formatter
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,15 +15,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,11 +55,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
+import com.multisuperplayer.core.common.format.DurationDraft
+import com.multisuperplayer.core.common.format.DurationInput
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
 import com.multisuperplayer.core.data.update.UpdateCheckTrigger
+import com.multisuperplayer.core.data.update.UpdateCooldown
 import com.multisuperplayer.core.data.update.UpdateRelease
 import com.multisuperplayer.core.data.update.UpdateSettings
+import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
@@ -99,7 +111,7 @@ fun UpdateRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // 进页面顺手查一次。**「自动检查」开关和 12 小时节流都在 `UpdateManager.check`
+    // 进页面顺手查一次。**「自动检查」开关和冷却窗口都在 `UpdateManager.check`
     // 里判**，不在这里判：这一层的 `settings` 首帧是默认值（很可能和用户设的不一样），
     // 拿它做判断等于用「还没读到的设置」替用户作决定。
     // 启动时那一次检查走在前面（见 `UpdateViewModel.checkAtLaunch`），所以这里
@@ -127,6 +139,7 @@ fun UpdateRoute(
         onOpenUnknownSource = viewModel::openUnknownSourceSettings,
         onSetChannel = viewModel::setChannel,
         onSetAutoCheck = viewModel::setAutoCheck,
+        onSetCheckInterval = viewModel::setCheckInterval,
         onPutToken = viewModel::putToken,
         onClearToken = viewModel::clearToken,
         onDismissFailure = viewModel::dismissFailure,
@@ -144,6 +157,7 @@ fun UpdateScreen(
         ignoredTag = null,
         lastCheckAtEpochMs = null,
         hasToken = false,
+        checkIntervalMs = UpdateCooldown.DEFAULT_MS,
     ),
     buildInfo: AppBuildInfo = AppBuildInfo.Unknown,
     onBack: () -> Unit,
@@ -154,12 +168,14 @@ fun UpdateScreen(
     onOpenUnknownSource: () -> Unit = {},
     onSetChannel: (UpdateChannel) -> Unit = {},
     onSetAutoCheck: (Boolean) -> Unit = {},
+    onSetCheckInterval: (Long) -> Unit = {},
     onPutToken: (String) -> Unit = {},
     onClearToken: () -> Unit = {},
     onDismissFailure: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showChannelDialog by remember { mutableStateOf(false) }
+    var showIntervalDialog by remember { mutableStateOf(false) }
     var showTokenDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -290,6 +306,22 @@ fun UpdateScreen(
             }
 
             item {
+                // 开关和通道之间：它只对开关打开时的自动检查有意义，
+                // 所以紧跟在开关下面；而它的取值又会决定「多久问一次」，
+                // 又必须排在「问什么」（通道）前面。
+                //
+                // 开关关掉时这一行**照常可改**，而不是变灰：变灰的行读起来像
+                // 「这里出错了」，而这里只是一个当下不生效的设置。
+                SettingActionButtonRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.msp_update_check_interval),
+                    subtitle = stringResource(R.string.msp_update_check_interval_desc),
+                    action = UpdateSummaries.interval(settings.checkIntervalMs).string(),
+                    onAction = { showIntervalDialog = true },
+                )
+            }
+
+            item {
                 // 通道用「按钮在右侧」那一行而不是整行可点的选择行：
                 // 右侧写的是**当前值**，而这一行里用户会先读那个值再决定要不要换，
                 // 整行可点的话读一下就跳走了。
@@ -332,6 +364,17 @@ fun UpdateScreen(
                 onSetChannel(it)
             },
             onDismiss = { showChannelDialog = false },
+        )
+    }
+
+    if (showIntervalDialog) {
+        CheckIntervalDialog(
+            currentMs = settings.checkIntervalMs,
+            onSelect = {
+                showIntervalDialog = false
+                onSetCheckInterval(it)
+            },
+            onDismiss = { showIntervalDialog = false },
         )
     }
 
@@ -467,6 +510,143 @@ private fun UpdateTokenDialog(
         },
     )
 }
+
+/**
+ * 冷却窗口的选择框：固定档位 + 「自定义…」。
+ *
+ * 档位按一下**立即生效并关框**（和通道那个框一样）：档位只有六个、一屏能看完，
+ * 再要一次「保存」只是多一步。
+ *
+ * 自定义那一档反过来：两格填完才出现「保存」。这时用户是在**填一次**而不是
+ * **选一个**，中途每敲一个数字都生效会把 12 改成 1、再改成 12 这样来回写盘。
+ *
+ * 进来时若当前值正好是某个档位，就停在档位上；否则（用户上次填的是自定义值）
+ * 直接把两格预填成当前值——「上次设了 2 小时 30 分，再点进来还能看见它」。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CheckIntervalDialog(
+    currentMs: Long,
+    onSelect: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val draft: DurationDraft = remember(currentMs) { UpdateCooldown.draftOf(currentMs) }
+    var custom by remember(currentMs) { mutableStateOf(UpdateCooldown.isCustom(currentMs)) }
+    var hours by remember(currentMs) { mutableStateOf(draft.hoursText()) }
+    var minutes by remember(currentMs) { mutableStateOf(draft.minutesText()) }
+
+    val parsed = UpdateCooldown.parseInput(hours, minutes)
+    val problem: MspText? = when (parsed) {
+        is DurationInput.Valid, DurationInput.Blank -> null
+        DurationInput.NotANumber -> MspText.Res(R.string.msp_update_check_interval_number)
+        DurationInput.TooShort -> MspText.Res(R.string.msp_update_check_interval_min)
+        DurationInput.TooLong -> MspText.Res(R.string.msp_update_check_interval_max)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.msp_update_check_interval)) },
+        text = {
+            Column {
+                // `FlowRow` 而不是等分 `Row`：六个档位加「自定义…」在中文下
+                // 正好一行，换成英文（`12 h` / `Custom…`）长度就变了，
+                // 等分会把字裁掉。换行对芯片文案是安全的——它们都很短。
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UpdateCooldown.PRESETS_MS.forEach { preset ->
+                        FilterChip(
+                            selected = !custom && UpdateCooldown.presetFor(currentMs) == preset,
+                            onClick = { onSelect(preset) },
+                            label = { Text(UpdateSummaries.interval(preset).string()) },
+                        )
+                    }
+                    FilterChip(
+                        selected = custom,
+                        onClick = { custom = true },
+                        label = { Text(stringResource(R.string.msp_update_check_interval_custom)) },
+                    )
+                }
+
+                if (custom) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        IntervalField(
+                            value = hours,
+                            onValueChange = { hours = it },
+                            label = stringResource(R.string.msp_update_check_interval_hours),
+                            modifier = Modifier.weight(1f),
+                        )
+                        IntervalField(
+                            value = minutes,
+                            onValueChange = { minutes = it },
+                            label = stringResource(R.string.msp_update_check_interval_minutes),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    // 出错时这一行**换成**错误文案，而不是在提示下面再补一行：
+                    // 这里只放得下一行，而「为什么保存按不动」比「该怎么填」更该被看见。
+                    Text(
+                        text = problem?.string()
+                            ?: stringResource(R.string.msp_update_check_interval_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (problem == null) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (custom) {
+                TextButton(
+                    onClick = {
+                        (parsed as? DurationInput.Valid)?.let {
+                            onSelect(it.minutes * UpdateCooldown.MINUTE_MS)
+                        }
+                    },
+                    enabled = parsed is DurationInput.Valid,
+                ) {
+                    Text(stringResource(R.string.msp_settings_save))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.msp_settings_cancel))
+            }
+        },
+    )
+}
+
+/**
+ * 时/分两格之一。
+ *
+ * 两格用 `weight(1f)` 等分是安全的：这里是数字输入，宽窄只由位数决定，
+ * 不像芯片文案那样会「换个语言就装不下」。
+ */
+@Composable
+private fun IntervalField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        // 截断挡的是「粘一整段进来」：这里先拒掉，否则超长数字会先落进状态、
+        // 再被解析层判成越界，报出来的原因和用户实际做的事对不上。
+        onValueChange = { onValueChange(it.take(MAX_INTERVAL_INPUT_CHARS)) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        label = { Text(label) },
+        modifier = modifier,
+    )
+}
+
+/** 上限 7 天 = `10080` 分 ⇒ 5 位；再留一位给「还在敲」。 */
+private const val MAX_INTERVAL_INPUT_CHARS = 6
 
 private const val COLLAPSED_NOTE_LINES = 12
 private const val COLLAPSED_NOTE_CHARS = 420

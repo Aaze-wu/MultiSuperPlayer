@@ -29,9 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.multisuperplayer.core.common.format.DurationDraft
+import com.multisuperplayer.core.common.format.DurationInput
 import com.multisuperplayer.core.model.text.MspText
-import com.multisuperplayer.core.player.SleepTimerCustomInput
-import com.multisuperplayer.core.player.SleepTimerDraft
 import com.multisuperplayer.core.player.SleepTimerOptions
 import com.multisuperplayer.core.player.SleepTimerRules
 import com.multisuperplayer.core.player.SleepTimerState
@@ -173,7 +173,7 @@ internal fun PlayerSleepTimerSheet(
  * ## 为什么提示语和报错共用下面那一行
  *
  * 对话框刚打开时两格是空的，此时报「请填写时长」等于在骂一个还没动手的人
- * （[SleepTimerCustomInput.Blank] 因此不算错）。空着时那一行显示的是**规则**
+ * （[DurationInput.Blank] 因此不算错）。空着时那一行显示的是**规则**
  * （「只填分钟也可以，最长 24 小时」），填错了同一位置换成错因——用户的眼睛
  * 不用换地方找，而且他总能知道上限是多少（没有这句话，超限的提示只会告诉他
  * 「太长了」，不说多少算长）。
@@ -185,21 +185,22 @@ internal fun PlayerSleepTimerSheet(
  */
 @Composable
 private fun CustomDurationDialog(
-    initial: SleepTimerDraft?,
+    initial: DurationDraft?,
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // 0 那格留空：一份「0 小时 30 分」的初值会让人以为自己填错过什么。
-    var hours by remember { mutableStateOf(initial?.hours?.takeIf { it > 0 }?.toString().orEmpty()) }
-    var minutes by remember { mutableStateOf(initial?.minutes?.takeIf { it > 0 }?.toString().orEmpty()) }
+    // 0 那格留空（见 `DurationDraft.hoursText`）：一份「0 小时 30 分」的初值
+    // 会让人以为自己填错过什么。
+    var hours by remember { mutableStateOf(initial?.hoursText().orEmpty()) }
+    var minutes by remember { mutableStateOf(initial?.minutesText().orEmpty()) }
 
     val parsed = SleepTimerOptions.parseCustomInput(hours, minutes)
     val problem: MspText? = when (parsed) {
         // 空着和填对了都不说话：这一行的位置留给「规则」。
-        is SleepTimerCustomInput.Valid, SleepTimerCustomInput.Blank -> null
-        SleepTimerCustomInput.NotANumber -> MspText.Res(R.string.msp_player_sleep_timer_custom_number)
-        SleepTimerCustomInput.TooShort -> MspText.Res(R.string.msp_player_sleep_timer_custom_min)
-        SleepTimerCustomInput.TooLong -> MspText.Res(R.string.msp_player_sleep_timer_custom_max)
+        is DurationInput.Valid, DurationInput.Blank -> null
+        DurationInput.NotANumber -> MspText.Res(R.string.msp_player_sleep_timer_custom_number)
+        DurationInput.TooShort -> MspText.Res(R.string.msp_player_sleep_timer_custom_min)
+        DurationInput.TooLong -> MspText.Res(R.string.msp_player_sleep_timer_custom_max)
     }
 
     AlertDialog(
@@ -234,8 +235,8 @@ private fun CustomDurationDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { (parsed as? SleepTimerCustomInput.Valid)?.let { onConfirm(it.minutes) } },
-                enabled = parsed is SleepTimerCustomInput.Valid,
+                onClick = { (parsed as? DurationInput.Valid)?.let { onConfirm(it.minutes) } },
+                enabled = parsed is DurationInput.Valid,
             ) {
                 Text(stringResource(R.string.msp_player_sleep_timer_custom_confirm))
             }

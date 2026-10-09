@@ -44,6 +44,10 @@
     <string name="msp_duration_hours">%1$d h</string>
     <string name="msp_duration_minutes">%1$d min</string>
     <string name="msp_duration_seconds">%1$d s</string>
+    <!-- The unit above hours. `humanDuration` never needs it (media durations top
+         out at a few hours); it exists so values naturally counted in days (such
+         as the update check interval) don't have to read "168 h". -->
+    <string name="msp_duration_days">%1$d d</string>
 
     <string name="msp_duration_hours_minutes">%1$d h %2$d min</string>
     <string name="msp_duration_hours_seconds">%1$d h %2$d s</string>

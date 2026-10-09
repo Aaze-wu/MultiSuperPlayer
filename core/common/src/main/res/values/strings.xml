@@ -60,6 +60,9 @@
     <string name="msp_duration_hours">%1$d 小时</string>
     <string name="msp_duration_minutes">%1$d 分</string>
     <string name="msp_duration_seconds">%1$d 秒</string>
+    <!-- 比小时更大的那一档。[humanDuration] 用不到它（媒体时长最多几小时），
+         加这一条是为了「以天为单位」的数值（自动检查间隔的档位）不用写成 168 小时。 -->
+    <string name="msp_duration_days">%1$d 天</string>
 
     <string name="msp_duration_hours_minutes">%1$d 小时 %2$d 分</string>
     <string name="msp_duration_hours_seconds">%1$d 小时 %2$d 秒</string>

@@ -1,5 +1,7 @@
 package com.multisuperplayer.core.player
 
+import com.multisuperplayer.core.common.format.DurationDraft
+import com.multisuperplayer.core.common.format.DurationInput
 import com.multisuperplayer.core.model.text.MspText
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -213,22 +215,22 @@ class SleepTimerTest {
         // 界内必须放行、界外必须拦住，这两条各自独立：`<= max` 写成 `< max` 的差别
         // 只有边界值那一个能发现，而它恰好是「24 小时整」这种会被真去填的值。
         assertEquals(
-            SleepTimerCustomInput.Valid(SleepTimerOptions.CUSTOM_MAX_MINUTES),
+            DurationInput.Valid(SleepTimerOptions.CUSTOM_MAX_MINUTES),
             SleepTimerOptions.parseCustomInput("24", "0"),
             "正好到上限必须能开出来",
         )
         assertEquals(
-            SleepTimerCustomInput.Valid(SleepTimerOptions.CUSTOM_MIN_MINUTES),
+            DurationInput.Valid(SleepTimerOptions.CUSTOM_MIN_MINUTES),
             SleepTimerOptions.parseCustomInput("", "1"),
             "正好到下限必须能开出来",
         )
         assertEquals(
-            SleepTimerCustomInput.TooLong,
+            DurationInput.TooLong,
             SleepTimerOptions.parseCustomInput("24", "1"),
             "超出一分钟也算超",
         )
         assertEquals(
-            SleepTimerCustomInput.TooShort,
+            DurationInput.TooShort,
             SleepTimerOptions.parseCustomInput("0", "0"),
             "0 分钟是非法，不是「不设定时」",
         )
@@ -238,9 +240,9 @@ class SleepTimerTest {
     fun `自定义时长小时那一格可以空着`() {
         // 只填分钟是最常见的用法：手机上「30」两下就打完了，没人愿意多打一个
         //「0 小时」。把空当成 0 和不把空当成 0，差别就只在这一格上。
-        assertEquals(SleepTimerCustomInput.Valid(30), SleepTimerOptions.parseCustomInput("", "30"))
-        assertEquals(SleepTimerCustomInput.Valid(120), SleepTimerOptions.parseCustomInput("2", ""))
-        assertEquals(SleepTimerCustomInput.Valid(90), SleepTimerOptions.parseCustomInput("1", "30"))
+        assertEquals(DurationInput.Valid(30), SleepTimerOptions.parseCustomInput("", "30"))
+        assertEquals(DurationInput.Valid(120), SleepTimerOptions.parseCustomInput("2", ""))
+        assertEquals(DurationInput.Valid(90), SleepTimerOptions.parseCustomInput("1", "30"))
     }
 
     @Test
@@ -249,7 +251,7 @@ class SleepTimerTest {
         // 不折的话，用户会对着一个明明填了「１０」的框读「只填数字」，
         // 然后反复检查自己填的到底是不是数字。
         assertEquals(
-            SleepTimerCustomInput.Valid(70),
+            DurationInput.Valid(70),
             SleepTimerOptions.parseCustomInput("１", "１０"),
         )
     }
@@ -258,28 +260,31 @@ class SleepTimerTest {
     fun `两格都空着不算出错而只是还没填`() {
         // 对话框刚打开时就是这个状态。把它归进「只填数字」那一类，用户一打开
         // 就被一句红字骂，而他根本还没动手。
-        assertEquals(SleepTimerCustomInput.Blank, SleepTimerOptions.parseCustomInput("", ""))
-        assertEquals(SleepTimerCustomInput.Blank, SleepTimerOptions.parseCustomInput("  ", " "))
+        assertEquals(DurationInput.Blank, SleepTimerOptions.parseCustomInput("", ""))
+        assertEquals(DurationInput.Blank, SleepTimerOptions.parseCustomInput("  ", " "))
     }
 
     @Test
-    fun `填了非数字和填了负数各有各的说法`() {
-        // 这两件事的下一步动作相反：一个是「改成数字」，一个是「改成正数」。
-        // 塌成同一个结果，用户就会按着错的提示去改。
+    fun `填了非数字和填了负数都按「不是数字」报`() {
+        // 负数**不能**按「太短」报：`-1 小时 30 分` 用「太短」说，用户会以为自己
+        // 填的是 1 小时（那个负号根本没被提到）；而 `-1 小时 90 分` 的总额甚至是
+        // 正的 30 分钟——只按总额判会把一个填错的输入当合法值收下。
+        // 两格用的都是数字键盘，负号只可能来自粘贴，所以「只填数字」才是对的话。
         assertEquals(
-            SleepTimerCustomInput.NotANumber,
+            DurationInput.NotANumber,
             SleepTimerOptions.parseCustomInput("1 小时", "0"),
         )
-        assertEquals(SleepTimerCustomInput.NotANumber, SleepTimerOptions.parseCustomInput("", "3.5"))
-        assertEquals(SleepTimerCustomInput.TooShort, SleepTimerOptions.parseCustomInput("-1", "30"))
+        assertEquals(DurationInput.NotANumber, SleepTimerOptions.parseCustomInput("", "3.5"))
+        assertEquals(DurationInput.NotANumber, SleepTimerOptions.parseCustomInput("-1", "30"))
+        assertEquals(DurationInput.NotANumber, SleepTimerOptions.parseCustomInput("-1", "90"))
     }
 
     @Test
     fun `超出上限的输入不会被悄悄夹到上限`() {
         // 「2400」被静默改成 24 小时比报错更糟：用户填的是一个数，生效的是另一个，
         // 而这两者看起来都很「正常」。这条保住的是「填的值要么原样生效、要么明确被拒」。
-        assertEquals(SleepTimerCustomInput.TooLong, SleepTimerOptions.parseCustomInput("2400", "0"))
-        assertEquals(SleepTimerCustomInput.TooLong, SleepTimerOptions.parseCustomInput("999999", "0"))
+        assertEquals(DurationInput.TooLong, SleepTimerOptions.parseCustomInput("2400", "0"))
+        assertEquals(DurationInput.TooLong, SleepTimerOptions.parseCustomInput("999999", "0"))
     }
 
     @Test
@@ -333,10 +338,10 @@ class SleepTimerTest {
     fun `自定义输入框的初值就是当前定时`() {
         // 预填是为了「改一下刚才那个数」这条路：不预填就得把两格重新打一遍。
         val custom = SleepTimerRules.startCountdown(t0, 200 * SleepTimerOptions.MINUTE_MS)
-        assertEquals(SleepTimerDraft(hours = 3, minutes = 20), SleepTimerOptions.draftOf(custom))
+        assertEquals(DurationDraft(hours = 3, minutes = 20), SleepTimerOptions.draftOf(custom))
 
         val preset = SleepTimerRules.startCountdown(t0, 30 * SleepTimerOptions.MINUTE_MS)
-        assertEquals(SleepTimerDraft(hours = 0, minutes = 30), SleepTimerOptions.draftOf(preset))
+        assertEquals(DurationDraft(hours = 0, minutes = 30), SleepTimerOptions.draftOf(preset))
 
         // 没有定时时两格都空着：填一个 0 进去会让人以为自己填错过什么。
         assertNull(SleepTimerOptions.draftOf(SleepTimerState.Off))
@@ -349,8 +354,8 @@ class SleepTimerTest {
         // `minutes * MINUTE_MS`）。这条盯的是「解析结果真的是分钟」：若单位写成秒，
         // 90 分钟会被设成 90 秒，而界面上从头到尾看不出区别。
         val parsed = SleepTimerOptions.parseCustomInput("1", "30")
-        assertEquals(SleepTimerCustomInput.Valid(90), parsed)
-        val minutes = (parsed as SleepTimerCustomInput.Valid).minutes
+        assertEquals(DurationInput.Valid(90), parsed)
+        val minutes = (parsed as DurationInput.Valid).minutes
         assertEquals(
             SleepTimerState.Countdown(
                 deadlineMs = t0 + 90 * SleepTimerOptions.MINUTE_MS,

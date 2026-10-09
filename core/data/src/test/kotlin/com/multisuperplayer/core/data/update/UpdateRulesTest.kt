@@ -246,6 +246,7 @@ class UpdateRulesTest {
             UpdateRules.skipsAutoCheck(
                 trigger = UpdateCheckTrigger.MANUAL,
                 autoCheck = false,
+                intervalMs = UpdateCooldown.DEFAULT_MS,
                 lastCheckAtEpochMs = now - 10_000,
                 atEpochMs = now,
             ),
@@ -260,6 +261,7 @@ class UpdateRulesTest {
             UpdateRules.skipsAutoCheck(
                 trigger = UpdateCheckTrigger.AUTO,
                 autoCheck = false,
+                intervalMs = UpdateCooldown.DEFAULT_MS,
                 lastCheckAtEpochMs = null,
                 atEpochMs = now,
             ),
@@ -273,6 +275,7 @@ class UpdateRulesTest {
             UpdateRules.skipsAutoCheck(
                 trigger = UpdateCheckTrigger.AUTO,
                 autoCheck = true,
+                intervalMs = UpdateCooldown.DEFAULT_MS,
                 lastCheckAtEpochMs = null,
                 atEpochMs = now,
             ),
@@ -280,26 +283,58 @@ class UpdateRulesTest {
     }
 
     @Test
-    fun `十二小时窗口内跳过`() {
+    fun `窗口内跳过`() {
+        val window = UpdateCooldown.PRESET_12H_MS
         assertTrue(
             UpdateRules.skipsAutoCheck(
                 trigger = UpdateCheckTrigger.AUTO,
                 autoCheck = true,
-                lastCheckAtEpochMs = now - (UpdateRules.AUTO_CHECK_INTERVAL_MS - 1),
+                intervalMs = window,
+                lastCheckAtEpochMs = now - (window - 1),
                 atEpochMs = now,
             ),
         )
     }
 
     @Test
-    fun `满十二小时之后要查`() {
+    fun `满一个窗口之后要查`() {
         // 边界取在「刚好等于」而不是「超过」：判据写的是 `< 间隔`，
         // 而这条边界正好是「差一毫秒」的邻居——两边都钉住，改符号才会红。
+        val window = UpdateCooldown.PRESET_12H_MS
         assertFalse(
             UpdateRules.skipsAutoCheck(
                 trigger = UpdateCheckTrigger.AUTO,
                 autoCheck = true,
-                lastCheckAtEpochMs = now - UpdateRules.AUTO_CHECK_INTERVAL_MS,
+                intervalMs = window,
+                lastCheckAtEpochMs = now - window,
+                atEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun `窗口用的是传进来的那个值而不是写死的`() {
+        // 冷却时长从 v1.2.3 起是用户设置项。这一条把同一对时间戳（一小时前，
+        // 特意选在**两个窗口之间**：不到十二小时、超过十五分钟）分别放进
+        // 「十二小时窗口」和「十五分钟窗口」：前者跳过、后者必须去查。
+        // 如果哪天有人在内部又写死一个常量，这两条会同时说出相反的答案。
+        val anHourAgo = now - UpdateCooldown.PRESET_1H_MS
+
+        assertTrue(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = true,
+                intervalMs = UpdateCooldown.PRESET_12H_MS,
+                lastCheckAtEpochMs = anHourAgo,
+                atEpochMs = now,
+            ),
+        )
+        assertFalse(
+            UpdateRules.skipsAutoCheck(
+                trigger = UpdateCheckTrigger.AUTO,
+                autoCheck = true,
+                intervalMs = UpdateCooldown.MIN_MS,
+                lastCheckAtEpochMs = anHourAgo,
                 atEpochMs = now,
             ),
         )
@@ -313,6 +348,7 @@ class UpdateRulesTest {
             UpdateRules.skipsAutoCheck(
                 trigger = UpdateCheckTrigger.AUTO,
                 autoCheck = true,
+                intervalMs = UpdateCooldown.DEFAULT_MS,
                 lastCheckAtEpochMs = now + 60_000,
                 atEpochMs = now,
             ),

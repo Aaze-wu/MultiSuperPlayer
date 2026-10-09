@@ -4,9 +4,12 @@ import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
+import com.multisuperplayer.core.data.update.UpdateCooldown
 import com.multisuperplayer.core.data.update.UpdateFailureText
 import com.multisuperplayer.core.data.update.UpdateRelease
 import com.multisuperplayer.core.data.update.UpdateVersion
+// 单位词在 core:common 里；本模块开了 nonTransitiveRClass，只能写全名。
+import com.multisuperplayer.core.common.R as CommonR
 import java.io.File
 import org.junit.Assert
 import org.junit.Test
@@ -199,6 +202,61 @@ class UpdateSummariesTest {
         )
     }
 
+    // ------------------------------------------------------------ 冷却窗口的值
+
+    @Test
+    fun `冷却 - 整天说天、整小时说小时、不到一小时只说分钟`() {
+        Assert.assertEquals(
+            MspText.Res(CommonR.string.msp_duration_days, listOf(7)),
+            UpdateSummaries.interval(UpdateCooldown.PRESET_7D_MS),
+        )
+        Assert.assertEquals(
+            MspText.Res(CommonR.string.msp_duration_days, listOf(3)),
+            UpdateSummaries.interval(UpdateCooldown.PRESET_3D_MS),
+        )
+        Assert.assertEquals(
+            MspText.Res(CommonR.string.msp_duration_hours, listOf(12)),
+            UpdateSummaries.interval(UpdateCooldown.PRESET_12H_MS),
+        )
+        Assert.assertEquals(
+            MspText.Res(CommonR.string.msp_duration_minutes, listOf(15)),
+            UpdateSummaries.interval(UpdateCooldown.MIN_MS),
+        )
+        Assert.assertEquals(
+            MspText.Res(CommonR.string.msp_duration_hours_minutes, listOf(1, 30)),
+            UpdateSummaries.interval(90 * UpdateCooldown.MINUTE_MS),
+        )
+    }
+
+    @Test
+    fun `冷却 - 比一天大的档位不写成小时`() {
+        // 档位表里有 3 天/7 天。天那一支如果拿掉，3 天会变成「72 小时」——
+        // 数值没错，但用户得自己去除 24。这一条钉的就是那一支还在。
+        val days = (UpdateCooldown.PRESETS_MS + UpdateCooldown.MIN_MS).map { ms ->
+            (UpdateSummaries.interval(ms) as MspText.Res).id
+        }
+
+        Assert.assertTrue(
+            "一个档位都没有说出「天」",
+            days.contains(CommonR.string.msp_duration_days),
+        )
+        // 6 小时/12 小时那些还是按小时说，不要为了「能用天」就把它们也换算掉。
+        Assert.assertEquals(
+            CommonR.string.msp_duration_hours,
+            (UpdateSummaries.interval(UpdateCooldown.PRESET_6H_MS) as MspText.Res).id,
+        )
+    }
+
+    @Test
+    fun `冷却 - 25 小时不说成 1 天多`() {
+        // 自定义档会落在「整天」与「整天 + 几小时」之间：25 小时既不是 1 天
+        // （会被说小），也不该写成 1500 分钟。先说小时，多的那些小时留在原位。
+        Assert.assertEquals(
+            MspText.Res(CommonR.string.msp_duration_hours, listOf(25)),
+            UpdateSummaries.interval(25 * UpdateCooldown.HOUR_MS),
+        )
+    }
+
     // ------------------------------------------------------------ 资源本身
 
     @Test
@@ -312,6 +370,15 @@ class UpdateSummariesTest {
             "msp_update_channel_beta_desc",
             "msp_update_auto_check",
             "msp_update_auto_check_desc",
+            "msp_update_check_interval",
+            "msp_update_check_interval_desc",
+            "msp_update_check_interval_custom",
+            "msp_update_check_interval_hint",
+            "msp_update_check_interval_number",
+            "msp_update_check_interval_min",
+            "msp_update_check_interval_max",
+            "msp_update_check_interval_hours",
+            "msp_update_check_interval_minutes",
             "msp_update_token",
             "msp_update_token_set",
             "msp_update_token_unset",

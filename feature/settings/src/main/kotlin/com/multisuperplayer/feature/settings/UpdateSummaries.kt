@@ -4,7 +4,11 @@ import com.multisuperplayer.core.common.appinfo.AppBuildInfo
 import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.update.UpdateAvailability
 import com.multisuperplayer.core.data.update.UpdateChannel
+import com.multisuperplayer.core.data.update.UpdateCooldown
 import com.multisuperplayer.core.data.update.UpdateFailureText
+// 单位词在 core:common 里（`humanDuration` 用同一套），本模块开了
+// nonTransitiveRClass，所以本文件那个 `R` 里没有它们，必须写全名。
+import com.multisuperplayer.core.common.R as CommonR
 
 /**
  * 更新相关的「状态 → 文案」映射。
@@ -68,6 +72,34 @@ object UpdateSummaries {
         MspText.Res(R.string.msp_update_token_set)
     } else {
         MspText.Res(R.string.msp_update_token_unset)
+    }
+
+    /**
+     * 冷却窗口的「值」文案：`12 小时` / `1 天` / `45 分`。
+     *
+     * 两种地方都用它：设置行右边那个当前值，以及对话框里的每一档。
+     * 两处共用同一条函数，是因为「右邊写了 1 天、对话框里那一档写着 24 小时」
+     * 这种不一致看起来就像两个不同的设置项。
+     *
+     * 天那一档必须说出来：档位表里有 3 天/7 天，不认「天」就会写成 `72 小时`、
+     * `168 小时`——数值没错，但用户得自己去除 24。
+     *
+     * 单位词用 `core:common` 的那一套（`msp_duration_*`）：和「共 N 首 / 总时长」
+     * 用的是同一个词汇表，英文也是同一套缩写（`12 h` / `1 d`）。
+     */
+    fun interval(intervalMs: Long): MspText {
+        val minutes = UpdateCooldown.minutesOf(intervalMs)
+        val hours = minutes / UpdateCooldown.MINUTES_PER_HOUR
+        val restMinutes = minutes % UpdateCooldown.MINUTES_PER_HOUR
+        return when {
+            restMinutes == 0 && hours > 0 && hours % UpdateCooldown.HOURS_PER_DAY == 0 ->
+                MspText.Res(CommonR.string.msp_duration_days, hours / UpdateCooldown.HOURS_PER_DAY)
+
+            restMinutes == 0 && hours > 0 -> MspText.Res(CommonR.string.msp_duration_hours, hours)
+            // 不到一小时就只说分钟（`45 分`），不要写成 `0 小时 45 分`。
+            hours == 0 -> MspText.Res(CommonR.string.msp_duration_minutes, restMinutes)
+            else -> MspText.Res(CommonR.string.msp_duration_hours_minutes, hours, restMinutes)
+        }
     }
 
     /** 失败原因。**八条各自一句**：分成两句话的每一种情况，下一步动作都不一样。 */

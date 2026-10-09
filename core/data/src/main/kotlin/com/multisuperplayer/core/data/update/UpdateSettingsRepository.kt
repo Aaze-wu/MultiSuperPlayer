@@ -21,8 +21,8 @@ import kotlinx.coroutines.withContext
 /**
  * 「检查更新」用到的全部持久化设置。
  *
- * [channel] / [autoCheck] / [ignoredTag] 是**状态**，[lastCheckAtEpochMs] 是**节流的依据**，
- * [hasToken] 是**有没有填令牌**。
+ * [channel] / [autoCheck] / [ignoredTag] / [checkIntervalMs] 是**状态**，
+ * [lastCheckAtEpochMs] 是**节流的依据**，[hasToken] 是**有没有填令牌**。
  *
  * [hasToken] 放在这里而不是「要不要把令牌解密出来」：设置页只需要说「已设置」，
  * 每次读设置都去解一次密（要访问 Keystore，在低端机上要几十毫秒）毫无必要，
@@ -35,6 +35,18 @@ data class UpdateSettings(
     val ignoredTag: String?,
     val lastCheckAtEpochMs: Long?,
     val hasToken: Boolean,
+    /**
+     * 自动检查的冷却窗口（毫秒）。
+     *
+     * 放在 `autoCheck` 旁边而不是替掉它：开关是总闸（要不要自动查），这个是节流
+     * （自动查的话，两次之间至少隔多久）。两件事合成一个控件之后，「关掉」会和
+     * 「设成一星期」变成同一个状态，而它们下一次要做的动作完全相反。
+     *
+     * 读到越界值（旧版本写的、被外部改坏的偏好文件）在**读出来的那一刻**就被
+     * [UpdateCooldown.normalize] 夹回合法区间：消费方（[UpdateRules.skipsAutoCheck]）
+     * 因此可以假定它已经是合法值，不用在每个比大小的地方各防一次。
+     */
+    val checkIntervalMs: Long,
 )
 
 /**
@@ -77,6 +89,7 @@ class UpdateSettingsRepository(
         ignoredTag = null,
         lastCheckAtEpochMs = null,
         hasToken = false,
+        checkIntervalMs = UpdateCooldown.DEFAULT_MS,
     )
 
     // 与其它设置共用一个文件。每次读都经过这里，保证「只有一个 store」。
@@ -90,6 +103,9 @@ class UpdateSettingsRepository(
                 ignoredTag = prefs[KEY_IGNORED_TAG]?.takeIf { it.isNotBlank() },
                 lastCheckAtEpochMs = prefs[KEY_LAST_CHECK]?.takeIf { it > 0 },
                 hasToken = prefs[KEY_TOKEN]?.isNotBlank() == true,
+                //「没存过」和「存了个坏的」走同一条路（都退回默认），
+                // 夹在读出这一刻，调用方就不用每个比大小的地方各防一次。
+                checkIntervalMs = UpdateCooldown.normalize(prefs[KEY_CHECK_INTERVAL]),
             )
         }
         .flowOn(dispatchers.io)
@@ -100,6 +116,19 @@ class UpdateSettingsRepository(
 
     suspend fun setAutoCheck(enabled: Boolean) {
         withContext(dispatchers.io) { store.edit { it[KEY_AUTO_CHECK] = enabled } }
+    }
+
+    /**
+     * 写入冷却窗口。
+     *
+     * 先过 [UpdateCooldown.normalize] 再落盘：存储里因此永远只有一个合法值，
+     * 而「夹一次」比「在每个读它的地方都证明自己拿到了合法值」便宜得多。
+     * 非法输入退回默认（而不是夹到最近的一档）：把空值/坏值当成「用户要求最短
+     * 窗口」，会静默地把应用变成替用户频繁请求，而界面上完全看不出来。
+     */
+    suspend fun setCheckInterval(intervalMs: Long) {
+        val normalized = UpdateCooldown.normalize(intervalMs)
+        withContext(dispatchers.io) { store.edit { it[KEY_CHECK_INTERVAL] = normalized } }
     }
 
     /**
@@ -180,6 +209,12 @@ class UpdateSettingsRepository(
         val KEY_IGNORED_TAG = stringPreferencesKey("update.ignored_tag")
         val KEY_LAST_CHECK = longPreferencesKey("update.last_check_at")
         val KEY_TOKEN = stringPreferencesKey("update.github_token")
+
+        /**
+         * 冷却窗口。「没存过」与「旧的 12 小时」因此是同一个状态：默认值就是 12 小时，
+         * 升级上来的用户不会因为多了这个开关而改变查更新的频率。
+         */
+        val KEY_CHECK_INTERVAL = longPreferencesKey("update.check_interval_ms")
     }
 }
 

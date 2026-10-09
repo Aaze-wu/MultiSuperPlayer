@@ -1,5 +1,8 @@
 package com.multisuperplayer.core.player
 
+import com.multisuperplayer.core.common.format.DurationDraft
+import com.multisuperplayer.core.common.format.DurationInput
+import com.multisuperplayer.core.common.format.DurationInputParser
 import com.multisuperplayer.core.model.text.MspText
 
 /**
@@ -42,47 +45,6 @@ sealed interface SleepTimerState {
 
     /** 当前这一集放完就停。 */
     data object UntilItemEnd : SleepTimerState
-}
-
-/**
- * 「自定义时长」那两格输入框的初值（小时 + 分钟）。
- *
- * 拆成两格而不是让用户填一个「总共多少分钟」：想设两小时的人要么在脑子里乘
- * 60，要么盯着那一个框犹豫自己填的到底是分钟还是小时。
- */
-data class SleepTimerDraft(val hours: Int, val minutes: Int)
-
-/**
- * 自定义时长输入的解析结果。
- *
- * 分成五种而不是「分钟数 or null」：这几种情况要给出**不同的话**。全都塌成
- * `null` 的话，「填了个字母」和「填了 9999 小时」会得到同一句提示，
- * 而这两件事的下一步动作完全相反——一个是改字，一个是改小。
- *
- * 所有判断都在纯函数里、不碰界面：界面只负责把 [NotANumber]、[TooShort]、
- * [TooLong] 各自翻译成一句话（那三句话是资源，进不了 JVM 单测）。
- */
-sealed interface SleepTimerCustomInput {
-
-    /** 解析成功。[minutes] 已落在 [SleepTimerOptions.CUSTOM_MIN_MINUTES] ~ [SleepTimerOptions.CUSTOM_MAX_MINUTES] 之内。 */
-    data class Valid(val minutes: Int) : SleepTimerCustomInput
-
-    /**
-     * 两格都空着。
-     *
-     * **这不是出错**：对话框刚打开、用户还没动手时就是这个状态，
-     * 一上来先摆一句红字等于在骂人。它只是「还不能点确定」。
-     */
-    data object Blank : SleepTimerCustomInput
-
-    /** 有一格填的不是数字。 */
-    data object NotANumber : SleepTimerCustomInput
-
-    /** 解析出来是 0（或负数）。 */
-    data object TooShort : SleepTimerCustomInput
-
-    /** 超过了上限。 */
-    data object TooLong : SleepTimerCustomInput
 }
 
 /**
@@ -210,45 +172,29 @@ object SleepTimerOptions {
      *
      * 预填是为了「改一下刚才那个数」这条最常见的路径：不预填的话，用户设了
      * 200 分钟、想改成 210，就得把两格重新打一遍。
-     *
-     * 只回填非零的那一格（0 小时留空）：一份「0 小时 30 分」的初值会让人
-     * 以为自己填错过什么。
      */
-    fun draftOf(state: SleepTimerState): SleepTimerDraft? {
+    fun draftOf(state: SleepTimerState): DurationDraft? {
         val countdown = state as? SleepTimerState.Countdown ?: return null
         val minutes = minutesOf(countdown.totalMs)
         if (minutes <= 0) return null
-        return SleepTimerDraft(hours = minutes / 60, minutes = minutes % 60)
+        return DurationDraft(hours = minutes / 60, minutes = minutes % 60)
     }
 
     /**
      * 解析自定义输入（小时、分钟两格的原文）。
      *
-     * 两格都允许空着，空 = 0：只填分钟是最常见的用法，硬要求「小时那格填 0」
-     * 只会让人多打一个字。
-     *
-     * 全角数字（`１２３`）会先折成半角：中文输入法在「全角」状态下打出来的就是
-     * 这些字符，而它们和半角数字**长得几乎一样**。不归一的话，用户会对着一个
-     * 明明填了「１０」的框读「只填数字」，然后反复数自己填的是不是数字。
+     * 解析本身在 [DurationInputParser]（`core:common`）里，和「自动检查间隔」
+     * 共用同一条实现：两个对话框让用户填的是同一件事（几小时几分钟），
+     * 各写一遍就等于把那里的两个坑（空串被 `toLongOrNull` 读成 null、全角数字）
+     * 各留一份。这里只负责把本档的上下界填进去。
      */
-    fun parseCustomInput(hoursText: String, minutesText: String): SleepTimerCustomInput {
-        val hours = hoursText.normalizedNumber()
-        val minutes = minutesText.normalizedNumber()
-        if (hours.isEmpty() && minutes.isEmpty()) return SleepTimerCustomInput.Blank
-
-        val hoursValue = hours.toCountOrNull() ?: return SleepTimerCustomInput.NotANumber
-        val minutesValue = minutes.toCountOrNull() ?: return SleepTimerCustomInput.NotANumber
-
-        // 在 Long 里算：输入框已经限了长度，但 `小时 * 60` 在 Int 里照样可能溢出，
-        // 而溢出成一个负数会让它掉进「至少 1 分钟」那句提示里——一个和真实原因
-        // 完全无关的说法。
-        val total = hoursValue * 60L + minutesValue
-        return when {
-            total < CUSTOM_MIN_MINUTES -> SleepTimerCustomInput.TooShort
-            total > CUSTOM_MAX_MINUTES -> SleepTimerCustomInput.TooLong
-            else -> SleepTimerCustomInput.Valid(total.toInt())
-        }
-    }
+    fun parseCustomInput(hoursText: String, minutesText: String): DurationInput =
+        DurationInputParser.parse(
+            hoursText = hoursText,
+            minutesText = minutesText,
+            minMinutes = CUSTOM_MIN_MINUTES,
+            maxMinutes = CUSTOM_MAX_MINUTES,
+        )
 
     /**
      * 把任意输入收敛成「一个能用的时长」。
@@ -277,27 +223,6 @@ object SleepTimerOptions {
         return PRESETS_MINUTES.firstOrNull { it * MINUTE_MS == state.totalMs }
     }
 }
-
-/**
- * 去掉首尾空白，并把全角数字折成半角。
- *
- * 只做这两件事，不做「顺手把中文数字也认了」：`十二` 这种输入一旦被接受，
- * 就得开始考虑 `十二点五`、`半`、`一刻钟`…那条路没有尽头，而它带来的收益
- * 远小于「用户以为播放器听懂了中文」。
- */
-private fun String.normalizedNumber(): String = trim().map { ch ->
-    if (ch in '\uFF10'..'\uFF19') '0' + (ch - '\uFF10') else ch
-}.joinToString("")
-
-/**
- * 把一格输入读成数字，**空格子读成 0**。
- *
- * `toLongOrNull()` 对空串返回的是 `null`（不是 0），直接用它会让「只填分钟」
- * 这种最常规的用法掉进「只填数字」那句提示里——一个和真实原因完全无关的说法，
- * 而且它看着还挺合理，所以会查很久。两格都空的情况在调用处已经先被
- * [SleepTimerCustomInput.Blank] 拦掉了，所以走到这里时空确实只表示 0。
- */
-private fun String.toCountOrNull(): Long? = if (isEmpty()) 0L else toLongOrNull()
 
 /**
  * 睡眠定时的纯规则。
