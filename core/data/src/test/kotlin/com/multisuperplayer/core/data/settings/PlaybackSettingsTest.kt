@@ -269,4 +269,36 @@ class PlaybackSettingsTest {
 
         assertNull(settings.trustUntrustedCertificates)
     }
+
+    @Test
+    fun `播放时禁止熄屏的键名是写入用户设备的契约`() {
+        // 与「信任证书」同理：键名改了，用户改过的选择会读不出来。这一条还多一层——
+        // 这个开关的**默认值是开**，读不出来就等于把用户主动关掉的东西又打开了。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.keep_screen_on_while_playing") to false,
+        ).toPlaybackSettings()
+
+        assertEquals(false, settings.keepScreenOnWhilePlaying)
+    }
+
+    @Test
+    fun `没设置过播放时禁止熄屏时是 null 而不是关着`() {
+        // null = 「没设置过」。这一条尤其要紧的是**它不能是 false**：
+        // 消费方写的是 `?: true`（默认开）和 `!= false`，一旦数据层把没设置过读成
+        // false，「默认开着」这个行为就变了，而且改起来只在数据层一个字。
+        assertNull(preferencesOf().toPlaybackSettings().keepScreenOnWhilePlaying)
+    }
+
+    @Test
+    fun `播放时禁止熄屏不会被别的布尔键带出来`() {
+        // 播放设置里布尔键已经挤了一排，前缀还都以 `playback.` 开头，写错一个不报错，
+        // 只会让「开一个开关把另一个也开上」——而这里多开的那一个会一直耗电。
+        val settings = preferencesOf(
+            booleanPreferencesKey("playback.equalizer_enabled") to true,
+            booleanPreferencesKey("playback.trust_untrusted_certificates") to true,
+            booleanPreferencesKey("theme.dynamic_color") to true,
+        ).toPlaybackSettings()
+
+        assertNull(settings.keepScreenOnWhilePlaying)
+    }
 }

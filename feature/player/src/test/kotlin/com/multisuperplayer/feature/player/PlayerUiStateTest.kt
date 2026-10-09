@@ -256,6 +256,51 @@ class PlayerUiStateTest {
     }
 
     @Test
+    fun `没在播放页改过时屏幕常亮跟随设置`() {
+        val state = PlayerUiState()
+
+        // 默认值由**调用方**每帧传进来（设置是异步到的），所以这里两个方向都要过一遍：
+        // 任何一处缓存了设置值，都会在第二个断言上红。
+        assertTrue(state.keepScreenOn(default = true))
+        assertFalse(state.keepScreenOn(default = false))
+    }
+
+    @Test
+    fun `临时改过之后设置再怎么变都不跟随`() {
+        val state = PlayerUiState()
+        state.applyKeepScreenOn(false)
+
+        // 用户在控制条上关掉了：设置里那个默认值（下次打开播放页仍然生效）
+        // 不该把这一次播放的决定顶掉。
+        assertFalse(state.keepScreenOn(default = true))
+
+        state.applyKeepScreenOn(true)
+        assertTrue(state.keepScreenOn(default = false))
+    }
+
+    @Test
+    fun `临时开关可以和设置值恰好相反地表达出来`() {
+        // 用可空覆盖值而不是「翻转」的意义就在这里：设置里是关着的、用户临时打开，
+        // 这个状态必须存得下来（如果拿「是否与默认值不同」当脏标记，这一格就丢了）。
+        val state = PlayerUiState()
+        assertNull(state.keepScreenOnOverride)
+
+        state.applyKeepScreenOn(true)
+        assertEquals(true, state.keepScreenOnOverride)
+        assertTrue(state.keepScreenOn(default = false))
+    }
+
+    @Test
+    fun `临时开关可以退回跟随设置`() {
+        val state = PlayerUiState()
+        state.applyKeepScreenOn(true)
+        state.applyKeepScreenOn(null)
+
+        assertNull(state.keepScreenOnOverride)
+        assertFalse("退回跟随之后以设置为准", state.keepScreenOn(default = false))
+    }
+
+    @Test
     fun `打开面板时控制条一并翻开`() {
         // 收控制条的逻辑是「播放中 4 秒不动就收」，它会在面板打开时把控制条收走，
         // 于是关掉面板之后下面的按钮位置全变了——用户回来点的东西和刚才看到的不是一回事。

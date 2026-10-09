@@ -50,7 +50,11 @@ plugins {
 //      并补上一个默认关闭的「允许不受信任的证书」开关。
 // 正式版与 beta **共用同一个 versionCode**（10100）：它们本来就是同一个版本。
 // ⚠️ alpha 是内部测试用的通道名，不公开发布；公开发布一律用 beta。
-val appVersionName: String = "1.1.0"
+//
+// 1.2.0 这一档**不发 beta**：两个新功能（语音识别缓存整体清空、播放时禁止熄屏）
+// 都是纯应用层改动，不碰系统 intent 解析 / 清单匹配那一类「只有真机才看得见」的东西，
+// 所以走 1.0.0 那条路直接发正式版。
+val appVersionName: String = "1.2.0"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

@@ -106,6 +106,16 @@ class PlaybackSettingsRepository(
         it[Keys.TRUST_UNTRUSTED_CERTIFICATES] = enabled
     }
 
+    /**
+     * 播放时屏幕常亮（见 [PlaybackSettings.keepScreenOnWhilePlaying]）。
+     *
+     * 写的是设置里的**默认值**；播放页那个临时开关不走这条路——它只改这一次会话，
+     * 写了反而会让用户下周打开播放器时发现「上次那一下变成默认了」。
+     */
+    suspend fun setKeepScreenOnWhilePlaying(enabled: Boolean) = edit {
+        it[Keys.KEEP_SCREEN_ON_WHILE_PLAYING] = enabled
+    }
+
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         withContext(dispatchers.io) { store.edit(block) }
     }
@@ -156,6 +166,16 @@ class PlaybackSettingsRepository(
          */
         val TRUST_UNTRUSTED_CERTIFICATES =
             booleanPreferencesKey("playback.trust_untrusted_certificates")
+
+        /**
+         * 播放时屏幕常亮（见 [PlaybackSettings.keepScreenOnWhilePlaying]）。
+         *
+         * 键名里把条件 `while_playing` 写全很重要：不写的话，将来若有人加一个
+         * 「完全不让屏幕熄灭」的开关，两个键会看起来是同一件事——它们是两个不同的
+         * 设置项（后者的作用范围更宽），不能共用一个键再靠语义区分。
+         */
+        val KEEP_SCREEN_ON_WHILE_PLAYING =
+            booleanPreferencesKey("playback.keep_screen_on_while_playing")
     }
 }
 
@@ -182,4 +202,6 @@ internal fun Preferences.toPlaybackSettings(): PlaybackSettings = PlaybackSettin
     equalizerBandGains = this[PlaybackSettingsRepository.Keys.EQUALIZER_BAND_GAINS],
     trustUntrustedCertificates =
         this[PlaybackSettingsRepository.Keys.TRUST_UNTRUSTED_CERTIFICATES],
+    keepScreenOnWhilePlaying =
+        this[PlaybackSettingsRepository.Keys.KEEP_SCREEN_ON_WHILE_PLAYING],
 )

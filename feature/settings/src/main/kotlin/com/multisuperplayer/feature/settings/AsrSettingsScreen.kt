@@ -11,6 +11,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -114,6 +115,7 @@ fun AsrSettingsRoute(
         onInstall = viewModel::install,
         onCancelInstall = viewModel::cancelInstall,
         onRemove = viewModel::remove,
+        onClearCache = viewModel::clearGeneratedSubtitleCache,
         onDismissMessage = viewModel::dismissMessage,
         modifier = modifier,
     )
@@ -138,6 +140,7 @@ fun AsrSettingsScreen(
     onInstall: () -> Unit,
     onCancelInstall: () -> Unit,
     onRemove: () -> Unit,
+    onClearCache: () -> Unit = {},
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -145,6 +148,11 @@ fun AsrSettingsScreen(
     // （见 `AsrModelLocator.remove`）。确认放在这一层而不是 ViewModel 里：
     // 「用户点过确认」是界面的事实，ViewModel 不该再猜一次。
     var confirmRemove by remember { mutableStateOf(false) }
+
+    // 清字幕也要确认，但理由与上面**不同**：不是因为代价大（那些字幕本来就随时可以
+    // 再跑一遍），而是因为用户要花掉的是**几分钟的算力**，而按下去之后界面上什么都不会
+    // 变（字幕列表在另一个页面）。不确认的话，误触一次就是几分钟白等。
+    var confirmClearCache by remember { mutableStateOf(false) }
 
     // 当前是不是开着「选服务商」的对话框。与 `confirmRemove` 同一个理由留在这里。
     var pickingService by remember { mutableStateOf(false) }
@@ -269,6 +277,38 @@ fun AsrSettingsScreen(
                 }
             }
 
+            // 生成字幕的缓存排在这一页的最后，而且**不在**上面那个分叉里：两路写的是同一批
+            // 文件（文件名是媒体哈希，与路线无关——见 `AsrSubtitleGenerator`），
+            // 所以选云端时这一行照样该在，否则一个用云端的用户永远看不到自己付过的钱
+            // 积在磁盘上的那块地方。
+            //
+            // 「模型文件不在这里」也必须在标题上就看出来：离它最近的那个删除按钮删的是模型。
+            item { SectionHeader(stringResource(R.string.msp_settings_section_asr_cache)) }
+            item {
+                val stats = state.cache.stats
+                // 没缓存时**不显示按钮**，而不是把按钮置灰：按下去不会有任何变化的按钮，
+                // 唯一的作用是让人怀疑「是不是没生效」。副标题照样给一句「还没有缓存」，
+                // 让这一行看上去是空的、不是没加载出来。
+                SettingActionButtonRow(
+                    icon = Icons.Outlined.DeleteSweep,
+                    title = stringResource(R.string.msp_settings_asr_cache_clear),
+                    subtitle = when {
+                        state.cache.busy -> stringResource(R.string.msp_settings_asr_cache_clearing)
+                        // 失败时说的是「还剩多少」，而不是「清空失败」四个字：
+                        // 后者会让人以为已经清掉了（而字幕还在，磁盘也没被释放）。
+                        state.cache.failed -> stats.describeClearFailure().string()
+                        else -> stats.describe().string()
+                    },
+                    action = if (stats.isEmpty || state.cache.busy) {
+                        null
+                    } else {
+                        stringResource(R.string.msp_settings_asr_cache_clear_action)
+                    },
+                    onAction = { confirmClearCache = true },
+                    help = stringResource(R.string.msp_settings_asr_cache_help),
+                )
+            }
+
             state.message?.let { message ->
                 item { AsrMessageBlock(message = message, onDismiss = onDismissMessage) }
             }
@@ -315,6 +355,31 @@ fun AsrSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmRemove = false }) {
+                    Text(stringResource(R.string.msp_settings_cancel))
+                }
+            },
+        )
+    }
+
+    if (confirmClearCache) {
+        AlertDialog(
+            onDismissRequest = { confirmClearCache = false },
+            title = { Text(stringResource(R.string.msp_settings_asr_cache_clear_title)) },
+            // 确认句里三件事都要有：删多少、要重付什么代价、什么不会被删
+            // （见 `GeneratedSubtitleCacheStats.describeClearConfirmation`）。
+            text = { Text(state.cache.stats.describeClearConfirmation().string()) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClearCache = false
+                        onClearCache()
+                    },
+                ) {
+                    Text(stringResource(R.string.msp_settings_asr_cache_clear_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearCache = false }) {
                     Text(stringResource(R.string.msp_settings_cancel))
                 }
             },

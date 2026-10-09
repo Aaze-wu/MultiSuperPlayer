@@ -197,6 +197,21 @@
     <!-- ===== Picture in picture ===== -->
     <string name="msp_player_pip">PiP</string>
 
+    <!-- ===== Keep screen on ===== -->
+    <!--
+      The control bar entry. The three sentences do different jobs and must not be
+      merged:
+
+      - `msp_player_keep_screen_on` is the *name* of the switch, used for
+        accessibility only. TalkBack joins it with the state on the chip:
+        "Keep the screen on while playing, Screen stays on, on";
+      - `_on` / `_off` are what the chip actually displays, and they describe
+        *what the screen will do now* rather than the feature name.
+    -->
+    <string name="msp_player_keep_screen_on">Keep the screen on while playing</string>
+    <string name="msp_player_keep_screen_on_on">Screen stays on</string>
+    <string name="msp_player_keep_screen_on_off">Screen may sleep</string>
+
     <!--
       Equalizer. The preset names are ours (that is one more reason not to use the
       system presets: those names belong to the vendor). Gain and frequency texts

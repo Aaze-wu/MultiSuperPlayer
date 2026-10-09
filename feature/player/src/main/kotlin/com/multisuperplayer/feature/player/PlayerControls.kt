@@ -469,7 +469,7 @@ internal fun PlayerActionChips(
 }
 
 /**
- * 「睡眠定时 / 播放队列 / 均衡器 / 画中画」四个会话级入口。
+ * 「睡眠定时 / 播放队列 / 均衡器 / 屏幕常亮 / 画中画」五个会话级入口。
  *
  * ## 为什么单独一行，而不是并进 [PlayerActionChips]
  *
@@ -532,6 +532,19 @@ internal fun PlayerSessionChips(
                 description = stringResource(R.string.msp_player_equalizer),
             )
         }
+        // 「屏幕常亮」跟均衡器同一套读法，标签写的是**现在屏幕会怎样**
+        // （「屏幕常亮」/「允许熄屏」）而不是功能名：这一个开关的后果在屏幕外面
+        // （几十秒后才看得到），用户唯一能当场确认的就是这句话。
+        session.keepScreenOn?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                // 无障碍描述给的是**这个开关的名字**，不是当前状态：状态在
+                // `msp_player_chip_active/inactive` 里已经读出来了。
+                description = stringResource(R.string.msp_player_keep_screen_on),
+            )
+        }
         // 画中画排最后：它和上面几个的区别是**点了会离开这个界面**（画面缩成一个小
         // 窗口），摆在最靠后/最靠边的位置，误触的代价最小。
         session.pip?.let { chip ->
@@ -566,7 +579,7 @@ data class PlayerBarChip(
 )
 
 /**
- * 会话级入口的一整组（睡眠定时 / 队列 / 均衡器 / 画中画）。
+ * 会话级入口的一整组（睡眠定时 / 队列 / 均衡器 / 屏幕常亮 / 画中画）。
  *
  * ## 为什么不写成几个平铺的参数
  *
@@ -581,9 +594,10 @@ data class PlayerBarChip(
  * ## 字段的空值含义各不相同
  *
  * [sleepTimer] 为 null 是「预览/单测里没给」，[queue] 为 null 是「队列里没东西可看」，
- * [equalizer] 为 null 是「预览/单测里没给」——真机上这个入口一直在：均衡器是在
- * 开始播放**之前**就能设的（那时设备支不支持都还不知道），把它藏起来会让功能
- * 变成「先放一会儿才出现」，而用户找的是一个设置项。
+ * [equalizer] 与 [keepScreenOn] 为 null 是「预览/单测里没给」——真机上这两个入口一直在：
+ * 均衡器是在开始播放**之前**就能设的（那时设备支不支持都还不知道），屏幕常亮则是
+ * 「这一次播放我想不想让它一直亮着」（设置里那个是全局默认，两件事）。
+ * 把它们藏起来会让功能变成「先放一会儿才出现」，而用户找的是一个开关。
  *
  * 公开（而不是 internal）是因为它出现在 `PlayerScreen` 的参数表上，而那个组合
  * 函数是公开的——公开函数不能暴露 internal 类型。
@@ -593,6 +607,7 @@ data class PlayerSessionChipSet(
     val sleepTimer: PlayerBarChip? = null,
     val queue: PlayerBarChip? = null,
     val equalizer: PlayerBarChip? = null,
+    val keepScreenOn: PlayerBarChip? = null,
     val pip: PlayerBarChip? = null,
 ) {
     /**
@@ -601,7 +616,9 @@ data class PlayerSessionChipSet(
      * 「要不要占位置」的判断点和「要不要画」的渲染点必须是同一个集合：分开写的话，
      * 以后加第五个入口时只改了一边，就会得到一行空白的间距（或一个跑出边界的东西）。
      */
-    val isEmpty: Boolean get() = sleepTimer == null && queue == null && equalizer == null && pip == null
+    val isEmpty: Boolean
+        get() = sleepTimer == null && queue == null && equalizer == null &&
+            keepScreenOn == null && pip == null
 }
 
 /**

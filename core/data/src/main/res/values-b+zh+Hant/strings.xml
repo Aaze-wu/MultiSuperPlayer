@@ -114,4 +114,10 @@
     <string name="msp_import_note_duplicate_items">%1$d 條重複</string>
     <string name="msp_import_note_full">清單數量已達上限 %1$d，%2$d 個未匯入</string>
 
+    <!-- ===== 生成的字幕快取（語音辨識的結果） ===== 理由見 values/strings.xml 的同一段說明。 -->
+    <string name="msp_asr_cache_empty">還沒有快取</string>
+    <string name="msp_asr_cache_stats">已快取 %1$d 份字幕 · %2$s</string>
+    <string name="msp_asr_cache_clear_failed">清空失敗，還剩 %1$d 份（%2$s）</string>
+    <string name="msp_asr_cache_clear_confirm">會刪掉 %1$d 份已生成的字幕（%2$s）。這些字幕是辨識出來的，刪掉之後要重新跑一遍辨識（耗時約等於音訊時長）。辨識模型不會被刪除。</string>
+
 </resources>

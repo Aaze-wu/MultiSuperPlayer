@@ -87,6 +87,21 @@ class PlayerViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), false)
 
     /**
+     * 播放时不让屏幕自动熄灭（默认**开**）。
+     *
+     * 和 [equalizerEnabled] 一样从 [settings] 派生：控制条上那个临时开关的底值
+     * 和设置页里的值必须是同一本账，否则会出现「设置页说开着、控制条说关着」。
+     *
+     * 默认值写在这里（`?: true`）而不是数据层：数据层用 null 表示「从没设置过」，
+     * 而「看视频时屏幕不该自己黑掉」这个判断只属于界面这一侧（见
+     * [com.multisuperplayer.core.data.settings.PlaybackSettings.keepScreenOnWhilePlaying]）。
+     * 首帧的初值直接给 `true`：磁盘上的值几毫秒后到，而首帧就是「默认」那一帧。
+     */
+    val keepScreenOnWhilePlaying: StateFlow<Boolean> = settings
+        .map { it.keepScreenOnWhilePlaying ?: true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), true)
+
+    /**
      * 均衡器曲线。读不出来（没设置过、或者存进去的是垃圾）时是平直的。
      *
      * 投影到**标准频段**上（见 `EqualizerCurve.onStandardBands`）：面板上永远是

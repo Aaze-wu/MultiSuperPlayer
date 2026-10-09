@@ -229,4 +229,20 @@
         <item>未知</item>
     </string-array>
 
+    <!-- ===== 生成的字幕缓存（语音识别的结果） ===== -->
+
+    <!--
+      这里只在**这条功能的入口**（设置 → 语音识别）出现，所以不解释「缓存」的技术含义，
+      只回答两件事：占了多少、删掉之后要重付什么代价。
+
+      数字与整句话住在 `GeneratedSubtitleCacheStats` 里（它要拼体积），这里只有模板。
+    -->
+    <string name="msp_asr_cache_empty">还没有缓存</string>
+    <!-- 例：`已缓存 3 份字幕 · 1.2 MB` -->
+    <string name="msp_asr_cache_stats">已缓存 %1$d 份字幕 · %2$s</string>
+    <!-- 必须写出还剩多少：只说「清空失败」，用户会把它当成一句无关痛痒的提示 -->
+    <string name="msp_asr_cache_clear_failed">清空失败，还剩 %1$d 份（%2$s）</string>
+    <!-- 「模型不会被删除」必须说出来：这一页上离它最近的按钮恰好是「删除模型」 -->
+    <string name="msp_asr_cache_clear_confirm">会删掉 %1$d 份已生成的字幕（%2$s）。这些字幕是识别出来的，删掉之后要重新跑一遍识别（耗时约等于音频时长）。识别模型不会被删除。</string>
+
 </resources>

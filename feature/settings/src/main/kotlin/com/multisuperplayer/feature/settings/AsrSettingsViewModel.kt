@@ -18,6 +18,8 @@ import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
+import com.multisuperplayer.core.data.subtitle.GeneratedSubtitleCacheStats
+import com.multisuperplayer.core.data.subtitle.GeneratedSubtitleStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,21 @@ private const val TAG = "AsrSettingsViewModel"
 data class AsrSettingsMessage(val text: MspText, val failed: Boolean)
 
 /**
+ * 「清除生成的字幕」那一行的状态。
+ *
+ * 三个字段合成一个对象，理由和翻译页的 `TranslationCacheState` 一样：拆成两个
+ * `StateFlow` 会在清空完成的那几帧里拼出「还剩 3 份」+「已清空」这种自相矛盾的组合。
+ *
+ * [failed] 只在**删除失败**时为 true。读盘失败不算：那时 [stats] 是上一次读到的值，
+ * 而「清空失败」是一句针对用户刚才那一下动作的话，不能拿另一种原因去填。
+ */
+data class GeneratedSubtitleCacheState(
+    val stats: GeneratedSubtitleCacheStats = GeneratedSubtitleCacheStats(entries = 0, bytes = 0L),
+    val busy: Boolean = false,
+    val failed: Boolean = false,
+)
+
+/**
  * 「语音识别」设置页的状态。
  *
  * 下载的三个字段（[installing] / [progress] / [message]）放在同一个 data class 里，
@@ -57,6 +74,7 @@ data class AsrSettingsUiState(
     val installing: Boolean = false,
     val progress: AsrModelProgress? = null,
     val message: AsrSettingsMessage? = null,
+    val cache: GeneratedSubtitleCacheState = GeneratedSubtitleCacheState(),
 ) {
 
     /** 当前选中的模型。 */
@@ -151,6 +169,7 @@ class AsrSettingsViewModel(
     private val asrModels: AsrModelLocator,
     private val asrInstaller: AsrModelInstaller,
     private val apiKeys: ApiKeyStore,
+    private val generatedSubtitles: GeneratedSubtitleStore,
     private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -169,6 +188,10 @@ class AsrSettingsViewModel(
                 _state.update { it.copy(settings = settings, statuses = statuses) }
             }
         }
+        // 生成的字幕占的地方必须是**首帧就对**的：下面那个 [refresh] 只挂在
+        // `ON_RESUME` 上，而同一个 Activity 内部的页面切换不会让它重新 resume——
+        // 只靠那条路的话，这一行会一直显示成「还没有缓存」（而它是错的）。
+        viewModelScope.launch { refreshCacheStats() }
     }
 
     /**
@@ -176,9 +199,16 @@ class AsrSettingsViewModel(
      *
      * 界面在外层 `ON_RESUME` 时调：模型也可能是在**播放页的面板**里下完的，
      * 那个动作发生在这个 ViewModel 之外，没有任何回调会通知这里。
+     *
+     * 生成的字幕同理（它是在播放页里跑出来的），所以两者在同一个时机一起读：
+     * 做成两个 `refresh` 只会让界面漏调一个。
      */
     fun refresh() {
-        viewModelScope.launch { _state.update { it.copy(statuses = readStatuses()) } }
+        viewModelScope.launch {
+            val statuses = readStatuses()
+            _state.update { it.copy(statuses = statuses) }
+            refreshCacheStats()
+        }
     }
 
     /**
@@ -354,6 +384,38 @@ class AsrSettingsViewModel(
         }
     }
 
+    /**
+     * 清空生成的字幕（设置页里那一个按钮的全部实现）。
+     *
+     * 重入保护：清空期间按钮照样可以点（`SettingActionButtonRow` 没有禁用态），
+     * 第二次点会去删一个正在被删的东西——删不掉就报「清空失败」，而第一次其实是成功的。
+     *
+     * 规模**读回来**而不是自己拼：删干净了没有只有磁盘知道，所以清完再 stat 一次。
+     * 返回 false 时那个数字是有意义的（还剩几份），不能显示成一句笼统的失败——
+     * 用户唯一能从界面上得到的结论是「这个按钮是假的」。
+     *
+     * 不动模型文件：这一页上两个删除动作的语义完全不同（一个是「把这些算出来的东西
+     * 还给磁盘」，一个是「把 190 MB 重新下回来的准备」），不能共用一个入口。
+     */
+    fun clearGeneratedSubtitleCache() {
+        viewModelScope.launch {
+            if (_state.value.cache.busy) return@launch
+            _state.update { it.copy(cache = it.cache.copy(busy = true, failed = false)) }
+            val removed = withContext(dispatchers.io) { generatedSubtitles.clear() }
+            val stats = withContext(dispatchers.io) { generatedSubtitles.stats() }
+            MspLog.i(TAG) { "清空生成的字幕：removed=$removed，剩下 ${stats.entries} 份" }
+            _state.update {
+                it.copy(
+                    cache = GeneratedSubtitleCacheState(
+                        stats = stats,
+                        busy = false,
+                        failed = !removed,
+                    ),
+                )
+            }
+        }
+    }
+
     /** 关掉页面上那条提示（失败的那条必需能关，否则它会一直挂着挡着下面的设置）。 */
     fun dismissMessage() {
         if (_state.value.message != null) _state.update { it.copy(message = null) }
@@ -377,5 +439,19 @@ class AsrSettingsViewModel(
      */
     private suspend fun readStatuses(): Map<String, AsrModelStatus> = withContext(dispatchers.io) {
         AsrModelCatalog.models.associate { model -> model.id to asrModels.statusOf(model) }
+    }
+
+    /**
+     * 重读「生成的字幕占了多少地方」。
+     *
+     * 走 IO 线程：`GeneratedSubtitleStore.stats()` 会列一次目录并逐个 stat，
+     * 而它在主线程上被调用的后果很直接——打开这一页时掉帧。
+     *
+     * 顺手把 `failed` 清掉：这是**重新读出来的一份事实**，上一次的删除失败
+     * 已经不代表现在的状态了（和 `SettingsViewModel.refreshCacheStats` 一致）。
+     */
+    private suspend fun refreshCacheStats() {
+        val stats = withContext(dispatchers.io) { generatedSubtitles.stats() }
+        _state.update { it.copy(cache = it.cache.copy(stats = stats, failed = false)) }
     }
 }

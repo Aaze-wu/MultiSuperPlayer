@@ -160,6 +160,25 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
         private set
 
     /**
+     * 这一次播放**临时**改过的「屏幕常亮」。null = 没改过，跟随设置里的默认值。
+     *
+     * ## 为什么它必须是可空覆盖值（和 [aspectRatioOverride] 同一套理由）
+     *
+     * 直接存一个 `Boolean` 就必须在一开始拿到设置里的值，而设置是异步从 DataStore
+     * 载入的，首帧拿到的只能是编的；于是必然要写「用户还没改过就跟随新到的设置」
+     * 这种脏标记，而它在**首次载入**时恰好是反的（当前值看起来就叫「用户改过了」，
+     * 设置里的默认值永远生效不了）。可空覆盖值把两件事分开存，不需要任何判断。
+     *
+     * ## 为什么会有人临时改它
+     *
+     * 「开着看一部片子」是很常见的场景（长视频、直播、监听画面），而「开着听一首歌
+     * 然后让它自己熄掉」同样常见。两种需求可以出现在同一天，而为此跑一趟设置页
+     * 去改全局默认值明显不划算。
+     */
+    var keepScreenOnOverride: Boolean? by mutableStateOf(null)
+        private set
+
+    /**
      * 现在是不是在画中画小窗口里。
      *
      * ## 为什么这一页必须知道这件事
@@ -305,6 +324,29 @@ class PlayerUiState(initialFullscreen: Boolean = false) {
      *   这一页晚到，存起来就永远差一次。
      */
     fun aspectRatio(default: AspectRatioMode): AspectRatioMode = aspectRatioOverride ?: default
+
+    /**
+     * 本次播放用不用「屏幕常亮」（把设置里的默认值作为兜底）。
+     *
+     * @param default 设置里存的值。**每次读**而不是存起来：设置可能比这一页晚到
+     *   （它是另一条 Flow），存起来就永远差一次。
+     */
+    fun keepScreenOn(default: Boolean): Boolean = keepScreenOnOverride ?: default
+
+    /**
+     * 临时改「屏幕常亮」，**不写回设置**。
+     *
+     * 这里传的是「用户想要的状态」而不是「翻转一下」：翻转的写法意味着这个函数必须
+     * 知道当前生效值，而当前生效值依赖设置（在另一个仓库里）——界面在点的那一刻
+     * 恰好就知道它，所以让调用方算好再传进来。
+     *
+     * 叫 `applyXxx` 而不是 `setKeepScreenOn`：属性自己就会生成 `setKeepScreenOnOverride`，
+     * 而 `setKeepScreenOn(Float)` 这种名字与属性访问器的 JVM 签名规则一旦沾边
+     * （见 [applyFullscreen]）就可能在编译期才报出来。
+     */
+    fun applyKeepScreenOn(value: Boolean?) {
+        keepScreenOnOverride = value
+    }
 
     /**
      * 临时改画面比例，**不写回设置**。

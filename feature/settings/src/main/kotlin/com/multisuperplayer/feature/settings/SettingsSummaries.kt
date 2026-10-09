@@ -107,6 +107,9 @@ internal object SettingsSummaries {
         val rememberPosition = playback.rememberPosition ?: true
         val recordRecentPlays = playback.recordRecentPlays ?: true
         val trustUntrustedCertificates = playback.trustUntrustedCertificates ?: false
+        // 默认值是**开**（看视频时屏幕自己黑掉没人想要），所以这里是 `?: true`。
+        // 写成 `?: false` 会让每一个没设置过的用户都多出一个「不阻止熄屏」的尾标。
+        val keepScreenOn = playback.keepScreenOnWhilePlaying ?: true
 
         return join(
             MspText.Plain(PlaybackSpeedOptions.format(speed)),
@@ -122,6 +125,9 @@ internal object SettingsSummaries {
             if (softwareDecodingAvailable) null else MspText.Res(R.string.msp_settings_summary_tail_no_ffmpeg),
             if (rememberPosition) null else MspText.Res(R.string.msp_settings_summary_tail_no_position),
             if (recordRecentPlays) null else MspText.Res(R.string.msp_settings_summary_tail_no_recent),
+            // 和上面两条一样是「偏离默认时说出来」。它的现象（看着看着屏幕黑了）
+            // 几乎不可能被用户联想到某个开关上，所以这一条得说出来。
+            if (keepScreenOn) null else MspText.Res(R.string.msp_settings_summary_tail_no_keep_screen_on),
             // 和别的尾标相反：这一条是「偏离默认时要说出来」，而且它是**安全**状态：
             // 用户可能一年前为了某台 NAS 打开过，之后再没想起它。摘要是他唯一
             // 每次都会路过的位置。
