@@ -68,7 +68,13 @@ plugins {
 // 它只多一个应用内设置，没有清单 / 权限 / 系统 intent 变化，验证能全部在本地
 // 与模拟器上做完 ⇒ 同样直接发正式版（与 0.9.0 那次「多一个开关」同规格）。
 // 与 1.2.0 不再共用功能集：README 的功能清单要跟着改。
-val appVersionName: String = "1.2.3"
+//
+// 1.2.4 回到 bug 修复版（两条都来自 todo/bugs.txt）：一是状态栏图标的明暗只在
+// onCreate 里算过一次，系统切深浅色 / 应用内换主题之后不再更新；二是播放列表里
+// 来自 SAF 目录的条目被当成 MediaStore 条目，`File(path).exists()` 永远为 false。
+// 两条都在「界面状态如何跟着数据走」这一层，没有清单 / 权限 / 系统 intent 变化
+// ⇒ 照例直接发正式版，与 1.2.3 **共用 user-visible 功能集**。
+val appVersionName: String = "1.2.4"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

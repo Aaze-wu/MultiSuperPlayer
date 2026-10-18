@@ -106,15 +106,27 @@ data class PlaylistItem(
          * 从 [MediaEntry.id] 反推来源。
          *
          * 只有**我们自己写进去的那几个前缀**能反推（浏览页的
-         * `BrowserEntry.MEDIA_ID_PREFIX`、网络地址与外部打开的
-         * [ExternalMediaIds]）；其余（MediaStore 的数字 id、`saf:` 开头的字符串）
-         * 一律算媒体库——不能因为「看起来不像数字」就下结论，
-         * 猜错会把 SAF 条目送去按文件路径查字幕（同样是查不到）。
+         * `BrowserEntry.MEDIA_ID_PREFIX`、SAF 扫描的 [SafMediaIds.PREFIX]、
+         * 网络地址与外部打开的 [ExternalMediaIds]）；
+         * 其余（MediaStore 的数字 id）一律算媒体库。
          *
-         * 浏览页这一支里面还要**再分一层**：`file:` 后面可能是绝对路径，也可能是
+         * ## 为什么 `saf:` 必须单独一支（v1.2.4）
+         *
+         * `saf:` 是 SAF 扫描器造出来的 id（`SafScanRules.safIdOf`，形如
+         * `saf:primary:Music/a.flac`），它背后是 `DocumentsProvider` 里的一棵树，
+         * 有完整的目录层级。把它当成 [MediaSource.MEDIA_STORE]，回放时字幕查找会
+         * 去问 `MediaStore` 的 `RELATIVE_PATH`——而 SAF 目录里的文件 MediaStore
+         * 根本看不见（云盘、应用私有目录、SD 卡受限目录都是这样），
+         * `relativePath` 从 `PlaylistItem` 快照里读出来也永远是 null。
+         * 症状是同目录的外挂字幕一条都找不到，而且**整个目录**都这样。
+         *
+         * 换句话说：`saf:` 归到媒体库不是「保守」，是判错——
+         * 它明明有目录可查，只是不在 MediaStore 的索引里。
+         *
+         * 浏览页那一支还要**再分一层**：`file:` 后面可能是绝对路径，也可能是
          * SAF 的 `content://…` document uri（见 `BrowserEntry.sourceOfRef`）。
          * 一律当成文件系统的话，那串 uri 会被「取上一级目录」，于是整个目录的字幕
-         * 一条都找不到——和上面那句「同样是查不到」是同一个症状的第二个来源。
+         * 一条都找不到——和上面是同一个症状的第二个来源。
          *
          * ## 为什么是 `when` 而不是 `if / else`
          *
@@ -132,6 +144,7 @@ data class PlaylistItem(
             ExternalMediaIds.isSharedId(mediaId) -> MediaSource.SHARED
             BrowserEntry.isBrowserMediaId(mediaId) ->
                 BrowserEntry.sourceOfRef(BrowserEntry.refOf(mediaId))
+            SafMediaIds.isSafId(mediaId) -> MediaSource.SAF_TREE
             else -> MediaSource.MEDIA_STORE
         }
     }

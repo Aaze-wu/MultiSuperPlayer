@@ -166,19 +166,19 @@ internal fun exportTrackOf(row: PlaylistRow): PlaybackExportTrack {
 /**
  * 「导出全部播放列表」要看的那份数据。
  *
- * [fileExists] 会真的去 `stat`（浏览页条目的路径），所以调用方必须把它放到
+ * [uriExists] 会真的去 `stat` / `query`（浏览页条目的 uri），所以调用方必须把它放到
  * IO 线程上——和 [buildPlaylistsUiState] 走 `flowOn(dispatchers.io)` 是同一个理由。
  */
 internal fun playlistExportCollections(
     playlists: List<Playlist>,
     library: MediaLibraryState,
-    fileExists: (String) -> Boolean = { false },
+    uriExists: (String) -> Boolean = { false },
 ): List<PlaybackExportCollection> {
     val byId = library.entriesById()
     return playlists.map { playlist ->
         PlaybackExportCollection(
             name = playlist.name,
-            tracks = PlaylistRows.build(playlist.items, byId, fileExists).map(::exportTrackOf),
+            tracks = PlaylistRows.build(playlist.items, byId, uriExists).map(::exportTrackOf),
         )
     }
 }

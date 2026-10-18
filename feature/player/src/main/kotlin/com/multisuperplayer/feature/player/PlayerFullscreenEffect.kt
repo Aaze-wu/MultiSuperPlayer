@@ -11,6 +11,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.multisuperplayer.core.ui.chrome.applySystemBarIconAppearance
+import com.multisuperplayer.core.ui.theme.LocalMspTokens
 
 /**
  * 当前设备是不是横屏。
@@ -61,8 +63,10 @@ fun rememberIsLandscape(): Boolean =
 fun PlayerFullscreenEffect(fullscreen: Boolean, inPip: Boolean = false) {
     val activity = LocalContext.current.findActivity()
     val view = LocalView.current
+    val isDark = LocalMspTokens.current.isDark
 
-    DisposableEffect(fullscreen) {
+    // 键里带 isDark：跟着主题换图标明暗，见下面的 applySystemBarIconAppearance。
+    DisposableEffect(fullscreen, isDark) {
         val window = activity?.window
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         if (fullscreen) {
@@ -74,7 +78,16 @@ fun PlayerFullscreenEffect(fullscreen: Boolean, inPip: Boolean = false) {
         } else {
             controller?.show(WindowInsetsCompat.Type.systemBars())
         }
-        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+        // 图标明暗要在这里再声明一次：这些 controller 调用和 `hide/show` 是
+        // **粘性**的窗口状态，浅色主题下按主题算会得到深色图标，而全屏时
+        // 系统栏是浮在画面上的（深色）——深色图标压上去等于看不见。
+        // 也就是说全屏期间一律用浅色图标，退出全屏再交还给主题。
+        applySystemBarIconAppearance(window, useDarkIcons = !fullscreen && !isDark)
+        onDispose {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+            // 全屏中直接离开播放页时，上面写的「浅色图标」会留在媒体库/设置页上。
+            applySystemBarIconAppearance(window, useDarkIcons = !isDark)
+        }
     }
 
     // 键里带上 inPip：进/出画中画两类都会重跑一次。进入时 `onDispose`（上一次的）

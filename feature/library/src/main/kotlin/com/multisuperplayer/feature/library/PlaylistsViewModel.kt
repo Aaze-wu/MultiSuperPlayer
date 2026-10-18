@@ -15,6 +15,7 @@ import com.multisuperplayer.core.data.export.TextImportReader
 import com.multisuperplayer.core.data.export.TextImportResult
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.data.media.MediaUriProbe
 import com.multisuperplayer.core.data.playlist.PlaylistImportMergeChoice
 import com.multisuperplayer.core.data.playlist.PlaylistImportOptions
 import com.multisuperplayer.core.data.playlist.PlaylistImportPlan
@@ -24,7 +25,6 @@ import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
 import com.multisuperplayer.core.model.text.MspText
-import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,14 +78,14 @@ internal fun MediaLibraryState.entriesById(): Map<String, MediaEntry> =
  * 打开的那个列表**查不到就当作没打开**（而不是保留上一次的详情）：用户可能
  * 在别处把它删了，这时应该退回列表页。
  *
- * @param fileExists 浏览页条目的「路径还在不在」。库查不到不等于文件没了，
+ * @param uriExists 浏览页条目的「uri 还在不在」。库查不到不等于文件没了，
  *   详见 [resolvePlaylistItem]。默认值一律当作不在，理由见 `PlaylistRows.build`。
  */
 internal fun buildPlaylistsUiState(
     playlists: List<Playlist>,
     library: MediaLibraryState,
     openId: String?,
-    fileExists: (String) -> Boolean = { false },
+    uriExists: (String) -> Boolean = { false },
 ): PlaylistsUiState {
     val byId = library.entriesById()
     val playlist = openId?.let { id -> playlists.firstOrNull { it.id == id } }
@@ -95,7 +95,7 @@ internal fun buildPlaylistsUiState(
             PlaylistDetail(
                 id = it.id,
                 name = it.name,
-                rows = PlaylistRows.build(it.items, byId, fileExists),
+                rows = PlaylistRows.build(it.items, byId, uriExists),
                 queue = PlaylistRows.queue(it.items, byId),
             )
         },
@@ -118,6 +118,7 @@ class PlaylistsViewModel(
     private val exportWriter: TextExportWriter,
     private val importReader: TextImportReader,
     private val importer: PlaylistImporter,
+    private val mediaProbe: MediaUriProbe,
 ) : ViewModel() {
 
     /**
@@ -133,7 +134,7 @@ class PlaylistsViewModel(
         library.state,
         openId,
     ) { playlists, libraryState, open ->
-        buildPlaylistsUiState(playlists, libraryState, open, fileExists = ::fileExists)
+        buildPlaylistsUiState(playlists, libraryState, open, uriExists = ::uriExists)
     }.flowOn(dispatchers.io).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -141,16 +142,21 @@ class PlaylistsViewModel(
     )
 
     /**
-     * 浏览页条目的「路径还在不在」。
+     * 这个 uri 现在还能不能读到。
      *
-     * 这是这一页唯一会碰文件系统的地方（整个 flow 在 `flowOn(dispatchers.io)` 上），
-     * 代价是一个 `stat`，换来的是「文件确实删了」这条信息；不查的话从浏览器加进来的
-     * 条目就只能一律按「不确定」处理。
+     * 这是这一页唯一会碰盘 / 碰内容提供者的地方（整个 flow 在
+     * `flowOn(dispatchers.io)` 上），代价是一次 `stat` 或一次跨进程 `query`，
+     * 换来的是「文件确实删了」这条信息；不查的话从浏览器加进来的条目就只能
+     * 一律按「不确定」处理。
+     *
+     * v1.2.4 之前这里是 `File(path).exists()`——对 SAF 的
+     * `content://…/document/…` **永远**返回 false，于是「系统文件选择器添加的
+     * 文件夹里挑的文件」一进详情就被标成「文件已不在」。判定交给
+     * [MediaUriProbe]，它按 scheme 分两条路（详见那里的类注释）。
      *
      * 失败一律算**不在**：判断不了的路径当「还在」就会让用户点进去才撞上错误。
      */
-    private fun fileExists(path: String): Boolean =
-        path.isNotEmpty() && runCatching { File(path).exists() }.getOrDefault(false)
+    private fun uriExists(uri: String): Boolean = mediaProbe.exists(uri)
 
     fun open(id: String) {
         openId.value = id
@@ -248,13 +254,14 @@ class PlaylistsViewModel(
         mutableExport.value = PlaybackExportState.Running
         val fileName = suggestedExportName(format)
         viewModelScope.launch {
-            // `stat` 与顺次编码都放到 IO：浏览页条目的「文件还在不在」是真去碰磁盘，
-            // 和 [buildPlaylistsUiState] 走 `flowOn(dispatchers.io)` 是同一个理由。
+            // `stat` / `query` 与顺次编码都放到 IO：浏览页条目的「文件还在不在」是真去碰
+            // 磁盘或内容提供者，和 [buildPlaylistsUiState] 走 `flowOn(dispatchers.io)`
+            // 是同一个理由。
             val collections = withContext(dispatchers.io) {
                 playlistExportCollections(
                     playlists = store.playlists.first(),
                     library = library.state.first(),
-                    fileExists = ::fileExists,
+                    uriExists = ::uriExists,
                 )
             }
             mutableExport.value = exportPlaybackTo(

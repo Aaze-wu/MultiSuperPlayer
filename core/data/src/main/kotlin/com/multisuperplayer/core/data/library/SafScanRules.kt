@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.data.library
 
 import com.multisuperplayer.core.model.MediaKind
+import com.multisuperplayer.core.model.SafMediaIds
 
 /**
  * SAF 扫描里的「纯规则」：文件类型判定、相对路径还原、去重键、遍历上限。
@@ -167,10 +168,17 @@ internal object SafScanRules {
      * 「来源 + 本来源内的键」的写法（`MediaEntry.id` 的注释里解释过为什么这么定），
      * 因此续播位置、播放列表里存的 key 天然不会和 MediaStore 条目撞车。
      */
-    fun safIdOf(documentId: String): String = "$SAF_ID_PREFIX$documentId"
+    fun safIdOf(documentId: String): String = SafMediaIds.idOf(documentId)
 
-    /** 见 [safIdOf]。 */
-    const val SAF_ID_PREFIX = "saf:"
+    /**
+     * 见 [safIdOf]。
+     *
+     * 值本身住在 [SafMediaIds.PREFIX]：读 id 的一侧在 `core:model`
+     * （`PlaylistItem.sourceOf`），它不能反过来依赖 `core:data`，所以那个模块
+     * 才是这个常量的归属地；这里保留同名别名的原因只是不让 `core:data` 里的
+     * 调用点来回跨模块引用。
+     */
+    const val SAF_ID_PREFIX = SafMediaIds.PREFIX
 
     // --------------------------------------------------------------- 去重
 

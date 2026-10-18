@@ -5,6 +5,7 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.model.MediaSource
 import com.multisuperplayer.core.model.PlaylistItem
+import com.multisuperplayer.core.model.SafMediaIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -157,8 +158,8 @@ class PlaylistRowsTest {
         val item = browserItem("/sdcard/Movies/a.mp4", "a")
         val asked = mutableListOf<String>()
 
-        PlaylistRows.build(listOf(item), emptyMap()) { path ->
-            asked.add(path)
+        PlaylistRows.build(listOf(item), emptyMap()) { uri ->
+            asked.add(uri)
             true
         }
 
@@ -191,9 +192,9 @@ class PlaylistRowsTest {
     }
 
     @Test
-    fun `库查不到的非浏览页条目不会靠路径蒙混过去`() {
-        // MediaStore 的 id 和 `file:` 前缀是两套东西；数字 id 不可能变成合法路径，
-        // 所以这一支连探针都不该问。
+    fun `媒体库的条目不会靠 uri 蒙混过去`() {
+        // MediaStore 的数字 id 代表**索引里的一行**，不是某个位置上的文件；
+        // 拿它的 uri 去验等于把「库里没有」偷偷改成「文件还在」。
         var probeCalls = 0
 
         val rows = PlaylistRows.build(listOf(item("12345")), emptyMap()) {
@@ -215,5 +216,61 @@ class PlaylistRowsTest {
         // 必须仍然按路径去列同目录，而不是去 MediaStore 查相对路径。
         assertEquals(MediaSource.FILE_SYSTEM, restored.source)
         assertEquals("/sdcard/Movies/a.mp4", restored.uri)
+    }
+
+    // ── SAF 条目（saf: 前缀，uri 是 document uri）────────────────────────────────
+
+    private fun safItem(documentId: String, title: String = documentId.substringAfterLast('/')) =
+        PlaylistItem.of(
+            MediaEntry(
+                id = SafMediaIds.idOf(documentId),
+                uri = safDocumentUriOf(documentId),
+                title = title,
+                kind = MediaKind.AUDIO,
+                source = MediaSource.SAF_TREE,
+            ),
+        )
+
+    private fun safDocumentUriOf(documentId: String) =
+        "content://com.android.externalstorage.documents/tree/primary%3AMusic/document/" +
+            documentId.replace(":", "%3A").replace("/", "%2F")
+
+    @Test
+    fun `被去重挤掉的 SAF 条目只要 uri 还在就不标成不在`() {
+        // `LibraryMergeRules` 会在「同一个文件既在 MediaStore、又在授权目录里」时
+        // 保留 MediaStore 那条，于是播放列表里存着的 `saf:` id 在库里**永远**查不到。
+        // 这类条目手里有完整的 document uri，问一句就知道真相。
+        val item = safItem("primary:Music/a.flac")
+        val asked = mutableListOf<String>()
+
+        val rows = PlaylistRows.build(listOf(item), emptyMap()) { uri ->
+            asked.add(uri)
+            true
+        }
+
+        assertFalse(rows[0].missing)
+        // 问的必须是 document uri：换成路径或 documentId 都问不到东西。
+        assertEquals(listOf(safDocumentUriOf("primary:Music/a.flac")), asked)
+        assertEquals(MediaSource.SAF_TREE, rows[0].display.source)
+    }
+
+    @Test
+    fun `SAF 的 uri 读不到时仍然标成已不在`() {
+        val rows = PlaylistRows.build(listOf(safItem("primary:Music/gone.flac", "gone")), emptyMap()) { false }
+
+        assertTrue(rows[0].missing)
+        // 快照里的标题兜住这一行，不能是空白。
+        assertEquals("gone", rows[0].display.title)
+        assertEquals(MediaSource.SAF_TREE, rows[0].display.source)
+    }
+
+    @Test
+    fun `SAF 条目的队列项带着 SAF 来源`() {
+        val restored = PlaylistRows.queue(listOf(safItem("primary:Cloud/a.flac")), emptyMap()).single()
+
+        // 判成媒体库的话字幕查找会去问 RELATIVE_PATH，而 SAF 目录里的文件
+        // MediaStore 根本看不见 —— 整个目录的外挂字幕一条都找不到。
+        assertEquals(MediaSource.SAF_TREE, restored.source)
+        assertEquals(safDocumentUriOf("primary:Cloud/a.flac"), restored.uri)
     }
 }

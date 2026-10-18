@@ -1,6 +1,7 @@
 package com.multisuperplayer.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -39,12 +40,22 @@ class PlaylistItemTest {
     }
 
     @Test
-    fun `SAF 的 id 不会被误判成文件系统`() {
-        // `saf:` 开头的 id 只有 MediaSource.SAF_TREE 认得，按文件路径去查字幕同样是查不到。
-        // 判据必须是「是不是我们写进去的那个前缀」，不能是「看起来像不像路径」。
-        val id = "saf:primary:Music/album/a.flac"
-        assertEquals(MediaSource.MEDIA_STORE, PlaylistItem.sourceOf(id))
-        assertEquals(MediaSource.MEDIA_STORE, PlaylistItem(mediaId = id, uri = id, title = "a").toEntry().source)
+    fun `SAF 扫描来的条目回放时仍然是 SAF 来源`() {
+        // v1.2.4：这一支原本落到 `else` 里被当成媒体库条目。
+        // `saf:` 的 id 背后是 DocumentsProvider 的一棵树，**有目录可查**，
+        // 只是那个目录不在 MediaStore 的索引里（云盘、应用私有目录、SD 卡受限目录）。
+        // 判成媒体库 ⇒ 字幕查找去问 `RELATIVE_PATH`，从 `PlaylistItem` 快照里
+        // 读出来永远是 null ⇒ 整个目录的外挂字幕一条都找不到，且不报任何错。
+        val id = SafMediaIds.idOf("primary:Music/album/a.flac")
+
+        assertEquals("saf:primary:Music/album/a.flac", id)
+        assertEquals("primary:Music/album/a.flac", SafMediaIds.documentIdOf(id))
+        assertTrue(SafMediaIds.isSafId(id))
+        assertEquals(MediaSource.SAF_TREE, PlaylistItem.sourceOf(id))
+        assertEquals(
+            MediaSource.SAF_TREE,
+            PlaylistItem(mediaId = id, uri = id, title = "a").toEntry().source,
+        )
     }
 
     @Test
@@ -85,15 +96,18 @@ class PlaylistItemTest {
     }
 
     @Test
-    fun `四个来源的前缀互不包含`() {
+    fun `五条来源的前缀互不包含`() {
         // `sourceOf` 用的是 when + 前缀判断，分支顺序不影响结果的前提正是
         // 「没有任何一个前缀是另一个的前缀」。这条用例把这个前提钉在原地，
         // 将来谁改了前缀（比如把 `url:` 改成 `u:`）会立刻失败。
         assertEquals(MediaSource.FILE_SYSTEM, PlaylistItem.sourceOf(BrowserEntry.mediaIdOf("/sdcard/a.mp4")))
         assertEquals(MediaSource.REMOTE, PlaylistItem.sourceOf(ExternalMediaIds.remoteIdOf("http://a/b.mp4")))
         assertEquals(MediaSource.SHARED, PlaylistItem.sourceOf(ExternalMediaIds.sharedIdOf("content://a/b.mp4")))
-        // SAF 的 id 里带 `:`，但它不带任何前缀 ⇒ 落到最保守的分支。
-        assertEquals(MediaSource.MEDIA_STORE, PlaylistItem.sourceOf("saf:primary:Music/a.flac"))
+        // SAF 的 id 里带 `:`（`saf:primary:Music/a.flac`），前缀本身不带，
+        // 所以「前缀」和「前缀后面那些冒号」不会互相误判。
+        assertEquals(MediaSource.SAF_TREE, PlaylistItem.sourceOf(SafMediaIds.idOf("primary:Music/a.flac")))
+        // 只有真正认不出来的（MediaStore 的数字 id）才落到最保守的那一支。
+        assertEquals(MediaSource.MEDIA_STORE, PlaylistItem.sourceOf("12345"))
     }
 
     @Test

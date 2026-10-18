@@ -13,6 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.multisuperplayer.core.ui.chrome.SystemBarIconAppearanceEffect
 
 /**
  * 应用主题入口。**整个应用只能通过它取色**，不要在业务代码里写死颜色。
@@ -58,6 +59,12 @@ fun MspTheme(
         else -> baseTheme.isDark
     }
     val oledBlack = baseTheme == MspBaseTheme.BLACK
+
+    // 状态栏/导航栏图标的明暗必须跟着**这个** isDark 走，而不是系统的深浅色：
+    // 主题 XML 和 `enableEdgeToEdge()` 都只认系统色，一旦用户在应用里强制
+    // 浅色/深色/纯黑，图标就和背景撞色（详见 SystemBarIconAppearanceEffect）。
+    // 挂在这里是因为全应用只有这一处知道「现在到底是浅色还是深色」。
+    SystemBarIconAppearanceEffect(useDarkIcons = !isDark)
 
     // 只有真正读这一行，「换封面 → 换主题」才是细粒度重组：读的是 snapshot state，
     // 而不是一个每次取值都换身份的 CompositionLocal。

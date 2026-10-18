@@ -16,6 +16,7 @@ import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
 import com.multisuperplayer.core.data.library.SafTreeScanner
 import com.multisuperplayer.core.data.library.SafTreeStore
+import com.multisuperplayer.core.data.media.MediaUriProbe
 import com.multisuperplayer.core.data.permissions.AppPermissions
 import com.multisuperplayer.core.data.playlist.PlaylistImportSink
 import com.multisuperplayer.core.data.playlist.PlaylistImporter
@@ -102,6 +103,10 @@ val dataModule = module {
             dispatchers = get(),
         )
     }
+
+    // 「这条 uri 现在还能不能读到」的探针：文件路径 `stat`，content uri 问 provider。
+    // 播放列表用它区分「文件真没了」与「只是媒体库查不到」，详见 MediaUriProbe。
+    single { MediaUriProbe(context = androidContext()) }
 
     single { ThemeSettingsRepository(context = androidContext(), dispatchers = get()) }
 

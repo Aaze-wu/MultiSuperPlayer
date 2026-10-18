@@ -139,8 +139,8 @@ class PlaylistsUiStateTest {
         val mixed = Playlist(id = "pl-3", name = "混着", createdAtMs = 3L, items = listOf(item1, browsed))
 
         val asked = mutableListOf<String>()
-        val state = buildPlaylistsUiState(listOf(mixed), ready, "pl-3") { p ->
-            asked.add(p)
+        val state = buildPlaylistsUiState(listOf(mixed), ready, "pl-3") { uri ->
+            asked.add(uri)
             true
         }
 
