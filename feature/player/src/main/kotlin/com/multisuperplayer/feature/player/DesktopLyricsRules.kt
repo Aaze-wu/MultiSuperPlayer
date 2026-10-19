@@ -202,6 +202,29 @@ internal fun defaultDesktopLyricsPosition(
 }
 
 /**
+ * 浮窗的固定宽度（dp）：屏幕宽度的 92%，**不跟歌词走**。
+ *
+ * 改动前用的是 `widthIn(max = 92%)`，于是「窗」本身会随那一句多长而伸缩：五个字
+ * 是一个小方块，二十个字是一条长条，切歌时左右两边一起跳。更麻烦的是位置按
+ * 「左上角」存 ⇒ 宽度一变，视觉中心就漂（同一个 x，宽窗口看着偏右、窄窗口偏左），
+ * 用户会以为「它自己挪了」。固定宽度之后「拖到哪就是哪」对**形状**也成立。
+ *
+ * 92% 是**沿用原来的上限**，不是新挑的数——那个上限本来就是为最长的句子定的，
+ * 只是短句时用不到。留 8% 是为了贴边放时两侧还能看到底下的应用。
+ *
+ * 高度**故意不固定**：行数取决于有没有译文（双语三行、仅原文两行）和字号，
+ * 把高度一起钉死就得为「没有译文时」预留一整行空白，比高度变一下更难看。
+ *
+ * @return dp 值（浮点）。放在纯函数里而不是写进 composable，是为了让
+ *   「宽度只跟屏幕有关、与歌词无关」这件事能被单测钉住。
+ */
+internal fun desktopLyricsWindowWidthDp(screenWidthDp: Int): Float =
+    screenWidthDp * DESKTOP_LYRICS_WIDTH_FRACTION
+
+/** 浮窗宽度占屏幕宽度的比例，见 [desktopLyricsWindowWidthDp]。 */
+internal const val DESKTOP_LYRICS_WIDTH_FRACTION = 0.92f
+
+/**
  * 字号档位上下走一格。
  *
  * 到顶/到底就停住（不循环）：循环会让人在「特大」上再点一下突然变成「小」，
@@ -250,5 +273,154 @@ internal fun desktopLyricsEntryAction(
     !enabled -> DesktopLyricsEntryAction.ENABLE
     locked -> DesktopLyricsEntryAction.UNLOCK
     else -> DesktopLyricsEntryAction.DISABLE
+}
+
+/**
+ * 设置流送来一个版本坐标时，浮窗该怎么办。
+ *
+ * 抽成纯函数是因为浮窗本身在 JVM 里既测不了也复现不了（要手指 + 真机），
+ * 而这条判断是「谁有权改窗口坐标」里最容易写错的一环。
+ *
+ * 背景：设置流每 200ms 就跟着播放进度推一次值（`controller.state` 里有 `positionMs`），
+ * 于是「同一个旧位置」会在拖动过程中反复到达。任何一次把它摆上去，都会把窗口
+ * 拽回手指按下之前的地方，下一次 `ACTION_MOVE` 又把它推回来——看起来也像乱窜。
+ *
+ * 注意：这**不是** v1.4.5 那个「满屏幕抖动」的全部原因。修完这条之后拖动仍然抖，
+ * 真因在 [DesktopLyricsWindow.dragMove] 的坐标补偿（本地坐标 + 我们请求的目标位置，
+ * 而窗口位置实测滞后约两帧 ⇒ 每帧都过补）。两条都得在才算修好。
+ *
+ * 分成五种而不是一个布尔值，是因为每种「不动」的**后果不同**：
+ * 拖拽中要立刻返回（不能动 `lastSeen`，否则松手后同一个值会被当成新值），
+ * 而「自己存的值回环回来」虽然也不摆，但要顺手结束等待。
+ */
+internal enum class DesktopLyricsPositionStep(
+    /** 要不要把这个位置摆到窗口上。 */
+    val apply: Boolean,
+    /** 要不要结束「等自己刚存的值回环」的等待。 */
+    val endSettle: Boolean,
+) {
+    /** 手指正按着：这条是拖动开始之前的旧值，摆上去就是把窗口拽回去。 */
+    IGNORE_WHILE_DRAGGING(apply = false, endSettle = false),
+
+    /** 和上一次处理过的值一模一样：播放位置每秒推五次状态，这种重复值要多少有多少。 */
+    IGNORE_REPEATED(apply = false, endSettle = false),
+
+    /** 自己刚存的值回来了：窗口本来就在那儿，不必再摆，但等待到此为止。 */
+    IGNORE_ECHO(apply = false, endSettle = true),
+
+    /**
+     * 回环还没回来，这条是保存之前的旧值。
+     *
+     * 只能按住一会儿——**存的值和原来完全一样时 DataStore 不会发新值**，
+     * 一直等下去就等于永远不再理会设置（在设置页点「重置位置」会彻底失灵）。
+     */
+    IGNORE_STALE(apply = false, endSettle = false),
+
+    /** 真的摆过去。 */
+    APPLY(apply = true, endSettle = true),
+}
+
+/**
+ * 见 [DesktopLyricsPositionStep] 的说明。
+ *
+ * @param lastSeen 上一次处理过的设置值（`null` = 这个窗口还没处理过任何值）。
+ * @param settling 自己刚写进设置、正在等它回来的那个位置（`null` = 没在等）。
+ * @param settleExpired 等回环的超时是否已过。
+ */
+internal fun desktopLyricsPositionStep(
+    incoming: DesktopLyricsPosition,
+    lastSeen: DesktopLyricsPosition?,
+    dragging: Boolean,
+    settling: DesktopLyricsPosition?,
+    settleExpired: Boolean,
+): DesktopLyricsPositionStep = when {
+    dragging -> DesktopLyricsPositionStep.IGNORE_WHILE_DRAGGING
+    incoming == lastSeen -> DesktopLyricsPositionStep.IGNORE_REPEATED
+    settling == null -> DesktopLyricsPositionStep.APPLY
+    incoming == settling -> DesktopLyricsPositionStep.IGNORE_ECHO
+    !settleExpired -> DesktopLyricsPositionStep.IGNORE_STALE
+    else -> DesktopLyricsPositionStep.APPLY
+}
+
+/** [WindowDragTracker] 这一帧该上报什么。 */
+internal enum class WindowDragEvent {
+    /** 什么都不用做（还没跨过 touchSlop，或者已经处理完了）。 */
+    NONE,
+
+    /** 拖动从这一刻开始，起点见 [WindowDragTracker.downX]/[WindowDragTracker.downY]。 */
+    START,
+
+    /** 拖动进行中，把窗口挪到这一刻的手指位置。 */
+    MOVE,
+
+    /** 手指抬起/被取消。 */
+    END,
+}
+
+/**
+ * 浮窗拖动的「什么时候算开始拖」判定。
+ *
+ * 只回答一个问题：这一帧的手指位置该不该让窗口跟着走。抽成独立类是因为
+ * 真正的位移计算必须用 `MotionEvent` 的屏幕绝对坐标，而那东西在 JVM 单测里
+ * 造不出来；能测的只有这段判定。
+ *
+ * ## 为什么不用 Compose 的 `position`
+ *
+ * `PointerInputChange.position` 是**相对窗口**的坐标，而窗口本身在跟着手指移动
+ * ⇒ 同一根手指的位置在本地坐标里会「跳回去」。用
+ * 「本地坐标 + 我们请求的窗口位置」能把这个偏差补回来，**但补偿会过量**：
+ * 实测（`input swipe` 400ms/200px，日志里 `local` 与 `getLocationOnScreen()`
+ * 并排打出来）本地坐标用的窗口位置比我们刚设的目标**滞后约两帧**，于是每帧
+ * 都多补 100~1000px——窗口先跟手、再倒着窜、再顺着窜，就是「满屏幕抖动」。
+ *
+ * `MotionEvent.rawX/rawY` 是屏幕绝对坐标，与窗口有没有移动**无关**，
+ * 窗口位置直接取「起始窗口位置 + 手指位移」，一步到位、没有任何读回反馈，
+ * 也不可能累积误差（贴到屏幕边缘被夹住之后往回拖也不会粘）。
+ */
+internal class WindowDragTracker(private val touchSlop: Float) {
+
+    /** 按下那一刻的手指屏幕坐标——也是拖动的基准点。 */
+    var downX = 0f
+        private set
+    var downY = 0f
+        private set
+
+    private var dragging = false
+
+    /**
+     * 已经松手、还没重新按下。
+     *
+     * 单独一个字段而不是复用 `dragging`：松手之后如果还收到 MOVE，
+     * 光看 `dragging == false` 会把它当成**新的一次拖动开始**，
+     * 于是一个迟到的 MOVE 就能把窗口莫名拽走一大截。
+     */
+    private var released = false
+
+    fun down(rawX: Float, rawY: Float) {
+        downX = rawX
+        downY = rawY
+        dragging = false
+        released = false
+    }
+
+    fun move(rawX: Float, rawY: Float): WindowDragEvent {
+        if (released) return WindowDragEvent.NONE
+        if (!dragging) {
+            val dx = rawX - downX
+            val dy = rawY - downY
+            if (dx * dx + dy * dy < touchSlop * touchSlop) return WindowDragEvent.NONE
+            dragging = true
+            return WindowDragEvent.START
+        }
+        return WindowDragEvent.MOVE
+    }
+
+    /** 松手。只有真的拖过才返回 [WindowDragEvent.END]——单纯点一下不该写盘。 */
+    fun up(): WindowDragEvent {
+        released = true
+        if (!dragging) return WindowDragEvent.NONE
+        dragging = false
+        return WindowDragEvent.END
+    }
 }
 

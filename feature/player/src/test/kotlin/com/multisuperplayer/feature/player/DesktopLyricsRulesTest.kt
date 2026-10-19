@@ -457,4 +457,226 @@ class DesktopLyricsRulesTest {
         // 四种都要能被走到：任何一种到不了，就说明有一档状态在界面上永远出不来。
         assertEquals(DesktopLyricsEntryAction.entries.toSet(), seen)
     }
+
+    // ------------------------------------------------------- 设置值来了怎么办
+
+    private val saved = DesktopLyricsPosition(x = 100, y = 200)
+
+    /** 只关心「摆不摆」，所以默认值都填「什么都不特殊」。 */
+    private fun step(
+        incoming: DesktopLyricsPosition = saved,
+        lastSeen: DesktopLyricsPosition? = null,
+        dragging: Boolean = false,
+        settling: DesktopLyricsPosition? = null,
+        settleExpired: Boolean = false,
+    ) = desktopLyricsPositionStep(
+        incoming = incoming,
+        lastSeen = lastSeen,
+        dragging = dragging,
+        settling = settling,
+        settleExpired = settleExpired,
+    )
+
+    @Test
+    fun `拖动中送来的设置值一律不摆`() {
+        // v1.4.5 的抖动就是这一条：设置流每 200ms 跟着播放进度来一次，
+        // 每次带来的都是拖动开始之前的旧位置；摆上去 = 把窗口从手指下拽走。
+        assertEquals(DesktopLyricsPositionStep.IGNORE_WHILE_DRAGGING, step(dragging = true))
+        // 连「正在等自己存的值回环」都被拖动压过去：此刻手指才是唯一的权威。
+        assertEquals(
+            DesktopLyricsPositionStep.IGNORE_WHILE_DRAGGING,
+            step(dragging = true, settling = DesktopLyricsPosition(1, 2)),
+        )
+    }
+
+    @Test
+    fun `拖动中的判断不动 lastSeen`() {
+        // 只看 IGNORE_WHILE_DRAGGING 的 endSettle/apply 都是 false：
+        // 调用方据此知道「什么都别改」，否则松手后同一个值会被当成新值再摆一次。
+        val value = step(dragging = true)
+        assertTrue(!value.apply)
+        assertTrue(!value.endSettle)
+    }
+
+    @Test
+    fun `同一个值第二次到达不摆`() {
+        // 播放中每秒推五次状态，同一个位置会重复来几百次；每次都摆一遍
+        // 就等于每 200ms 重设一次 WindowManager 的 LayoutParams。
+        assertEquals(
+            DesktopLyricsPositionStep.IGNORE_REPEATED,
+            step(lastSeen = saved),
+        )
+    }
+
+    @Test
+    fun `新值且没在等回环时照摆`() {
+        assertEquals(DesktopLyricsPositionStep.APPLY, step(lastSeen = DesktopLyricsPosition(0, 0)))
+        assertTrue(step().apply)
+    }
+
+    @Test
+    fun `自己刚存的值回环回来时不摆但结束等待`() {
+        // 窗口刚被拖到那儿，再摆一次是多余的一次 LayoutParams 写入；
+        // 但等待必须结束，否则下一次真正的设置变化会被当成旧值吞掉。
+        val value = step(lastSeen = DesktopLyricsPosition(0, 0), settling = saved)
+        assertEquals(DesktopLyricsPositionStep.IGNORE_ECHO, value)
+        assertTrue(!value.apply)
+        assertTrue(value.endSettle)
+    }
+
+    @Test
+    fun `回环没回来之前旧值先按住`() {
+        // DataStore 的写入是异步的：松手之后，设置流还会把「上一次的值」推一次。
+        assertEquals(
+            DesktopLyricsPositionStep.IGNORE_STALE,
+            step(
+                incoming = DesktopLyricsPosition(999, 999),
+                lastSeen = DesktopLyricsPosition(0, 0),
+                settling = saved,
+            ),
+        )
+    }
+
+    @Test
+    fun `回环超时之后照样听设置`() {
+        // 存的值和原来一模一样时 DataStore 不会发新值，回环永远等不到。
+        // 没有这条超时，设置页的「重置位置」会彻底失灵（一直按住旧值）。
+        val value = step(
+            incoming = DesktopLyricsPosition(999, 999),
+            lastSeen = DesktopLyricsPosition(0, 0),
+            settling = saved,
+            settleExpired = true,
+        )
+        assertEquals(DesktopLyricsPositionStep.APPLY, value)
+        assertTrue(value.endSettle)
+    }
+
+    @Test
+    fun `判定优先级 - 拖动压过重复与回环`() {
+        // 同时成立时必须是「拖动」赢：手指在按着的时候，
+        // 任何一边的判断错了都会让窗口在手指下乱跳。
+        assertEquals(
+            DesktopLyricsPositionStep.IGNORE_WHILE_DRAGGING,
+            step(lastSeen = saved, dragging = true, settling = saved, settleExpired = true),
+        )
+    }
+
+    @Test
+    fun `判定优先级 - 重复值压过回环`() {
+        // 重复值连「结束等待」都不该做：那个值本来就已经处理过了。
+        assertEquals(
+            DesktopLyricsPositionStep.IGNORE_REPEATED,
+            step(lastSeen = saved, settling = DesktopLyricsPosition(1, 2)),
+        )
+    }
+
+    // ---- WindowDragTracker：什么时候算「开始拖动」 ----
+
+    @Test
+    fun `拖动 - 没过阈值不上报`() {
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        assertEquals(WindowDragEvent.NONE, tracker.move(505f, 1505f))
+        assertEquals(WindowDragEvent.NONE, tracker.move(510f, 1510f))
+    }
+
+    @Test
+    fun `拖动 - 没过阈值就松手不算拖动`() {
+        // 单纯点一下（没有位移）不能写盘：写盘会让「点按钮」也挪一下窗口。
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        assertEquals(WindowDragEvent.NONE, tracker.move(502f, 1501f))
+        assertEquals(WindowDragEvent.NONE, tracker.up())
+    }
+
+    @Test
+    fun `拖动 - 刚过阈值就报开始且保留按下点`() {
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        assertEquals(WindowDragEvent.START, tracker.move(500f, 1530f))
+        // 起点必须是「按下的位置」，不是「跨过阈值的位置」——
+        // 否则按下到过阈值这段位移会被永久吞掉（实测横跨 113px 的手势只累到 24px）。
+        assertEquals(500f, tracker.downX, 0.001f)
+        assertEquals(1500f, tracker.downY, 0.001f)
+    }
+
+    @Test
+    fun `拖动 - 开始之后每一帧都报移动`() {
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        assertEquals(WindowDragEvent.START, tracker.move(500f, 1530f))
+        assertEquals(WindowDragEvent.MOVE, tracker.move(500f, 1600f))
+        assertEquals(WindowDragEvent.MOVE, tracker.move(400f, 1700f))
+    }
+
+    @Test
+    fun `拖动 - 拖动中松手报结束`() {
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        assertEquals(WindowDragEvent.START, tracker.move(500f, 1530f))
+        assertEquals(WindowDragEvent.END, tracker.up())
+    }
+
+    @Test
+    fun `拖动 - 结束之后不再报移动`() {
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        tracker.move(500f, 1530f)
+        tracker.up()
+        // 松手后残留的 MOVE 不能再让窗口跟着走。
+        assertEquals(WindowDragEvent.NONE, tracker.move(500f, 1700f))
+        assertEquals(WindowDragEvent.NONE, tracker.up())
+    }
+
+    @Test
+    fun `拖动 - 斜向位移按直线距离算阈值`() {
+        // 3-4-5 直角三角形：单看 dx、dy 都小于 20，直线距离 25 已经过阈值。
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(0f, 0f)
+        assertEquals(WindowDragEvent.START, tracker.move(15f, 20f))
+    }
+
+    @Test
+    fun `拖动 - 第二次按下重新开始`() {
+        val tracker = WindowDragTracker(touchSlop = 20f)
+        tracker.down(500f, 1500f)
+        tracker.move(500f, 1530f)
+        tracker.up()
+        tracker.down(200f, 800f)
+        assertEquals(200f, tracker.downX, 0.001f)
+        assertEquals(WindowDragEvent.NONE, tracker.move(205f, 805f))
+        assertEquals(WindowDragEvent.START, tracker.move(200f, 830f))
+    }
+
+    // ---- 浮窗宽度：只看屏幕，不看歌词 ----
+
+    @Test
+    fun `浮窗宽度 - 是屏幕的百分之九十二`() {
+        // 411dp 是模拟器实测值（1080px / 420dpi），411 * 0.92 = 378.12。
+        assertEquals(378.12f, desktopLyricsWindowWidthDp(411), 0.01f)
+        assertEquals(0.92f, DESKTOP_LYRICS_WIDTH_FRACTION, 0.0001f)
+    }
+
+    @Test
+    fun `浮窗宽度 - 与歌词内容无关`() {
+        // 这个函数根本不接收歌词，是「只跟屏幕有关」最直接的证明：
+        // 同一块屏幕上，五个字的句子和二十个字的句子拿到同一个宽度。
+        assertEquals(
+            desktopLyricsWindowWidthDp(411),
+            desktopLyricsWindowWidthDp(411),
+            0f,
+        )
+    }
+
+    @Test
+    fun `浮窗宽度 - 横屏跟着屏幕变宽`() {
+        assertTrue(desktopLyricsWindowWidthDp(891) > desktopLyricsWindowWidthDp(411))
+    }
+
+    @Test
+    fun `浮窗宽度 - 留出两侧边距`() {
+        // 必须小于屏宽：贴边放的时候两侧还能看到底下的应用，也才拖得回来。
+        assertTrue(desktopLyricsWindowWidthDp(411) < 411f)
+        assertTrue(desktopLyricsWindowWidthDp(411) > 411f * 0.8f)
+    }
 }

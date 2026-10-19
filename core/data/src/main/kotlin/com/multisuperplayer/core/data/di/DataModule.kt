@@ -11,6 +11,7 @@ import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
 import com.multisuperplayer.core.data.browser.BrowserRepository
 import com.multisuperplayer.core.data.browser.StorageAccess
 import com.multisuperplayer.core.data.history.PlaybackPositionRepository
+import com.multisuperplayer.core.data.history.RecentMediaResolver
 import com.multisuperplayer.core.data.history.RecentPlayRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaStoreScanner
@@ -131,9 +132,21 @@ val dataModule = module {
         PlaybackPositionRepository(context = androidContext(), dispatchers = get())
     }
 
+    // 把「媒体库里查不到」的 id 再做一次库外解析：浏览页（内置文件浏览器 /
+    // 系统文件选择器）放的文件不进媒体库，只靠投影的话它们永远进不了最近播放
+    // （见 RecentMediaResolver 与 RecentPlayRepository 的注释）。
+    single { RecentMediaResolver(context = androidContext()) }
+
     // 「最近播放」= 续播记录 × 当前媒体库的投影。需要读媒体库当前状态，
     // 所以只能排在上面两个注册之后。
-    single { RecentPlayRepository(positionStore = get(), library = get()) }
+    single {
+        RecentPlayRepository(
+            positionStore = get(),
+            library = get(),
+            resolver = get(),
+            dispatchers = get(),
+        )
+    }
 
     // 播放列表存在单独的 DataStore 文件（msp_playlists）里：写一次就是几 KB 自由文本，
     // 混进 msp_settings 会拖慢用户设置的写入。

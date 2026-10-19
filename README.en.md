@@ -5,7 +5,7 @@ A local audio/video player for Android, focused on its **subtitle/lyrics pipelin
 - Language: Kotlin + Jetpack Compose (Material 3)
 - Playback engine: AndroidX Media3 (ExoPlayer) + the NextLib FFmpeg software-decoding extension
 - Minimum: Android 8.0 (API 26)
-- Current version: **1.2.4** (stable)
+- Current version: **1.4.5** (stable)
 - License: [GPL-3.0](LICENSE)
 
 Release notes (user-facing): [docs/release-notes](docs/release-notes/)
@@ -312,7 +312,10 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
   subtitle files are enumerated and scored — so media inside a `.nomedia` folder, which the system media
   library cannot see at all, does not lose its subtitles either.
 - **Recent**: built from the resume records (position + timestamp), up to 50 entries; opening one resumes
-  from where you stopped rather than from the beginning.
+  from where you stopped rather than from the beginning. Ids in a record that are **not in the media
+  library** (files played from Browse) are resolved once more on the spot: if a name and a size can be
+  read the row is listed as usual, and if not (file deleted, permission revoked) that row is simply
+  hidden - **the record itself is kept**.
 - **No position still means it was played**: an item you opened for a few seconds keeps a position of 0
   but **stays in the list**, rendered as "Played </time> - no position kept" rather than "00:00".
   "Not worth resuming" and "never played" are two different things; earlier versions collapsed both
@@ -464,7 +467,8 @@ system picker.
   A hand-picked subtitle **does not depend on the directory scan**, so it attaches even where automatic
   discovery has no way to run.
 - **Nothing is written to the media library**: browsing is browsing. Files opened this way do not enter
-  the library or the Recent list.
+  the library. **They do show up under Recent since v1.4.5**: that row is looked up from the playback
+  record on the spot - no record rewritten or deleted, and the library is not polluted.
 
 > Directory rows show the **original name with its extension** (`Movie.zh-CN.ass` shows as
 > `Movie.zh-CN.ass`), because the point of this list is finding one specific file, and the extension and
@@ -887,7 +891,8 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v1.2.3** | **The automatic update-check interval is now configurable: on the *Check for updates* page a new row sits between the *check automatically* switch and the update channel, with six presets - 1 / 6 / 12 hours, 1 / 3 / 7 days - plus *Custom...* with an hours field and a minutes field (15 minutes minimum, 7 days maximum; out-of-range or non-numeric input is reported on the spot and *Save* stays disabled); that window is the cooling-off period of the automatic check, previously hard-wired to 12 hours and now defined once in `UpdateCooldown` and stored in DataStore, while pressing *Check* yourself is never affected by it; the row stays editable with the switch off (a setting is not locked behind a switch); the default is still 12 hours, so upgrading changes nothing** | Done |
 | **v1.2.4** | **Two fixes where UI state stopped following the data: (1) the status-bar icon tint was computed once at startup only - the activity is not recreated when the system flips light/dark, and switching the in-app theme re-declared nothing either, so dark icons could end up on a dark background. A new `SystemBarIconAppearanceEffect` lives in the theme and re-applies whenever the theme flips; the player's fullscreen path declares its own rule and restores it on exit. (2) Entries whose files live in a folder added through the system file picker are no longer reported as missing when a playlist is played back - the `saf:` ids were classified as MediaStore numeric ids while the existence check used `File(path).exists()`, which can never resolve a `content://` uri. `SafMediaIds` and `MediaUriProbe` now split the check by uri kind (document lookup for `content`, local path for `file`)** | Done |
 | **v1.3.0** | **Favorites and desktop lyrics: (1) file / folder favourites - the star at the top right of the media library opens a separate favourites page where files and folders sit in one list, newest first, capped at 200; the selection bar in the media library, the browser and the recent list can favourite the selected items, and the browser's top bar favourites the folder you are in; tapping a favourite folder switches to Browse and opens that directory, and a revoked grant is reported as "this folder can no longer be opened" instead of showing an empty directory; the recent list gained multi-select along the way. (2) Desktop lyrics - a new Settings page with the switch, four font sizes, four background opacities, a position lock and reset; a `TYPE_APPLICATION_OVERLAY` window shows the current line plus a preview of the next one and carries play/pause, font smaller, font larger and lock buttons; it stays away when the user turned it off, when the overlay permission is missing, when subtitles are switched off, when the file has no lyrics, and while this app is in the foreground; adds the `SYSTEM_ALERT_WINDOW` permission and its row on the permissions page** | Done |
-| **v1.4.0** | **Counts and hints: (1) the browser shows how many items a folder holds - every sub-folder shows `N items` on its right and the crumb row shows this level's own total; the rule is direct children only, files and folders count as one each, no recursion, and the total comes from the unfiltered, untruncated table so hidden files and the 5 000-entry cap do not affect it; counts are not part of the listing query, SAF trees get theirs a moment later, and an unavailable count stays blank rather than showing 0. (2) Instructional hints can be dismissed - the Browse-tab source hint, the playlist drag-to-reorder hint and the playback-queue drag hint each gain an ×, and once dismissed they never return; warnings are never dismissible (missing permission, truncated listing, missing files in a playlist, no manual reordering while shuffle is on), and whether a hint can be dismissed is a fixed allow-list, so an id that is not in it is not even written to disk. (3) Settings gains a *Restore tips* row at the very bottom, whose subtitle says how many tips are dismissed and whose button is absent when none are** | **Current (stable)** |
+| **v1.4.0** | **Counts and hints: (1) the browser shows how many items a folder holds - every sub-folder shows `N items` on its right and the crumb row shows this level's own total; the rule is direct children only, files and folders count as one each, no recursion, and the total comes from the unfiltered, untruncated table so hidden files and the 5 000-entry cap do not affect it; counts are not part of the listing query, SAF trees get theirs a moment later, and an unavailable count stays blank rather than showing 0. (2) Instructional hints can be dismissed - the Browse-tab source hint, the playlist drag-to-reorder hint and the playback-queue drag hint each gain an ×, and once dismissed they never return; warnings are never dismissible (missing permission, truncated listing, missing files in a playlist, no manual reordering while shuffle is on), and whether a hint can be dismissed is a fixed allow-list, so an id that is not in it is not even written to disk. (3) Settings gains a *Restore tips* row at the very bottom, whose subtitle says how many tips are dismissed and whose button is absent when none are** | Done |
+| **v1.4.5** | **Three fixes for things that moved on their own or silently did nothing, plus a fixed overlay width: (1) dragging the desktop lyrics overlay no longer races across the screen - the offset was computed from the finger position inside the window combined with the target the window had just been asked to move to, but the real window lags that request by roughly two frames, so every frame over-corrected by 100-1000 px and the next one corrected back (a steady 200 px downward drag produced y = 1750 -> 1650 -> 1600 -> 1557 -> 1582 -> 1649 -> 1741 -> 1894 -> 1878 -> 1545 -> 982 -> 811 -> 1749 -> 2150); it now uses absolute screen coordinates from `rawX/rawY`: new position = the window position at the moment you pressed + how far the finger travelled, with no read-back of `layoutParams`, the decision logic extracted into `WindowDragTracker` (9 unit tests), `pointerInteropFilter` returning `true`, and the overlay buttons using `awaitEachGesture` with their own slop test (2) files played from Browse (built-in browser and system file picker alike) now show up under Recent - the record had always been written, but the projection only accepted ids present in the media library while browse-page files deliberately stay out of it; a new `RecentMediaResolver` re-resolves library-missing ids outside the library and the result lives in the in-memory list only: no record rewritten, none deleted, the library untouched, with the list of ids to ask for decided by the pure `unresolvedIds` (7 unit tests) (3) two ineffective `<exclude domain="file" path="cache"/>` entries were removed from the two backup rule files (they excluded a domain that was never included), so `lintVitalRelease` no longer prints two errors on every release build (4) the overlay width is now fixed at 92% of the screen (`desktopLyricsWindowWidthDp`) instead of stretching with the current line - and the width has to be set on the window: inside a `WRAP_CONTENT` overlay Compose only sees `constraints.maxWidth == 840 px`, and both `Modifier.width` and `Modifier.requiredWidth` go through `Constraints.constrainWidth`, so the fix is `layoutParams.width` plus `fillMaxWidth()` in the content** | **Current (stable)** |
 | Later | Audio translation (dubbing) | Planned |
 
 ---
@@ -1203,10 +1208,12 @@ These are deliberate for this release, not oversights:
    (Media opened through the built-in browser is **not affected**: it takes the "list the directory"
    route, see section 1.7.)
 9. **The built-in browser writes nothing to the media library.** Browsing is browsing: files opened
-    this way do not enter the library or the Recent list. Since v0.5.9 it **does take part in
-    multi-select** (it can "add to playlist" exactly like the library), but the selected entries still
-    are not written back to the library — "add to playlist" writes to the playlist table, a different
-    table.
+    this way do not enter the library. Since v0.5.9 it **does take part in multi-select** (it can "add to
+    playlist" exactly like the library), but the selected entries still are not written back to the
+    library — "add to playlist" writes to the playlist table, a different table. **Since v1.4.5 they do
+    show up under Recent**: that row is looked up from the playback record on the spot
+    (`RecentMediaResolver`), so nothing enters the library and no record is rewritten or deleted; when
+    the file cannot be read the row disappears and comes back by itself once it can.
 10. **Playlist entries do not keep a "display name".** Entries are stored by id key, so restoring one
     only brings back the title / artist / duration snapshot fields. What this costs is the **subtitle
     discovery log line**: it writes "looking for subtitles for xxx", and for an entry restored from a
@@ -1300,6 +1307,20 @@ These are deliberate for this release, not oversights:
 21. **Only those three hints can be dismissed, and only all of them at once.** There is no hint manager,
     no per-hint restore, and no undo after dismissing one (that is what "dismiss" means, which is also why
     there is no confirmation dialog). The restore entry is fixed to the last row of Settings.
+22. **The desktop lyrics overlay does not move itself back into place.** It remembers the coordinates you
+    last dragged it to: after changing the font size, gaining a second line of translation or rotating the
+    screen it is only guaranteed to stay on screen, not to return to where it was (use Reset position on
+    the settings page to bring it back to the middle). That is the price of "during a drag only the finger
+    decides" - a window that moves on its own is worse than one in an imperfect spot. Since v1.4.5 the
+    **width is fixed** (92% of the screen, no longer stretching with the length of the line) while the
+    height still follows the number of lines, so short lines leave empty space on both sides - the other
+    side of "the width does not jump with the content".
+23. **Rows under Recent that came from Browse only appear while the file is readable, and they carry no
+    artwork.** Delete the file, unplug the card or revoke the folder granted through the system file
+    picker and the row disappears (the playback record is kept, not deleted). Such an entry is not part of
+    the media library, so a cover would mean decoding the file once more, which this release does not do.
+    A resume position follows the absolute path of a file, so the same file moved elsewhere counts as a
+    different file.
 
 ---
 

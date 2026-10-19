@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+ 的备份 / 设备迁移规则 -->
+<!--
+  Android 12+ 的备份 / 设备迁移规则。
+
+  `<cloud-backup>` 与 `<device-transfer>` 各有一份 include，和 backup_rules.xml 保持
+  同一套域；原因与那里的注释相同——**不要**写 `<exclude domain="file" path="cache" />`，
+  那是排除一个没有被 include 的域，lint 会判 `[FullBackupContent] cache is not in an
+  included path` 错误。
+-->
 <data-extraction-rules>
     <cloud-backup>
         <include
@@ -8,9 +15,6 @@
         <include
             domain="database"
             path="." />
-        <exclude
-            domain="file"
-            path="cache" />
     </cloud-backup>
     <device-transfer>
         <include

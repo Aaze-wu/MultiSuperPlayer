@@ -51,6 +51,40 @@ internal object RecentPlayRules {
     }
 
     /**
+     * 哪些媒体 id 需要去「库外」再找一次（记录里有、当前媒体库里没有）。
+     *
+     * 浏览页放的文件**不进媒体库**，它们的记录永远对不上库里那本字典——
+     * 直接把名单交给 [RecentMediaResolver] 去问「文件还在不在」，找到的条目再
+     * 当成额外输入喂回 [project]（它是纯的，不认识 IO）。
+     *
+     * 三条限制都是性能，而不是语义：
+     *
+     * - **有上限**：每条都要做一次跨进程 `query` 或 `stat`，不能把 200 条上限的
+     *   整张表都拿去问；按时间倒序取前 [limit] 个候选，已经够填满一页。
+     * - **去重**：同一个文件播过十次就有十条记录，问一次就行。
+     * - **不含负数位置**：[project] 会滤掉它们，这里滤掉就不用白问一次。
+     */
+    fun unresolvedIds(
+        records: List<PlaybackRecord>,
+        entries: List<MediaEntry>,
+        limit: Int = DEFAULT_LIMIT,
+    ): List<String> {
+        if (limit <= 0) return emptyList()
+        if (records.isEmpty()) return emptyList()
+
+        val byId = entries.associateBy(MediaEntry::id)
+        return records
+            .asSequence()
+            .filter { it.positionMs >= 0L }
+            .sortedByDescending { it.savedAtMs }
+            .map { it.mediaId }
+            .filter { byId[it] == null }
+            .distinct()
+            .take(limit)
+            .toList()
+    }
+
+    /**
      * [project] 的反向：把一行最近播放还原成它对应的续播记录。
      *
      * 给「删除 + 撤销」用（见 `RecentPlayRepository.restore`）。和 [project] 放在

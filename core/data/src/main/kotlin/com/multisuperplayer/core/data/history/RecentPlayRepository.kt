@@ -1,9 +1,13 @@
 package com.multisuperplayer.core.data.history
 
+import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.RecentPlay
 import com.multisuperplayer.core.player.PlaybackPositionStore
+import com.multisuperplayer.core.player.PlaybackRecord
+import kotlinx.coroutines.withContext
 
 /**
  * 「最近播放」页的数据来源。
@@ -31,10 +35,21 @@ import com.multisuperplayer.core.player.PlaybackPositionStore
  *
  * 代价是界面文案必须把这件事说出来（「续播位置也会一起忘掉」），
  * 不能让用户以为只是把一行从屏幕上抹掉。
+ *
+ * ## 为什么还多一个 [resolver]
+ *
+ * 投影只认「媒体库里的条目」，而浏览页（内置文件浏览器 / 系统文件选择器）
+ * 放的文件刻意不进媒体库——它们在媒体库里永远查不到，记录写下来了却一条都
+ * 显示不出来。所以投影前把「库里没有的 id」拿去 [RecentMediaResolver] 问一次
+ * 「文件还在不在」，在的拼成临时条目参与投影。
+ *
+ * 临时条目**只活在这一页的内存里**：不写进媒体库、也不改写任何记录（见那个类的注释）。
  */
 class RecentPlayRepository(
     private val positionStore: PlaybackPositionStore,
     private val library: MediaLibraryRepository,
+    private val resolver: RecentMediaResolver,
+    private val dispatchers: DispatcherProvider,
 ) {
 
     /**
@@ -45,7 +60,32 @@ class RecentPlayRepository(
      */
     suspend fun recent(limit: Int = RecentPlayRules.DEFAULT_LIMIT): List<RecentPlay> {
         val entries = (library.state.value as? MediaLibraryState.Ready)?.entries ?: return emptyList()
-        return RecentPlayRules.project(positionStore.readAll(), entries, limit)
+        val records = positionStore.readAll()
+        val resolved = resolveMissing(records, entries, limit)
+        return RecentPlayRules.project(records, entries + resolved, limit)
+    }
+
+    /**
+     * 把媒体库里查不到的那几条记录拿去「库外」找一次。
+     *
+     * 放在 IO 线程上一次做完：每一条都可能是一次 `stat` 或一次跨进程 `query`，
+     * 主线程上几个文件就能抳出一帧。找不到就跳过——**不删记录**，
+     * 文件回来了它应该自己重新出现。
+     */
+    private suspend fun resolveMissing(
+        records: List<PlaybackRecord>,
+        entries: List<MediaEntry>,
+        limit: Int,
+    ): List<MediaEntry> {
+        val missing = RecentPlayRules.unresolvedIds(records, entries, limit)
+        if (missing.isEmpty()) return emptyList()
+        return withContext(dispatchers.io) {
+            missing.mapNotNull { id ->
+                runCatching { resolver.resolve(id) }
+                    // 解析不了就是「现在读不到」：跳过这一条，不要让整页崩掉。
+                    .getOrNull()
+            }
+        }
     }
 
     /**

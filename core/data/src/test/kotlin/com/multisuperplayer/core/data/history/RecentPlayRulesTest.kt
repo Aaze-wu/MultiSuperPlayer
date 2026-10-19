@@ -187,4 +187,71 @@ class RecentPlayRulesTest {
 
         assertEquals(50, project(records, records.map { entry(it.mediaId) }).size)
     }
+
+    // ---------------------------------------------------------- 库外解析名单
+
+    private fun unresolved(
+        records: List<PlaybackRecord>,
+        entries: List<MediaEntry>,
+        limit: Int = RecentPlayRules.DEFAULT_LIMIT,
+    ) = RecentPlayRules.unresolvedIds(records, entries, limit)
+
+    @Test
+    fun `媒体库里有的 id 不进库外解析名单`() {
+        // 每一条都要付一次跨进程 `query` 或 `stat`，已经查得到的没理由再问一次。
+        val records = listOf(record("audio:1"), record("audio:2"))
+        val entries = listOf(entry("audio:1"), entry("audio:2"))
+
+        assertTrue(unresolved(records, entries).isEmpty())
+    }
+
+    @Test
+    fun `浏览页的 id 进库外解析名单`() {
+        // 这一条就是 v1.4.5 修的那个 bug 的形状：记录在磁盘上，媒体库里永远没有
+        // 对应的条目（浏览页放的文件刻意不进库），于是投影一条都出不来。
+        val records = listOf(
+            record("file:/storage/emulated/0/Music/a.mp3", savedAtMs = 200L),
+            record("audio:1", savedAtMs = 100L),
+        )
+
+        assertEquals(
+            listOf("file:/storage/emulated/0/Music/a.mp3"),
+            unresolved(records, listOf(entry("audio:1"))),
+        )
+    }
+
+    @Test
+    fun `同一个 id 只问一次`() {
+        // 同一个文件播十次就是十条记录；不去重的话这一页要问十遍同一个文件。
+        val records = (1..10).map { record("file:/a.mp3", savedAtMs = it.toLong()) }
+
+        assertEquals(listOf("file:/a.mp3"), unresolved(records, emptyList()))
+    }
+
+    @Test
+    fun `名单按时间倒序且受 limit 限制`() {
+        // 上限是必需的：续播记录最多留着 200 条，全都拿去问就是 200 次跨进程调用。
+        val records = (1..10).map { record("file:/$it.mp3", savedAtMs = it.toLong()) }
+
+        assertEquals(
+            listOf("file:/10.mp3", "file:/9.mp3", "file:/8.mp3"),
+            unresolved(records, emptyList(), limit = 3),
+        )
+    }
+
+    @Test
+    fun `limit 为零时不问任何 id`() {
+        val records = listOf(record("file:/a.mp3"))
+
+        assertTrue(unresolved(records, emptyList(), limit = 0).isEmpty())
+        assertTrue(unresolved(records, emptyList(), limit = -1).isEmpty())
+    }
+
+    @Test
+    fun `位置为负数的记录不进库外解析名单`() {
+        // 投影会滤掉它们，那就没必要为它们付一次 IO。
+        val records = listOf(record("file:/bad.mp3", positionMs = -1L))
+
+        assertTrue(unresolved(records, emptyList()).isEmpty())
+    }
 }

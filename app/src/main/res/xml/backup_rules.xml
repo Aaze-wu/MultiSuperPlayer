@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 及以下的备份规则：播放进度、主题、API Key 都走云备份 -->
+<!--
+  Android 11 及以下的备份规则。
+
+  只声明**真的在用**的两个域：
+  - sharedpref：`msp_locale`（界面语言）、`msp_permissions`（权限申请记录）
+  - database：目前没有数据库，留给以后
+
+  **不要**再写 `<exclude domain="file" path="cache" />`：被排除的域如果本身没有被
+  include，这个 exclude 对备份毫无影响（没 include 的域本来就不备份），而 lint 会判它
+  `[FullBackupContent] cache is not in an included path` 错误，release 的 lintVital 直接标红。
+
+  设置本体（主题、播放、字幕、桌面歌词、API Key……）存在 DataStore 里，路径是
+  `files/datastore/*.preferences_pb`，属于 `file` 域——**当前刻意不备份**：从别的设备
+  恢复一份和本机媒体库对不上的播放进度/收藏，比丢掉设置更难解释。
+-->
 <full-backup-content>
     <include
         domain="sharedpref"
@@ -7,7 +21,4 @@
     <include
         domain="database"
         path="." />
-    <exclude
-        domain="file"
-        path="cache" />
 </full-backup-content>
