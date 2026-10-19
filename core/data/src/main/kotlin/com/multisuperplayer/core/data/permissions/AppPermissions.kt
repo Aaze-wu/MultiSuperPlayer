@@ -87,6 +87,7 @@ class AppPermissions(
         allFiles = allFilesState(),
         notification = notificationState(activity),
         bluetooth = bluetoothState(activity),
+        overlay = overlayState(),
     )
 
     /**
@@ -170,6 +171,9 @@ class AppPermissions(
 
         // 特权权限没有「申请」这一条路（见 PermissionRules.canAskInPlace）。
         PermissionKind.ALL_FILES -> emptyList()
+
+        // 同上：悬浮窗只能通过它自己的系统页面打开，`requestPermissions` 对它静默拒绝。
+        PermissionKind.OVERLAY -> emptyList()
     }
 
     /**
@@ -185,13 +189,15 @@ class AppPermissions(
     /**
      * 该带用户去哪个系统页面。
      *
-     * 「所有文件访问」有专属页面（[StorageAccess.preferredSettingsIntent]）；其余三项
+     * 「所有文件访问」有专属页面（[StorageAccess.preferredSettingsIntent]），
+     * 「悬浮窗」也有专属页面（[overlaySettingsIntent]）；其余三项
      * 统一去**应用详情页**。不给每一类各挑一个更精确的页面，是因为通知那一类更精确的
      * `ACTION_APP_NOTIFICATION_SETTINGS` 在部分定制系统上根本没有 Activity 承接，
      * 而应用详情页每个系统都有，且四类权限在那里都能改。
      */
     fun settingsIntent(kind: PermissionKind): Intent = when (kind) {
         PermissionKind.ALL_FILES -> storage.preferredSettingsIntent()
+        PermissionKind.OVERLAY -> overlaySettingsIntent()
         else -> appDetailsIntent()
     }
 
@@ -265,6 +271,23 @@ class AppPermissions(
         else -> PermissionState.NOT_ASKED
     }
 
+    /**
+     * 「悬浮窗」同样只有两态：开着 / 没开。
+     *
+     * 没有 `UNSUPPORTED` 这一支是**故意的**：`SYSTEM_ALERT_WINDOW` 从 API 1 就在，
+     * 而本应用的最低版本是 26，所以「这个系统没有这一项」在这条分支上是不可能事件。
+     * 写一个永远不会命中的分支，以后读代码的人还得去验证它到底能不能命中。
+     *
+     * 也没有「问过没有」这回事：[Settings.canDrawOverlays] 直接答事实，用户在那个
+     * 专属页面上开或不开，系统不会区分「没问过」与「拒绝了」——所以这里也不编。
+     */
+    private fun overlayState(): PermissionState =
+        if (Settings.canDrawOverlays(appContext)) {
+            PermissionState.GRANTED
+        } else {
+            PermissionState.NOT_ASKED
+        }
+
     private fun notificationState(activity: Activity?): PermissionState {
         if (Build.VERSION.SDK_INT < VERSION_TIRAMISU) return PermissionState.UNSUPPORTED
         return PermissionRules.stateOf(
@@ -317,6 +340,17 @@ class AppPermissions(
 
     private fun appDetailsIntent(): Intent = Intent(
         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", appContext.packageName, null),
+    )
+
+    /**
+     * 「悬浮窗」的专属页面。
+     *
+     * 带 `package:` 是因为系统可能支持多个可以画悬浮窗的应用，不带包名时部分 ROM
+     * 会打开一个列表页而不是本应用那一项，用户在列表里找不到自己刚点的应用。
+     */
+    private fun overlaySettingsIntent(): Intent = Intent(
+        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
         Uri.fromParts("package", appContext.packageName, null),
     )
 

@@ -70,11 +70,17 @@ internal class BrowserSelection(
     val ids: List<String> = emptyList(),
     val count: Int = 0,
     val allSelected: Boolean = false,
+    /**
+     * 选中项是不是**全部已收藏**。决定星标是空心还是实心：
+     * 同一个按钮做两件事，必须先在视觉上说清楚。
+     */
+    val favoriteAll: Boolean = false,
     val onToggle: (String) -> Unit = {},
     val onExit: () -> Unit = {},
     val onSelectAll: () -> Unit = {},
     val onClear: () -> Unit = {},
     val onAddToPlaylist: () -> Unit = {},
+    val onFavorite: () -> Unit = {},
     val onPlay: () -> Unit = {},
 ) {
     /** 是否处于多选状态。整页的动作条、行的勾选框、返回键都由它决定。 */

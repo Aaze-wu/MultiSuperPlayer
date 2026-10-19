@@ -71,6 +71,12 @@
     <string name="msp_subtitle_style_margin_raised">抬高</string>
     <string name="msp_subtitle_style_margin_high">很高</string>
 
+    <!-- 桌面歌詞的字號檔位名（見 values/strings.xml 的同一段說明）。 -->
+    <string name="msp_desktop_lyrics_size_small">小</string>
+    <string name="msp_desktop_lyrics_size_medium">標準</string>
+    <string name="msp_desktop_lyrics_size_large">大</string>
+    <string name="msp_desktop_lyrics_size_huge">特大</string>
+
     <!-- 導出（播放記錄 / 播放清單）。理由見 values/strings.xml 的同一段說明。 -->
     <string name="msp_export_format_csv">CSV</string>
     <string name="msp_export_format_json">JSON</string>

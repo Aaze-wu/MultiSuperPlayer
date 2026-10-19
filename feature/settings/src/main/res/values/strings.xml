@@ -147,6 +147,8 @@
     <string name="msp_permissions_notification_desc">系统 13 起默认关闭。播放控制的通知是前台服务通知，不受这一项影响；这一项管的是应用自己发出的提示。</string>
     <string name="msp_permissions_bluetooth">蓝牙</string>
     <string name="msp_permissions_bluetooth_desc">系统 12 起才有这一项。当前版本还没有功能需要它，声明保留是为了将来接蓝牙播放设备时不必再申请一次。</string>
+    <string name="msp_permissions_overlay">显示在其他应用上层</string>
+    <string name="msp_permissions_overlay_desc">桌面歌词要把歌词窗口画在别的应用上面。只用于这一个功能，不开也能正常播放，只是没有桌面歌词。</string>
 
     <!--
       六种状态，**必须分开说**，因为它们各自对应的下一步不同：
@@ -724,4 +726,44 @@
     <string name="msp_update_startup_now">立即更新</string>
     <string name="msp_update_startup_later">以后再说</string>
     <string name="msp_update_startup_hint">点「立即更新」会进入更新页面，那里可以看到完整的更新说明并下载安装。</string>
+
+    <!-- 桌面歌词 -->
+    <string name="msp_settings_desktop_lyrics">桌面歌词</string>
+    <string name="msp_settings_summary_desktop_lyrics_off">关闭中</string>
+    <string name="msp_settings_summary_desktop_lyrics_no_permission">已开启 · 缺少悬浮窗权限</string>
+    <string name="msp_settings_summary_desktop_lyrics_locked">已锁定</string>
+    <string name="msp_desktop_lyrics_title">桌面歌词</string>
+    <string name="msp_desktop_lyrics_section_switch">显示</string>
+    <string name="msp_desktop_lyrics_switch_title">显示桌面歌词</string>
+    <string name="msp_desktop_lyrics_switch_help">歌词浮在别的应用上面，只有当前文件有字幕时才会出现。</string>
+    <string name="msp_desktop_lyrics_switch_on">已开启：播放时会浮在别的应用上面</string>
+    <string name="msp_desktop_lyrics_switch_off">关闭中：播放时不会出现</string>
+    <string name="msp_desktop_lyrics_switch_no_permission">已开启，但还没有「显示在其他应用上层」权限，现在不会出现</string>
+    <string name="msp_desktop_lyrics_grant_title">显示在其他应用上层</string>
+    <string name="msp_desktop_lyrics_grant_subtitle">系统的特殊授权，要在那个页面里打开之后浮窗才能挂上去</string>
+    <string name="msp_desktop_lyrics_grant_action">去开启</string>
+    <string name="msp_desktop_lyrics_note">歌词来自当前播放文件挂载的字幕（含翻译）。没有字幕的文件不会出现桌面歌词；锁屏或者本应用在前台时也不显示，免得和播放页里的字幕叠在一起。</string>
+    <string name="msp_desktop_lyrics_section_appearance">外观</string>
+    <string name="msp_desktop_lyrics_font_size_title">字号</string>
+    <string name="msp_desktop_lyrics_font_size_subtitle">只影响桌面歌词，不影响画面里的字幕</string>
+    <string name="msp_desktop_lyrics_font_size_help">浮窗上的字号按钮也能逐级调整</string>
+    <string name="msp_desktop_lyrics_font_size_value">%1$d sp</string>
+    <string name="msp_desktop_lyrics_opacity_title">背景不透明度</string>
+    <string name="msp_desktop_lyrics_opacity_subtitle">越浅越不挡画面，字也越容易被背景吃掉</string>
+    <string name="msp_desktop_lyrics_opacity_help">只有底色跟着变，文字始终是全不透明的</string>
+    <string name="msp_desktop_lyrics_opacity_desc_light">几乎全透明，字只靠描边撑住</string>
+    <string name="msp_desktop_lyrics_opacity_desc_soft">默认档：看得清字，也看得见后面的画面</string>
+    <string name="msp_desktop_lyrics_opacity_desc_strong">偏暗的底色，强光和亮画面上更稳</string>
+    <string name="msp_desktop_lyrics_opacity_desc_solid">完全不透明，最清楚的阅读效果</string>
+    <string name="msp_desktop_lyrics_reset_appearance_title">恢复默认外观</string>
+    <string name="msp_desktop_lyrics_reset_appearance_subtitle">字号回到「标准」、不透明度回到 60%</string>
+    <string name="msp_desktop_lyrics_reset_appearance_action">恢复默认</string>
+    <string name="msp_desktop_lyrics_locked_title">锁定位置</string>
+    <string name="msp_desktop_lyrics_locked_subtitle_on">已锁定：拖不动，按钮也点不到，触摸会穿到下面的应用</string>
+    <string name="msp_desktop_lyrics_locked_subtitle_off">未锁定：可以拖着它换地方，也可以点上面的按钮</string>
+    <string name="msp_desktop_lyrics_locked_help">锁定之后要解锁，回来这里或者播放页。</string>
+    <string name="msp_desktop_lyrics_section_position">位置</string>
+    <string name="msp_desktop_lyrics_reset_position_title">恢复默认位置</string>
+    <string name="msp_desktop_lyrics_reset_position_subtitle">回到屏幕下方居中；不会关掉桌面歌词</string>
+    <string name="msp_desktop_lyrics_reset_position_action">重置位置</string>
 </resources>

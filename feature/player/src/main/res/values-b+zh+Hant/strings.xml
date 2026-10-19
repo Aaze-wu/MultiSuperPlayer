@@ -237,4 +237,13 @@
     <string name="msp_player_eq_idle_note">還沒開始播放：現在的調整會存下來，開始播放後才會聽到。</string>
     <string name="msp_player_eq_unsupported_note">這台裝置沒有可用的等化器，開關與預設都不會有作用。</string>
     <string name="msp_player_eq_mapping_note">這五段會對應到本機音訊效果支援的頻段上。</string>
+
+    <!--
+      桌面歌詞。這一組四個鍵是同一個晶片的四種狀態（見 desktopLyricsEntryAction）：
+      關著寫功能名，開著寫現在就有什麼，鎖定與缺權限各寫各自的障礙。
+    -->
+    <string name="msp_player_desktop_lyrics">桌面歌詞</string>
+    <string name="msp_player_desktop_lyrics_on">歌詞浮窗</string>
+    <string name="msp_player_desktop_lyrics_locked">已鎖定</string>
+    <string name="msp_player_desktop_lyrics_need_permission">需要權限</string>
 </resources>

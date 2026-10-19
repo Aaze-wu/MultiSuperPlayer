@@ -8,6 +8,7 @@ import com.multisuperplayer.core.common.log.LogSummary
 import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
+import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -312,6 +313,28 @@ internal object SettingsSummaries {
         !supported -> MspText.Res(R.string.msp_settings_file_access_unsupported)
         granted -> MspText.Res(R.string.msp_settings_file_access_on)
         else -> MspText.Res(R.string.msp_settings_file_access_off)
+    }
+
+    /**
+     * 桌面歌词：`标准 · 60%`（开了）/ `关闭中`（没开）/ `已开启 · 缺少悬浮窗权限`。
+     *
+     * 「开了但没有悬浮窗权限」必须单独说。这个组合下**什么都不会显示**，而这一行
+     * 若只写「已开启」，用户会以为功能坏了——他刚刚在这里打开了开关，回到桌面
+     * 却一片安静，而真正缺的那一步（系统设置里的「显示在其他应用上层」）在别处。
+     *
+     * @param overlayGranted 由调用方传入而不是在这里查：判断要用 `Settings.canDrawOverlays`，
+     *   而它在 JVM 单测里恒为 `false`，写进纯函数就再也测不了「已授权」的那条分支。
+     */
+    fun desktopLyrics(settings: DesktopLyricsSettings, overlayGranted: Boolean): MspText = when {
+        !settings.enabled -> MspText.Res(R.string.msp_settings_summary_desktop_lyrics_off)
+        !overlayGranted -> MspText.Res(R.string.msp_settings_summary_desktop_lyrics_no_permission)
+        else -> join(
+            settings.style.fontSize.label,
+            settings.style.opacity.label,
+            // 锁定只在开着时才有意义，且它是个**不显眼**的状态：锁上之后浮窗点不动了，
+            // 用户在别处找不到解锁的入口时，这一行是他确认「是被锁住了」的地方。
+            if (settings.locked) MspText.Res(R.string.msp_settings_summary_desktop_lyrics_locked) else null,
+        )
     }
 
     /** 关于：只放版本号。检查更新、开源许可、导出日志都在这一页里，不必再挤进副标题。 */

@@ -3,6 +3,8 @@ package com.multisuperplayer.feature.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.multisuperplayer.core.model.text.MspText
+import com.multisuperplayer.core.data.favorites.Favorite
+import com.multisuperplayer.core.data.favorites.FavoriteStore
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.data.playlist.PlaylistStore
@@ -139,9 +141,12 @@ internal fun shouldRescanOnResume(state: MediaLibraryState): Boolean =
 class LibraryViewModel(
     private val repository: MediaLibraryRepository,
     playlistStore: PlaylistStore,
+    favoriteStore: FavoriteStore,
 ) : ViewModel() {
 
     private val playlistEditing = PlaylistEditing(playlistStore)
+
+    private val favoriteEditing = FavoriteEditing(favoriteStore)
 
     private val filter = MutableStateFlow(LibraryFilter.ALL)
     private val query = MutableStateFlow("")
@@ -167,6 +172,17 @@ class LibraryViewModel(
      * 但真的离开之后订阅会被取消，不会为了一个看不见的对话框常驻一个 DataStore 观察者。
      */
     val playlists: StateFlow<List<Playlist>> = playlistEditing.playlists.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptyList(),
+    )
+
+    /**
+     * 当前收藏，界面用它决定多选框里那颗星是空心的还是实心的。
+     *
+     * 和 [playlists] 一样的订阅策略：退出媒体库再回来不用重读，真离开之后不常驻观察者。
+     */
+    val favorites: StateFlow<List<Favorite>> = favoriteEditing.favorites.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         initialValue = emptyList(),
@@ -240,6 +256,19 @@ class LibraryViewModel(
 
     private fun publish(text: MspText) {
         _message.value = UiMessage(text = text, nonce = messageNonce.incrementAndGet())
+    }
+
+    /**
+     * 收藏 / 取消收藏选中的条目。
+     *
+     * 一键的方向由 [FavoriteEditing.toggleFiles] 按「是否全部已收藏」决定，
+     * 两个页面（媒体库、最近播放）必须是同一个判定，所以只在那里写一次。
+     */
+    fun toggleFavorite(entries: List<MediaEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch {
+            favoriteEditing.toggleFiles(entries)?.let(::publish)
+        }
     }
 
     fun refresh() {

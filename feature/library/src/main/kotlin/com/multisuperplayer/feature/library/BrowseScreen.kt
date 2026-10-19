@@ -53,6 +53,8 @@ import com.multisuperplayer.core.data.browser.BrowserRoot
 import com.multisuperplayer.core.data.browser.BrowserRootIssue
 import com.multisuperplayer.core.data.browser.BrowserSort
 import com.multisuperplayer.core.data.browser.BrowserSourceKind
+import com.multisuperplayer.core.data.favorites.Favorite
+import com.multisuperplayer.core.data.favorites.FavoriteRules
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
 import com.multisuperplayer.core.data.subtitle.subtitleSourceOf
 import com.multisuperplayer.core.model.BrowserEntry
@@ -87,20 +89,37 @@ private const val BROWSE_TAG = "BrowseRoute"
  *   而把 `.srt` 混进播放队列只会得到一句「无法播放」。
  * @param onOpenNetwork 点来源清单里的「网络地址」时去哪里。页面本体不知道自己
  *   能被导航到哪儿（那一层的知识在 `MspApp` 的导航图里），所以只能由外面传进来。
+ * @param pendingFavorite 从收藏页点了一个文件夹时的**一次性请求**：进到浏览页后
+ *   直接打开这条目录。非 null 就会被消费一次，然后必须由 [onPendingFavoriteApplied]
+ *   清掉——留在那儿的话，此后每次回到浏览标签都会强制跳回那个目录，用户进去的
+ *   子目录会被上一次的请求顶掉。
  */
 @Composable
 fun BrowseRoute(
     onPlayRequest: (List<MediaEntry>, Int) -> Unit = { _, _ -> },
     onOpenSubtitle: (SubtitleSource) -> Unit = {},
     onOpenNetwork: () -> Unit = {},
+    pendingFavorite: Favorite.Folder? = null,
+    onPendingFavoriteApplied: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val viewModel: BrowseViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 从收藏页点了某个文件夹：直接在浏览页里打开它。
+    // 导航图里跨标签页传递一个对象没有别的路（路由参数是字符串，而这里要带着
+    // 整条面包屑和来源类型），所以跟「外部打开字幕」一样：发起方把意图存进状态，
+    // 目标页消费之后立刻叫发起方清掉——不清的话再次点浏览标签会莫名地又跳一次。
+    LaunchedEffect(pendingFavorite) {
+        val target = pendingFavorite ?: return@LaunchedEffect
+        viewModel.openFavoriteFolder(target)
+        onPendingFavoriteApplied()
+    }
 
     // 选择集是**界面瞬态**（和媒体库页一样，不进 ViewModel、不落盘），
     // 而且**有顺序**：用户先点哪条、后点哪条，就是加入播放列表/开始播放的顺序。
@@ -182,7 +201,17 @@ fun BrowseRoute(
         onSelectAll = { selectedIds = LibrarySelectionRules.addAll(selectedIds, selectable) },
         onClear = { selectedIds = LibrarySelectionRules.removeAll(selectedIds, selectable) },
         onAddToPlaylist = { pickerOpen = true },
+        onFavorite = { viewModel.toggleFavorite(selectedEntries) },
+        favoriteAll = FavoriteRules.allFavorited(favorites, selectedEntries),
         onPlay = { if (selectedEntries.isNotEmpty()) onPlayRequest(selectedEntries, 0) },
+    )
+
+    // 当前目录是否已收藏。目录页的星标要跟着收藏列表实时变（收藏页/别处取消之后回来也是对的）。
+    val trail = state.trail
+    val folderFavorited = trail != null && FavoriteRules.containsFolder(
+        current = favorites,
+        kind = trail.kind,
+        ref = trail.current.ref,
     )
 
     BrowseScreen(
@@ -190,6 +219,8 @@ fun BrowseRoute(
         modifier = modifier,
         selection = selection,
         snackbarHostState = snackbarHostState,
+        folderFavorited = folderFavorited,
+        onToggleFolderFavorite = viewModel::toggleFolderFavorite,
         onEnterSource = viewModel::enterSource,
         onEnterDirectory = viewModel::enterDirectory,
         onOpenCrumb = viewModel::openCrumb,
@@ -270,6 +301,8 @@ internal fun BrowseScreen(
     modifier: Modifier = Modifier,
     selection: BrowserSelection = BrowserSelection(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    folderFavorited: Boolean = false,
+    onToggleFolderFavorite: () -> Unit = {},
     onEnterSource: (BrowserRoot) -> Unit = {},
     onEnterDirectory: (BrowserEntry) -> Unit = {},
     onOpenCrumb: (Int) -> Unit = {},
@@ -303,6 +336,8 @@ internal fun BrowseScreen(
             modifier = modifier,
             selection = selection,
             snackbarHostState = snackbarHostState,
+            folderFavorited = folderFavorited,
+            onToggleFolderFavorite = onToggleFolderFavorite,
             onUp = onBack,
             onEnterDirectory = onEnterDirectory,
             onOpenCrumb = onOpenCrumb,

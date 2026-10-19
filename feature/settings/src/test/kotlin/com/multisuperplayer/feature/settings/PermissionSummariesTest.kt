@@ -293,13 +293,14 @@ class PermissionSummariesTest {
     }
 
     @Test
-    fun `可更改项 - 恰好是四项且有顺序`() {
+    fun `可更改项 - 恰好是五项且有顺序`() {
         Assert.assertEquals(
             listOf(
                 PermissionKind.MEDIA,
                 PermissionKind.ALL_FILES,
                 PermissionKind.NOTIFICATION,
                 PermissionKind.BLUETOOTH,
+                PermissionKind.OVERLAY,
             ),
             PermissionSummaries.changeable,
         )
@@ -485,6 +486,8 @@ class PermissionSummariesTest {
             "msp_permissions_notification_desc",
             "msp_permissions_bluetooth",
             "msp_permissions_bluetooth_desc",
+            "msp_permissions_overlay",
+            "msp_permissions_overlay_desc",
             "msp_permissions_state_granted",
             "msp_permissions_state_partial",
             "msp_permissions_state_not_asked",

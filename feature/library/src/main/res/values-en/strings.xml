@@ -199,4 +199,23 @@
     <string name="msp_network_empty_title">No network address has been played yet</string>
     <string name="msp_network_empty_desc">Enter a link above to play it right away. Recently used addresses stay here so you can play them again with one tap.</string>
     <string name="msp_network_remove">Remove from the list</string>
+
+    <!-- ===== Favorites =====
+         Files and folders share one list (newest first). Wording uses "item", not "song":
+         the list can hold videos as well as whole folders. -->
+    <string name="msp_favorites_title">Favorites</string>
+    <string name="msp_favorites_open">Open favorites</string>
+    <string name="msp_favorites_add">Add to favorites</string>
+    <string name="msp_favorites_remove">Remove from favorites</string>
+    <string name="msp_favorites_empty_title">No favorites yet</string>
+    <string name="msp_favorites_empty_desc">Long-press a few items in Library or Recently played and tap the star in the top bar; in Browse the star favorites the folder you are in.</string>
+    <!-- The skipped count has two possible causes (already favorited / limit reached) and the
+         store only reports a number, so the wording mentions both. -->
+    <string name="msp_library_favorites_added">Added %1$d item(s) to favorites</string>
+    <string name="msp_library_favorites_added_skipped">Added %1$d item(s) to favorites; %2$d were already there or the limit was reached</string>
+    <string name="msp_library_favorites_removed">Removed %1$d item(s) from favorites</string>
+    <string name="msp_library_favorites_full">Favorites are full (%1$d max)</string>
+    <string name="msp_library_favorites_folder_added">Folder added to favorites</string>
+    <string name="msp_library_favorites_folder_removed">Folder removed from favorites</string>
+    <string name="msp_favorites_folder_missing">This folder can no longer be opened; the permission may have been revoked or the folder removed.</string>
 </resources>

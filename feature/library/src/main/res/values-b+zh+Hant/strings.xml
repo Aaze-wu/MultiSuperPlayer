@@ -194,4 +194,22 @@
     <string name="msp_network_empty_title">還沒有播放過網路位址</string>
     <string name="msp_network_empty_desc">在上面填一個連結就能直接播放。最近用過的網址會留在這裡，下次點一下就放。</string>
     <string name="msp_network_remove">從清單裡移除</string>
+
+    <!-- ===== 收藏 =====
+         檔案與資料夾放在同一個清單裡（新的在前）。文案裡統一用「項」而不是「首」：
+         清單裡既可能有影片，也可能有整個資料夾。 -->
+    <string name="msp_favorites_title">收藏</string>
+    <string name="msp_favorites_open">開啟收藏</string>
+    <string name="msp_favorites_add">收藏</string>
+    <string name="msp_favorites_remove">取消收藏</string>
+    <string name="msp_favorites_empty_title">還沒有收藏</string>
+    <string name="msp_favorites_empty_desc">在媒體庫或最近播放裡長按選取幾項，用頂列的星標收藏；在瀏覽頁裡星標收藏的是目前所在的資料夾。</string>
+    <!-- 跳過的那部分有兩種可能（已經在收藏裡 / 已達上限），儲存層只回報數量，所以兩種都說。 -->
+    <string name="msp_library_favorites_added">已收藏 %1$d 項</string>
+    <string name="msp_library_favorites_added_skipped">已收藏 %1$d 項，另有 %2$d 項已經在收藏裡或已達上限</string>
+    <string name="msp_library_favorites_removed">已取消收藏 %1$d 項</string>
+    <string name="msp_library_favorites_full">收藏已滿（最多 %1$d 項）</string>
+    <string name="msp_library_favorites_folder_added">已收藏這個資料夾</string>
+    <string name="msp_library_favorites_folder_removed">已取消收藏這個資料夾</string>
+    <string name="msp_favorites_folder_missing">這個資料夾已經打不開了，可能授權已失效或目錄已被移除。</string>
 </resources>

@@ -86,6 +86,17 @@
     <string name="msp_subtitle_style_margin_raised">抬高</string>
     <string name="msp_subtitle_style_margin_high">很高</string>
 
+    <!--
+      桌面歌词的字号档位名。理由同上面那组字幕档位名：它们绑在
+      `DesktopLyricsFontSize` 的枚举上，枚举住在 core:data，文案就得跟着。
+
+      不透明度没有文案：那一维的档位名就是百分数（`40%`），与语言无关。
+    -->
+    <string name="msp_desktop_lyrics_size_small">小</string>
+    <string name="msp_desktop_lyrics_size_medium">标准</string>
+    <string name="msp_desktop_lyrics_size_large">大</string>
+    <string name="msp_desktop_lyrics_size_huge">特大</string>
+
     <!-- ============================================================
          导出（播放记录 / 播放列表）
          ============================================================

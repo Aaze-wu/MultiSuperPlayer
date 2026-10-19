@@ -63,6 +63,11 @@
     <string name="msp_subtitle_style_margin_raised">Raised</string>
     <string name="msp_subtitle_style_margin_high">Very high</string>
 
+    <string name="msp_desktop_lyrics_size_small">Small</string>
+    <string name="msp_desktop_lyrics_size_medium">Normal</string>
+    <string name="msp_desktop_lyrics_size_large">Large</string>
+    <string name="msp_desktop_lyrics_size_huge">Huge</string>
+
     <!-- ==== Export (recently played / playlists) ==== -->
     <!-- 表头与类型名会被写进导出文件，所以必须跟着用户的语言走（见 values/strings.xml）。 -->
     <string name="msp_export_format_csv">CSV</string>

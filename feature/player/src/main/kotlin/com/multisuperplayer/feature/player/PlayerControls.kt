@@ -469,7 +469,7 @@ internal fun PlayerActionChips(
 }
 
 /**
- * 「睡眠定时 / 播放队列 / 均衡器 / 屏幕常亮 / 画中画」五个会话级入口。
+ * 「睡眠定时 / 播放队列 / 均衡器 / 屏幕常亮 / 桌面歌词 / 画中画」六个会话级入口。
  *
  * ## 为什么单独一行，而不是并进 [PlayerActionChips]
  *
@@ -545,6 +545,17 @@ internal fun PlayerSessionChips(
                 description = stringResource(R.string.msp_player_keep_screen_on),
             )
         }
+        // 桌面歌词摆在屏幕常亮之后、画中画之前：它和上面几个一样是「这次播放的
+        // 一种状态」，但它的结果发生在**应用外面**（切到别的应用才看得到），
+        // 所以文案写的是它现在处在哪一档，而不是一句「桌面歌词」。
+        session.desktopLyrics?.let { chip ->
+            ChipButton(
+                text = chip.label,
+                active = chip.active,
+                onClick = chip.onClick,
+                description = stringResource(R.string.msp_player_desktop_lyrics),
+            )
+        }
         // 画中画排最后：它和上面几个的区别是**点了会离开这个界面**（画面缩成一个小
         // 窗口），摆在最靠后/最靠边的位置，误触的代价最小。
         session.pip?.let { chip ->
@@ -579,7 +590,7 @@ data class PlayerBarChip(
 )
 
 /**
- * 会话级入口的一整组（睡眠定时 / 队列 / 均衡器 / 屏幕常亮 / 画中画）。
+ * 会话级入口的一整组（睡眠定时 / 队列 / 均衡器 / 屏幕常亮 / 桌面歌词 / 画中画）。
  *
  * ## 为什么不写成几个平铺的参数
  *
@@ -608,17 +619,18 @@ data class PlayerSessionChipSet(
     val queue: PlayerBarChip? = null,
     val equalizer: PlayerBarChip? = null,
     val keepScreenOn: PlayerBarChip? = null,
+    val desktopLyrics: PlayerBarChip? = null,
     val pip: PlayerBarChip? = null,
 ) {
     /**
      * 所有入口都没有。
      *
      * 「要不要占位置」的判断点和「要不要画」的渲染点必须是同一个集合：分开写的话，
-     * 以后加第五个入口时只改了一边，就会得到一行空白的间距（或一个跑出边界的东西）。
+     * 以后加第六个入口时只改了一边，就会得到一行空白的间距（或一个跑出边界的东西）。
      */
     val isEmpty: Boolean
         get() = sleepTimer == null && queue == null && equalizer == null &&
-            keepScreenOn == null && pip == null
+            keepScreenOn == null && desktopLyrics == null && pip == null
 }
 
 /**

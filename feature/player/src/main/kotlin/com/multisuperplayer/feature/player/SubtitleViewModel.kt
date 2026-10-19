@@ -117,6 +117,8 @@ class SubtitleViewModel(
     private val asrInstaller: AsrModelInstaller,
     /** 识别 → 序列化 → 落盘，见 core:data 的 `AsrSubtitleGenerator`。 */
     private val subtitleGenerator: AsrSubtitleGenerator,
+    /** 桌面歌词的共享状态源。这个页面是它的**主要**数据来源，见 init 里的推送。 */
+    private val desktopLyrics: DesktopLyricsController,
 ) : ViewModel() {
 
     /**
@@ -363,6 +365,35 @@ class SubtitleViewModel(
                 }
             }
         }
+
+        // 桌面歌词：把「合成之后」的文档推给应用级的那个状态源。
+        //
+        // 推 `state`（而不是 `resolvedLoadState`）是因为浮窗要的正是这一份：
+        // 译文已经叠上去、显示模式已经生效、时间轴偏移和倍速也在里面。用加载
+        // 管线里那份原始文档，浮窗会少显示译文、而且时间轴对不上。
+        viewModelScope.launch {
+            state.collect { ui ->
+                desktopLyrics.publish(
+                    ownerKey = this@SubtitleViewModel,
+                    document = ui.document,
+                    timelineOffsetMs = ui.timelineOffsetMs,
+                    ratePermille = ui.subtitleRatePermille,
+                )
+            }
+        }
+    }
+
+    /**
+     * 播放页被销毁时收回自己的那份推送。
+     *
+     * 不收的话浮窗会一直拿着这个页面最后一次的文档：用户从播放页返回列表、
+     * 再点开另一首歌，浮窗仍然停在旧歌词上（因为推送永远不会被覆盖）。收回之后
+     * 控制器会自己按「自动匹配」重新扫一份，这条兜底路径同时也是「只在迷你
+     * 播放器里听歌」那个场景的唯一来源。
+     */
+    override fun onCleared() {
+        desktopLyrics.unpublish(this)
+        super.onCleared()
     }
 
     /**

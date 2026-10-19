@@ -9,10 +9,15 @@ import com.multisuperplayer.core.data.export.PlaybackExportCollection
 import com.multisuperplayer.core.data.export.PlaybackExportFormat
 import com.multisuperplayer.core.data.export.PlaybackExportTrack
 import com.multisuperplayer.core.data.export.TextExportWriter
+import com.multisuperplayer.core.data.favorites.Favorite
+import com.multisuperplayer.core.data.favorites.FavoriteStore
 import com.multisuperplayer.core.data.history.RecentPlayRepository
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
+import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.model.Playlist
 import com.multisuperplayer.core.model.RecentPlay
 import com.multisuperplayer.core.model.text.MspText
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 最近播放页的界面状态。
@@ -96,7 +102,13 @@ class RecentViewModel(
     playbackSettings: PlaybackSettingsRepository,
     context: Context,
     private val exportWriter: TextExportWriter,
+    playlistStore: PlaylistStore,
+    favoriteStore: FavoriteStore,
 ) : ViewModel() {
+
+    private val playlistEditing = PlaylistEditing(playlistStore)
+
+    private val favoriteEditing = FavoriteEditing(favoriteStore)
 
     /**
      * 导出时要用的 `Resources`。
@@ -250,11 +262,72 @@ class RecentViewModel(
     /** 导出出来的文件里也会出现中文表头，所以要能解析字符串（见 [appContext]）。 */
     private fun resolve(text: MspText): String = text.resolve(appContext.resources)
 
-    private fun reload() {
-        viewModelScope.launch { readRows() }
+    // -------------------------------------------------------- 多选：收藏 / 播放列表
+
+    /**
+     * 当前收藏。界面用它判断操作条上的星是实心还是空心（选中项是否全部已收藏）。
+     *
+     * 只在多选里用到，所以照样是 `WhileSubscribed`：不进多选时不该常驻一个
+     * DataStore 观察者。
+     */
+    val favorites: StateFlow<List<Favorite>> = favoriteEditing.favorites.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptyList(),
+    )
+
+    /** 「加入播放列表」要选的清单。与 [favorites] 同一套说法。 */
+    val playlists: StateFlow<List<Playlist>> = playlistEditing.playlists.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptyList(),
+    )
+
+    private val _message = MutableStateFlow<UiMessage?>(null)
+
+    /** 一次性提示（「已收藏 N 项」/「已加入 N 项」）。用 [UiMessage.nonce] 当 key 显示。 */
+    val message: StateFlow<UiMessage?> = _message.asStateFlow()
+
+    private val messageNonce = AtomicLong()
+
+    /**
+     * 收藏 / 取消收藏多选中的记录。
+     *
+     * 只收藏**文件**，不收藏「最近播放过」这件事：这一页的条目本身就是媒体条目，
+     * 收藏之后进的是同一份收藏清单（见 `FavoriteStore`），跟从媒体库/浏览页
+     * 收藏的结果完全一样。三个入口共用一处存储，用户不会看到两份「收藏」。
+     */
+    fun toggleFavorite(entries: List<MediaEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch {
+            favoriteEditing.toggleFiles(entries)?.let(::publish)
+        }
     }
 
-    /** 读一次记录并要求媒体库已就绪。失败/未就绪的语义见 `recentUiState`。 */
+    fun addToPlaylist(playlistId: String, entries: List<MediaEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch {
+            publish(addedToPlaylistText(playlistEditing.addTo(playlistId, entries), entries.size))
+        }
+    }
+
+    fun createPlaylistWith(name: String, entries: List<MediaEntry>) {
+        viewModelScope.launch {
+            val added = playlistEditing.createWith(name, entries) ?: run {
+                publish(MspText.Res(R.string.msp_library_playlist_create_failed))
+                return@launch
+            }
+            publish(addedToPlaylistText(added, entries.size))
+        }
+    }
+
+    private fun publish(text: MspText) {
+        _message.value = UiMessage(text = text, nonce = messageNonce.incrementAndGet())
+    }
+
+    private fun reload() {
+        viewModelScope.launch { readRows() }
+    }    /** 读一次记录并要求媒体库已就绪。失败/未就绪的语义见 `recentUiState`。 */
     private suspend fun readRows() {
         // 开关关着就没什么可显示的，读了也是白读（见 [enabled]）。
         // 这里不清空 [cached] 里已有的内容：重新打开开关时界面会先显示

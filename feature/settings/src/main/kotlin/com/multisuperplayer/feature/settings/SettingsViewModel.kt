@@ -19,6 +19,8 @@ import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.CustomAccent
+import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
+import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
@@ -150,6 +152,14 @@ class SettingsViewModel(
     private val translationSettings: TranslationSettingsRepository,
     private val subtitleStyleSettings: SubtitleSettingsRepository,
     private val playbackSettingsRepository: PlaybackSettingsRepository,
+    /**
+     * 桌面歌词偏好。
+     *
+     * 入口页只读它一项内容：那一行的副标题（`标准 · 60%` / `关闭中`）。**写**它的是
+     * 独立的子页（`DesktopLyricsSettingsViewModel`）和播放页的面板，这里不提供任何
+     * setter——同一个开关在两处各有各的实现，迟早会出现「这页改完那页还是旧值」。
+     */
+    private val desktopLyricsSettings: DesktopLyricsSettingsRepository,
     private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
@@ -249,6 +259,16 @@ class SettingsViewModel(
     fun refreshKeepAlive() {
         keepAliveStateFlow.value = keepAlive.state()
     }
+
+    /**
+     * 桌面歌词偏好（入口页那一行的副标题）。
+     *
+     * 用 `Eagerly` + 默认值初值：这一行的副标题必须**首帧**就是当前状态，
+     * 否则会先闪一个「关闭中」再变成「标准 · 60%」——用户看到的是一次假的开关动作。
+     * 默认值与仓库的默认值同源（[DesktopLyricsSettings] 的默认参数），不写字面量。
+     */
+    val desktopLyrics: StateFlow<DesktopLyricsSettings> = desktopLyricsSettings.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DesktopLyricsSettings())
 
     /**
      * 用 `Eagerly` 而不是 `WhileSubscribed`：主题要在界面出现之前就位，

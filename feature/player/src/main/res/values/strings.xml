@@ -287,4 +287,13 @@
     <string name="msp_player_eq_idle_note">还没开始播放：现在的调整会存下来，开始播放后才会听到。</string>
     <string name="msp_player_eq_unsupported_note">这台设备没有可用的均衡器，开关和预设都不会有作用。</string>
     <string name="msp_player_eq_mapping_note">这五段会映射到本机音频效果支持的频段上。</string>
+
+    <!--
+      桌面歌词。这一组四个键是同一个芯片的四种状态（见 desktopLyricsEntryAction）：
+      关着写功能名，开着写现在就有什么，锁定与缺权限各写各自的障碍。
+    -->
+    <string name="msp_player_desktop_lyrics">桌面歌词</string>
+    <string name="msp_player_desktop_lyrics_on">歌词浮窗</string>
+    <string name="msp_player_desktop_lyrics_locked">已锁定</string>
+    <string name="msp_player_desktop_lyrics_need_permission">需要权限</string>
 </resources>

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -196,4 +197,7 @@ private fun iconOf(kind: PermissionKind): ImageVector = when (kind) {
     PermissionKind.ALL_FILES -> Icons.Outlined.Lock
     PermissionKind.NOTIFICATION -> Icons.Outlined.Notifications
     PermissionKind.BLUETOOTH -> Icons.Outlined.Bluetooth
+    // 悬浮窗用「小窗叠在大画面上」的那一形（画中画的图标）：它表达的是
+    // 「这个窗口会盖在别的应用身上」，而不是又一道锁——锁已经给了「所有文件访问」。
+    PermissionKind.OVERLAY -> Icons.Outlined.PictureInPictureAlt
 }

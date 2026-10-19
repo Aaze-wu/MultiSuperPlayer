@@ -64,6 +64,7 @@ class PermissionManifestCoverageTest {
             PermissionKind.ALL_FILES to listOf(Manifest.permission.MANAGE_EXTERNAL_STORAGE),
             PermissionKind.NOTIFICATION to listOf(Manifest.permission.POST_NOTIFICATIONS),
             PermissionKind.BLUETOOTH to listOf(Manifest.permission.BLUETOOTH_CONNECT),
+            PermissionKind.OVERLAY to listOf(Manifest.permission.SYSTEM_ALERT_WINDOW),
         )
 
         required.forEach { (kind, permissions) ->

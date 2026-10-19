@@ -234,4 +234,14 @@
     <string name="msp_player_eq_idle_note">Nothing is playing yet: your changes are saved and you will hear them once playback starts.</string>
     <string name="msp_player_eq_unsupported_note">This device has no usable equalizer, so the switch and the presets will have no effect.</string>
     <string name="msp_player_eq_mapping_note">These five bands are mapped onto the frequencies your device actually supports.</string>
+
+    <!--
+      Desktop lyrics. These four keys are four states of one chip (see
+      desktopLyricsEntryAction): off shows the feature name, on shows what you get,
+      and locked / needs-permission each name their own obstacle.
+    -->
+    <string name="msp_player_desktop_lyrics">Desktop lyrics</string>
+    <string name="msp_player_desktop_lyrics_on">Lyrics overlay</string>
+    <string name="msp_player_desktop_lyrics_locked">Locked</string>
+    <string name="msp_player_desktop_lyrics_need_permission">Needs permission</string>
 </resources>

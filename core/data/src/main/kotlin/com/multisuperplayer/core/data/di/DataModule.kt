@@ -25,6 +25,7 @@ import com.multisuperplayer.core.data.power.KeepAliveAccess
 import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
+import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
@@ -37,6 +38,7 @@ import com.multisuperplayer.core.data.export.TextExportWriter
 import com.multisuperplayer.core.data.export.TextImportReader
 import com.multisuperplayer.core.data.external.ExternalMediaResolver
 import com.multisuperplayer.core.data.external.PendingExternalPlayback
+import com.multisuperplayer.core.data.favorites.FavoriteStore
 import com.multisuperplayer.core.data.remote.RemoteUrlStore
 import com.multisuperplayer.core.data.subtitle.SubtitleFileLocator
 import com.multisuperplayer.core.data.subtitle.SubtitleRepository
@@ -112,6 +114,8 @@ val dataModule = module {
 
     single { SubtitleSettingsRepository(context = androidContext(), dispatchers = get()) }
 
+    single { DesktopLyricsSettingsRepository(context = androidContext(), dispatchers = get()) }
+
     single { PlaybackSettingsRepository(context = androidContext(), dispatchers = get()) }
 
     // 不加 dispatchers：这一个设置不用 DataStore、也不做异步读取，理由见 AppLocaleStore 的注释。
@@ -130,6 +134,11 @@ val dataModule = module {
     // 播放列表存在单独的 DataStore 文件（msp_playlists）里：写一次就是几 KB 自由文本，
     // 混进 msp_settings 会拖慢用户设置的写入。
     single { PlaylistStore(context = androidContext(), dispatchers = get()) }
+
+    // 收藏（文件 + 文件夹）同样单独一个文件（msp_favorites）。和播放列表分开是因为
+    // 两者都由用户手动攒、都会一次写几 KB，合在一起意味着收藏一次要把所有播放列表
+    // 重写一遍，反过来也一样。
+    single { FavoriteStore(context = androidContext(), dispatchers = get()) }
 
     /**
      * 导入那条路的入口（`PlaylistImporter` 收的是接口，为的是能单测，见它的类注释）。

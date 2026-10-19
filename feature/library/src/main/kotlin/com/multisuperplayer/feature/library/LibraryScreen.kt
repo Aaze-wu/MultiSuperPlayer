@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -78,6 +79,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.data.library.MediaLibraryState
+import com.multisuperplayer.core.data.favorites.Favorite
+import com.multisuperplayer.core.data.favorites.FavoriteRules
 import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
@@ -99,11 +102,13 @@ import org.koin.androidx.compose.koinViewModel
 fun LibraryRoute(
     modifier: Modifier = Modifier,
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit = { _, _ -> },
+    onOpenFavorites: () -> Unit = {},
 ) {
     val viewModel: LibraryViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -128,6 +133,7 @@ fun LibraryRoute(
         modifier = modifier,
         message = message,
         playlists = playlists,
+        favorites = favorites,
         onRequestPermission = { permissionLauncher.launch(viewModel.requiredPermissions()) },
         onRefresh = viewModel::refresh,
         onFilterChange = viewModel::setFilter,
@@ -137,6 +143,8 @@ fun LibraryRoute(
         onViewModeChange = viewModel::setViewMode,
         onAddToPlaylist = viewModel::addToPlaylist,
         onCreatePlaylistWith = viewModel::createPlaylistWith,
+        onToggleFavorite = viewModel::toggleFavorite,
+        onOpenFavorites = onOpenFavorites,
         onPlayRequest = onPlayRequest,
     )
 }
@@ -155,6 +163,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     message: UiMessage? = null,
     playlists: List<Playlist> = emptyList(),
+    favorites: List<Favorite> = emptyList(),
     onRequestPermission: () -> Unit = {},
     onRefresh: () -> Unit = {},
     onFilterChange: (LibraryFilter) -> Unit = {},
@@ -164,6 +173,8 @@ fun LibraryScreen(
     onViewModeChange: (LibraryViewMode) -> Unit = {},
     onAddToPlaylist: (playlistId: String, entries: List<MediaEntry>) -> Unit = { _, _ -> },
     onCreatePlaylistWith: (name: String, entries: List<MediaEntry>) -> Unit = { _, _ -> },
+    onToggleFavorite: (entries: List<MediaEntry>) -> Unit = {},
+    onOpenFavorites: () -> Unit = {},
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit = { _, _ -> },
 ) {
     // 只需要 partial / truncated 这两个信息，分支判定整个交给 state.pane（纯函数，有单测）。
@@ -224,6 +235,8 @@ fun LibraryScreen(
                         selectedIds = LibrarySelectionRules.removeAll(selectedIds, state.entries)
                     },
                     onAddToPlaylist = { pickerOpen = true },
+                    onFavorite = { onToggleFavorite(selectedEntries) },
+                    favoriteAll = FavoriteRules.allFavorited(favorites, selectedEntries),
                     onPlay = {
                         if (selectedEntries.isNotEmpty()) onPlayRequest(selectedEntries, 0)
                     },
@@ -232,6 +245,15 @@ fun LibraryScreen(
                 TopAppBar(
                     title = { Text(stringResource(R.string.msp_library_title)) },
                     actions = {
+                        // 收藏入口：它不是底部标签页，而是「媒体库的一个视图」——
+                        // 收藏的内容全都来自媒体库，另开一个平行入口会让人以为
+                        // 那是另一份数据。
+                        IconButton(onClick = onOpenFavorites) {
+                            Icon(
+                                Icons.Outlined.StarBorder,
+                                contentDescription = stringResource(R.string.msp_favorites_open),
+                            )
+                        }
                         IconButton(onClick = onRefresh) {
                             Icon(
                                 Icons.Outlined.Refresh,

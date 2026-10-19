@@ -174,6 +174,25 @@ Developer changelog (design notes, file list, tests): [docs/changelogs](docs/cha
   number ("1.37× text size") cannot be explained. **The default presets resolve to exactly the numbers
   v0.5.15 hard-coded** (16sp text size / 24sp line height / no outline / 12dp bottom margin), so nobody sees
   their subtitles suddenly change after upgrading — a unit test guards this.
+- **Desktop lyrics**: with Settings → Desktop lyrics switched on, the current line (plus a preview of the
+  next one) floats **above every other app** while you do something else. It shares **the same timeline**
+  as the subtitle layer (same position mapping, same "which cue is current" decision), so the window and
+  the player can never disagree; the window itself carries play/pause, font smaller, font larger and lock
+  buttons, can be dragged, and remembers where you put it. Its look (four font sizes, four background
+  opacities) is stored separately from the in-picture subtitle style. Five separate reasons keep it away,
+  each with its own visible consequence: you turned it off, the *Display over other apps* permission is
+  missing (called out on its own, otherwise the switch looks broken), subtitle display mode is off
+  (subtitles off means no text at all), the file has no lyrics, and **this app is in the foreground**
+  (the player already draws the subtitles; a second layer would write the same sentence twice).
+  The window uses `TYPE_APPLICATION_OVERLAY` and deliberately **no Service**: adding a window only needs a
+  `Context` holding the permission, and a playing process already lives inside the playback service, so
+  skipping the service skips a `FOREGROUND_SERVICE_*` permission and a permanent notification. "Is the app
+  in the foreground" is decided by counting resumed activities, and the count reaching zero is followed by
+  a **short grace period** — in-app navigation and the permission dialog both leave briefly, and showing the
+  overlay right then would drop a block of lyrics onto those screens. Locking means **touches pass
+  through** (against mis-taps), not "the window ignores touch": the latter could never be undone, and since
+  the window sits above every app the only way out would be killing the process — so the unlock entry
+  points live in Settings and on the player.
 
 ### 1.3 Subtitle translation
 
@@ -358,6 +377,29 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
   de-duplicates**, so an entry already in the list does not become two).
   Imported entries go through the same "not in the library ⇒ mark it, keep its place" rules, so
   importing a file full of tracks this device does not have cannot break the playlist.
+- **Favourites (files and folders)**: the star at the top right of the media library opens a
+  **favourites page** where files and folders sit in one list, newest first, capped at 200 entries
+  (reaching the cap says "favourites are full" outright — the item you just tapped is never dropped
+  silently). There are only two kinds of entry point, the **selection bar** and **the folder you are
+  in**, and no per-row star: the right edge of a row already holds the duration, the delete button and
+  the drag handle, and one more icon there makes "what happens if I tap this" crowded, while favouriting
+  is not a frequent action and collecting twenty items at once is far more useful. The star reads as
+  filled when **everything you selected** is already favourited.
+  A favourited **folder stores the whole breadcrumb** (the source kind plus every level walked), not
+  just the last segment: a `BrowserTrail` *is* "every level walked", and storing only the leaf means
+  reconstructing the rest through two derivation rules that diverge — exactly at cases like "the folder
+  opens but its parent does not". Tapping a favourited folder switches to Browse and **opens that
+  directory** (same breadcrumb, sort order and multi-select), handed across pages by a one-shot
+  "folder to open" mailbox that is cleared as soon as it is consumed; keeping it would mean every later
+  tap on the Browse tab gets overridden by the last request. A revoked grant or a pulled SD card is
+  **probed first** and reported as "this folder can no longer be opened", because not probing shows an
+  empty directory — indistinguishable from "my files were deleted". The list itself is a hand-written
+  plain-text record (`decode()` never throws, because it runs inside `DataStore.map {}` where a single
+  throw poisons the whole flow forever), and an unrecognised folder source **skips that record** instead
+  of falling back to "file system": the default value would read an SAF folder as a path and only
+  surface days later as "the folder will not open".
+  The **recent list also gained multi-select** in the same pass, so favouriting something you just
+  played does not depend on a per-row button — one action bar, implemented once.
 
 ### 1.7 Built-in file browser
 
@@ -824,7 +866,8 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v1.2.1** | **Subtitle-matching fixes: (1) file names carrying release tags (`[SomeGroup.com]Some.Movie.2023.1080p.WEB-DL.mkv`) now pair with a clean subtitle name (there is no reliable way to tell how a bracket should be read, so both writings - as-is and with tags stripped - are used as candidates and the best score wins; a bracket holding only a year, and parentheses holding a Chinese phrase, are kept whole; an episode number is ignored only when both sides point at the same episode, because a wrong episode is worse than no subtitle; simplified and traditional Chinese are not matched against each other) and (2) subtitles inside a folder added with the system file picker are found again (the source of an entry is derived from its `ref` - `content://` means SAF, anything else the file system - and the playlist playback path is fixed as well); it also fixes a crash only seen on a device, caused by an unescaped brace in a regular expression (JVM accepts a lone `}`, Android's ICU does not; a structural guard test now covers it)** | Done |
 | **v1.2.2** | **Two fixes for names that were "close enough" but failed silently: (1) a file whose name contains `#` or `%` now plays from the built-in browser and its same-named subtitles / lyrics can be read (the address used to be built by string concatenation as `file://$path`, where `#` was taken as a fragment and `%` as the start of an escape sequence; a pure-Kotlin `LocalPathUri` encodes every code point that is not URI-safe and decodes it back, wired into the player's media URI, subtitle file reading and the speech-recognition media lookup) and (2) same-named subtitles / lyrics next to an audio file (`song.mp3` with `song.srt`, `song.mp3` with `song.mp3.srt`) now attach automatically (the ±25 format-affinity value used to take part in the auto-attach threshold too, pushing a same-named candidate below it; eligibility is now `titleMatchScore` and ordering is `matchScore`, so with both `.lrc` and `.srt` in the same folder the `.lrc` still wins)** | Done |
 | **v1.2.3** | **The automatic update-check interval is now configurable: on the *Check for updates* page a new row sits between the *check automatically* switch and the update channel, with six presets - 1 / 6 / 12 hours, 1 / 3 / 7 days - plus *Custom...* with an hours field and a minutes field (15 minutes minimum, 7 days maximum; out-of-range or non-numeric input is reported on the spot and *Save* stays disabled); that window is the cooling-off period of the automatic check, previously hard-wired to 12 hours and now defined once in `UpdateCooldown` and stored in DataStore, while pressing *Check* yourself is never affected by it; the row stays editable with the switch off (a setting is not locked behind a switch); the default is still 12 hours, so upgrading changes nothing** | Done |
-| **v1.2.4** | **Two fixes where UI state stopped following the data: (1) the status-bar icon tint was computed once at startup only - the activity is not recreated when the system flips light/dark, and switching the in-app theme re-declared nothing either, so dark icons could end up on a dark background. A new `SystemBarIconAppearanceEffect` lives in the theme and re-applies whenever the theme flips; the player's fullscreen path declares its own rule and restores it on exit. (2) Entries whose files live in a folder added through the system file picker are no longer reported as missing when a playlist is played back - the `saf:` ids were classified as MediaStore numeric ids while the existence check used `File(path).exists()`, which can never resolve a `content://` uri. `SafMediaIds` and `MediaUriProbe` now split the check by uri kind (document lookup for `content`, local path for `file`)** | **Current (stable)** |
+| **v1.2.4** | **Two fixes where UI state stopped following the data: (1) the status-bar icon tint was computed once at startup only - the activity is not recreated when the system flips light/dark, and switching the in-app theme re-declared nothing either, so dark icons could end up on a dark background. A new `SystemBarIconAppearanceEffect` lives in the theme and re-applies whenever the theme flips; the player's fullscreen path declares its own rule and restores it on exit. (2) Entries whose files live in a folder added through the system file picker are no longer reported as missing when a playlist is played back - the `saf:` ids were classified as MediaStore numeric ids while the existence check used `File(path).exists()`, which can never resolve a `content://` uri. `SafMediaIds` and `MediaUriProbe` now split the check by uri kind (document lookup for `content`, local path for `file`)** | Done |
+| **v1.3.0** | **Favorites and desktop lyrics: (1) file / folder favourites - the star at the top right of the media library opens a separate favourites page where files and folders sit in one list, newest first, capped at 200; the selection bar in the media library, the browser and the recent list can favourite the selected items, and the browser's top bar favourites the folder you are in; tapping a favourite folder switches to Browse and opens that directory, and a revoked grant is reported as "this folder can no longer be opened" instead of showing an empty directory; the recent list gained multi-select along the way. (2) Desktop lyrics - a new Settings page with the switch, four font sizes, four background opacities, a position lock and reset; a `TYPE_APPLICATION_OVERLAY` window shows the current line plus a preview of the next one and carries play/pause, font smaller, font larger and lock buttons; it stays away when the user turned it off, when the overlay permission is missing, when subtitles are switched off, when the file has no lyrics, and while this app is in the foreground; adds the `SYSTEM_ALERT_WINDOW` permission and its row on the permissions page** | **Current (stable)** |
 | Later | Audio translation (dubbing) | Planned |
 
 ---

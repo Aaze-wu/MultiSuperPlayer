@@ -73,6 +73,7 @@ import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 /**
  * 控制条和提示层自动消失的时间。
@@ -511,6 +512,47 @@ fun PlayerRoute(
         onClick = { ui.applyKeepScreenOn(!keepScreenOn) },
     )
 
+    // 桌面歌词入口。
+    //
+    // 它不是「开/关」两态，而是四态（见 `desktopLyricsEntryAction`）：没权限时
+    // 开关开着一整件事都等于没开（浮窗挂不上去），所以那一档的文案必须是
+    // 「需要权限」而不是「已开启」——否则用户会照着这句话回到桌面，
+    // 然后发现什么都没有。
+    //
+    // 状态取自 `DesktopLyricsOverlayHost`（一个应用级 single）而不是另开一个
+    // ViewModel：浮窗的开关、锁定、权限三件事都住在那个宿主里，播放页只做一个
+    // 「把它现在那一档显示出来」的窗口。它给浮窗用的权限结论和给这个按钮用的
+    // 是同一个值，所以不会出现「按钮说已开启、浮窗却还没出现」。
+    val desktopLyricsHost: DesktopLyricsOverlayHost = koinInject()
+    val desktopLyricsEntry by desktopLyricsHost.entry.collectAsStateWithLifecycle()
+    val desktopLyricsChip = PlayerBarChip(
+        label = stringResource(
+            when (desktopLyricsEntry.action) {
+                DesktopLyricsEntryAction.REQUEST_PERMISSION -> R.string.msp_player_desktop_lyrics_need_permission
+                // 关着的时候写功能名（和睡眠定时/均衡器同一套读法），不是「开桌面歌词」：
+                // 芯片上本来就只放名词，动词留给点下去之后发生的事。
+                DesktopLyricsEntryAction.ENABLE -> R.string.msp_player_desktop_lyrics
+                DesktopLyricsEntryAction.UNLOCK -> R.string.msp_player_desktop_lyrics_locked
+                DesktopLyricsEntryAction.DISABLE -> R.string.msp_player_desktop_lyrics_on
+            },
+        ),
+        // 只有「真的在用」才点亮：开着但没权限时不点亮——那正是要引起注意的状态，
+        // 而点亮在用户眼里等于「这个功能好好的」。
+        active = desktopLyricsEntry.enabled && desktopLyricsEntry.permissionGranted,
+        onClick = {
+            when (desktopLyricsEntry.action) {
+                // 先开开关再跳系统页：用户回来时功能已经就绪，不用再点第二次。
+                DesktopLyricsEntryAction.REQUEST_PERMISSION -> {
+                    desktopLyricsHost.setEnabled(true)
+                    desktopLyricsHost.openPermissionSettings(context.findActivity())
+                }
+                DesktopLyricsEntryAction.ENABLE -> desktopLyricsHost.setEnabled(true)
+                DesktopLyricsEntryAction.UNLOCK -> desktopLyricsHost.setLocked(false)
+                DesktopLyricsEntryAction.DISABLE -> desktopLyricsHost.setEnabled(false)
+            }
+        },
+    )
+
     // 会话级入口打包成一个对象再往下穿（见 `PlayerSessionChipSet` 的 KDoc：
     // 平铺参数要穿过五层，以后加入口就得改十几处）。
     val sessionChips = PlayerSessionChipSet(
@@ -518,6 +560,7 @@ fun PlayerRoute(
         queue = queueChip,
         equalizer = equalizerChip,
         keepScreenOn = keepScreenOnChip,
+        desktopLyrics = desktopLyricsChip,
         pip = pipChip,
     )
 

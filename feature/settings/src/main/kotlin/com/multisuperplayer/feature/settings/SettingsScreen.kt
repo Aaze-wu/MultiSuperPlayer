@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.SystemUpdate
@@ -30,8 +31,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.appinfo.AppBuildInfo
+import com.multisuperplayer.core.data.permissions.PermissionKind
 import com.multisuperplayer.core.data.permissions.PermissionSnapshot
+import com.multisuperplayer.core.data.permissions.PermissionState
 import com.multisuperplayer.core.data.power.KeepAliveState
+import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -39,9 +43,9 @@ import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 设置**入口页**：七行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
+ * 设置**入口页**：九行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
- * 为什么把它拆成入口页 + 七个子页，而不是继续把设置项铺在一页里：
+ * 为什么把它拆成入口页 + 九个子页，而不是继续把设置项铺在一页里：
  *
  * 1. 一页铺开的表在设置项变多之后必然要滚两三屏，而用户每次进来只为一件事。
  *    找「长按倍速」要先滚过所有主题选项，这个成本会随每一项新增而增长。
@@ -51,13 +55,14 @@ import org.koin.androidx.compose.koinViewModel
  * 3. 「关于」这类信息页和「调什么」的设置页混在一起，是后面加「检查更新」、
  *    开源许可、导出日志时最别扭的地方。分开之后它们各有各的地方。
  *
- * 这个页面因此**不需要**任何写入回调，只读摘要 + 七条导航。
+ * 这个页面因此**不需要**任何写入回调，只读摘要 + 九条导航。
  */
 @Composable
 fun SettingsRoute(
     modifier: Modifier = Modifier,
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
+    onOpenDesktopLyrics: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
@@ -69,6 +74,7 @@ fun SettingsRoute(
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val translation by viewModel.translation.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
+    val desktopLyrics by viewModel.desktopLyrics.collectAsStateWithLifecycle()
     val permissionState by viewModel.permissionState.collectAsStateWithLifecycle()
     val keepAliveState by viewModel.keepAliveState.collectAsStateWithLifecycle()
     val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
@@ -105,6 +111,7 @@ fun SettingsRoute(
         theme = theme,
         buildInfo = viewModel.buildInfo,
         playback = playback,
+        desktopLyrics = desktopLyrics,
         translation = translation,
         asrEntry = asrEntry,
         localModelEntry = localModelEntry,
@@ -114,6 +121,7 @@ fun SettingsRoute(
         modifier = modifier,
         onOpenAppearance = onOpenAppearance,
         onOpenPlayback = onOpenPlayback,
+        onOpenDesktopLyrics = onOpenDesktopLyrics,
         onOpenTranslationSettings = onOpenTranslationSettings,
         onOpenAsrSettings = onOpenAsrSettings,
         onOpenAbout = onOpenAbout,
@@ -135,6 +143,11 @@ fun SettingsScreen(
     buildInfo: AppBuildInfo = AppBuildInfo.Unknown,
     modifier: Modifier = Modifier,
     playback: PlaybackSettings = PlaybackSettings(),
+    /**
+     * 桌面歌词偏好。默认值是个**关**状态（[DesktopLyricsSettings] 的默认参数），
+     * 与真实首帧一致：这一行默认不会说「已开启」。
+     */
+    desktopLyrics: DesktopLyricsSettings = DesktopLyricsSettings(),
     translation: TranslationSettings = TranslationSettings(),
     asrEntry: AsrEntryState = AsrEntryState(),
     /**
@@ -152,6 +165,7 @@ fun SettingsScreen(
     keepAliveState: KeepAliveState = KeepAliveState.RESTRICTED,
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
+    onOpenDesktopLyrics: () -> Unit = {},
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
@@ -187,6 +201,24 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_playback),
                     subtitle = SettingsSummaries.playback(playback, softwareDecodingAvailable).string(),
                     onClick = onOpenPlayback,
+                )
+            }
+            item {
+                SettingActionRow(
+                    // 紧跟在「播放」后面：它也是个**播放时**才起作用的东西，
+                    // 但自己一页——理由写在 `DesktopLyricsSettingsRoute` 的注释里（它会跳系统授权页，
+                    // 而「播放设置」那一页的三个子页都不能接受一次意外跳转）。
+                    icon = Icons.Outlined.PictureInPictureAlt,
+                    title = stringResource(R.string.msp_settings_desktop_lyrics),
+                    // 悬浮窗权限单独传给摘要：开了但没权限时屏幕上什么都不会出现，
+                    // 而那一行如果只说「已开启」，用户会以为功能坏了。
+                    subtitle = SettingsSummaries
+                        .desktopLyrics(
+                            desktopLyrics,
+                            permissionState[PermissionKind.OVERLAY] == PermissionState.GRANTED,
+                        )
+                        .string(),
+                    onClick = onOpenDesktopLyrics,
                 )
             }
             item {

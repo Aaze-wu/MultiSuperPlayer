@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -32,6 +34,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -84,6 +87,9 @@ internal fun DirectoryBrowser(
     modifier: Modifier = Modifier,
     selection: BrowserSelection = BrowserSelection(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    /** 当前目录是否已收藏（顶栏那颗星是实心还是空心）。 */
+    folderFavorited: Boolean = false,
+    onToggleFolderFavorite: () -> Unit = {},
     onUp: () -> Unit = {},
     onEnterDirectory: (BrowserEntry) -> Unit = {},
     onOpenCrumb: (Int) -> Unit = {},
@@ -108,6 +114,8 @@ internal fun DirectoryBrowser(
                     onSelectAll = selection.onSelectAll,
                     onClearSelection = selection.onClear,
                     onAddToPlaylist = selection.onAddToPlaylist,
+                    onFavorite = selection.onFavorite,
+                    favoriteAll = selection.favoriteAll,
                     onPlay = selection.onPlay,
                 )
             } else {
@@ -137,6 +145,30 @@ internal fun DirectoryBrowser(
                         }
                     },
                     actions = {
+                        // 收藏「当前这个目录」。放在排序按钮**左边**：
+                        // 排序是每一次浏览都要用的、收藏是一个偶尔做一次的动作，
+                        // 常驻的那个该在内侧。
+                        IconButton(onClick = onToggleFolderFavorite) {
+                            Icon(
+                                imageVector = if (folderFavorited) {
+                                    Icons.Outlined.Star
+                                } else {
+                                    Icons.Outlined.StarBorder
+                                },
+                                contentDescription = stringResource(
+                                    if (folderFavorited) {
+                                        R.string.msp_favorites_remove
+                                    } else {
+                                        R.string.msp_favorites_add
+                                    },
+                                ),
+                                tint = if (folderFavorited) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    LocalContentColor.current
+                                },
+                            )
+                        }
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.Sort,

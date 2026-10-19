@@ -5,7 +5,7 @@ import android.Manifest
 /**
  * 权限页里的一项。
  *
- * **只有这四项**，不是应用声明过的全部权限。分界线是「用户能不能改」：
+ * **只有这五项**，不是应用声明过的全部权限。分界线是「用户能不能改」：
  * 能改的才值得列成一行，改不了的（`INTERNET` 之类）列出来只会让人以为点了有用，
  * 于是它们退化成一段折叠说明（见 [PermissionRules.OTHER_PERMISSIONS]）。
  */
@@ -21,6 +21,14 @@ enum class PermissionKind {
 
     /** 蓝牙 `BLUETOOTH_CONNECT`（31+）。 */
     BLUETOOTH,
+
+    /**
+     * 悬浮窗 `SYSTEM_ALERT_WINDOW`：桌面歌词要把窗口画在别的应用之上。
+     *
+     * 声明顺序 = 权限页的显示顺序，所以它排在最后：「桌面歌词」是默认关闭的可选功能，
+     * 位置越靠前越容易被当成「必须先开的东西」。
+     */
+    OVERLAY,
 }
 
 /**
@@ -83,12 +91,13 @@ data class MediaPermissionFacts(
     val asked: Boolean,
 )
 
-/** 权限页的四行状态，一次算好。 */
+/** 权限页每一行的状态，一次算好。 */
 data class PermissionSnapshot(
     val media: PermissionState = PermissionState.NOT_ASKED,
     val allFiles: PermissionState = PermissionState.NOT_ASKED,
     val notification: PermissionState = PermissionState.NOT_ASKED,
     val bluetooth: PermissionState = PermissionState.NOT_ASKED,
+    val overlay: PermissionState = PermissionState.NOT_ASKED,
 ) {
 
     operator fun get(kind: PermissionKind): PermissionState = when (kind) {
@@ -96,6 +105,7 @@ data class PermissionSnapshot(
         PermissionKind.ALL_FILES -> allFiles
         PermissionKind.NOTIFICATION -> notification
         PermissionKind.BLUETOOTH -> bluetooth
+        PermissionKind.OVERLAY -> overlay
     }
 }
 
@@ -163,16 +173,22 @@ object PermissionRules {
      * 送他去应用详情页则**永远不会错**：那里既有开关（能开就能开），
      * 也能看出这一项是不是真的开不了。
      *
-     * 「所有文件访问」也永远是 `false`：它是特权权限，系统不给应用弹框这一条路，
-     * 只能把用户送到那个专属设置页。这一条如果写反，用户点「申请」同样什么都不会发生
-     * （系统对 `MANAGE_EXTERNAL_STORAGE` 的 `requestPermissions` 直接静默拒绝）。
+     * 「所有文件访问」和「悬浮窗」也永远是 `false`：它们都是特权权限，系统不给应用
+     * 弹框这一条路，只能把用户送到各自的专属设置页。这一条如果写反，用户点「申请」
+     * 同样什么都不会发生（系统对 `MANAGE_EXTERNAL_STORAGE` 与 `SYSTEM_ALERT_WINDOW`
+     * 的 `requestPermissions` 都直接静默拒绝）。
+     *
+     * 判据写成**白名单**（[IN_PLACE_KINDS]）而不是「不等于那两个」：反过来写的话，
+     * 将来加第六项时会默认落在「能就地弹框」那一支——一个按了没反应的按钮，
+     * 而且没有任何编译期提示。白名单的形式会让新加的一项不写进去就**默认不给按钮**，
+     * 那是两种错里更轻的那一种（用户看到的是「去设置」，而不是「点了没用」）。
      */
     fun canAskInPlace(kind: PermissionKind, state: PermissionState): Boolean = when (state) {
         // 这三态的共同点：系统还愿意为此弹框（PARTIAL 也是——缺的那一半照样能申请）。
         PermissionState.NOT_ASKED,
         PermissionState.ASK_AGAIN,
         PermissionState.PARTIAL,
-        -> kind != PermissionKind.ALL_FILES
+        -> kind in IN_PLACE_KINDS
 
         // GRANTED：已经允许了，没有可申请的东西。
         // GO_TO_SETTINGS：系统不再弹框，只能去设置页。
@@ -235,5 +251,18 @@ object PermissionRules {
         Manifest.permission.MANAGE_EXTERNAL_STORAGE,
         Manifest.permission.POST_NOTIFICATIONS,
         Manifest.permission.BLUETOOTH_CONNECT,
+        Manifest.permission.SYSTEM_ALERT_WINDOW,
+    )
+
+    /**
+     * 能**就地弹系统授权框**的那几项（见 [canAskInPlace]）。
+     *
+     * 不在这一份里的都是「只能去系统页面开」的特权权限：`MANAGE_EXTERNAL_STORAGE`
+     * 和 `SYSTEM_ALERT_WINDOW`。
+     */
+    private val IN_PLACE_KINDS: Set<PermissionKind> = setOf(
+        PermissionKind.MEDIA,
+        PermissionKind.NOTIFICATION,
+        PermissionKind.BLUETOOTH,
     )
 }

@@ -42,6 +42,7 @@ internal object PermissionSummaries {
         PermissionKind.ALL_FILES -> MspText.Res(R.string.msp_settings_file_access)
         PermissionKind.NOTIFICATION -> MspText.Res(R.string.msp_permissions_notification)
         PermissionKind.BLUETOOTH -> MspText.Res(R.string.msp_permissions_bluetooth)
+        PermissionKind.OVERLAY -> MspText.Res(R.string.msp_permissions_overlay)
     }
 
     /**
@@ -53,6 +54,7 @@ internal object PermissionSummaries {
         PermissionKind.ALL_FILES -> MspText.Res(R.string.msp_permissions_all_files_desc)
         PermissionKind.NOTIFICATION -> MspText.Res(R.string.msp_permissions_notification_desc)
         PermissionKind.BLUETOOTH -> MspText.Res(R.string.msp_permissions_bluetooth_desc)
+        PermissionKind.OVERLAY -> MspText.Res(R.string.msp_permissions_overlay_desc)
     }
 
     /**

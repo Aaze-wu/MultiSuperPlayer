@@ -1,5 +1,6 @@
 package com.multisuperplayer.feature.library
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -46,11 +47,39 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.common.format.TimeFormat
 import com.multisuperplayer.core.data.export.PlaybackExportFormat
+import com.multisuperplayer.core.data.favorites.FavoriteRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.RecentPlay
 import com.multisuperplayer.core.ui.text.string
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+
+/**
+ * 最近播放页的多选接线。
+ *
+ * 与目录页的 `BrowserSelection` 是同一套形状：多选状态在界面层（不进 ViewModel），
+ * 数字、全选、退出、两个动作全都从这里往下传，界面层不再各自判断
+ * 「现在是多选还是平常」。
+ *
+ * 这一页以前没有多选，所以**行的删除按钮只在非多选时出现**：多选时每一行左边的
+ * 封面换成了勾选框，行内再放一个叉号会被读成「从选择里去掉这一项」。
+ */
+data class RecentSelection(
+    val ids: List<String> = emptyList(),
+    val count: Int = 0,
+    val allSelected: Boolean = false,
+    /** 选中项是否全部已收藏（决定操作条上的星是实心还是空心）。 */
+    val favoriteAll: Boolean = false,
+    val onToggle: (String) -> Unit = {},
+    val onExit: () -> Unit = {},
+    val onSelectAll: () -> Unit = {},
+    val onClear: () -> Unit = {},
+    val onAddToPlaylist: () -> Unit = {},
+    val onFavorite: () -> Unit = {},
+    val onPlay: () -> Unit = {},
+) {
+    val mode: Boolean get() = ids.isNotEmpty()
+}
 
 /**
  * 最近播放入口（有状态）。
@@ -63,6 +92,46 @@ fun RecentRoute(
     val viewModel: RecentViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val export by viewModel.export.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+
+    // 选择集是**界面瞬态**（不进 ViewModel、不落盘），而且**有顺序**：
+    // 用户先点哪条、后点哪条，就是加入播放列表/开始播放的顺序。
+    var selectedIds by rememberSaveable(stateSaver = MEDIA_SELECTION_SAVER) {
+        mutableStateOf(emptyList<String>())
+    }
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
+
+    // 这一页的条目全部可播（每一行就是一条续播记录），所以「可播清单」就是全部行。
+    val entries = remember(state.rows) { state.rows.orEmpty().map { it.entry } }
+
+    // 剪枝的理由与浏览页相同：刷新后记录可能少了几条，留着旧 id 会让操作条
+    // 显示一个屏幕上不存在的数字。key 用这份清单而不是它的长度。
+    LaunchedEffect(entries) {
+        val pruned = pruneSelection(selectedIds, entries)
+        if (pruned !== selectedIds) selectedIds = pruned
+    }
+
+    val selectedEntries = LibrarySelectionRules.resolve(entries, selectedIds)
+
+    // 多选时返回键的语义是「退出多选」。与浏览页一致，也要写在别的地方的
+    // BackHandler 之后（这里没有，但保持顺序习惯一致）。
+    BackHandler(enabled = selectedIds.isNotEmpty()) { selectedIds = emptyList() }
+
+    val selection = RecentSelection(
+        ids = selectedIds,
+        count = selectedEntries.size,
+        allSelected = LibrarySelectionRules.allSelected(selectedIds, entries),
+        favoriteAll = FavoriteRules.allFavorited(favorites, selectedEntries),
+        onToggle = { id -> selectedIds = toggleSelection(selectedIds, entries, id) },
+        onExit = { selectedIds = emptyList() },
+        onSelectAll = { selectedIds = LibrarySelectionRules.addAll(selectedIds, entries) },
+        onClear = { selectedIds = LibrarySelectionRules.removeAll(selectedIds, entries) },
+        onAddToPlaylist = { pickerOpen = true },
+        onFavorite = { viewModel.toggleFavorite(selectedEntries) },
+        onPlay = { if (selectedEntries.isNotEmpty()) onPlayRequest(selectedEntries, 0) },
+    )
 
     // 导出要分两步：先记住用户选的是哪种格式（弹菜单那一刻就知道），再等 SAF
     // 回来拿到目标 uri（可能要过好几秒，用户还得翻目录）。两件事不能一起从
@@ -97,10 +166,23 @@ fun RecentRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // 收藏 / 加入播放列表的结果。与「最近」自己的删除/导出提示共用一个
+    // snackbarHost：否则同一个页面会出现两条上下叠着的提示。
+    val snackbarHostState = remember { SnackbarHostState() }
+    val messageText = message?.text?.string()
+    LaunchedEffect(message?.nonce) {
+        val text = messageText ?: return@LaunchedEffect
+        // nonce 而不是文本做 key：连续两次「已收藏 3 项」是完全相等的对象，
+        // 只按文本判断的话第二条不会显示，用户会以为第二次点击没生效。
+        snackbarHostState.showSnackbar(text)
+    }
+
     RecentScreen(
         state = state,
         modifier = modifier,
         export = export,
+        selection = selection,
+        snackbarHostState = snackbarHostState,
         onRefresh = viewModel::refresh,
         onDelete = viewModel::delete,
         onUndoDelete = viewModel::undoDelete,
@@ -115,6 +197,25 @@ fun RecentRoute(
         },
         onDismissExport = viewModel::dismissExport,
     )
+
+    if (pickerOpen) {
+        PlaylistPickerDialog(
+            playlists = playlists,
+            onDismiss = { pickerOpen = false },
+            // 选完就退出多选：动作已经落地，接着还勾着一批东西会让用户
+            // 以为「刚才那一批还没加进去」。
+            onPick = { playlistId ->
+                viewModel.addToPlaylist(playlistId, selectedEntries)
+                pickerOpen = false
+                selectedIds = emptyList()
+            },
+            onCreate = { name ->
+                viewModel.createPlaylistWith(name, selectedEntries)
+                pickerOpen = false
+                selectedIds = emptyList()
+            },
+        )
+    }
 }
 
 /**
@@ -144,6 +245,7 @@ fun RecentScreen(
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     export: PlaybackExportState = PlaybackExportState.Idle,
+    selection: RecentSelection = RecentSelection(),
     onRefresh: () -> Unit = {},
     onDelete: (RecentPlay) -> Unit = {},
     onUndoDelete: (RecentPlay) -> Unit = {},
@@ -196,48 +298,62 @@ fun RecentScreen(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.msp_recent_title)) },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(
-                            imageVector = Icons.Outlined.Refresh,
-                            contentDescription = stringResource(R.string.msp_recent_refresh),
-                        )
-                    }
-                    // 一条记录都没有时不给「清空」：那时它没有任何作用，
-                    // 而一个点了没反应的图标比一个不存在的图标更让人困惑。
-                    //
-                    // 导出同理（哪怕导出空表会被拦成「没有可导出的内容」，
-                    // 那个提示本身也没意义：那个图标不应该在那里）。
-                    if (!state.rows.isNullOrEmpty()) {
-                        // 「导出成哪种格式」必须先问：SAF 的 `CreateDocument` 只能带
-                        // 一个文件名，带不了「CSV 还是 JSON」这个选择。
-                        Box {
-                            IconButton(onClick = { choosingExport = true }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.FileDownload,
-                                    contentDescription = stringResource(R.string.msp_recent_export),
+            if (selection.mode) {
+                SelectionTopBar(
+                    count = selection.count,
+                    allSelected = selection.allSelected,
+                    onExit = selection.onExit,
+                    onSelectAll = selection.onSelectAll,
+                    onClearSelection = selection.onClear,
+                    onAddToPlaylist = selection.onAddToPlaylist,
+                    onFavorite = selection.onFavorite,
+                    favoriteAll = selection.favoriteAll,
+                    onPlay = selection.onPlay,
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.msp_recent_title)) },
+                    actions = {
+                        IconButton(onClick = onRefresh) {
+                            Icon(
+                                imageVector = Icons.Outlined.Refresh,
+                                contentDescription = stringResource(R.string.msp_recent_refresh),
+                            )
+                        }
+                        // 一条记录都没有时不给「清空」：那时它没有任何作用，
+                        // 而一个点了没反应的图标比一个不存在的图标更让人困惑。
+                        //
+                        // 导出同理（哪怕导出空表会被拦成「没有可导出的内容」，
+                        // 那个提示本身也没意义：那个图标不应该在那里）。
+                        if (!state.rows.isNullOrEmpty()) {
+                            // 「导出成哪种格式」必须先问：SAF 的 `CreateDocument` 只能带
+                            // 一个文件名，带不了「CSV 还是 JSON」这个选择。
+                            Box {
+                                IconButton(onClick = { choosingExport = true }) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.FileDownload,
+                                        contentDescription = stringResource(R.string.msp_recent_export),
+                                    )
+                                }
+                                ExportFormatMenu(
+                                    expanded = choosingExport,
+                                    onDismiss = { choosingExport = false },
+                                    onPick = { format ->
+                                        choosingExport = false
+                                        onExport(format)
+                                    },
                                 )
                             }
-                            ExportFormatMenu(
-                                expanded = choosingExport,
-                                onDismiss = { choosingExport = false },
-                                onPick = { format ->
-                                    choosingExport = false
-                                    onExport(format)
-                                },
-                            )
+                            IconButton(onClick = { confirmingClear = true }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteSweep,
+                                    contentDescription = stringResource(R.string.msp_recent_clear),
+                                )
+                            }
                         }
-                        IconButton(onClick = { confirmingClear = true }) {
-                            Icon(
-                                imageVector = Icons.Outlined.DeleteSweep,
-                                contentDescription = stringResource(R.string.msp_recent_clear),
-                            )
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -270,8 +386,11 @@ fun RecentScreen(
 
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(rows, key = { _, row -> row.entry.id }) { index, row ->
+                        val longPress = { selection.onToggle(row.entry.id) }
                         MediaEntryRow(
                             entry = row.entry,
+                            selected = row.entry.id in selection.ids,
+                            selectionMode = selection.mode,
                             // 位置为 0 是**一条正常记录**（刚播过，但下次从头播：短片、
                             // 或播到只剩尾巴的那种）。显示「播放到 00:00」会被读成
                             // 「没记下位置」，所以这一支单独给一句话。
@@ -287,19 +406,33 @@ fun RecentScreen(
                                     TimeFormat.dateTime(row.playedAtMs),
                                 )
                             },
-                            onClick = { onPlayRequest(rows.map { it.entry }, index) },
+                            // 多选时点整行 = 勾/取消勾；平常点整行 = 从这一条开始播。
+                            onClick = {
+                                if (selection.mode) {
+                                    selection.onToggle(row.entry.id)
+                                } else {
+                                    onPlayRequest(rows.map { it.entry }, index)
+                                }
+                            },
+                            // 长按进多选（并立即把这一行勾上），与媒体库/浏览页同一个手势。
+                            onLongClick = if (selection.mode) null else longPress,
                             trailing = {
                                 // 时长 + 删除。时长保留（它是这一行唯一的「这文件多大」
                                 // 信息），删除按钮放在它右边——和播放列表详情页
                                 // 「时长 + 移除」完全一样的排法，两处按钮长在同一个
                                 // 位置上，用户不用分别学。
+                                //
+                                // 多选时不给行内删除：那时左边的封面已经换成了勾选框，
+                                // 行内再放一个叉号会被读成「从选择里去掉这一项」。
                                 EntryTrailing {
                                     EntryDuration(row.entry)
-                                    IconButton(onClick = { deleteWithUndo(row) }) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Close,
-                                            contentDescription = removeLabel,
-                                        )
+                                    if (!selection.mode) {
+                                        IconButton(onClick = { deleteWithUndo(row) }) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Close,
+                                                contentDescription = removeLabel,
+                                            )
+                                        }
                                     }
                                 }
                             },

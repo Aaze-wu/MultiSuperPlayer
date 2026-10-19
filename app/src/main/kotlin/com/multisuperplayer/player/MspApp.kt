@@ -38,6 +38,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.external.PendingExternalPlayback
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
+import com.multisuperplayer.core.data.favorites.Favorite
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.ui.chrome.AppChromeState
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
@@ -50,6 +51,7 @@ import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import com.multisuperplayer.feature.library.BrowseRoute
+import com.multisuperplayer.feature.library.FavoritesRoute
 import com.multisuperplayer.feature.library.LibraryRoute
 import com.multisuperplayer.feature.library.NetworkRoute
 import com.multisuperplayer.feature.library.PlaylistsRoute
@@ -58,6 +60,7 @@ import com.multisuperplayer.feature.player.PlayerRoute
 import com.multisuperplayer.feature.settings.AboutRoute
 import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
 import com.multisuperplayer.feature.settings.AsrSettingsRoute
+import com.multisuperplayer.feature.settings.DesktopLyricsSettingsRoute
 import com.multisuperplayer.feature.settings.KeepAliveRoute
 import com.multisuperplayer.feature.settings.UpdateRoute
 import com.multisuperplayer.feature.settings.LocalModelSettingsRoute
@@ -267,6 +270,15 @@ private const val TRANSLATION_SETTINGS_ROUTE = "settings/translation"
  */
 private const val APPEARANCE_SETTINGS_ROUTE = "settings/appearance"
 private const val PLAYBACK_SETTINGS_ROUTE = "settings/playback"
+
+/**
+ * 桌面歌词页：开关、字号、不透明度、锁定、恢复位置。
+ *
+ * 单独一页而不是塞进「播放设置」：开启它要跳一次系统的「显示在其他应用上层」页面，
+ * 而那张页面属于「系统让步」那一类（和权限页、后台保活页同类），
+ * 放在「播放设置」里会让一个只调倍速的人莫名跳到系统页面。
+ */
+private const val DESKTOP_LYRICS_ROUTE = "settings/desktop-lyrics"
 // 模型管理要能离开页面继续下载（见 `AsrSettingsViewModel`），所以它是独立目的地；
 // 下载任务活在它自己的 `viewModelScope` 里，返回设置页不会把下载掐掉。
 private const val ASR_SETTINGS_ROUTE = "settings/asr"
@@ -332,6 +344,15 @@ private const val PERMISSION_SETTLE_TIMEOUT_MS = 30_000L
  */
 private const val LOCAL_MODEL_ROUTE = "settings/translation/local"
 
+/**
+ * 收藏页。
+ *
+ * 它是**媒体库下的子页**，不是第六个底部标签：底部五个标签是「在哪儿找东西」的
+ * 五个大分区，而收藏是「我手里有一批东西」的个人清单，归属比分区更靠下。
+ * 做成标签的代价是底部栏多一格，而用户一周可能只进一次收藏页。
+ */
+private const val FAVORITES_ROUTE = "favorites"
+
 @Composable
 private fun MspAppScaffold(
     updateViewModel: UpdateViewModel,
@@ -382,6 +403,13 @@ private fun MspAppScaffold(
     // 类型，而旋转会丢的也只是「用户得再点一次这条字幕」——它生效了就会立刻被消费掉，
     // 能被旋转丢掉的只可能是还没生效的那一个。
     var pendingSubtitle by remember { mutableStateOf<SubtitleSource?>(null) }
+
+    // 用户在收藏页点了一个文件夹 —— 同样是跨页信箱，只有一个值。
+    //
+    // 这里必须跨页，因为「收藏」和「浏览」是两个不同的目的地，而 `Favorite.Folder`
+    // 带着整条面包屑 + 来源类型，塞不进路由参数（那是字符串）。消费方式与
+    // [pendingSubtitle] 一致：浏览页拿去用掉，然后回调把信盒清空。
+    var pendingFolder by remember { mutableStateOf<Favorite.Folder?>(null) }
 
     val openSubtitle: (SubtitleSource) -> Unit = { source ->
         pendingSubtitle = source
@@ -463,12 +491,32 @@ private fun MspAppScaffold(
                     // 重复点同一个列表项不应该在返回栈里堆出十几个播放页，
                     // 所以这条导航统一走 playFrom 里的 launchSingleTop。
                     onPlayRequest = playFrom,
+                    // 媒体库右上角那颗星。`launchSingleTop`：连点两次不会堆出两层收藏页。
+                    onOpenFavorites = {
+                        navController.navigate(FAVORITES_ROUTE) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable(FAVORITES_ROUTE) {
+                FavoritesRoute(
+                    onBack = { navController.popBackStack() },
+                    onPlayRequest = playFrom,
+                    onOpenFolder = { folder ->
+                        // 先把信放进盒子，再切到浏览标签；浏览页进组合时会把这条
+                        // 请求消费掉（见 `BrowseRoute` 的 `pendingFavorite`）。
+                        pendingFolder = folder
+                        navigateToTab(MspDestination.BROWSE)
+                    },
                 )
             }
             composable(MspDestination.BROWSE.route) {
                 BrowseRoute(
                     onPlayRequest = playFrom,
                     onOpenSubtitle = openSubtitle,
+                    // 从收藏页过来时直接打开那个目录。用掉就清空：留在那儿的话，
+                    // 此后再点进浏览标签都会强制跳回同一个目录。
+                    pendingFavorite = pendingFolder,
+                    onPendingFavoriteApplied = { pendingFolder = null },
                     // 「网络地址」那一行在浏览页里面，但去哪个页面只有这一层知道
                     // （导航图住在这里），所以只能把 «去哪儿» 当参数传下去。
                     // `launchSingleTop`：连点两次不会堆出两层网络地址页。
@@ -527,6 +575,7 @@ private fun MspAppScaffold(
                 SettingsRoute(
                     onOpenAppearance = { navController.navigate(APPEARANCE_SETTINGS_ROUTE) },
                     onOpenPlayback = { navController.navigate(PLAYBACK_SETTINGS_ROUTE) },
+                    onOpenDesktopLyrics = { navController.navigate(DESKTOP_LYRICS_ROUTE) },
                     onOpenTranslationSettings = { navController.navigate(TRANSLATION_SETTINGS_ROUTE) },
                     onOpenAsrSettings = { navController.navigate(ASR_SETTINGS_ROUTE) },
                     onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
@@ -571,6 +620,9 @@ private fun MspAppScaffold(
             }
             composable(PLAYBACK_SETTINGS_ROUTE) {
                 PlaybackSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(DESKTOP_LYRICS_ROUTE) {
+                DesktopLyricsSettingsRoute(onBack = { navController.popBackStack() })
             }
             composable(ABOUT_ROUTE) {
                 AboutRoute(onBack = { navController.popBackStack() })

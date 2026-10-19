@@ -185,6 +185,23 @@ class PermissionRulesTest {
     }
 
     @Test
+    fun `canAskInPlace - 悬浮窗永远只能去设置页`() {
+        // 和「所有文件访问」同一类：`SYSTEM_ALERT_WINDOW` 是 special access，
+        // `requestPermissions` 对它静默拒绝，只能跳 `ACTION_MANAGE_OVERLAY_PERMISSION`。
+        listOf(
+            PermissionState.NOT_ASKED,
+            PermissionState.ASK_AGAIN,
+            PermissionState.GO_TO_SETTINGS,
+            PermissionState.PARTIAL,
+        ).forEach { state ->
+            assertFalse(
+                "悬浮窗在 $state 时也不该就地申请",
+                PermissionRules.canAskInPlace(PermissionKind.OVERLAY, state),
+            )
+        }
+    }
+
+    @Test
     fun `canAskInPlace - 其余三项只要系统还愿意弹框就能申请`() {
         listOf(PermissionKind.MEDIA, PermissionKind.NOTIFICATION, PermissionKind.BLUETOOTH).forEach { kind ->
             listOf(
@@ -245,7 +262,7 @@ class PermissionRulesTest {
     }
 
     @Test
-    fun `清单对照表 - 四项可更改权限对应的权限名都在单列清单里`() {
+    fun `清单对照表 - 五项可更改权限对应的权限名都在单列清单里`() {
         // 单列清单是拿来跟 AndroidManifest 对照的，所以它必须**看得到**四项里每一项
         // 实际申请的那个权限名。漏一条（比如加了第五项却忘了往这里加），
         // 覆盖测试就再也拦不住「声明了权限但页面上没说」。
@@ -254,6 +271,7 @@ class PermissionRulesTest {
         assertTrue(PermissionRules.LISTED_PERMISSIONS.contains(Manifest.permission.BLUETOOTH_CONNECT))
         assertTrue(PermissionRules.LISTED_PERMISSIONS.contains(Manifest.permission.READ_MEDIA_AUDIO))
         assertTrue(PermissionRules.LISTED_PERMISSIONS.contains(Manifest.permission.READ_MEDIA_VIDEO))
+        assertTrue(PermissionRules.LISTED_PERMISSIONS.contains(Manifest.permission.SYSTEM_ALERT_WINDOW))
     }
 
     @Test

@@ -19,6 +19,8 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -213,8 +215,12 @@ internal val MEDIA_SELECTION_SAVER = listSaver<List<String>, String>(
  * 标题位置放「已选 N 项」，返回图标当「退出多选」——
  * 用户按下返回键的直觉就是「取消当前这个状态」，没必要为它单独发明一个按钮。
  *
- * 媒体库页和浏览页共用这一条：两个页面上的手势、图标、文案完全一样，
+ * 媒体库页、最近播放页和浏览页共用这一条：三个页面上的手势、图标、文案完全一样，
  * 而复制一份的代价是以后加一个动作时会漏掉其中一边。
+ *
+ * [favoriteAll] 只说「选中项是不是全都已收藏」，用来决定星标是实心还是空心：
+ * 空心的意思是「点下去会收藏」，实心的意思是「点下去会取消」。同一个按钮做两件事
+ * 必须先在视觉上说出来，否则用户以为自己在收藏，实际取消了。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -225,7 +231,9 @@ internal fun SelectionTopBar(
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onFavorite: () -> Unit,
     onPlay: () -> Unit,
+    favoriteAll: Boolean = false,
 ) {
     TopAppBar(
         title = { Text(stringResource(R.string.msp_library_selection_count, count)) },
@@ -255,6 +263,14 @@ internal fun SelectionTopBar(
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
                     contentDescription = stringResource(R.string.msp_library_add_to_playlist),
+                )
+            }
+            IconButton(onClick = onFavorite) {
+                Icon(
+                    imageVector = if (favoriteAll) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                    contentDescription = stringResource(
+                        if (favoriteAll) R.string.msp_favorites_remove else R.string.msp_favorites_add,
+                    ),
                 )
             }
             IconButton(onClick = onPlay) {

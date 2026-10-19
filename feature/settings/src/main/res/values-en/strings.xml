@@ -103,6 +103,8 @@
     <string name="msp_permissions_notification_desc">Off by default from Android 13 on. Playback controls use a foreground-service notification and are not affected by this; this covers messages the app itself posts.</string>
     <string name="msp_permissions_bluetooth">Bluetooth</string>
     <string name="msp_permissions_bluetooth_desc">Only present from Android 12 on. Nothing in this version needs it yet; it stays declared so connecting Bluetooth playback devices later does not mean asking for it again.</string>
+    <string name="msp_permissions_overlay">Display over other apps</string>
+    <string name="msp_permissions_overlay_desc">Desktop lyrics draws its window on top of other apps. Used only for that feature; playback works fine without it, just without desktop lyrics.</string>
 
     <string name="msp_permissions_state_granted">Allowed</string>
     <string name="msp_permissions_state_partial">Partially allowed</string>
@@ -583,4 +585,44 @@
     <string name="msp_update_startup_now">Update now</string>
     <string name="msp_update_startup_later">Later</string>
     <string name="msp_update_startup_hint">Update now opens the update page, where you can read the full release notes and install it.</string>
+
+    <!-- Desktop lyrics -->
+    <string name="msp_settings_desktop_lyrics">Desktop lyrics</string>
+    <string name="msp_settings_summary_desktop_lyrics_off">Off</string>
+    <string name="msp_settings_summary_desktop_lyrics_no_permission">On · missing the overlay permission</string>
+    <string name="msp_settings_summary_desktop_lyrics_locked">Locked</string>
+    <string name="msp_desktop_lyrics_title">Desktop lyrics</string>
+    <string name="msp_desktop_lyrics_section_switch">Display</string>
+    <string name="msp_desktop_lyrics_switch_title">Show desktop lyrics</string>
+    <string name="msp_desktop_lyrics_switch_help">Floats the lyrics on top of other apps, and only while the current file has subtitles.</string>
+    <string name="msp_desktop_lyrics_switch_on">On: shown on top of other apps while playing</string>
+    <string name="msp_desktop_lyrics_switch_off">Off: nothing appears while playing</string>
+    <string name="msp_desktop_lyrics_switch_no_permission">Turned on, but the \"Display over other apps\" permission is still missing, so nothing appears</string>
+    <string name="msp_desktop_lyrics_grant_title">Display over other apps</string>
+    <string name="msp_desktop_lyrics_grant_subtitle">A special system grant that has to be switched on there before the window can be shown</string>
+    <string name="msp_desktop_lyrics_grant_action">Open settings</string>
+    <string name="msp_desktop_lyrics_note">Lyrics come from the subtitles attached to the file being played, translations included. A file without subtitles shows nothing, and nothing is drawn while the screen is locked or this app is in front, so it never overlaps the subtitles in the player.</string>
+    <string name="msp_desktop_lyrics_section_appearance">Appearance</string>
+    <string name="msp_desktop_lyrics_font_size_title">Text size</string>
+    <string name="msp_desktop_lyrics_font_size_subtitle">Affects the desktop lyrics only, not the subtitles in the picture</string>
+    <string name="msp_desktop_lyrics_font_size_help">The size button on the window steps through the same levels.</string>
+    <string name="msp_desktop_lyrics_font_size_value">%1$d sp</string>
+    <string name="msp_desktop_lyrics_opacity_title">Background opacity</string>
+    <string name="msp_desktop_lyrics_opacity_subtitle">Lighter keeps the picture visible, but the text is easier to lose against it</string>
+    <string name="msp_desktop_lyrics_opacity_help">Only the background fades; the text always stays fully opaque.</string>
+    <string name="msp_desktop_lyrics_opacity_desc_light">Almost transparent, the text is held up by its outline alone</string>
+    <string name="msp_desktop_lyrics_opacity_desc_soft">The default: easy to read, and the picture behind still shows</string>
+    <string name="msp_desktop_lyrics_opacity_desc_strong">A darker backing, steadier on bright and busy footage</string>
+    <string name="msp_desktop_lyrics_opacity_desc_solid">Fully opaque, the easiest to read</string>
+    <string name="msp_desktop_lyrics_reset_appearance_title">Reset appearance</string>
+    <string name="msp_desktop_lyrics_reset_appearance_subtitle">Text size back to Normal, opacity back to 60%</string>
+    <string name="msp_desktop_lyrics_reset_appearance_action">Reset</string>
+    <string name="msp_desktop_lyrics_locked_title">Lock position</string>
+    <string name="msp_desktop_lyrics_locked_subtitle_on">Locked: it cannot be dragged or tapped, and touches go through to the app below</string>
+    <string name="msp_desktop_lyrics_locked_subtitle_off">Unlocked: drag it anywhere and use the buttons on it</string>
+    <string name="msp_desktop_lyrics_locked_help">To unlock, come back to this page or the player page.</string>
+    <string name="msp_desktop_lyrics_section_position">Position</string>
+    <string name="msp_desktop_lyrics_reset_position_title">Reset position</string>
+    <string name="msp_desktop_lyrics_reset_position_subtitle">Back to the bottom centre of the screen; does not turn the lyrics off</string>
+    <string name="msp_desktop_lyrics_reset_position_action">Reset</string>
 </resources>

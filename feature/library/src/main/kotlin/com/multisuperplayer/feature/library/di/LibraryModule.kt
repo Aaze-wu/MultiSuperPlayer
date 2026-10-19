@@ -1,6 +1,7 @@
 package com.multisuperplayer.feature.library.di
 
 import com.multisuperplayer.feature.library.BrowseViewModel
+import com.multisuperplayer.feature.library.FavoritesViewModel
 import com.multisuperplayer.feature.library.LibraryViewModel
 import com.multisuperplayer.feature.library.NetworkViewModel
 import com.multisuperplayer.feature.library.PlaylistsViewModel
@@ -23,6 +24,9 @@ val libraryModule = module {
     viewModelOf(::RecentViewModel)
     viewModelOf(::PlaylistsViewModel)
     viewModelOf(::BrowseViewModel)
+    // 收藏页。它**不是**底部标签页，入口在媒体库顶栏——收藏是「媒体库的一个视图」，
+    // 而不是和使用方式平行的第四个地方。独立 VM 的理由同上：它有自己的读盘与删除。
+    viewModelOf(::FavoritesViewModel)
     // 网络地址页。它的入口在浏览页的来源清单里（不是底部标签页），
     // 但状态归它自己：地址框里的半截输入和浏览页的目录位置没有任何关系。
     viewModelOf(::NetworkViewModel)

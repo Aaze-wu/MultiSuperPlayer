@@ -74,7 +74,16 @@ plugins {
 // 来自 SAF 目录的条目被当成 MediaStore 条目，`File(path).exists()` 永远为 false。
 // 两条都在「界面状态如何跟着数据走」这一层，没有清单 / 权限 / 系统 intent 变化
 // ⇒ 照例直接发正式版，与 1.2.3 **共用 user-visible 功能集**。
-val appVersionName: String = "1.2.4"
+//
+// 1.3.0 起了**新的功能**：桌面歌词（浮在其他应用上面的歌词浮窗）。这一档确实
+// **动了清单与权限**（新增 `SYSTEM_ALERT_WINDOW`），按 1.1.0 那套规矩本可以先发
+// beta —— 但那条规矩的理由是「intent 解析 / 清单匹配在 JVM 单测里观测不到」，
+// 而这里的失败点只有「浮窗到底会不会真的浮出来」，它已经在真机上端到端验过
+// （授权 → 回桌面 → 窗口出现在启动器之上 → 播完/锁屏/应用在前台时按规则隐藏），
+// 加上授权本身失败时是**看得见**的（入口芯片停在「需要权限」）而不是静默失效，
+// 所以照 1.2.3 那条路直接发正式版。
+// 与 1.2.4 不再共用功能集：README 的功能清单要跟着改。
+val appVersionName: String = "1.3.0"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

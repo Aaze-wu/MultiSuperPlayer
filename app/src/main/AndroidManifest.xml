@@ -75,6 +75,23 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!--
+        桌面歌词：把歌词窗口画在别的应用之上（`TYPE_APPLICATION_OVERLAY`）。
+
+        这一条**不是**「装上就有」的普通权限：它是一份 special access，从 API 23 起
+        必须由用户在「显示在其他应用上层」那个系统页里单独放给本应用，代码里调
+        `requestPermissions` 对它是静默拒绝（见 `PermissionRules.canAskInPlace`）。
+        所以：这里声明它 → 权限页把它列成一行（`PermissionKind.OVERLAY`）→
+        需要用户动手时跳 `ACTION_MANAGE_OVERLAY_PERMISSION`。
+
+        缺了这条声明，`WindowManager.addView` 会直接抛 `BadTokenException`
+        （"permission denied for window type 2038"），而桌面歌词那边能做的只有
+        「挂不上就不挂」——用户看到的是「开了开关但没有歌词」，没有任何提示。
+    -->
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- 播放器不建议强制要求硬件特性，缺失时软件解码兜底 -->
     <uses-feature
         android:name="android.hardware.touchscreen"

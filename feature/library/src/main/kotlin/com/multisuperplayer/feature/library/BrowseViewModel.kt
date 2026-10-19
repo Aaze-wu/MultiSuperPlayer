@@ -10,6 +10,9 @@ import com.multisuperplayer.core.data.browser.BrowserRoot
 import com.multisuperplayer.core.data.browser.BrowserSort
 import com.multisuperplayer.core.data.browser.BrowserTrail
 import com.multisuperplayer.core.data.browser.StorageAccess
+import com.multisuperplayer.core.data.favorites.Favorite
+import com.multisuperplayer.core.data.favorites.FavoriteRules
+import com.multisuperplayer.core.data.favorites.FavoriteStore
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.playlist.PlaylistStore
 import com.multisuperplayer.core.model.BrowserEntry
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -101,9 +105,12 @@ class BrowseViewModel(
     private val browser: BrowserRepository,
     private val storage: StorageAccess,
     playlistStore: PlaylistStore,
+    favoriteStore: FavoriteStore,
 ) : ViewModel() {
 
     private val playlistEditing = PlaylistEditing(playlistStore)
+
+    private val favoriteEditing = FavoriteEditing(favoriteStore)
 
     private val trail = MutableStateFlow<BrowserTrail?>(null)
     private val sort = MutableStateFlow(BrowserSort.NAME_ASC)
@@ -226,6 +233,15 @@ class BrowseViewModel(
     private val messageNonce = AtomicLong()
 
     /**
+     * 当前收藏。界面用它判断顶栏那颗星是实心还是空心（当前目录已收藏）。
+     */
+    val favorites: StateFlow<List<Favorite>> = favoriteEditing.favorites.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptyList(),
+    )
+
+    /**
      * 把多选中的条目追加到某个已有播放列表。
      *
      * 这里传的是 [MediaEntry]（渲染时由 `BrowserEntry.toMediaEntry()` 得到）而不是
@@ -256,6 +272,52 @@ class BrowseViewModel(
 
     private fun publish(text: MspText) {
         _message.value = UiMessage(text = text, nonce = messageNonce.incrementAndGet())
+    }
+
+    /**
+     * 收藏 / 取消收藏多选中的文件。
+     *
+     * 多选里只有**可播的文件**（见 `selectableMedia`）：目录不是文件，收藏它走的是
+     * 顶栏那颗星（[toggleFolderFavorite]）——两种对象、两个入口，不会搞混。
+     */
+    fun toggleFavorite(entries: List<MediaEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch {
+            favoriteEditing.toggleFiles(entries)?.let(::publish)
+        }
+    }
+
+    /** 收藏 / 取消收藏当前所在的目录。停在来源清单时什么都不做。 */
+    fun toggleFolderFavorite() {
+        val current = trail.value ?: return
+        viewModelScope.launch {
+            favoriteEditing.toggleFolder(current)?.let(::publish)
+        }
+    }
+
+    /**
+     * 从收藏里直接打开一个目录（收藏页点文件夹）。
+     *
+     * trail 整条换掉（而不是从空开始逐层 enter）：收藏存的就是**整条面包屑**
+     * （见 `Favorite.Folder`），所以目标位置是确定的，不需要重新走一遍。
+     *
+     * 换完之后**再单独问一次**能不能打开。这一步不能省：收藏可能是几天前存的，
+     * 期间 SAF 授权被撤销、SD 卡被拔掉、目录被改名——而界面上的表现会是
+     * 一个「空目录」，用户看到的是「我的文件没了」。实际上这里只是**打不开**。
+     * 用的是同一个 `browser.listing`，所以界面最终拿到的仍是同一份查询结果
+     * （多这一次查询的代价是一次目录列表，远小于让用户以为文件丢了）。
+     */
+    fun openFavoriteFolder(favorite: Favorite.Folder) {
+        val target = favorite.toTrail()
+        trail.value = target
+        viewModelScope.launch {
+            val listing = browser.listing(target, sort.value, showHidden.value).first()
+            when (listing) {
+                is BrowserContent.Unreadable, is BrowserContent.NotADirectory ->
+                    publish(MspText.Res(R.string.msp_favorites_folder_missing))
+                else -> Unit
+            }
+        }
     }
 
     /**
