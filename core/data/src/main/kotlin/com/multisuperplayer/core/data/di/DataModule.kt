@@ -26,6 +26,7 @@ import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
+import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
@@ -117,6 +118,9 @@ val dataModule = module {
     single { DesktopLyricsSettingsRepository(context = androidContext(), dispatchers = get()) }
 
     single { PlaybackSettingsRepository(context = androidContext(), dispatchers = get()) }
+
+    // 「哪些说明类提示被关掉了」。警告类提示不走这里（它们不能被关），见 HintIds。
+    single { HintSettingsRepository(context = androidContext(), dispatchers = get()) }
 
     // 不加 dispatchers：这一个设置不用 DataStore、也不做异步读取，理由见 AppLocaleStore 的注释。
     single { LocaleSettingsRepository(context = androidContext()) }

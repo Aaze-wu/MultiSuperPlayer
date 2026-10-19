@@ -33,4 +33,16 @@ internal interface DirectorySource {
      *   各种 IO / provider 异常都收敛成 [BrowserListing.Unreadable]。
      */
     suspend fun list(ref: String): BrowserListing
+
+    /**
+     * [ref] 这一层有多少个**直接子项**（文件 + 文件夹各算 1，不递归）。
+     *
+     * 返回 null 表示「问不到」：授权被收回、provider 不支持、读目录时出错。
+     * 界面必须把 null 当成「这次不显示数量」，**不能**当成 0——那会写成
+     * 「0 项」，而用户明明点得进去。这个区分的理由和 [BrowserListing] 里
+     * 「空目录 ≠ 读不到」完全一样。
+     *
+     * 默认实现返回 null：不是每个实现都值得为它多问一次 provider。
+     */
+    suspend fun count(ref: String): Int? = null
 }

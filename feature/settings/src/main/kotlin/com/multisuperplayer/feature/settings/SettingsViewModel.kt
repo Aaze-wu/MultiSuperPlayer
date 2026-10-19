@@ -21,6 +21,7 @@ import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.CustomAccent
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
+import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
@@ -160,6 +161,13 @@ class SettingsViewModel(
      * setter——同一个开关在两处各有各的实现，迟早会出现「这页改完那页还是旧值」。
      */
     private val desktopLyricsSettings: DesktopLyricsSettingsRepository,
+    /**
+     * 「恢复所有提示」那一行。
+     *
+     * 说明类提示（浏览页怎么用、怎么拖动排序）被用户关掉之后记在 DataStore 里，
+     * 没有别的入口能恢复它们，这里就是唯一那个出口。写操作只有 [restoreHints] 一处。
+     */
+    private val hintSettings: HintSettingsRepository,
     private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
@@ -279,6 +287,22 @@ class SettingsViewModel(
      */
     val theme: StateFlow<ThemeSettings> = themeSettings.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSettings())
+
+    /**
+     * 被关掉的说明类提示有几条。
+     *
+     * 只用得上**数量**：那一行的副标题是「已关闭 N 条」，而「N == 0」恰好也是
+     * 「这个按钮不该出现」的判据（见 `SettingActionButtonRow` 的 `action == null`）。
+     * 具体是哪几条界面并不关心。
+     *
+     * 初值 0 = 首帧先说「没有关闭任何提示」：DataStore 几毫秒后到，
+     * 而反过来的初值（假装关过几条）会让绝大多数用户首帧看到一个假的按钮。
+     */
+    val dismissedHintCount: StateFlow<Int> = hintSettings.dismissed
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    fun restoreHints() = persist("恢复所有提示") { hintSettings.restoreAll() }
 
     fun selectBaseTheme(theme: MspBaseTheme) = persist("主题基底=${theme.id}") {
         themeSettings.setBaseTheme(theme.id)

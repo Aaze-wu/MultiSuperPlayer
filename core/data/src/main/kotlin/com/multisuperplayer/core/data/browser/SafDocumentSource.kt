@@ -49,35 +49,79 @@ internal class SafDocumentSource(private val context: Context) : DirectorySource
     override val kind: BrowserSourceKind = BrowserSourceKind.SAF
 
     override suspend fun list(ref: String): BrowserListing = withContext(Dispatchers.IO) {
-        val uri = runCatching { Uri.parse(ref) }.getOrNull()
-            ?: return@withContext BrowserListing.Unreadable
+        val located = locate(ref) ?: return@withContext BrowserListing.Unreadable
+
+        val childrenUri = runCatching {
+            DocumentsContract.buildChildDocumentsUriUsingTree(located.treeUri, located.documentId)
+        }.getOrNull() ?: return@withContext BrowserListing.Unreadable
+
+        val entries = try {
+            queryChildren(childrenUri, located.treeUri)
+        } catch (error: Exception) {
+            // SecurityException（授权被回收 / 用户卸载了那个 provider）是这里最常见的一种，
+            // 但它和「provider 崩了」的处理一样：这次问不通。旧代码里把这类异常
+            // 吞成空列表，界面就会显示「这个目录是空的」，把唯一有用的线索藏掉了。
+            MspLog.w(TAG, error) { "列出 SAF 目录失败（documentId=${located.documentId}）" }
+            return@withContext BrowserListing.Unreadable
+        } ?: return@withContext BrowserListing.Unreadable
+
+        BrowserListing.Ready(entries)
+    }
+
+    /**
+     * 数这一层有多少个直接子项。
+     *
+     * **这是唯一会为子文件夹额外问一次 provider 的地方。** 代价是每个子文件夹
+     * 一次 `query`，所以它被单独放在 [count] 里、由 ViewModel 在列目录之后
+     * 逐个补齐（而不是塞进 [list] 让「打开一个目录」变慢）。云盘 provider
+     * 一次 query 可能要几百毫秒——那时界面已经能滚动、能点进其它目录了，
+     * 数字只是晚一点出来。
+     *
+     * 失败一律返回 null（不显示数量），**绝不返回 0**：0 会被界面写成
+     * 「0 项」，而用户点进去明明有东西。
+     */
+    override suspend fun count(ref: String): Int? = withContext(Dispatchers.IO) {
+        val located = locate(ref) ?: return@withContext null
+
+        val childrenUri = runCatching {
+            DocumentsContract.buildChildDocumentsUriUsingTree(located.treeUri, located.documentId)
+        }.getOrNull() ?: return@withContext null
+
+        try {
+            // 只要行数，所以投影只给一列：有的 provider 拿到 5 列投影会把
+            // 每个子项的元数据都准备好，而这里一个字段都用不上。
+            resolver.query(
+                childrenUri,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                null,
+                null,
+                null,
+            )?.use { it.count } ?: null
+        } catch (error: Exception) {
+            MspLog.w(TAG, error) { "统计 SAF 子项数量失败（documentId=${located.documentId}）" }
+            null
+        }
+    }
+
+    /**
+     * 把一个 ref 拆成「哪棵树 + 哪个 document」。
+     *
+     * 见类注释：树根取 `getTreeDocumentId`，子目录取 `getDocumentId`。
+     * 解析失败返回 null，调用方一律当作「问不通」。
+     */
+    private fun locate(ref: String): Located? {
+        val uri = runCatching { Uri.parse(ref) }.getOrNull() ?: return null
 
         // 没有 tree 段就不是文档树里的位置（比如别的应用直接塞进来的 document uri），
         // 拼不出 children uri，只能算问不通。
         val treeDocumentId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
             ?: run {
                 MspLog.d(TAG) { "uri 没有 tree 段，无法列目录：$ref" }
-                return@withContext BrowserListing.Unreadable
+                return null
             }
 
-        val documentId = currentDocumentId(uri, treeDocumentId)
-            ?: return@withContext BrowserListing.Unreadable
-
-        val childrenUri = runCatching {
-            DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
-        }.getOrNull() ?: return@withContext BrowserListing.Unreadable
-
-        val entries = try {
-            queryChildren(childrenUri, uri)
-        } catch (error: Exception) {
-            // SecurityException（授权被回收 / 用户卸载了那个 provider）是这里最常见的一种，
-            // 但它和「provider 崩了」的处理一样：这次问不通。旧代码里把这类异常
-            // 吞成空列表，界面就会显示「这个目录是空的」，把唯一有用的线索藏掉了。
-            MspLog.w(TAG, error) { "列出 SAF 目录失败（documentId=$documentId）" }
-            return@withContext BrowserListing.Unreadable
-        } ?: return@withContext BrowserListing.Unreadable
-
-        BrowserListing.Ready(entries)
+        val documentId = currentDocumentId(uri, treeDocumentId) ?: return null
+        return Located(treeUri = uri, documentId = documentId)
     }
 
     /**
@@ -91,6 +135,8 @@ internal class SafDocumentSource(private val context: Context) : DirectorySource
         } else {
             treeDocumentId
         }
+
+    private data class Located(val treeUri: Uri, val documentId: String)
 
     /** 查询失败时返回 `null`（区别于「查到了，但是空的」）。 */
     private fun queryChildren(childrenUri: Uri, treeUri: Uri): List<BrowserEntry>? {

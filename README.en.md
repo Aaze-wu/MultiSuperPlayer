@@ -249,6 +249,17 @@ device)*, where the model runs on the phone and the subtitle text never leaves i
 - The theme swaps the **entire tree**, not just the widgets the app draws itself: `MspTheme` sits at the
   outermost level and distributes both the base color scheme and the accent, so `Scaffold`, dialogs,
   dropdown menus and scroll containers never leak a white background.
+- **Instructional hints can be dismissed.** The one-line banners in the UI split into two kinds by "does
+  dismissing it lose information", and only the **instructional** ones (the Browse tab's "these are the
+  places you can browse from", the playlist page's "long-press a row to reorder", the playback queue's
+  "hold the handle on the right and drag") get an × on the right; once dismissed they never come back.
+  The **warning** ones (missing permission, truncated listing, missing files in a playlist, no manual
+  reordering while shuffle is on) get no × — they are the **only clue** that something is currently
+  wrong, and dismissing one turns the symptom into "it mysteriously does not work". Whether a hint can be
+  dismissed is a **fixed allow-list** (`HintIds`) rather than a per-site decision: an id that is not in
+  the list is not even written to disk, so future warnings are undismissible by construction. To bring
+  them back: Settings → the last row, **"Restore tips"** (its subtitle says how many you dismissed, and the
+  button is absent when the count is 0).
 
 ### 1.5 Localization
 
@@ -431,6 +442,14 @@ system picker.
   **Directories always come before files**, regardless of the selected order.
 - **5 000 entries per directory** maximum: beyond that the listing is truncated, and it **says so**
   instead of quietly returning fewer rows.
+- **Item counts**: every sub-folder shows `N items` on its right, and the crumb row shows this level's
+  own total (`486 items`). The rule is **direct children only, files and folders count as one each, no
+  recursion**; the total comes from the **unfiltered, untruncated** table, so it stays correct with the
+  hidden-files switch off or the listing truncated at 5 000 (it describes how many entries the disk has
+  on this level, not how many rows are drawn). Counts are **not part of the listing query**: the rows are
+  drawn first and the numbers trickle in afterwards (`DirectorySource.count()` may return `null`; an SAF
+  tree costs one extra query to the system). `null` means "could not ask", so the row stays **blank**
+  rather than showing 0 — a 0 would read as "this folder was emptied".
 - **Tapping a playable file** builds the queue from **every playable entry in the current directory**
   (not the whole library) and starts at the one you tapped.
 - **Multi-select**: long-press any row to enter selection mode, then select all / clear / add to playlist /
@@ -867,7 +886,8 @@ connection" — send the user the wrong way and it never gets fixed.
 | **v1.2.2** | **Two fixes for names that were "close enough" but failed silently: (1) a file whose name contains `#` or `%` now plays from the built-in browser and its same-named subtitles / lyrics can be read (the address used to be built by string concatenation as `file://$path`, where `#` was taken as a fragment and `%` as the start of an escape sequence; a pure-Kotlin `LocalPathUri` encodes every code point that is not URI-safe and decodes it back, wired into the player's media URI, subtitle file reading and the speech-recognition media lookup) and (2) same-named subtitles / lyrics next to an audio file (`song.mp3` with `song.srt`, `song.mp3` with `song.mp3.srt`) now attach automatically (the ±25 format-affinity value used to take part in the auto-attach threshold too, pushing a same-named candidate below it; eligibility is now `titleMatchScore` and ordering is `matchScore`, so with both `.lrc` and `.srt` in the same folder the `.lrc` still wins)** | Done |
 | **v1.2.3** | **The automatic update-check interval is now configurable: on the *Check for updates* page a new row sits between the *check automatically* switch and the update channel, with six presets - 1 / 6 / 12 hours, 1 / 3 / 7 days - plus *Custom...* with an hours field and a minutes field (15 minutes minimum, 7 days maximum; out-of-range or non-numeric input is reported on the spot and *Save* stays disabled); that window is the cooling-off period of the automatic check, previously hard-wired to 12 hours and now defined once in `UpdateCooldown` and stored in DataStore, while pressing *Check* yourself is never affected by it; the row stays editable with the switch off (a setting is not locked behind a switch); the default is still 12 hours, so upgrading changes nothing** | Done |
 | **v1.2.4** | **Two fixes where UI state stopped following the data: (1) the status-bar icon tint was computed once at startup only - the activity is not recreated when the system flips light/dark, and switching the in-app theme re-declared nothing either, so dark icons could end up on a dark background. A new `SystemBarIconAppearanceEffect` lives in the theme and re-applies whenever the theme flips; the player's fullscreen path declares its own rule and restores it on exit. (2) Entries whose files live in a folder added through the system file picker are no longer reported as missing when a playlist is played back - the `saf:` ids were classified as MediaStore numeric ids while the existence check used `File(path).exists()`, which can never resolve a `content://` uri. `SafMediaIds` and `MediaUriProbe` now split the check by uri kind (document lookup for `content`, local path for `file`)** | Done |
-| **v1.3.0** | **Favorites and desktop lyrics: (1) file / folder favourites - the star at the top right of the media library opens a separate favourites page where files and folders sit in one list, newest first, capped at 200; the selection bar in the media library, the browser and the recent list can favourite the selected items, and the browser's top bar favourites the folder you are in; tapping a favourite folder switches to Browse and opens that directory, and a revoked grant is reported as "this folder can no longer be opened" instead of showing an empty directory; the recent list gained multi-select along the way. (2) Desktop lyrics - a new Settings page with the switch, four font sizes, four background opacities, a position lock and reset; a `TYPE_APPLICATION_OVERLAY` window shows the current line plus a preview of the next one and carries play/pause, font smaller, font larger and lock buttons; it stays away when the user turned it off, when the overlay permission is missing, when subtitles are switched off, when the file has no lyrics, and while this app is in the foreground; adds the `SYSTEM_ALERT_WINDOW` permission and its row on the permissions page** | **Current (stable)** |
+| **v1.3.0** | **Favorites and desktop lyrics: (1) file / folder favourites - the star at the top right of the media library opens a separate favourites page where files and folders sit in one list, newest first, capped at 200; the selection bar in the media library, the browser and the recent list can favourite the selected items, and the browser's top bar favourites the folder you are in; tapping a favourite folder switches to Browse and opens that directory, and a revoked grant is reported as "this folder can no longer be opened" instead of showing an empty directory; the recent list gained multi-select along the way. (2) Desktop lyrics - a new Settings page with the switch, four font sizes, four background opacities, a position lock and reset; a `TYPE_APPLICATION_OVERLAY` window shows the current line plus a preview of the next one and carries play/pause, font smaller, font larger and lock buttons; it stays away when the user turned it off, when the overlay permission is missing, when subtitles are switched off, when the file has no lyrics, and while this app is in the foreground; adds the `SYSTEM_ALERT_WINDOW` permission and its row on the permissions page** | Done |
+| **v1.4.0** | **Counts and hints: (1) the browser shows how many items a folder holds - every sub-folder shows `N items` on its right and the crumb row shows this level's own total; the rule is direct children only, files and folders count as one each, no recursion, and the total comes from the unfiltered, untruncated table so hidden files and the 5 000-entry cap do not affect it; counts are not part of the listing query, SAF trees get theirs a moment later, and an unavailable count stays blank rather than showing 0. (2) Instructional hints can be dismissed - the Browse-tab source hint, the playlist drag-to-reorder hint and the playback-queue drag hint each gain an ×, and once dismissed they never return; warnings are never dismissible (missing permission, truncated listing, missing files in a playlist, no manual reordering while shuffle is on), and whether a hint can be dismissed is a fixed allow-list, so an id that is not in it is not even written to disk. (3) Settings gains a *Restore tips* row at the very bottom, whose subtitle says how many tips are dismissed and whose button is absent when none are** | **Current (stable)** |
 | Later | Audio translation (dubbing) | Planned |
 
 ---
@@ -1271,6 +1291,15 @@ These are deliberate for this release, not oversights:
     also **replaces** the streaming one wholesale rather than being published progressively (swapping the
     table mid-playback would shift cue indices, and hand-edited translations are keyed on *index + source
     text*).
+20. **The browser's counts are a snapshot taken when the directory was listed: not live, not recursive,
+    and not split by kind.** Drop a file into that folder from another app and the number does not change
+    on its own (leave and re-enter the directory to refresh); it counts **direct children only** and does
+    not answer "how many in total including everything below"; there is no "12 files / 3 folders"
+    breakdown either. The cheap half was done, and the other half would mean watching the whole disk,
+    which costs more than the number is worth.
+21. **Only those three hints can be dismissed, and only all of them at once.** There is no hint manager,
+    no per-hint restore, and no undo after dismissing one (that is what "dismiss" means, which is also why
+    there is no confirmation dialog). The restore entry is fixed to the last row of Settings.
 
 ---
 

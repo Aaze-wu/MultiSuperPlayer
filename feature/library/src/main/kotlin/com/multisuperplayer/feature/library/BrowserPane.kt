@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -84,6 +85,8 @@ internal fun DirectoryBrowser(
     content: BrowserContent,
     sort: BrowserSort,
     showHidden: Boolean,
+    /** 子文件夹的直接子项数量，键是 `BrowserEntry.ref`。见 `BrowseUiState.folderCounts`。 */
+    folderCounts: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier,
     selection: BrowserSelection = BrowserSelection(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -189,10 +192,34 @@ internal fun DirectoryBrowser(
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            CrumbRow(trail = trail, onOpenCrumb = onOpenCrumb)
+            // 面包屑和「共 N 项」放在同一行：数字贴右边，滚面包屑时它不跟着跑。
+            // 放进 `LazyRow` 里当最后一项会变成「深层目录看不到总数」。
+            val totalCount = (content as? BrowserContent.Ready)?.totalCount
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CrumbRow(
+                    trail = trail,
+                    onOpenCrumb = onOpenCrumb,
+                    modifier = Modifier.weight(1f),
+                )
+                // 0 项的时候不写「共 0 项」：下面已经有一句「这个文件夹是空的」，
+                // 两个数字叠在一起只是噪音。
+                if (totalCount != null && totalCount > 0) {
+                    Text(
+                        text = stringResource(R.string.msp_browser_count_total, totalCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.padding(end = 12.dp),
+                    )
+                }
+            }
             HorizontalDivider()
             BrowserBody(
                 content = content,
+                folderCounts = folderCounts,
                 selection = selection,
                 onEnterDirectory = onEnterDirectory,
                 onOpenFile = onOpenFile,
@@ -204,10 +231,14 @@ internal fun DirectoryBrowser(
 
 /** 面包屑。横向可滚：深层的路径一定比屏幕宽。 */
 @Composable
-private fun CrumbRow(trail: BrowserTrail, onOpenCrumb: (Int) -> Unit) {
+private fun CrumbRow(
+    trail: BrowserTrail,
+    onOpenCrumb: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val lastIndex = trail.crumbs.lastIndex
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         contentPadding = PaddingValues(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -241,6 +272,7 @@ private fun CrumbRow(trail: BrowserTrail, onOpenCrumb: (Int) -> Unit) {
 @Composable
 private fun BrowserBody(
     content: BrowserContent,
+    folderCounts: Map<String, Int>,
     selection: BrowserSelection,
     onEnterDirectory: (BrowserEntry) -> Unit,
     onOpenFile: (BrowserEntry) -> Unit,
@@ -297,6 +329,7 @@ private fun BrowserBody(
                     items(items = content.entries, key = { it.ref }) { entry ->
                         BrowserEntryRow(
                             entry = entry,
+                            folderCount = folderCounts[entry.ref],
                             selected = entry.mediaId in selection.ids,
                             selectionMode = selection.mode,
                             onToggleSelection = { selection.onToggle(entry.mediaId) },
@@ -338,6 +371,8 @@ private fun BrowserBody(
 @Composable
 private fun BrowserEntryRow(
     entry: BrowserEntry,
+    /** 子文件夹的直接子项数量；null = 还没数出来 / 数不出来，不显示。 */
+    folderCount: Int?,
     selected: Boolean,
     selectionMode: Boolean,
     onToggleSelection: () -> Unit,
@@ -434,11 +469,27 @@ private fun BrowserEntryRow(
             trailingContent = when {
                 directory -> {
                     {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        // 数量放在箭头**左边**：箭头是「点进去」的方向，必须始终
+                        // 贴在行的最右侧、位置不变；数字长短不影响它。
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (folderCount != null) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.msp_browser_child_count,
+                                        folderCount,
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(end = 4.dp),
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 entry.extension.isNotEmpty() -> {

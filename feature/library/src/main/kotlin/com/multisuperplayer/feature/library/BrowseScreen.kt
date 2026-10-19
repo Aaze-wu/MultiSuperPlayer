@@ -53,6 +53,7 @@ import com.multisuperplayer.core.data.browser.BrowserRoot
 import com.multisuperplayer.core.data.browser.BrowserRootIssue
 import com.multisuperplayer.core.data.browser.BrowserSort
 import com.multisuperplayer.core.data.browser.BrowserSourceKind
+import com.multisuperplayer.core.data.settings.HintIds
 import com.multisuperplayer.core.data.favorites.Favorite
 import com.multisuperplayer.core.data.favorites.FavoriteRules
 import com.multisuperplayer.core.data.subtitle.SubtitleSource
@@ -263,6 +264,7 @@ fun BrowseRoute(
             onOpenSubtitle(subtitleSourceOf(entry.ref, entry.name, entry.sizeBytes))
         },
         onOpenNetwork = onOpenNetwork,
+        onDismissHint = viewModel::dismissHint,
     )
 
     if (pickerOpen) {
@@ -315,6 +317,7 @@ internal fun BrowseScreen(
     onOpenFile: (BrowserEntry) -> Unit = {},
     onOpenSubtitle: (BrowserEntry) -> Unit = {},
     onOpenNetwork: () -> Unit = {},
+    onDismissHint: (String) -> Unit = {},
 ) {
     val trail = state.trail
     if (trail == null) {
@@ -326,6 +329,7 @@ internal fun BrowseScreen(
             onRemoveTree = onRemoveTree,
             onOpenAllFilesAccess = onOpenAllFilesAccess,
             onOpenNetwork = onOpenNetwork,
+            onDismissHint = onDismissHint,
         )
     } else {
         DirectoryBrowser(
@@ -333,6 +337,7 @@ internal fun BrowseScreen(
             content = state.content,
             sort = state.sort,
             showHidden = state.showHidden,
+            folderCounts = state.folderCounts,
             modifier = modifier,
             selection = selection,
             snackbarHostState = snackbarHostState,
@@ -366,6 +371,7 @@ private fun SourceList(
     onRemoveTree: (String) -> Unit,
     onOpenAllFilesAccess: () -> Unit,
     onOpenNetwork: () -> Unit,
+    onDismissHint: (String) -> Unit,
 ) {
     Scaffold(
         modifier = modifier,
@@ -384,12 +390,17 @@ private fun SourceList(
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            Banner(
-                icon = Icons.Outlined.Info,
-                text = stringResource(R.string.msp_browse_hint),
-                container = MaterialTheme.colorScheme.surfaceVariant,
-                content = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // 说明类提示：可以关，关掉之后由 HintSettingsRepository 记住。
+            // 它不是警告（没有「哪里不对」），每次进来都占掉两行只是噪音。
+            if (HintIds.BROWSE_SOURCES !in state.dismissedHints) {
+                Banner(
+                    icon = Icons.Outlined.Info,
+                    text = stringResource(R.string.msp_browse_hint),
+                    container = MaterialTheme.colorScheme.surfaceVariant,
+                    content = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onDismiss = { onDismissHint(HintIds.BROWSE_SOURCES) },
+                )
+            }
             // 「网络地址」固定在提示条下面，**不在** `roots` 那一支里：
             // 一个文件夹都没授权时它也得在。看网络地址本来就不需要存储权限，
             // 把它藏进「有授权才显示」的清单里，等于让只想看网络片子的人无从下手。

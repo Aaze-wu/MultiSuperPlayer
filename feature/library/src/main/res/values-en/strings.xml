@@ -92,6 +92,7 @@
 
     <!-- ===== Browse (SAF folders) ===== -->
     <string name="msp_browse_title">Browse</string>
+    <string name="msp_library_hint_dismiss">Dismiss hint</string>
     <string name="msp_browse_add">Add folder</string>
     <string name="msp_browse_hint">These are the places you can browse. Nothing in the system media library needs to be added here.</string>
     <string name="msp_browse_empty_title">No folders granted yet</string>
@@ -153,6 +154,10 @@
     <string name="msp_browser_not_directory">This is no longer a folder</string>
     <string name="msp_browser_not_directory_desc">It may have been renamed or deleted elsewhere. Try going up one level.</string>
     <string name="msp_browser_show_hidden">Show hidden files</string>
+    <!-- Number at the end of a subfolder row. Direct children only, files and folders each count as one. -->
+    <string name="msp_browser_child_count">%1$d items</string>
+    <!-- Total shown at the end of the current folder's breadcrumb. Also direct children only. -->
+    <string name="msp_browser_count_total">%1$d items</string>
     <string name="msp_browser_truncated">Too many items, showing the first %1$d</string>
     <string name="msp_browser_up">Up one level</string>
     <string name="msp_browser_back_sources">Back to sources</string>

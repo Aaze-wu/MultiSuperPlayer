@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
@@ -43,7 +44,7 @@ import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 设置**入口页**：九行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
+ * 设置**入口页**：十行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
  * 为什么把它拆成入口页 + 九个子页，而不是继续把设置项铺在一页里：
  *
@@ -55,7 +56,9 @@ import org.koin.androidx.compose.koinViewModel
  * 3. 「关于」这类信息页和「调什么」的设置页混在一起，是后面加「检查更新」、
  *    开源许可、导出日志时最别扭的地方。分开之后它们各有各的地方。
  *
- * 这个页面因此**不需要**任何写入回调，只读摘要 + 九条导航。
+ * 这个页面因此**几乎**不需要写入回调：只读摘要 + 九条导航 + 最后一行一个动作
+ * （「恢复所有提示」）。那个动作之所以留在这页而不是塞进子页，是因为它不存在「参数」：
+ * 关掉几条全由本地偏好决定，用户能做的只有「全部恢复」一件事。
  */
 @Composable
 fun SettingsRoute(
@@ -79,6 +82,7 @@ fun SettingsRoute(
     val keepAliveState by viewModel.keepAliveState.collectAsStateWithLifecycle()
     val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
     val localModelEntry by viewModel.localModelEntry.collectAsStateWithLifecycle()
+    val dismissedHintCount by viewModel.dismissedHintCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -118,6 +122,7 @@ fun SettingsRoute(
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
         permissionState = permissionState,
         keepAliveState = keepAliveState,
+        dismissedHintCount = dismissedHintCount,
         modifier = modifier,
         onOpenAppearance = onOpenAppearance,
         onOpenPlayback = onOpenPlayback,
@@ -128,6 +133,7 @@ fun SettingsRoute(
         onOpenPermissions = onOpenPermissions,
         onOpenKeepAlive = onOpenKeepAlive,
         onOpenUpdate = onOpenUpdate,
+        onRestoreHints = viewModel::restoreHints,
     )
 }
 
@@ -163,6 +169,11 @@ fun SettingsScreen(
      * 而反过来默认「已加入」会让预览和真实首帧说一句不成立的话。
      */
     keepAliveState: KeepAliveState = KeepAliveState.RESTRICTED,
+    /**
+     * 被关掉的说明类提示有几条。0 = 「恢复所有提示」这一行没有可做的事
+     * （按钮不出现，副标题明说“没有关闭任何提示”）。
+     */
+    dismissedHintCount: Int = 0,
     onOpenAppearance: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenDesktopLyrics: () -> Unit = {},
@@ -172,6 +183,11 @@ fun SettingsScreen(
     onOpenPermissions: () -> Unit = {},
     onOpenKeepAlive: () -> Unit = {},
     onOpenUpdate: () -> Unit = {},
+    /**
+     * 「恢复所有提示」被点。它是这一页**唯一**的写入动作，所以没有跟着
+     * `onOpenXxx` 的叫法（那些都是导航）。
+     */
+    onRestoreHints: () -> Unit = {},
 ) {
     // 系统取色要 Android 12。判断放这里而不是塞进 [SettingsSummaries]：
     // `Build.VERSION.SDK_INT` 在 JVM 单测里恒为 0，进了纯函数就测不了「支持」那条分支。
@@ -296,6 +312,32 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_about),
                     subtitle = SettingsSummaries.about(buildInfo).string(),
                     onClick = onOpenAbout,
+                )
+            }
+            item {
+                // 这是**动作**而不是「点开一页」，所以用带按钮的整行（右边一个按钮，
+                // 行本身不可点）：一个点一下就生效的东西如果整行可点，用户读到一半
+                // 碰一下屏幕就把状态改了。
+                //
+                // 位置在**最后一行**（「关于」之后）：用户只有在「提示不见了、想找回来」
+                // 时才会来找它，而这是一件偶尔发生的收拾动作，不该打断上面那串
+                // 按常用程度排的设置项；「关于」保持它原来的收尾位置，不因为新增
+                // 一个动作而被推到中间。没有关过任何提示时按钮**不出现**——
+                // 一个按下去什么都不会变的按钮只会让人怀疑自己点漏了。
+                SettingActionButtonRow(
+                    icon = Icons.Outlined.Lightbulb,
+                    title = stringResource(R.string.msp_settings_restore_hints),
+                    subtitle = if (dismissedHintCount > 0) {
+                        stringResource(R.string.msp_settings_restore_hints_count, dismissedHintCount)
+                    } else {
+                        stringResource(R.string.msp_settings_restore_hints_none)
+                    },
+                    action = if (dismissedHintCount > 0) {
+                        stringResource(R.string.msp_settings_restore_hints_action)
+                    } else {
+                        null
+                    },
+                    onAction = onRestoreHints,
                 )
             }
         }

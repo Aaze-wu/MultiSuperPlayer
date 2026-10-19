@@ -66,6 +66,9 @@ import com.multisuperplayer.core.ui.list.rememberReorderPreview
  * @param shuffleEnabled 随机播放开着的时候**不允许**手动排序：那时列表顺序
  *   已经不是播放顺序了，拖出来的位置和实际听到的顺序对不上——允许它，
  *   用户会得到「拖了但顺序还是乱的」这个无法解释的结果。
+ * @param dragHintDismissed 用户关掉过「按住右侧把手拖动」这条说明。关掉之后就
+ *   不再画它，也不再占地方。**随机播放那一条不受影响**：它说的是「现在为什么
+ *   拖不动」，是状态说明而不是教学，关掉之后用户只会得到一个拖不动的列表。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +76,8 @@ internal fun PlayerQueueSheet(
     queue: List<MediaEntry>,
     currentIndex: Int,
     shuffleEnabled: Boolean,
+    dragHintDismissed: Boolean = false,
+    onDismissDragHint: () -> Unit = {},
     onPlay: (Int) -> Unit,
     onRemove: (Int) -> Unit,
     onMove: (Int, Int) -> Unit,
@@ -125,18 +130,37 @@ internal fun PlayerQueueSheet(
                 onMove = onMove,
             )
 
-            Text(
-                text = stringResource(
-                    if (shuffleEnabled) {
-                        R.string.msp_player_queue_shuffle_locked
-                    } else {
-                        R.string.msp_player_queue_drag_hint
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+            // 「怎么拖着排序」是说明，看过一遍就够，可以关；「随机播放时不能拖」
+            // 是状态说明，关掉之后用户只会看到一个拖不动的列表，所以不给关闭按钮。
+            val canDismiss = !shuffleEnabled
+            if (!canDismiss || !dragHintDismissed) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (shuffleEnabled) {
+                                R.string.msp_player_queue_shuffle_locked
+                            } else {
+                                R.string.msp_player_queue_drag_hint
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = if (canDismiss) Modifier.weight(1f) else Modifier,
+                    )
+                    if (canDismiss) {
+                        IconButton(onClick = onDismissDragHint) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.msp_player_hint_dismiss),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

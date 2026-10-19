@@ -83,7 +83,12 @@ plugins {
 // 加上授权本身失败时是**看得见**的（入口芯片停在「需要权限」）而不是静默失效，
 // 所以照 1.2.3 那条路直接发正式版。
 // 与 1.2.4 不再共用功能集：README 的功能清单要跟着改。
-val appVersionName: String = "1.3.0"
+//
+// 1.4.0 又起了**新的功能**（浏览页的数量显示、说明类提示可以关掉并可恢复），
+// 两条都只动应用内的界面与一份本地偏好，没有清单 / 权限 / 系统 intent 变化，
+// 所以照 1.2.3 那条路直接发正式版，不发 beta。
+// 与 1.3.0 不再共用功能集：README 的功能清单要跟着改。
+val appVersionName: String = "1.4.0"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

@@ -244,6 +244,8 @@
     <string name="msp_player_queue_playing">正在播放</string>
     <string name="msp_player_queue_drag_hint">按住右侧把手上下拖动可调整顺序。</string>
     <string name="msp_player_queue_shuffle_locked">随机播放开启时不能手动排序：列表顺序已不是播放顺序。</string>
+    <!-- 队列底部说明条的关闭按钮（无障碍描述）。随机播放那一条是警告，没有关闭按钮。 -->
+    <string name="msp_player_hint_dismiss">关闭提示</string>
 
     <!-- ===== 画中画 ===== -->
     <!-- 控制条上的入口。英文用 PiP 缩写：写成 “Picture in picture” 会把芯片撑得比别的都长。 -->

@@ -20,6 +20,16 @@
     <string name="msp_settings_permissions">Permissions</string>
     <string name="msp_settings_about">About</string>
 
+    <!--
+      The action row at the bottom of the entry screen: bring back every hint the user
+      dismissed. Tips can be dismissed, warnings (missing permissions, truncated scan,
+      missing playlist items) cannot — which is why this says "tips", not "notifications".
+    -->
+    <string name="msp_settings_restore_hints">Restore tips</string>
+    <string name="msp_settings_restore_hints_count">You dismissed %1$d tip(s)</string>
+    <string name="msp_settings_restore_hints_none">You have not dismissed any tip</string>
+    <string name="msp_settings_restore_hints_action">Restore</string>
+
     <!-- Separator between summary fragments. -->
     <string name="msp_settings_summary_sep">" · "</string>
 

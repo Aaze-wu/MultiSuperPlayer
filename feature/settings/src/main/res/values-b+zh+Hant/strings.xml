@@ -20,6 +20,16 @@
     <string name="msp_settings_permissions">權限</string>
     <string name="msp_settings_about">關於</string>
 
+    <!--
+      入口頁最後那一列的動作：把「關閉過」的說明類提示全部恢復。
+      說明類（瀏覽頁提示、拖動排序提示）可以關，警告類（權限不全、掃描被截斷、
+      播放清單裡有失效項目）不能關，所以這裡說的是「所有提示」而不是「所有通知」。
+    -->
+    <string name="msp_settings_restore_hints">恢復所有提示</string>
+    <string name="msp_settings_restore_hints_count">已關閉 %1$d 條操作提示</string>
+    <string name="msp_settings_restore_hints_none">還沒有關閉任何提示</string>
+    <string name="msp_settings_restore_hints_action">恢復</string>
+
     <!-- 摘要片段之間的分隔符。 -->
     <string name="msp_settings_summary_sep">" · "</string>
 

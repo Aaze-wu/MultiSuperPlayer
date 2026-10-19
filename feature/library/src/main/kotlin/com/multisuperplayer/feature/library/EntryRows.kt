@@ -294,10 +294,16 @@ internal fun EntryTrailing(content: @Composable () -> Unit) {
 }
 
 /**
- * 提示条（权限不全 / 扫描被截断 / 播放列表里有失效条目）。
+ * 提示条。
  *
- * 必须显示。否则用户看到的是一个**看起来完整**的列表，会以为文件丢了，
- * 而实际上它们只是被权限或层级限制挡在了扫描之外。
+ * 两种性质完全不同的提示共用这个外观，**区别只在 [onDismiss]**：
+ *
+ * - **警告类**（权限不全 / 扫描被截断 / 播放列表里有失效条目）**不给关闭**。
+ *   它们说的是「现在有一件事不对」，关掉之后用户就再也看不到唯一的线索，
+ *   看到的是一个**看起来完整**的列表，会以为文件丢了，而实际上它们只是
+ *   被权限或层级限制挡在了扫描之外。
+ * - **说明类**（怎么浏览、怎么拖动排序）传 [onDismiss]。看过一遍就够了，
+ *   关掉之后由 `HintSettingsRepository` 记住，下次不再出现。
  */
 @Composable
 internal fun Banner(
@@ -305,15 +311,31 @@ internal fun Banner(
     text: String,
     container: Color,
     content: Color,
+    /** 传 null = 不可关闭（警告类）。传一个动作 = 说明类，右上角出现关闭按钮。 */
+    onDismiss: (() -> Unit)? = null,
 ) {
     Surface(color = container, contentColor = content, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(start = 16.dp, top = 10.dp, end = 4.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(imageVector = icon, contentDescription = null)
-            Text(text = text, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                // 有关闭按钮时文字必须让出宽度，否则长文案会把按钮挤出屏幕
+                // （英文的提示句比中文长将近一倍）。
+                modifier = if (onDismiss == null) Modifier else Modifier.weight(1f),
+            )
+            if (onDismiss != null) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.msp_library_hint_dismiss),
+                    )
+                }
+            }
         }
     }
 }

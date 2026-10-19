@@ -109,6 +109,37 @@ class BrowserContentTest {
     }
 
     @Test
+    fun `总数按未过滤未截断的原始表算`() {
+        // 顶部那行「共 N 项」是给用户核对「我是不是看全了」用的，所以它必须
+        // 描述**磁盘上这一层有多少项**，而不是「当前视图里画了几行」。
+        val entries = listOf(hiddenFile(".hidden"), file("a.mp4"), file("b.mp4"))
+
+        val filtered = BrowserContent.of(BrowserListing.Ready(entries), BrowserSort.NAME_ASC, false)
+            as BrowserContent.Ready
+
+        assertEquals(2, filtered.entries.size)
+        assertEquals(3, filtered.totalCount)
+
+        // 打开「显示隐藏文件」不会改变总数（它描述的是目录，不是视图）。
+        val shown = BrowserContent.of(BrowserListing.Ready(entries), BrowserSort.NAME_ASC, true)
+            as BrowserContent.Ready
+        assertEquals(3, shown.totalCount)
+    }
+
+    @Test
+    fun `截断之后总数仍然是真实数量`() {
+        // 5001 项只画 5000 行，顶部要说「共 5001 项」：
+        // 这里用的是 `entries.size`（截断后）还是原始表，正是这个用例要钉住的差异。
+        val entries = List(MAX_ENTRIES_PER_DIRECTORY + 1) { file("f%05d.mp4".format(it)) }
+
+        val ready = BrowserContent.of(BrowserListing.Ready(entries), BrowserSort.NAME_ASC, false)
+            as BrowserContent.Ready
+
+        assertEquals(MAX_ENTRIES_PER_DIRECTORY, ready.entries.size)
+        assertEquals(MAX_ENTRIES_PER_DIRECTORY + 1, ready.totalCount)
+    }
+
+    @Test
     fun `Idle 与 Loading 都不是 Ready-空`() {
         // 「还没进任何目录」（要让用户选来源）和「正在列目录」（要显示加载）
         // 和「这个目录是空的」是**三句不同的话**。都当成空列表的话，

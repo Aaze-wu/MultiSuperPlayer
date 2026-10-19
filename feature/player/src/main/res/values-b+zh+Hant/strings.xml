@@ -198,6 +198,8 @@
     <string name="msp_player_queue_playing">正在播放</string>
     <string name="msp_player_queue_drag_hint">按住右側把手上下拖動可調整順序。</string>
     <string name="msp_player_queue_shuffle_locked">隨機播放開啟時不能手動排序：清單順序已不是播放順序。</string>
+    <!-- 佇列底部說明條的關閉按鈕（無障礙描述）。隨機播放那一條是警告，沒有關閉按鈕。 -->
+    <string name="msp_player_hint_dismiss">關閉提示</string>
 
     <!-- ===== 子母畫面 ===== -->
     <string name="msp_player_pip">子母畫面</string>

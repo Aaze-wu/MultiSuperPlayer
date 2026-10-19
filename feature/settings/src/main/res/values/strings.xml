@@ -35,6 +35,16 @@
     <string name="msp_settings_permissions">权限</string>
     <string name="msp_settings_about">关于</string>
 
+    <!--
+      入口页最后那行动作：把「关闭过」的说明类提示全部恢复。
+      说明类（浏览页提示、拖动排序提示）能关，警告类（权限不全、扫描被截断、
+      播放列表里有失效条目）不能关，所以这里说的是「所有提示」而不是「所有通知」。
+    -->
+    <string name="msp_settings_restore_hints">恢复所有提示</string>
+    <string name="msp_settings_restore_hints_count">已关闭 %1$d 条操作提示</string>
+    <string name="msp_settings_restore_hints_none">还没有关闭任何提示</string>
+    <string name="msp_settings_restore_hints_action">恢复</string>
+
     <!-- ===== 入口页摘要 ===== -->
 
     <!--

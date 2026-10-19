@@ -31,6 +31,14 @@ sealed interface BrowserContent {
         val truncated: Boolean,
         /** 未过滤前，以 `.` 开头的条目数量。用来区分「真空」和「被开关挡住了」。 */
         val hiddenCount: Int,
+        /**
+         * 过滤**之前**这一层有多少个直接子项（文件 + 文件夹各算 1，不递归）。
+         *
+         * [entries] 不能拿来代替它：隐藏项被过滤掉、超出上限的被截断之后，
+         * 列表长度会比真实数量小——而「这个文件夹里有几项」正是要给用户看的那个数。
+         * 默认值取 `entries.size` 只是为了让旧的构造点不必改；真正的值由 [of] 填。
+         */
+        val totalCount: Int = entries.size,
     ) : BrowserContent {
 
         val empty: Boolean get() = entries.isEmpty()
@@ -64,6 +72,9 @@ sealed interface BrowserContent {
                         // 隐藏项数量按**未过滤**的原始表算：过滤之后的表里已经
                         // 看不到它们了，算出来永远是 0，`onlyHidden` 就永远不成立。
                         hiddenCount = listing.entries.count { it.hidden },
+                        // 同理：总数也按未过滤、未截断的原始表算。用 `arranged.entries.size`
+                        // 会让「显示隐藏文件」开关和 5000 条上限一起把这个数字改小。
+                        totalCount = listing.entries.size,
                     )
                 }
 

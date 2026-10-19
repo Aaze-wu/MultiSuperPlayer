@@ -146,6 +146,8 @@ fun PlayerRoute(
     val currentIndex by viewModel.currentIndex.collectAsStateWithLifecycle()
     // 播放时是否禁止熄屏（设置里的全局默认值）。只在用户改设置时才变。
     val keepScreenOnPref by viewModel.keepScreenOnWhilePlaying.collectAsStateWithLifecycle()
+    // 队列面板底部那条拖动说明有没有被关掉（只在用户点关闭时才变）。
+    val queueDragHintDismissed by viewModel.queueDragHintDismissed.collectAsStateWithLifecycle()
 
     val subtitleViewModel: SubtitleViewModel = koinViewModel()
     val subtitleState by subtitleViewModel.state.collectAsStateWithLifecycle()
@@ -702,6 +704,8 @@ fun PlayerRoute(
             queue = queue,
             currentIndex = currentIndex,
             shuffleEnabled = state.shuffleEnabled,
+            dragHintDismissed = queueDragHintDismissed,
+            onDismissDragHint = viewModel::dismissQueueDragHint,
             onPlay = viewModel::playQueueItem,
             onRemove = viewModel::removeQueueItem,
             onMove = viewModel::moveQueueItem,

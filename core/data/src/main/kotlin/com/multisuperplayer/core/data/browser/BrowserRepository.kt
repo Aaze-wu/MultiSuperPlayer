@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
  * 内置文件浏览器的数据入口。
@@ -77,6 +78,18 @@ class BrowserRepository(
         val listing = sourceOf(trail.kind).list(trail.current.ref)
         emit(BrowserContent.of(listing, sort, showHidden))
     }.flowOn(dispatchers.io)
+
+    /**
+     * 数一个子目录里有多少个直接子项。
+     *
+     * 它故意**不在** [listing] 里：一个目录里可能有几十个子文件夹，每个都问一次
+     * provider 会让「打开目录」从一瞬间变成好几秒（云盘 provider 一次 query 就能
+     * 几百毫秒）。调用方在列表已经画出来之后逐个补，数字晚一点出现，但不用等。
+     *
+     * 返回 null = 问不到（授权没了 / provider 不支持 / IO 出错）。**不是 0**。
+     */
+    suspend fun count(kind: BrowserSourceKind, ref: String): Int? =
+        withContext(dispatchers.io) { sourceOf(kind).count(ref) }
 
     private fun buildRoots(trees: List<SafTreeInfo>): List<BrowserRoot> = BrowserRoots.build(
         volumes = storage.volumes(),

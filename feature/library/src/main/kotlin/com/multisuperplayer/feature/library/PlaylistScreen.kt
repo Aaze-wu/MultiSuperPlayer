@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -61,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.export.PlaybackExportFormat
 import com.multisuperplayer.core.data.playlist.PlaylistImportMergeChoice
 import com.multisuperplayer.core.data.playlist.PlaylistImportState
+import com.multisuperplayer.core.data.settings.HintIds
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
 import com.multisuperplayer.core.ui.list.ReorderDragAutoScroll
@@ -85,6 +87,7 @@ fun PlaylistsRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val export by viewModel.export.collectAsStateWithLifecycle()
     val importState by viewModel.importState.collectAsStateWithLifecycle()
+    val dismissedHints by viewModel.dismissedHints.collectAsStateWithLifecycle()
 
     // 导出要分两步：先记住用户选的是「导哪个 + 哪种格式」（弹菜单那一刻就知道），
     // 再等 SAF 回来拿到目标 uri（可能要过好几秒，用户还得翻目录）。两件事不能
@@ -129,6 +132,8 @@ fun PlaylistsRoute(
         modifier = modifier,
         export = export,
         importState = importState,
+        dismissedHints = dismissedHints,
+        onDismissHint = viewModel::dismissHint,
         onImport = { importLauncher.launch(IMPORT_MIME_TYPES) },
         onImportChoice = viewModel::chooseImportMerge,
         onDismissImport = viewModel::dismissImport,
@@ -213,6 +218,9 @@ fun PlaylistsScreen(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     export: PlaybackExportState = PlaybackExportState.Idle,
     importState: PlaylistImportState = PlaylistImportState.Idle,
+    /** 用户关掉过的说明类提示（见 `HintIds`）。警告类横幅不受它影响。 */
+    dismissedHints: Set<String> = emptySet(),
+    onDismissHint: (String) -> Unit = {},
     onOpen: (String) -> Unit = {},
     onCloseDetail: () -> Unit = {},
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit = { _, _ -> },
@@ -368,6 +376,8 @@ fun PlaylistsScreen(
 
                 detail != null -> PlaylistDetailPane(
                     detail = detail,
+                    dismissedHints = dismissedHints,
+                    onDismissHint = onDismissHint,
                     onPlayRequest = onPlayRequest,
                     onRemoveItem = { mediaIds -> onRemoveItem(detail.id, mediaIds) },
                     onMoveItem = { from, to -> onMoveItem(detail.id, from, to) },
@@ -391,7 +401,11 @@ fun PlaylistsScreen(
                     // 拖动期间渲染的是这一份，松手时才把「谁移到哪儿」交出去。
                     val shown = rememberReorderPreview(items = rows, state = drag, onCommit = onMove)
                     // 列表上面插着一条拖动提示：`LazyColumn` 的下标要减掉它才是数据下标。
-                    val headerCount = if (rows.size > 1) 1 else 0
+                    // 提示只有两条以上才出现（一条时拖动没有意义），而且用户关掉之后
+                    // 也不再占位——所以表头数量**必须**用同一个布尔值算，
+                    // 两处各写一个条件的话，迟早有一处忘了改，拖动就会错行。
+                    val showDragHint = rows.size > 1 && HintIds.PLAYLIST_DRAG !in dismissedHints
+                    val headerCount = if (showDragHint) 1 else 0
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
@@ -409,8 +423,10 @@ fun PlaylistsScreen(
                             ),
                     ) {
                         // 只有一条时拖动没有任何意义，提示也就不必占一行。
-                        if (rows.size > 1) {
-                            item(key = "drag-hint") { DragHint() }
+                        if (showDragHint) {
+                            item(key = "drag-hint") {
+                                DragHint(onDismiss = { onDismissHint(HintIds.PLAYLIST_DRAG) })
+                            }
                         }
                         itemsIndexed(shown, key = { _, it -> it.id }) { index, playlist ->
                             PlaylistListRow(
@@ -637,6 +653,8 @@ private fun PlaylistListRow(
 @Composable
 private fun PlaylistDetailPane(
     detail: PlaylistDetail,
+    dismissedHints: Set<String>,
+    onDismissHint: (String) -> Unit,
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit,
     onRemoveItem: (Collection<String>) -> Unit,
     onMoveItem: (from: Int, to: Int) -> Unit,
@@ -657,7 +675,9 @@ private fun PlaylistDetailPane(
     val rows = detail.rows
     val shown = rememberReorderPreview(items = rows, state = drag, onCommit = onMoveItem)
     // 上面可能插着失效横幅和拖动提示：`LazyColumn` 的下标要减掉它们才是数据下标。
-    val headerCount = (if (detail.missingCount > 0) 1 else 0) + (if (rows.size > 1) 1 else 0)
+    // 两个条目的条件必须分别和下面两个 `if` 一字不差地对上（包括「用户关过提示」）。
+    val showDragHint = rows.size > 1 && HintIds.PLAYLIST_DRAG !in dismissedHints
+    val headerCount = (if (detail.missingCount > 0) 1 else 0) + (if (showDragHint) 1 else 0)
 
     LazyColumn(
         state = listState,
@@ -682,8 +702,10 @@ private fun PlaylistDetailPane(
             }
         }
         // 只有一条时拖动没有任何意义，提示也就没必要占一行。
-        if (rows.size > 1) {
-            item(key = "drag-hint") { DragHint() }
+        if (showDragHint) {
+            item(key = "drag-hint") {
+                DragHint(onDismiss = { onDismissHint(HintIds.PLAYLIST_DRAG) })
+            }
         }
         itemsIndexed(shown, key = { _, row -> row.item.mediaId }) { index, row ->
             Box(
@@ -727,15 +749,30 @@ private fun PlaylistDetailPane(
  *
  * 抽出来的理由不是省几行，而是「文案只有一个来处」：以后改措辞时不会有
  * 一个页面改了、另一个页面还写着旧话。
+ *
+ * 「怎么拖动」属于**说明**，不是「哪里不对」——用户看过一遍就够了，
+ * 所以带关闭按钮；关掉之后由 `HintSettingsRepository` 记住，不再出现。
  */
 @Composable
-private fun DragHint() {
-    Text(
-        text = stringResource(R.string.msp_playlists_drag_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
-    )
+private fun DragHint(onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.msp_playlists_drag_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onDismiss) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.msp_library_hint_dismiss),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
 }
 
 /**

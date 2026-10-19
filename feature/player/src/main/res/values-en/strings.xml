@@ -193,6 +193,8 @@
     <string name="msp_player_queue_playing">Now playing</string>
     <string name="msp_player_queue_drag_hint">Drag the handle on the right to change the order.</string>
     <string name="msp_player_queue_shuffle_locked">Reordering is unavailable while shuffle is on: the list no longer matches playback order.</string>
+    <!-- Dismiss button of the drag hint under the queue. The shuffle notice is a warning, so it has none. -->
+    <string name="msp_player_hint_dismiss">Dismiss hint</string>
 
     <!-- ===== Picture in picture ===== -->
     <string name="msp_player_pip">PiP</string>

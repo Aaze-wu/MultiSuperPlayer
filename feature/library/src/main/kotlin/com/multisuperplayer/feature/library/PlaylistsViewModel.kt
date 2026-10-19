@@ -22,6 +22,7 @@ import com.multisuperplayer.core.data.playlist.PlaylistImportPlan
 import com.multisuperplayer.core.data.playlist.PlaylistImportState
 import com.multisuperplayer.core.data.playlist.PlaylistImporter
 import com.multisuperplayer.core.data.playlist.PlaylistStore
+import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
 import com.multisuperplayer.core.model.text.MspText
@@ -113,6 +114,7 @@ internal fun buildPlaylistsUiState(
 class PlaylistsViewModel(
     private val library: MediaLibraryRepository,
     private val store: PlaylistStore,
+    private val hints: HintSettingsRepository,
     private val dispatchers: DispatcherProvider,
     context: Context,
     private val exportWriter: TextExportWriter,
@@ -128,6 +130,21 @@ class PlaylistsViewModel(
     private val appContext = context.applicationContext
 
     private val openId = MutableStateFlow<String?>(null)
+
+    /**
+     * 用户关掉过的说明类提示。单独一条流而不是塞进 [uiState]：它跟
+     * 「哪个列表打开着 / 文件还在不在」没有关系，混进去只会让那条
+     * `flowOn(io)` 的 combine 在每关一次提示时重算一遍全部行。
+     */
+    val dismissedHints: StateFlow<Set<String>> = hints.dismissed.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        initialValue = emptySet(),
+    )
+
+    fun dismissHint(id: String) {
+        viewModelScope.launch { hints.dismiss(id) }
+    }
 
     val uiState: StateFlow<PlaylistsUiState> = combine(
         store.playlists,

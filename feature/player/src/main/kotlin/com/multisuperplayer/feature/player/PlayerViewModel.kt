@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.multisuperplayer.core.data.artwork.ArtworkColors
 import com.multisuperplayer.core.data.artwork.ArtworkPaletteRepository
+import com.multisuperplayer.core.data.settings.HintIds
+import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.common.log.MspLog
@@ -54,6 +56,8 @@ class PlayerViewModel(
     private val tracks: TrackSelectionController,
     artworkPalette: ArtworkPaletteRepository,
     private val playbackSettings: PlaybackSettingsRepository,
+    /** 关掉了哪些说明类提示（队列面板底部那一条）。 */
+    private val hints: HintSettingsRepository,
     /** 均衡器。它在 `:core:player` 里，生命周期跟着内核而不是这一页。 */
     private val equalizer: EqualizerController,
 ) : ViewModel() {
@@ -71,6 +75,20 @@ class PlayerViewModel(
      */
     val settings: StateFlow<PlaybackSettings> = playbackSettings.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), PlaybackSettings())
+
+    /**
+     * 队列面板底部那条「按住右侧把手拖动」的说明是否已经被关掉。
+     *
+     * 映射成一个 Boolean 而不是把整个集合交给界面：界面只需要回答一个问题，
+     * 而集合每多一个 id 都会让面板白重组一次。
+     */
+    val queueDragHintDismissed: StateFlow<Boolean> = hints.dismissed
+        .map { HintIds.PLAYER_QUEUE_DRAG in it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), false)
+
+    fun dismissQueueDragHint() {
+        viewModelScope.launch { hints.dismiss(HintIds.PLAYER_QUEUE_DRAG) }
+    }
 
     /**
      * 均衡器开关。

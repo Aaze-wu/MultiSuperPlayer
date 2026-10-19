@@ -15,6 +15,7 @@ import com.multisuperplayer.core.data.favorites.FavoriteRules
 import com.multisuperplayer.core.data.favorites.FavoriteStore
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.playlist.PlaylistStore
+import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.model.BrowserEntry
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
@@ -25,9 +26,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -57,6 +63,15 @@ data class BrowseUiState(
     val content: BrowserContent = BrowserContent.Idle,
     val sort: BrowserSort = BrowserSort.NAME_ASC,
     val showHidden: Boolean = false,
+    /**
+     * 子文件夹的直接子项数量，键是 `BrowserEntry.ref`。
+     *
+     * 缺键 = 还没数出来 / 数不出来，界面按「不显示数量」处理。
+     * 它和 [content] 不是同时到达的：目录列表先画出来，数字随后逐个补。
+     */
+    val folderCounts: Map<String, Int> = emptyMap(),
+    /** 用户关掉过的说明类提示 id。见 `HintIds`。 */
+    val dismissedHints: Set<String> = emptySet(),
 ) {
     val loading: Boolean get() = roots == null
 
@@ -78,6 +93,18 @@ private data class BrowseNav(
     val trail: BrowserTrail?,
     val sort: BrowserSort,
     val showHidden: Boolean,
+)
+
+/**
+ * 「当前在哪个位置」+「这个位置列出来是什么」。
+ *
+ * 两件事必须绑在一起：子文件夹计数要知道 `ref` 该交给哪种来源（文件系统 / SAF），
+ * 而那个答案在 `trail.kind` 上。分开成两条 flow 再 `combine` 的话，切目录的瞬间
+ * 会短暂出现「新的 trail + 旧的目录内容」这种并不存在的组合。
+ */
+private data class BrowseSnapshot(
+    val trail: BrowserTrail?,
+    val content: BrowserContent,
 )
 
 /**
@@ -104,6 +131,7 @@ class BrowseViewModel(
     private val library: MediaLibraryRepository,
     private val browser: BrowserRepository,
     private val storage: StorageAccess,
+    private val hints: HintSettingsRepository,
     playlistStore: PlaylistStore,
     favoriteStore: FavoriteStore,
 ) : ViewModel() {
@@ -134,31 +162,74 @@ class BrowseViewModel(
             initialValue = BrowseNav(trail = null, sort = BrowserSort.NAME_ASC, showHidden = false),
         )
 
-    private val content: Flow<BrowserContent> = nav.flatMapLatest { current ->
+    /**
+     * 目录内容。`shareIn` 是必须的：它同时被 [uiState] 和 [folderCounts] 订阅，
+     * 冷 flow 被收两次就会**把同一个目录列两遍**（云盘上这一下就是好几秒）。
+     */
+    private val snapshot: Flow<BrowseSnapshot> = nav.flatMapLatest { current ->
         val target = current.trail
         if (target == null) {
             // 停在来源清单：这里不是「空目录」，而是「还没有选目录」。
             // 混成 `Ready(emptyList())` 会让界面显示一个空目录的空状态文案。
-            flowOf(BrowserContent.Idle)
+            flowOf(BrowseSnapshot(trail = null, content = BrowserContent.Idle))
         } else {
             browser.listing(target, current.sort, current.showHidden)
+                .map { BrowseSnapshot(trail = target, content = it) }
         }
-    }
+    }.shareIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        replay = 1,
+    )
+
+    /**
+     * 子文件夹的条目数，逐个到就逐个发。
+     *
+     * 用 `scan` 累积成一张表而不是让 flow 每来一个数就复制一整张：一个目录里
+     * 有几百个子文件夹时，每个都 `map +` 一次是 O(n²) 次拷贝。表只增不减——
+     * 键是**绝对 ref**，换到别的目录之后旧键根本不会被界面查到，留着不影响显示。
+     */
+    private val folderCounts: Flow<Map<String, Int>> = snapshot
+        .flatMapLatest(::countsOf)
+        .scan(emptyMap<String, Int>()) { known, (ref, count) -> known + (ref to count) }
 
     val uiState: StateFlow<BrowseUiState> =
-        combine(sources, nav, content) { roots, current, listing ->
+        combine(sources, nav, snapshot, folderCounts, hints.dismissed) { roots, current, shown, counts, dismissed ->
             BrowseUiState(
                 roots = roots,
                 trail = current.trail,
-                content = listing,
+                content = shown.content,
                 sort = current.sort,
                 showHidden = current.showHidden,
+                folderCounts = counts,
+                dismissedHints = dismissed,
             )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
             initialValue = BrowseUiState(),
         )
+
+    /**
+     * 当前目录里每个子文件夹的条目数，一次问一个。
+     *
+     * `content` 不是 Ready（加载中 / 读不到 / 停在来源清单）时什么都不用数。
+     * 数不出来（null）的目录直接跳过：界面上少一个数字，好过写一个「0 项」
+     * 骗用户这个文件夹是空的。
+     */
+    private fun countsOf(current: BrowseSnapshot): Flow<Pair<String, Int>> {
+        val trail = current.trail ?: return emptyFlow()
+        val ready = current.content as? BrowserContent.Ready ?: return emptyFlow()
+        val folders = ready.entries.filter { it.isDirectory }
+        if (folders.isEmpty()) return emptyFlow()
+
+        return flow {
+            for (folder in folders) {
+                val count = browser.count(trail.kind, folder.ref) ?: continue
+                emit(folder.ref to count)
+            }
+        }
+    }
 
     /** 从来源清单里的一行开始浏览。 */
     fun enterSource(root: BrowserRoot) {
@@ -207,6 +278,11 @@ class BrowseViewModel(
     /** 用户在系统设置页里改过「所有文件访问」之后回到应用时调（`ON_RESUME`）。 */
     fun reloadSources() {
         reloadToken.update { it + 1 }
+    }
+
+    /** 关掉一条说明类提示（警告类不在 `HintIds` 里，这里也写不进去）。 */
+    fun dismissHint(id: String) {
+        viewModelScope.launch { hints.dismiss(id) }
     }
 
     fun addTree(uri: String) = library.addTree(uri)

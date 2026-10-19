@@ -49,6 +49,24 @@ internal class FileSystemSource(private val access: AllFilesAccess) : DirectoryS
         BrowserListing.Ready(children.map(::toEntry))
     }
 
+    /**
+     * 直接 `list()` 一次，只取长度。
+     *
+     * 比 SAF 那边便宜得多（一次系统调用，不需要 query、不需要读任何列），
+     * 所以这里不设上限：截断规则（`MAX_ENTRIES_PER_DIRECTORY`）管的是
+     * 「界面愿意画多少行」，不该让用户看到「5000+ 项」这种被我们编出来的数。
+     * 权限同样每次重问，理由见 [list]。
+     */
+    override suspend fun count(ref: String): Int? = withContext(Dispatchers.IO) {
+        if (!access.granted()) return@withContext null
+
+        val dir = File(ref)
+        if (!dir.isDirectory) return@withContext null
+
+        // null = 读不到（权限、IO）；不是 0。0 是真空目录。
+        dir.list()?.size
+    }
+
     private fun toEntry(file: File): BrowserEntry {
         val directory = file.isDirectory
         val name = file.name

@@ -91,6 +91,7 @@
 
     <!-- ===== 瀏覽（SAF 授權目錄） ===== -->
     <string name="msp_browse_title">瀏覽</string>
+    <string name="msp_library_hint_dismiss">關閉提示</string>
     <string name="msp_browse_add">新增資料夾</string>
     <string name="msp_browse_hint">這裡列出的是可以開始瀏覽的位置。系統媒體庫裡的內容不需要在這裡授權。</string>
     <string name="msp_browse_empty_title">還沒有授權任何資料夾</string>
@@ -152,6 +153,10 @@
     <string name="msp_browser_not_directory">這裡已經不是資料夾了</string>
     <string name="msp_browser_not_directory_desc">它可能在別的地方被改名或刪除了。往上翻一層再找找。</string>
     <string name="msp_browser_show_hidden">顯示隱藏檔案</string>
+    <!-- 子資料夾列尾的數字。直接子項，檔案 + 資料夾各算 1，不遞迴 -->
+    <string name="msp_browser_child_count">%1$d 項</string>
+    <!-- 目前資料夾標題列右側的總數。同樣只算直接子項 -->
+    <string name="msp_browser_count_total">共 %1$d 項</string>
     <string name="msp_browser_truncated">內容太多，只列出了前 %1$d 項</string>
     <string name="msp_browser_up">上一層</string>
     <string name="msp_browser_back_sources">返回來源清單</string>
