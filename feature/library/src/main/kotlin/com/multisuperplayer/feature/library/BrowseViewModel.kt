@@ -306,12 +306,18 @@ class BrowseViewModel(
      * 一个「空目录」，用户看到的是「我的文件没了」。实际上这里只是**打不开**。
      * 用的是同一个 `browser.listing`，所以界面最终拿到的仍是同一份查询结果
      * （多这一次查询的代价是一次目录列表，远小于让用户以为文件丢了）。
+     *
+     * 注意这里取的是**第一个非 [BrowserContent.Loading] 的结论**，而不是 `.first()`：
+     * `browser.listing` 的第一项永远是「正在读」，拿它做判断只会永远落到 `else`
+     * 分支——界面照样显示「读不到这个文件夹」，但那句一次性的提示就再也不会出现，
+     * 而它正是用户从收藏页点过来时唯一能看到的「为什么进去是空的」。
      */
     fun openFavoriteFolder(favorite: Favorite.Folder) {
         val target = favorite.toTrail()
         trail.value = target
         viewModelScope.launch {
-            val listing = browser.listing(target, sort.value, showHidden.value).first()
+            val listing = browser.listing(target, sort.value, showHidden.value)
+                .first { it !is BrowserContent.Loading }
             when (listing) {
                 is BrowserContent.Unreadable, is BrowserContent.NotADirectory ->
                     publish(MspText.Res(R.string.msp_favorites_folder_missing))
