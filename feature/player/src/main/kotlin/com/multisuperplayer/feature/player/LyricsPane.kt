@@ -2,12 +2,14 @@ package com.multisuperplayer.feature.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,12 +35,15 @@ import com.multisuperplayer.core.model.SubtitleDocument
  * LRC 只记录每行的开始时间、没有结束概念，用 `cueAt` 会让高亮在每句末尾闪一下或者
  * 整句消失——这正是那两个方法的 KDoc 里写明的分工。
  *
- * ## 自动滚动的两个细节
+ * ## 自动滚动的三个细节
  *
  * 1. 只在**行号变化**时滚（`LaunchedEffect(activeIndex)`），不是每 200ms 滚一次。
  * 2. 用户正在手动滑动时不抢。手指还在屏幕上就把列表拽回去，表现为
  *    「怎么滑都被弹回当前行」——用 `isScrollInProgress` 挡掉这一次，
  *    松手之后下一次换行会自然接上。
+ * 3. 滚多少**按这一行实测的高度算**，不按「第几行」算。原因见 [LyricsScrollRules]：
+ *    长句会折成好几行、双语还多一行译文，行高不是常数，按索引锚定会把当前行
+ *    的尾巴推到视口下面（用户看到的是「这一句还有一段藏在下面」）。
  *
  * ## 为什么有 [compact]
  *
@@ -69,7 +74,7 @@ internal fun LyricsPane(
     LaunchedEffect(activeIndex) {
         if (activeIndex < 0) return@LaunchedEffect
         if (listState.isScrollInProgress) return@LaunchedEffect
-        listState.animateScrollToItem((activeIndex - ANCHOR_OFFSET).coerceAtLeast(0))
+        listState.animateScrollToLyric(activeIndex)
     }
 
     LazyColumn(
@@ -151,8 +156,32 @@ private fun LyricLine(
 }
 
 /**
- * 让当前行落在视口偏上的位置，而不是正好贴在最上面。
+ * 把第 [index] 行滚进视口——**滚完以后这一行要整行可见**。
  *
- * 贴在最上面的话，下一句还没出现就已经在视口外了，滚动看起来是「跳」而不是「走」。
+ * 分两步，因为「它多高」这件事只有它被组合出来之后才知道：
+ *
+ * 1. 目标行还不在 `visibleItemsInfo` 里（离得太远，比如拖动进度条跳了一段，
+ *    或者它自己长到把视口下沿撑满了）⇒ 先用 [LazyListState.animateScrollToItem]
+ *    按索引把它带进视口。这一步只能把它按在视口上沿。
+ * 2. 拿到实测高度以后，用 [LyricsScrollRules.anchorDelta] 算出还差几像素，
+ *    [animateScrollBy] 补上。常见情况（当前行本来就在视口里）只有这一步，
+ *    所以是一次连续的动画，不会「先跳再挪」。
+ *
+ * 注意第 1 步之后**必须重新读一遍** `layoutInfo`：滚动动画会改写它，用旧值算出来
+ * 的位移一定是错的。
  */
-private const val ANCHOR_OFFSET = 2
+private suspend fun LazyListState.animateScrollToLyric(index: Int) {
+    if (layoutInfo.visibleItemsInfo.none { it.index == index }) {
+        animateScrollToItem(index)
+    }
+    val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    val delta = LyricsScrollRules.anchorDelta(
+        viewportStart = layoutInfo.viewportStartOffset,
+        viewportEnd = layoutInfo.viewportEndOffset,
+        beforeContentPadding = layoutInfo.beforeContentPadding,
+        afterContentPadding = layoutInfo.afterContentPadding,
+        itemOffset = info.offset,
+        itemSize = info.size,
+    )
+    if (delta != 0) animateScrollBy(delta.toFloat())
+}
