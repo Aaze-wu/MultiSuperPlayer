@@ -62,6 +62,7 @@ import com.multisuperplayer.core.data.subtitle.subtitleFileExtensions
 import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.BrowserEntry
 import com.multisuperplayer.core.ui.artwork.ArtworkImage
+import com.multisuperplayer.core.ui.text.ScrollingTitleText
 import com.multisuperplayer.core.ui.text.string
 
 /**
@@ -462,7 +463,9 @@ private fun BrowserEntryRow(
                 }
             },
             headlineContent = {
-                Text(text = entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // 同上：长文件名滚动。`mediaId` 与 `MediaEntry.id` 是同一套 id（见
+                // `BrowserSelection`），所以能直接与「当前播的那一条」对齐。
+                ScrollingTitleText(text = entry.name, entryId = entry.mediaId, selected = selected)
             },
             // 后缀用大写显示：它在视觉上是「标签」而不是句子的一部分，
             // 而且在小字号下大写比小写更容易和文件名分开。

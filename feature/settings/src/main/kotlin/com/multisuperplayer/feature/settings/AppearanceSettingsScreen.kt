@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,7 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.CustomAccent
+import com.multisuperplayer.core.data.settings.DisplaySettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
+import com.multisuperplayer.core.ui.text.TitleScrollRules
 import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.CustomAccentRanges
 import com.multisuperplayer.core.ui.theme.MspAccent
@@ -66,7 +69,7 @@ import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 /**
- * 外观设置：主题基底、强调色、两个取色来源、界面语言。
+ * 外观设置：主题基底、强调色、两个取色来源、列表显示、界面语言。
  *
  * 从设置入口页推上来，所以带返回键；返回时 [onBack] 只弹一层栈（见 `MspApp.kt` 的路由），
  * 不会回到「媒体库」。
@@ -79,11 +82,13 @@ fun AppearanceSettingsRoute(
 ) {
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val display by viewModel.display.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     AppearanceSettingsScreen(
         theme = theme,
         language = language,
+        display = display,
         onBack = onBack,
         onSelectBaseTheme = viewModel::selectBaseTheme,
         onSelectAccent = viewModel::selectAccent,
@@ -91,6 +96,7 @@ fun AppearanceSettingsRoute(
         onClearCustomAccent = viewModel::clearCustomAccent,
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
+        onSetScrollLongTitles = viewModel::setScrollLongTitles,
         onSelectLanguage = { selected ->
             viewModel.setLanguage(selected)
             // 低于 Android 13 必须先写后重建：写进去的是 SharedPreferences，
@@ -111,12 +117,14 @@ fun AppearanceSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     language: AppLanguage = AppLanguage.DEFAULT,
+    display: DisplaySettings = DisplaySettings(),
     onSelectBaseTheme: (MspBaseTheme) -> Unit = {},
     onSelectAccent: (MspAccent) -> Unit = {},
     onSelectCustomAccent: (CustomAccent) -> Unit = {},
     onClearCustomAccent: () -> Unit = {},
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
+    onSetScrollLongTitles: (Boolean) -> Unit = {},
     onSelectLanguage: (AppLanguage) -> Unit = {},
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
@@ -132,6 +140,10 @@ fun AppearanceSettingsScreen(
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val dynamicColorBlockedByOled = baseTheme == MspBaseTheme.BLACK
     val dynamicColorUsable = dynamicColorSupported && !dynamicColorBlockedByOled
+    // 长标题滚动的开关。`null` = 用户没设置过 ⇒ 用 UI 层默认值（开）。
+    // 默认值只从 [TitleScrollRules] 取，不写字面量：与上面两个取色开关同理，
+    // 直接写 `?: true` 就等于多了一份会和默认值分家的副本。
+    val scrollLongTitles = display.scrollLongTitles ?: TitleScrollRules.DEFAULT_ENABLED
     // 强调色选择弹窗。这一页只此一个对话框，所以用一个布尔量而不是枚举；
     // 它渲染在 `Scaffold` 外面，不会随列表滚动被回收（见文件末尾）。
     var showAccentPicker by remember { mutableStateOf(false) }
@@ -245,6 +257,20 @@ fun AppearanceSettingsScreen(
                     enabled = enabled,
                     onCheckedChange = onSetDynamicColor,
                     help = stringResource(R.string.msp_settings_theme_note_dynamic),
+                )
+            }
+
+            item { SectionHeader(stringResource(R.string.msp_settings_section_list_display)) }
+            item {
+                SettingsSwitchRow(
+                    // 左右箭头：这个开关的作用就是「文字会沿水平方向移动」。
+                    icon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = null) },
+                    title = stringResource(R.string.msp_settings_scroll_long_titles),
+                    subtitle = stringResource(R.string.msp_settings_scroll_long_titles_desc),
+                    checked = scrollLongTitles,
+                    enabled = true,
+                    onCheckedChange = onSetScrollLongTitles,
+                    help = stringResource(R.string.msp_settings_note_scroll_long_titles),
                 )
             }
 

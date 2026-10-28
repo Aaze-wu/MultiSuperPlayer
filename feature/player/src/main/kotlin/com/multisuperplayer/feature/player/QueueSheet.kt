@@ -46,6 +46,7 @@ import com.multisuperplayer.core.ui.list.ReorderDragTrigger
 import com.multisuperplayer.core.ui.list.reorderDragSource
 import com.multisuperplayer.core.ui.list.rememberReorderDragState
 import com.multisuperplayer.core.ui.list.rememberReorderPreview
+import com.multisuperplayer.core.ui.text.ScrollingTitleText
 
 /**
  * 播放队列面板：看现在排了什么，直接跳到某一条，删掉、重排。
@@ -315,12 +316,14 @@ private fun QueueRow(
         }
 
         Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-            Text(
+            // 队列里**只有正在播的那一条**会滚（其他行连当前项都不是），
+            // 否则一屏四五条名字同时卷，反而看不出谁在播。
+            ScrollingTitleText(
                 text = entry.title,
+                entryId = entry.id,
+                selected = isCurrent,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isCurrent) colors.primary else colors.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             // 副标题可能为空（没有艺术家也没有专辑）：空的 `subtitle` 是空串，
             // 直接画出来会让这一行的两行文字只剩一行，行高还是固定的——

@@ -43,6 +43,9 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.ui.chrome.AppChromeState
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
 import com.multisuperplayer.core.ui.chrome.LocalAppChromeState
+import com.multisuperplayer.core.ui.text.LocalTitleScrollState
+import com.multisuperplayer.core.ui.text.TitleScrollRules
+import com.multisuperplayer.core.ui.text.TitleScrollState
 import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.ArtworkAccentState
 import com.multisuperplayer.core.ui.theme.LocalArtworkAccentState
@@ -92,6 +95,18 @@ fun MspApp() {
     // 主题包在最外层：它要覆盖底部导航栏，也要覆盖以后可能出现的对话框。
     val settingsViewModel: SettingsViewModel = koinViewModel()
     val theme by settingsViewModel.theme.collectAsStateWithLifecycle()
+
+    // 「长文件名滚动」的开关与「当前播的是哪一条」要在**整个应用**里可见：
+    // 需要它的行分布在媒体库/浏览/最近/播放列表/收藏/队列六个页面，而它们
+    // 分属两个互不相认的 feature 模块。一条 CompositionLocal 比给六个
+    // 页面的 Route 串进去同一个参数短得多，也不会「漏掉某一页」。
+    //
+    // `null` = 用户没设置过，默认值只在这一层解（`DEFAULT_ENABLED`）。
+    val display by settingsViewModel.display.collectAsStateWithLifecycle()
+    // 同一个 Activity 作用域 ⇒ 与各页面里 `koinViewModel()` 拿到的是**同一个**实例，
+    // 不会多建一个播放器。
+    val playbackViewModel: AppPlaybackViewModel = koinViewModel()
+    val nowPlaying by playbackViewModel.nowPlaying.collectAsStateWithLifecycle()
 
     // 自定义强调色：设置里存的是「三根滑块的位置」，而主题要的是四个颜色，
     // 换算放在 ViewModel 里（`customAccentSeeds`）。不在这边现算的原因是
@@ -195,6 +210,10 @@ fun MspApp() {
     CompositionLocalProvider(
         LocalArtworkAccentState provides artworkAccentState,
         LocalAppChromeState provides chromeState,
+        LocalTitleScrollState provides TitleScrollState(
+            enabled = display.scrollLongTitles ?: TitleScrollRules.DEFAULT_ENABLED,
+            currentEntryId = nowPlaying?.id,
+        ),
     ) {
         MspTheme(
             baseTheme = MspBaseTheme.fromId(theme.baseThemeId),

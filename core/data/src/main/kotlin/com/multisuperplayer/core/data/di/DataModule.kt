@@ -27,6 +27,7 @@ import com.multisuperplayer.core.data.settings.ApiKeyStore
 import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
+import com.multisuperplayer.core.data.settings.DisplaySettingsRepository
 import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
@@ -113,6 +114,10 @@ val dataModule = module {
     single { MediaUriProbe(context = androidContext()) }
 
     single { ThemeSettingsRepository(context = androidContext(), dispatchers = get()) }
+
+    // 「长文件名滚动」这类列表显示偏好。和主题分开：那一类只装配色，这一类只装
+    // 文字的显示方式，见 DisplaySettingsRepository 的注释。
+    single { DisplaySettingsRepository(context = androidContext(), dispatchers = get()) }
 
     single { SubtitleSettingsRepository(context = androidContext(), dispatchers = get()) }
 

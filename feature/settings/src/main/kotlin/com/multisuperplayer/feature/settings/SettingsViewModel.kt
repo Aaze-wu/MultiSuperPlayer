@@ -21,6 +21,8 @@ import com.multisuperplayer.core.data.settings.AsrSettingsRepository
 import com.multisuperplayer.core.data.settings.CustomAccent
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
+import com.multisuperplayer.core.data.settings.DisplaySettings
+import com.multisuperplayer.core.data.settings.DisplaySettingsRepository
 import com.multisuperplayer.core.data.settings.HintSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
@@ -168,6 +170,13 @@ class SettingsViewModel(
      * 没有别的入口能恢复它们，这里就是唯一那个出口。写操作只有 [restoreHints] 一处。
      */
     private val hintSettings: HintSettingsRepository,
+    /**
+     * 列表显示偏好（目前只有「长文件名滚动」一项）。
+     *
+     * 默认值**不在这里**：仓库里那一项是 `Boolean?`，`null` = 用户没设置过，
+     * 解析成「开」这件事只发生在界面层（`TitleScrollRules.DEFAULT_ENABLED`）。
+     */
+    private val displaySettings: DisplaySettingsRepository,
     private val localeSettings: LocaleSettingsRepository,
     private val softwareDecoders: SoftwareDecoderSupport,
     private val probe: TranslationProbe,
@@ -289,6 +298,15 @@ class SettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSettings())
 
     /**
+     * 列表显示偏好。
+     *
+     * 初值 `DisplaySettings()`（全空）= 「用户没设置过」= 界面按默认值显示，
+     * 所以首帧不会先画成「关」再跳成「开」。
+     */
+    val display: StateFlow<DisplaySettings> = displaySettings.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DisplaySettings())
+
+    /**
      * 被关掉的说明类提示有几条。
      *
      * 只用得上**数量**：那一行的副标题是「已关闭 N 条」，而「N == 0」恰好也是
@@ -359,6 +377,11 @@ class SettingsViewModel(
 
     fun setColorFromArtwork(enabled: Boolean) = persist("封面取色=$enabled") {
         themeSettings.setColorFromArtwork(enabled)
+    }
+
+    /** 开关「长文件名滚动显示」。 */
+    fun setScrollLongTitles(enabled: Boolean) = persist("长标题滚动=$enabled") {
+        displaySettings.setScrollLongTitles(enabled)
     }
 
     // ------------------------------------------------------------------ 语言

@@ -46,6 +46,7 @@ import com.multisuperplayer.core.model.ArtworkSourceRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.ui.artwork.ArtworkImage
+import com.multisuperplayer.core.ui.text.ScrollingTitleText
 import com.multisuperplayer.core.ui.text.displayTitle
 import com.multisuperplayer.core.ui.text.string
 
@@ -66,6 +67,10 @@ import com.multisuperplayer.core.ui.text.string
  * 外面再包一层背景会被它盖住），并且要求长按**不再**触发点击手势——
  * `combinedClickable` 的长按会一直吞事件到手指抬起，拖拽的那套手势收不到移动，
  * 表现就是「长按之后列表纹丝不动」。两者都给默认值，其余页面照旧。
+ *
+ * 标题用 [ScrollingTitleText] 而不是裸 `Text`：放不下的长文件名会横向滚动。
+ * 「滚不滚」「谁滚」全在那个组件内部决定（开关在设置里、当前播哪一条在
+ * `LocalTitleScrollState` 里），所以这一行不需要多一个参数，四个调用点也不用改。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -98,7 +103,13 @@ internal fun MediaEntryRow(
     ) {
         ListItem(
             headlineContent = {
-                Text(entry.displayTitle().string(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ScrollingTitleText(
+                    text = entry.displayTitle().string(),
+                    entryId = entry.id,
+                    // 多选时勾上的那些也算「用户在看的这一条」：它们的标题当场变成
+                    // 他要确认的对象，结果只剩一个省略号就只能点进去看。
+                    selected = selected,
+                )
             },
             supportingContent = {
                 Text(
