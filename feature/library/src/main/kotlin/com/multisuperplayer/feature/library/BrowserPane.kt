@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -45,10 +46,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -102,6 +105,10 @@ internal fun DirectoryBrowser(
     onShowHiddenChange: (Boolean) -> Unit = {},
     onOpenFile: (BrowserEntry) -> Unit = {},
     onOpenSubtitle: (BrowserEntry) -> Unit = {},
+    /** 这个目录上次滚到哪儿（键是目录的 `ref`）；null = 没去过，按顶格。 */
+    scrollPositionOf: (String) -> BrowseScrollPosition? = { null },
+    /** 目录列表滚了，把「停在哪儿」交出去。 */
+    onScrollPositionChanged: (String, BrowseScrollPosition) -> Unit = { _, _ -> },
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -221,6 +228,11 @@ internal fun DirectoryBrowser(
             HorizontalDivider()
             BrowserBody(
                 content = content,
+                // 这一层是谁：滚动位置就按它记。用 `trail.current.ref` 而不是路径，
+                // 理由见 `BrowserScrollMemory`。
+                directoryRef = trail.current.ref,
+                scrollPositionOf = scrollPositionOf,
+                onScrollPositionChanged = onScrollPositionChanged,
                 folderCounts = folderCounts,
                 selection = selection,
                 onEnterDirectory = onEnterDirectory,
@@ -231,7 +243,21 @@ internal fun DirectoryBrowser(
     }
 }
 
-/** 面包屑。横向可滚：深层的路径一定比屏幕宽。 */
+/**
+ * 面包屑。横向可滚：深层的路径一定比屏幕宽。
+ *
+ * ## 停到「当前目录」那一端
+ *
+ * 不滚的话，深层路径从最左端开始画，屏幕上只剩「内部存储 › Download › …」，
+ * 而用户最需要看见的那一段（我现在在哪）被挤到右边——路径越长越明显。
+ *
+ * 用 `scrollToItem` 而不是 `animateScrollToItem`：位置是「本来就该在那里」的，
+ * 不是一次动作；每次进目录都演一段横向滚动只是噪音。这个 effect 只在
+ * [BrowserTrail.crumbs] 变化时重跑，用户自己划走之后不会被拽回去。
+ *
+ * 最后一段本身如果比屏幕还长，`LazyRow` 会按内容宽度铺开（滚动方向不限宽），
+ * 这里停在它的**开头**：完整名字在顶栏标题上，面包屑只需要交代「在哪一级」。
+ */
 @Composable
 private fun CrumbRow(
     trail: BrowserTrail,
@@ -239,7 +265,12 @@ private fun CrumbRow(
     modifier: Modifier = Modifier,
 ) {
     val lastIndex = trail.crumbs.lastIndex
+    val listState = rememberLazyListState()
+    LaunchedEffect(trail.crumbs) {
+        listState.scrollToItem(lastIndex)
+    }
     LazyRow(
+        state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -274,6 +305,10 @@ private fun CrumbRow(
 @Composable
 private fun BrowserBody(
     content: BrowserContent,
+    /** 当前这个目录是谁（`BrowserTrail.current.ref`），滚动位置按它记。 */
+    directoryRef: String,
+    scrollPositionOf: (String) -> BrowseScrollPosition?,
+    onScrollPositionChanged: (String, BrowseScrollPosition) -> Unit,
     folderCounts: Map<String, Int>,
     selection: BrowserSelection,
     onEnterDirectory: (BrowserEntry) -> Unit,
@@ -327,21 +362,80 @@ private fun BrowserBody(
                     description = stringResource(R.string.msp_browser_empty_dir_desc),
                 )
 
-                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(items = content.entries, key = { it.ref }) { entry ->
-                        BrowserEntryRow(
-                            entry = entry,
-                            folderCount = folderCounts[entry.ref],
-                            selected = entry.mediaId in selection.ids,
-                            selectionMode = selection.mode,
-                            onToggleSelection = { selection.onToggle(entry.mediaId) },
-                            onEnterDirectory = onEnterDirectory,
-                            onOpenFile = onOpenFile,
-                            onOpenSubtitle = onOpenSubtitle,
-                        )
-                    }
-                }
+                else -> DirectoryList(
+                    entries = content.entries,
+                    directoryRef = directoryRef,
+                    scrollPositionOf = scrollPositionOf,
+                    onScrollPositionChanged = onScrollPositionChanged,
+                    folderCounts = folderCounts,
+                    selection = selection,
+                    onEnterDirectory = onEnterDirectory,
+                    onOpenFile = onOpenFile,
+                    onOpenSubtitle = onOpenSubtitle,
+                )
             }
+        }
+    }
+}
+
+/**
+ * 目录里那一列条目。
+ *
+ * ## 滚动位置为什么必须记到组合外面
+ *
+ * 切目录时 `content` 会先变成 `Loading`（`BrowserRepository.listing` 第一行就发
+ * `Loading`），这一列整棵离开组合，`rememberLazyListState()` 自己跟着没了
+ * ⇒ 从子目录返回父目录会回到顶部。所以位置记在外面的
+ * [BrowserScrollMemory] 里（由 ViewModel 持有），回来时当初始值重新交给列表。
+ *
+ * ## 为什么每次滚动都写，而不是「离开组合那一刻」再写
+ *
+ * `DisposableEffect.onDispose` 跑在 **applyChanges**，而新分支的 `remember` 跑在
+ * **composition**：同一个目录直接换一份内容时，新的列表会先读到旧值、旧的才把
+ * 真实值写进去，恢复就错一间。`snapshotFlow` 不会遇到这种时序：值一变就写。
+ *
+ * 写得勤也不怕——这份 Map 没有 `State` 包着，写它**不触发重组**（见
+ * [BrowserScrollMemory] 的注释），每帧一次 `Int` 写入的代价可以忽略。
+ */
+@Composable
+private fun DirectoryList(
+    entries: List<BrowserEntry>,
+    directoryRef: String,
+    scrollPositionOf: (String) -> BrowseScrollPosition?,
+    onScrollPositionChanged: (String, BrowseScrollPosition) -> Unit,
+    folderCounts: Map<String, Int>,
+    selection: BrowserSelection,
+    onEnterDirectory: (BrowserEntry) -> Unit,
+    onOpenFile: (BrowserEntry) -> Unit,
+    onOpenSubtitle: (BrowserEntry) -> Unit,
+) {
+    // 恢复时按**现在**的条目数夹一下：上次停在第 40 行，这次这个目录只剩 12 项
+    // （文件被删了），直接把 40 交给列表会落在一片空白上。
+    val restored = remember(directoryRef) {
+        scrollPositionOf(directoryRef)?.clampTo(entries.size)
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = restored?.index ?: 0,
+        initialFirstVisibleItemScrollOffset = restored?.offset ?: 0,
+    )
+    LaunchedEffect(listState, directoryRef) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                onScrollPositionChanged(directoryRef, BrowseScrollPosition(index = index, offset = offset))
+            }
+    }
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+        items(items = entries, key = { it.ref }) { entry ->
+            BrowserEntryRow(
+                entry = entry,
+                folderCount = folderCounts[entry.ref],
+                selected = entry.mediaId in selection.ids,
+                selectionMode = selection.mode,
+                onToggleSelection = { selection.onToggle(entry.mediaId) },
+                onEnterDirectory = onEnterDirectory,
+                onOpenFile = onOpenFile,
+                onOpenSubtitle = onOpenSubtitle,
+            )
         }
     }
 }

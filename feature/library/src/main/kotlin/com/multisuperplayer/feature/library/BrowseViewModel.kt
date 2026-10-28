@@ -144,6 +144,20 @@ class BrowseViewModel(
     private val sort = MutableStateFlow(BrowserSort.NAME_ASC)
     private val showHidden = MutableStateFlow(false)
 
+    /**
+     * 每个目录的列表滚到哪儿了（键是目录的 `ref`）。
+     *
+     * 放在 ViewModel 而不是 `remember`，理由是**活不过切目录**：
+     * `browser.listing` 每次换目录都先发一个 `Loading`（见它的注释），
+     * 这一来目录列表整棵离开组合，`remember` 的列表状态跟着一起没了——
+     * 于是「从子目录返回父目录」永远回到顶部。这里的寿命和导航栈（[trail]）
+     * 一样：旋转屏幕、切出去再回来都还在。
+     *
+     * 它**不是** [BrowseUiState] 的字段：位置变化不该引起重组，
+     * 界面是「要恢复时来问一句」的用法（见 `DirectoryList`）。
+     */
+    private val browseScroll = BrowserScrollMemory()
+
     /** 见类 KDoc：这不是数据，是「请重新问一次系统」的触发器。 */
     private val reloadToken = MutableStateFlow(0)
 
@@ -266,6 +280,14 @@ class BrowseViewModel(
     fun openCrumb(index: Int) {
         trail.value = trail.value?.jumpTo(index)
     }
+
+    /** 目录列表滚动时把「停在哪儿」记下来（[ref] 是目录的 `ref`）。 */
+    fun rememberBrowseScroll(ref: String, position: BrowseScrollPosition) {
+        browseScroll.remember(ref, position)
+    }
+
+    /** 目录列表重建时问：这个目录上次停在哪儿；没去过就是 null（按顶格处理）。 */
+    fun browseScrollOf(ref: String): BrowseScrollPosition? = browseScroll.recall(ref)
 
     fun selectSort(value: BrowserSort) {
         sort.value = value

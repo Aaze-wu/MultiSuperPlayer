@@ -225,6 +225,8 @@ fun BrowseRoute(
         onEnterSource = viewModel::enterSource,
         onEnterDirectory = viewModel::enterDirectory,
         onOpenCrumb = viewModel::openCrumb,
+        scrollPositionOf = viewModel::browseScrollOf,
+        onScrollPositionChanged = viewModel::rememberBrowseScroll,
         onBack = viewModel::goBack,
         onSortChange = viewModel::selectSort,
         onShowHiddenChange = viewModel::setShowHidden,
@@ -318,6 +320,9 @@ internal fun BrowseScreen(
     onOpenSubtitle: (BrowserEntry) -> Unit = {},
     onOpenNetwork: () -> Unit = {},
     onDismissHint: (String) -> Unit = {},
+    /** 目录列表上次停在哪（键是目录的 `ref`）。默认不记，见 `DirectoryList`。 */
+    scrollPositionOf: (String) -> BrowseScrollPosition? = { null },
+    onScrollPositionChanged: (String, BrowseScrollPosition) -> Unit = { _, _ -> },
 ) {
     val trail = state.trail
     if (trail == null) {
@@ -350,6 +355,8 @@ internal fun BrowseScreen(
             onShowHiddenChange = onShowHiddenChange,
             onOpenFile = onOpenFile,
             onOpenSubtitle = onOpenSubtitle,
+            scrollPositionOf = scrollPositionOf,
+            onScrollPositionChanged = onScrollPositionChanged,
         )
     }
 }

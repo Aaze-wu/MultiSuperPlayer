@@ -91,7 +91,10 @@ plugins {
 //
 // 1.4.8 同样是纯应用内改动：长文件名滚动只是给若干个标题换了画法，外加一份
 // 本地偏好（开关），没有清单 / 权限 / 系统 intent 变化 ⇒ 直接发正式版。
-val appVersionName: String = "1.4.8"
+//
+// 1.4.9 更小：目录列表记住滚动位置 + 面包屑停到当前层，只动 Compose 的列表状态，
+// 不落盘、不加权限、不改清单 ⇒ 直接发正式版。
+val appVersionName: String = "1.4.9"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()
