@@ -174,6 +174,7 @@ private suspend fun LazyListState.animateScrollToLyric(index: Int) {
     if (layoutInfo.visibleItemsInfo.none { it.index == index }) {
         animateScrollToItem(index)
     }
+    // animateScrollToItem 之后 layoutInfo 是新的，这里的 offset/size 才是实测值。
     val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
     val delta = LyricsScrollRules.anchorDelta(
         viewportStart = layoutInfo.viewportStartOffset,

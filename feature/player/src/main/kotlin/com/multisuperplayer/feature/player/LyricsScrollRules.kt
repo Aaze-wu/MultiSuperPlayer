@@ -39,12 +39,23 @@ package com.multisuperplayer.feature.player
 internal object LyricsScrollRules {
 
     /**
-     * 把 [itemOffset] 处的歌词行挪进视口所需的**像素位移**（正数 = 内容往上滚）。
+     * 把 [itemOffset] 处的歌词行挪进视口所需的**滚动量**，可以直接喂给
+     * `LazyListState.animateScrollBy`：**正数 = 往下滚**（内容上移、行的偏移变小），
+     * 负数 = 往回滚。
+     *
+     * ## 为什么这里必须处理符号
+     *
+     * 「这一行要在屏幕上往下移动 305px」与「列表要往下滚 305px」是**两个相反的操作**：
+     * `animateScrollBy(+x)` 会让所有行的 offset **减少** x。把「行的位移」直接喂进去
+     * 就会往反方向滚，症状不是崩溃也不是一片空白，而是——每换一句，列表就朝错误方向
+     * 走半个屏幕，前几句被一路顶出视口。界面上看起来只是「开头那几句莫名其妙没了」，
+     * 所以符号归一律收在这个纯函数里，调用点与单测共用同一套符号。
      *
      * 坐标系与 `LazyListLayoutInfo` / `LazyListItemInfo` 一致：都是相对视口起点的
      * 像素，所以 *同时* 平移视口与 item 时结果不变（见单测）。
      *
-     * @param viewportStart 视口起点（`LazyListLayoutInfo.viewportStartOffset`，通常 0）。
+     * @param viewportStart 视口起点（`LazyListLayoutInfo.viewportStartOffset`，带内边距时
+     *   是负数，如 -63）。
      * @param viewportEnd 视口终点（`viewportEndOffset`，通常就是视口高度）。
      * @param beforeContentPadding 内容区上内边距（`beforeContentPadding`）：歌词区
      *   `compact` 与否取 24dp / 8dp，居中必须在**内容区**里居中，否则「贴着上沿」
@@ -53,7 +64,7 @@ internal object LyricsScrollRules {
      * @param itemOffset 这一行当前的主轴起点（`LazyListItemInfo.offset`）。
      * @param itemSize 这一行**实测**的高度（`LazyListItemInfo.size`）。还没被组合出来
      *   时没有值——调用方必须保证传进来的是量到的数字，不能拿「一行大概多高」去猜。
-     * @return 需要滚动的像素。0 表示「已经在位」，调用方不必再动画一次。
+     * @return 需要滚动的像素（正 = 往下滚）。0 表示「已经在位」，调用方不必再动画一次。
      *   视口 / 内容区 / 行高退化（≤ 0）时一律返回 0：这几种输入只会在「还没量出来」
      *   的那一帧出现，那里什么都不能做。
      */
@@ -75,6 +86,7 @@ internal object LyricsScrollRules {
         } else {
             bandStart + (bandHeight - itemSize) / 2
         }
-        return desiredTop - itemOffset
+        // 行要从 itemOffset 走到 desiredTop ⇒ 滚动量取反：往下滚会让 offset 变小。
+        return itemOffset - desiredTop
     }
 }
