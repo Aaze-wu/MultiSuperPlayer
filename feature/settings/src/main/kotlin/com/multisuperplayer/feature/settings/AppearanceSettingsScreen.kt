@@ -58,7 +58,6 @@ import com.multisuperplayer.core.data.settings.AppLanguage
 import com.multisuperplayer.core.data.settings.CustomAccent
 import com.multisuperplayer.core.data.settings.DisplaySettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
-import com.multisuperplayer.core.ui.text.TitleScrollRules
 import com.multisuperplayer.core.ui.text.string
 import com.multisuperplayer.core.ui.theme.CustomAccentRanges
 import com.multisuperplayer.core.ui.theme.MspAccent
@@ -69,7 +68,7 @@ import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 /**
- * 外观设置：主题基底、强调色、两个取色来源、列表显示、界面语言。
+ * 外观设置：主题基底、强调色、两个取色来源、长文件名滚动（只有入口，开关在子页）、界面语言。
  *
  * 从设置入口页推上来，所以带返回键；返回时 [onBack] 只弹一层栈（见 `MspApp.kt` 的路由），
  * 不会回到「媒体库」。
@@ -77,6 +76,7 @@ import kotlin.math.roundToInt
 @Composable
 fun AppearanceSettingsRoute(
     onBack: () -> Unit,
+    onOpenTitleScroll: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
@@ -96,7 +96,7 @@ fun AppearanceSettingsRoute(
         onClearCustomAccent = viewModel::clearCustomAccent,
         onSetDynamicColor = viewModel::setDynamicColor,
         onSetColorFromArtwork = viewModel::setColorFromArtwork,
-        onSetScrollLongTitles = viewModel::setScrollLongTitles,
+        onOpenTitleScroll = onOpenTitleScroll,
         onSelectLanguage = { selected ->
             viewModel.setLanguage(selected)
             // 低于 Android 13 必须先写后重建：写进去的是 SharedPreferences，
@@ -124,7 +124,7 @@ fun AppearanceSettingsScreen(
     onClearCustomAccent: () -> Unit = {},
     onSetDynamicColor: (Boolean) -> Unit = {},
     onSetColorFromArtwork: (Boolean) -> Unit = {},
-    onSetScrollLongTitles: (Boolean) -> Unit = {},
+    onOpenTitleScroll: () -> Unit = {},
     onSelectLanguage: (AppLanguage) -> Unit = {},
 ) {
     val baseTheme = MspBaseTheme.fromId(theme.baseThemeId)
@@ -140,10 +140,8 @@ fun AppearanceSettingsScreen(
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val dynamicColorBlockedByOled = baseTheme == MspBaseTheme.BLACK
     val dynamicColorUsable = dynamicColorSupported && !dynamicColorBlockedByOled
-    // 长标题滚动的开关。`null` = 用户没设置过 ⇒ 用 UI 层默认值（开）。
-    // 默认值只从 [TitleScrollRules] 取，不写字面量：与上面两个取色开关同理，
-    // 直接写 `?: true` 就等于多了一份会和默认值分家的副本。
-    val scrollLongTitles = display.scrollLongTitles ?: TitleScrollRules.DEFAULT_ENABLED
+    // 长标题滚动的开关已经搬到子页 `TitleScrollSettingsScreen`。这一页只剩一行入口，
+    // 它的副标题就是「当前到底开没开、有几个页面被点名」——读的是 [display]。
     // 强调色选择弹窗。这一页只此一个对话框，所以用一个布尔量而不是枚举；
     // 它渲染在 `Scaffold` 外面，不会随列表滚动被回收（见文件末尾）。
     var showAccentPicker by remember { mutableStateOf(false) }
@@ -262,15 +260,15 @@ fun AppearanceSettingsScreen(
 
             item { SectionHeader(stringResource(R.string.msp_settings_section_list_display)) }
             item {
-                SettingsSwitchRow(
-                    // 左右箭头：这个开关的作用就是「文字会沿水平方向移动」。
-                    icon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = null) },
+                // 这里只留一个入口行，开关搬到了子页 `TitleScrollSettingsScreen`。
+                // 副标题写**当前状态**（开/关 + 有几个页面被点名），而不是功能说明：
+                // 用户设过五个页面之后，这一行只写「开」的话，他下次点进去看到七个勾以外
+                // 的信息就没了参照，会以为那些设置丢了。
+                SettingActionRow(
+                    icon = Icons.Outlined.SwapHoriz,
                     title = stringResource(R.string.msp_settings_scroll_long_titles),
-                    subtitle = stringResource(R.string.msp_settings_scroll_long_titles_desc),
-                    checked = scrollLongTitles,
-                    enabled = true,
-                    onCheckedChange = onSetScrollLongTitles,
-                    help = stringResource(R.string.msp_settings_note_scroll_long_titles),
+                    subtitle = SettingsSummaries.scrollTitles(display).string(),
+                    onClick = onOpenTitleScroll,
                 )
             }
 

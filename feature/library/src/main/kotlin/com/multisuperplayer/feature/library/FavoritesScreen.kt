@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.favorites.Favorite
 import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.ui.text.ScrollingTitleText
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
@@ -136,6 +138,7 @@ fun FavoritesScreen(
                                 val index = queue.indexOfFirst { it.id == entry.id }
                                 MediaEntryRow(
                                     entry = entry,
+                                    page = TitleScrollPage.FAVORITES,
                                     onClick = {
                                         if (index >= 0) onPlayRequest(queue, index)
                                     },
@@ -177,7 +180,8 @@ private fun FolderRow(
     val path = remember(folder) { folder.crumbs.joinToString(" / ") { it.label } }
     ListItem(
         headlineContent = {
-            Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // 文件夹名也可能很长（用户自己建的目录）：和文件行走同一条规则。
+            ScrollingTitleText(text = folder.name, entryId = null, page = TitleScrollPage.FAVORITES)
         },
         supportingContent = {
             Text(

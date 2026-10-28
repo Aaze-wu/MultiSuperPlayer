@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.multisuperplayer.core.data.remote.RemoteUrlRules
 import com.multisuperplayer.core.model.MediaEntry
+import com.multisuperplayer.core.ui.text.ScrollingTitleText
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -241,10 +243,12 @@ private fun NetworkUrlRow(
             )
         },
         headlineContent = {
-            Text(
+            // 名字也可能很长（`RemoteUrlRules.titleOf` 不截断），所以照样走滚动：
+            // 这一页默认只滚当前播的那一条，但被点名之后整张历史都滚。
+            ScrollingTitleText(
                 text = RemoteUrlRules.titleOf(url),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                entryId = null,
+                page = TitleScrollPage.NETWORK,
             )
         },
         supportingContent = {

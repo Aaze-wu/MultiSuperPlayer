@@ -9,6 +9,7 @@ import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.settings.AspectRatioMode
 import com.multisuperplayer.core.data.settings.AsrSettings
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
+import com.multisuperplayer.core.data.settings.DisplaySettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -18,6 +19,8 @@ import com.multisuperplayer.core.llm.LlmModelStatus
 import com.multisuperplayer.core.player.PlaybackSpeedOptions
 import com.multisuperplayer.core.player.SpeedBoostOptions
 import com.multisuperplayer.core.translate.describeMissingItems
+import com.multisuperplayer.core.ui.text.TitleScrollPage
+import com.multisuperplayer.core.ui.text.TitleScrollRules
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
@@ -91,6 +94,31 @@ internal object SettingsSummaries {
             else -> null
         }
         return join(baseTheme.label, accentLabel, tail)
+    }
+
+    /**
+     * 外观 › 长文件名滚动 的入口行：`开 · 2 个页面所有长名字都滚`。
+     *
+     * 为什么要把「几个页面」写出来：这一行是用户判断「我上次到底设过没有」的
+     * 唯一位置，而子页里的逐页开关默认一个都不勾——只写「开」的话，他点进去
+     * 看到七行全空的勾，会以为自己那些设置丢了。
+     *
+     * 「开」与「关」都用资源而不是 `String` 拼接，与同文件其余摘要一致：
+     * 英文那句的语序不同（`On · every long name scrolls on 2 pages`），
+     * 拼字符串拼不出来。
+     */
+    fun scrollTitles(display: DisplaySettings): MspText {
+        // `null` = 用户没设置过 ⇒ UI 层默认（开）。默认值只从 [TitleScrollRules] 取。
+        val enabled = display.scrollLongTitles ?: TitleScrollRules.DEFAULT_ENABLED
+        if (!enabled) return MspText.Res(R.string.msp_settings_scroll_summary_off)
+        // 只数**认得出来的**页面：降级安装后仓里会留着新版写下的 id，
+        // 把它们算进去会出现「写着 3 个页面，进去只勾上 2 行」。
+        val pages = TitleScrollPage.known(display.alwaysScrollPages).size
+        return if (pages == 0) {
+            MspText.Res(R.string.msp_settings_scroll_summary_current_only)
+        } else {
+            MspText.Res(R.string.msp_settings_scroll_summary_pages, pages)
+        }
     }
 
     /**

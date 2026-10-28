@@ -44,6 +44,7 @@ import com.multisuperplayer.core.ui.chrome.AppChromeState
 import com.multisuperplayer.core.ui.chrome.LocalAppChrome
 import com.multisuperplayer.core.ui.chrome.LocalAppChromeState
 import com.multisuperplayer.core.ui.text.LocalTitleScrollState
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.text.TitleScrollRules
 import com.multisuperplayer.core.ui.text.TitleScrollState
 import com.multisuperplayer.core.ui.text.string
@@ -73,6 +74,7 @@ import com.multisuperplayer.feature.settings.PlaybackSettingsRoute
 import com.multisuperplayer.feature.settings.SettingsRoute
 import com.multisuperplayer.feature.settings.SettingsViewModel
 import com.multisuperplayer.feature.settings.StartupUpdateDialog
+import com.multisuperplayer.feature.settings.TitleScrollSettingsRoute
 import com.multisuperplayer.feature.settings.TranslationSettingsRoute
 import com.multisuperplayer.feature.settings.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -213,6 +215,9 @@ fun MspApp() {
         LocalTitleScrollState provides TitleScrollState(
             enabled = display.scrollLongTitles ?: TitleScrollRules.DEFAULT_ENABLED,
             currentEntryId = nowPlaying?.id,
+            // 只把**认得出来的**页面 id 交下去：降级安装后仓里可能留着新版写下的 id，
+            // 而 `TitleScrollPage.known` 会把它们静默丢掉（见那个函数的说明）。
+            alwaysScrollPages = TitleScrollPage.known(display.alwaysScrollPages),
         ),
     ) {
         MspTheme(
@@ -289,6 +294,15 @@ private const val TRANSLATION_SETTINGS_ROUTE = "settings/translation"
  */
 private const val APPEARANCE_SETTINGS_ROUTE = "settings/appearance"
 private const val PLAYBACK_SETTINGS_ROUTE = "settings/playback"
+
+/**
+ * 外观 › 长文件名滚动。
+ *
+ * 从外观页再往下挂一层（路径里 `appearance` 后面又多一段），而不是把八个开关
+ * 摊在外观页里：一个总开关加上七个页面各自的勾，会把「主题/强调色」那一组
+ * 挤到需要滚一屏才能看到底，而这一组只在「名字太长放不下」时才有人关心。
+ */
+private const val TITLE_SCROLL_SETTINGS_ROUTE = "settings/appearance/scrolling"
 
 /**
  * 桌面歌词页：开关、字号、不透明度、锁定、恢复位置。
@@ -635,7 +649,15 @@ private fun MspAppScaffold(
                 )
             }
             composable(APPEARANCE_SETTINGS_ROUTE) {
-                AppearanceSettingsRoute(onBack = { navController.popBackStack() })
+                AppearanceSettingsRoute(
+                    onBack = { navController.popBackStack() },
+                    onOpenTitleScroll = {
+                        navController.navigate(TITLE_SCROLL_SETTINGS_ROUTE) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable(TITLE_SCROLL_SETTINGS_ROUTE) {
+                TitleScrollSettingsRoute(onBack = { navController.popBackStack() })
             }
             composable(PLAYBACK_SETTINGS_ROUTE) {
                 PlaybackSettingsRoute(onBack = { navController.popBackStack() })

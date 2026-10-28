@@ -47,6 +47,7 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.ui.artwork.ArtworkImage
 import com.multisuperplayer.core.ui.text.ScrollingTitleText
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.text.displayTitle
 import com.multisuperplayer.core.ui.text.string
 
@@ -70,12 +71,15 @@ import com.multisuperplayer.core.ui.text.string
  *
  * 标题用 [ScrollingTitleText] 而不是裸 `Text`：放不下的长文件名会横向滚动。
  * 「滚不滚」「谁滚」全在那个组件内部决定（开关在设置里、当前播哪一条在
- * `LocalTitleScrollState` 里），所以这一行不需要多一个参数，四个调用点也不用改。
+ * `LocalTitleScrollState` 里）。但「这一行是哪一页的行」它猜不出来 ——
+ * 同一个组件被四个页面用，所以 [page] 必须由调用方传下来，
+ * 否则「在媒体库把这一页点名成全部滚动」对一个从播放列表冒出来的行也会生效。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MediaEntryRow(
     entry: MediaEntry,
+    page: TitleScrollPage,
     selected: Boolean = false,
     selectionMode: Boolean = false,
     supporting: String? = null,
@@ -106,6 +110,7 @@ internal fun MediaEntryRow(
                 ScrollingTitleText(
                     text = entry.displayTitle().string(),
                     entryId = entry.id,
+                    page = page,
                     // 多选时勾上的那些也算「用户在看的这一条」：它们的标题当场变成
                     // 他要确认的对象，结果只剩一个省略号就只能点进去看。
                     selected = selected,

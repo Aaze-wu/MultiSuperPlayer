@@ -86,6 +86,7 @@ import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.MediaKind
 import com.multisuperplayer.core.model.Playlist
 import com.multisuperplayer.core.ui.artwork.ArtworkImage
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.text.displayTitle
 import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
@@ -545,6 +546,7 @@ private fun MediaEntryList(
                 is LibraryRow.Item -> item(key = row.key) {
                     MediaEntryRow(
                         entry = row.entry,
+                        page = TitleScrollPage.LIBRARY,
                         selected = row.entry.id in selectedIds,
                         selectionMode = selectionMode,
                         onClick = {

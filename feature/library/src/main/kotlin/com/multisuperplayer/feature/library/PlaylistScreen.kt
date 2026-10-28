@@ -72,6 +72,8 @@ import com.multisuperplayer.core.ui.list.reorderDragSource
 import com.multisuperplayer.core.ui.list.reorderItemColor
 import com.multisuperplayer.core.ui.list.rememberReorderDragState
 import com.multisuperplayer.core.ui.list.rememberReorderPreview
+import com.multisuperplayer.core.ui.text.ScrollingTitleText
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
@@ -595,7 +597,8 @@ private fun PlaylistListRow(
     ) {
         ListItem(
             headlineContent = {
-                Text(playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // 清单名是用户自己起的，长度不受控 ⇒ 和其它页面用同一条滚动规则。
+                ScrollingTitleText(text = playlist.name, entryId = null, page = TitleScrollPage.PLAYLISTS)
             },
             supportingContent = {
                 Text(stringResource(R.string.msp_library_item_count, playlist.size))
@@ -713,6 +716,7 @@ private fun PlaylistDetailPane(
             ) {
                 MediaEntryRow(
                     entry = row.display,
+                    page = TitleScrollPage.PLAYLISTS,
                     // 失效的条目照常留在队列里（见 PlaylistRows.queue 的说明），
                     // 但必须在副标题上说清楚，用户点下去之前就知道可能放不出来。
                     supporting = if (row.missing) {

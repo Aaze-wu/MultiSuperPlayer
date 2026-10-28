@@ -50,6 +50,7 @@ import com.multisuperplayer.core.data.export.PlaybackExportFormat
 import com.multisuperplayer.core.data.favorites.FavoriteRules
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.RecentPlay
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.text.string
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -389,6 +390,7 @@ fun RecentScreen(
                         val longPress = { selection.onToggle(row.entry.id) }
                         MediaEntryRow(
                             entry = row.entry,
+                            page = TitleScrollPage.RECENT,
                             selected = row.entry.id in selection.ids,
                             selectionMode = selection.mode,
                             // 位置为 0 是**一条正常记录**（刚播过，但下次从头播：短片、

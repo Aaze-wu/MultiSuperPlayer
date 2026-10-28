@@ -47,6 +47,7 @@ import com.multisuperplayer.core.ui.list.reorderDragSource
 import com.multisuperplayer.core.ui.list.rememberReorderDragState
 import com.multisuperplayer.core.ui.list.rememberReorderPreview
 import com.multisuperplayer.core.ui.text.ScrollingTitleText
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 
 /**
  * 播放队列面板：看现在排了什么，直接跳到某一条，删掉、重排。
@@ -316,11 +317,13 @@ private fun QueueRow(
         }
 
         Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-            // 队列里**只有正在播的那一条**会滚（其他行连当前项都不是），
-            // 否则一屏四五条名字同时卷，反而看不出谁在播。
+            // 队列里默认只有正在播的那一条会滚（其他行连当前项都不是），
+            // 否则一屏四五条名字同时卷，反而看不出谁在播。在设置里把「播放队列」
+            // 点名成「始终滚动」之后，整张列表一起滚——那是用户自己要的。
             ScrollingTitleText(
                 text = entry.title,
                 entryId = entry.id,
+                page = TitleScrollPage.QUEUE,
                 selected = isCurrent,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isCurrent) colors.primary else colors.onSurface,

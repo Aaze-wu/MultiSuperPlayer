@@ -544,6 +544,11 @@ private fun SourceRow(
             )
         },
         headlineContent = {
+            // 这一页里**只有来源清单**留着普通 `Text`：它的标题全部来自固定资源
+            // （「媒体库」/「文件选择器」）或上面那一行的固定名字，长度不受用户控制，
+            // 而真正会被用户起名的东西（文件名）在 `BrowserPane` 里走滚动。
+            // 给这几行也套上滚动组件只是多一层包装，反而会让「这一页有滚动」
+            // 这种判断在 grep 时变模糊。
             Text(
                 text = root.label.string(),
                 maxLines = 1,

@@ -53,34 +53,97 @@ class TitleScrollRulesTest {
     }
 
     @Test
-    fun `四个条件缺一不可`() {
+    fun `主条件缺一不可`() {
         val all = TitleScrollRules.shouldScroll(
             enabled = true,
             animationsEnabled = true,
             isCurrent = true,
+            alwaysScroll = false,
             text = "一个很长很长的文件名.mkv",
         )
         assertTrue(all)
 
         assertFalse(
             "设置里关掉之后一律不滚",
-            TitleScrollRules.shouldScroll(false, true, true, "x.mkv"),
+            TitleScrollRules.shouldScroll(false, true, true, false, "x.mkv"),
         )
         assertFalse(
             "系统开了「移除动画」就不滚",
-            TitleScrollRules.shouldScroll(true, animationsEnabled = false, true, "x.mkv"),
+            TitleScrollRules.shouldScroll(true, animationsEnabled = false, true, false, "x.mkv"),
         )
         assertFalse(
-            "不是当前那一条就不滚",
-            TitleScrollRules.shouldScroll(true, true, isCurrent = false, "x.mkv"),
+            "不是当前那一条、这一页也没被点名就不滚",
+            TitleScrollRules.shouldScroll(true, true, isCurrent = false, alwaysScroll = false, "x.mkv"),
+        )
+    }
+
+    @Test
+    fun `页面被点名之后不再需要是当前那一条`() {
+        // 这正是加页面维度的目的（浏览页/媒体库要横向扫文件名）。
+        // 它必须能单独生效：一个都不知道自己在播什么的页面（网络地址清单里根本没有
+        // 「当前」概念，`entryId` 就是 null）也应该能全量滚动。
+        assertTrue(
+            TitleScrollRules.shouldScroll(
+                enabled = true,
+                animationsEnabled = true,
+                isCurrent = false,
+                alwaysScroll = true,
+                text = "一个很长很长的文件名.mkv",
+            ),
+        )
+    }
+
+    @Test
+    fun `页面通行证不能越过总开关和移除动画`() {
+        // 逐页勾选是从属于总开关的：总开关关掉时设置页把它们全部置灰（勾痕保留），
+        // 判据这一层也必须跟着不许滚。否则「我关掉了它却还在爬」——而且只在我点名过的
+        // 那几页上爬，排查时最难想到。
+        assertFalse(
+            TitleScrollRules.shouldScroll(
+                enabled = false,
+                animationsEnabled = true,
+                isCurrent = true,
+                alwaysScroll = true,
+                text = "x.mkv",
+            ),
+        )
+        assertFalse(
+            TitleScrollRules.shouldScroll(
+                enabled = true,
+                animationsEnabled = false,
+                isCurrent = false,
+                alwaysScroll = true,
+                text = "x.mkv",
+            ),
+        )
+    }
+
+    @Test
+    fun `没传页面的行不算任何页`() {
+        // 对话框里的列表、预览、没有页面归属的行传 `null`。
+        // 它在任何设置下都只能靠「是当前那一条」才滚。
+        assertFalse(TitleScrollRules.alwaysScrolls(null, TitleScrollPage.entries.toSet()))
+        assertTrue(
+            TitleScrollRules.alwaysScrolls(
+                TitleScrollPage.LIBRARY,
+                setOf(TitleScrollPage.LIBRARY),
+            ),
+        )
+        assertFalse(
+            TitleScrollRules.alwaysScrolls(
+                TitleScrollPage.RECENT,
+                setOf(TitleScrollPage.LIBRARY),
+            ),
         )
     }
 
     @Test
     fun `空标题不滚`() {
         // 空串上挂 marquee 只是每 1.4 秒空转一圈，白耗帧。
-        assertFalse(TitleScrollRules.shouldScroll(true, true, true, ""))
-        assertFalse(TitleScrollRules.shouldScroll(true, true, true, "   "))
+        assertFalse(TitleScrollRules.shouldScroll(true, true, true, false, ""))
+        assertFalse(TitleScrollRules.shouldScroll(true, true, true, false, "   "))
+        // 空标题即使整页被点名也不滚。
+        assertFalse(TitleScrollRules.shouldScroll(true, true, false, true, ""))
     }
 
     @Test
@@ -104,5 +167,34 @@ class TitleScrollRulesTest {
         val state = TitleScrollState()
         assertFalse(state.enabled)
         assertEquals(null, state.currentEntryId)
+        // 默认一个页面都不点名 —— 行为与「逐页开关」这个功能上线前完全一致。
+        assertTrue(state.alwaysScrollPages.isEmpty())
+    }
+
+    @Test
+    fun `页面 id 是持久化契约`() {
+        // 这些字符串会写进用户设备的 DataStore。**改名等于把所有人设过的页面清空**，
+        // 而那种“设置自己丢了”的反馈几乎不可能被怀疑到一行枚举上。
+        assertEquals(
+            listOf("library", "browse", "recent", "favorites", "playlists", "queue", "network"),
+            TitleScrollPage.entries.map { it.id },
+        )
+        // id 必须两两不同，否则勾上一个会同时点亮两页。
+        assertEquals(TitleScrollPage.entries.size, TitleScrollPage.entries.map { it.id }.toSet().size)
+    }
+
+    @Test
+    fun `认不出来的页面 id 丢掉而不是抛异常`() {
+        // 降级安装回来时仓里会留着新版写下的 id。
+        val pages = TitleScrollPage.known(setOf("library", "ghost", "queue"))
+        assertEquals(setOf(TitleScrollPage.LIBRARY, TitleScrollPage.QUEUE), pages)
+        // null（= 用户从没设过）和空集走同一条路。
+        assertTrue(TitleScrollPage.known(null).isEmpty())
+        assertTrue(TitleScrollPage.known(emptySet()).isEmpty())
+        // 往返一致。
+        assertEquals(
+            TitleScrollPage.entries.toSet(),
+            TitleScrollPage.known(TitleScrollPage.entries.map { it.id }.toSet()),
+        )
     }
 }

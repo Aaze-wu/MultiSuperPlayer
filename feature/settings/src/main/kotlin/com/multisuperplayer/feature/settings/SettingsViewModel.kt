@@ -53,6 +53,7 @@ import com.multisuperplayer.core.translate.TranslationCacheStore
 import com.multisuperplayer.core.translate.TranslationProbe
 import com.multisuperplayer.core.translate.TranslationTarget
 import com.multisuperplayer.core.translate.describeTranslationFailure
+import com.multisuperplayer.core.ui.text.TitleScrollPage
 import com.multisuperplayer.core.ui.theme.ArtworkAccent
 import com.multisuperplayer.core.ui.theme.MspAccent
 import com.multisuperplayer.core.ui.theme.MspBaseTheme
@@ -382,6 +383,17 @@ class SettingsViewModel(
     /** 开关「长文件名滚动显示」。 */
     fun setScrollLongTitles(enabled: Boolean) = persist("长标题滚动=$enabled") {
         displaySettings.setScrollLongTitles(enabled)
+    }
+
+    /**
+     * 打开/关闭某一页的「所有长文件名都滚」。
+     *
+     * 只把**页面 id** 交给仓库，读-改-写在仓库的 DataStore 事务里做（见
+     * `DisplaySettingsRepository.setAlwaysScrollPage`）：这里若先读 `display.value`
+     * 再写整份集合，用户连着点两页时后一次会把前一次吞掉。
+     */
+    fun setAlwaysScrollPage(page: TitleScrollPage, enabled: Boolean) = persist("逐页滚动=${page.id}=$enabled") {
+        displaySettings.setAlwaysScrollPage(page.id, enabled)
     }
 
     // ------------------------------------------------------------------ 语言

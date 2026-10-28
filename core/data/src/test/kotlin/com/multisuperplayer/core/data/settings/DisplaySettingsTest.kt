@@ -3,6 +3,7 @@ package com.multisuperplayer.core.data.settings
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -62,5 +63,39 @@ class DisplaySettingsTest {
         ).toDisplaySettings()
 
         assertNull(settings.scrollLongTitles)
+        assertNull(settings.alwaysScrollPages)
+    }
+
+    @Test
+    fun `逐页设置没设置过时是 null 而不是空集`() {
+        // 「一页都没点名」和「用户把勾全取消了」在界面上是两件事；
+        // 写 `?: emptySet()` 会把前者伪造成后者，而判定那边
+        // `isEmpty()` 两种都是 true，所以这个差别一旦丢了就再也找不回来。
+        assertNull(preferencesOf().toDisplaySettings().alwaysScrollPages)
+    }
+
+    @Test
+    fun `逐页设置的键名也是写入用户设备的契约`() {
+        // 与上面那个 boolean 键同理：改名 ⇒ 所有人点名过的页面全部静默失效，
+        // 表现是「我明明勾了浏览页，它就是不滚」。按字面量锁死。
+        val settings = preferencesOf(
+            stringSetPreferencesKey("display.always_scroll_pages") to setOf("library", "browse"),
+        ).toDisplaySettings()
+
+        assertEquals(setOf("library", "browse"), settings.alwaysScrollPages)
+    }
+
+    @Test
+    fun `逐页设置与总开关是各自独立的键`() {
+        // 两者写在同一个 data class 里，但意义完全不同：总开关关掉之后逐页勾选
+        // 只是置灰（勾痕保留）。若哪天有人把它们合并成一个字段，
+        // 「关掉总开关就丢掉逐页选择」会是一个用户无法理解的副作用。
+        val settings = preferencesOf(
+            booleanPreferencesKey("display.scroll_long_titles") to false,
+            stringSetPreferencesKey("display.always_scroll_pages") to setOf("queue"),
+        ).toDisplaySettings()
+
+        assertEquals(false, settings.scrollLongTitles)
+        assertEquals(setOf("queue"), settings.alwaysScrollPages)
     }
 }

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import kotlinx.coroutines.flow.Flow
@@ -38,6 +39,19 @@ data class DisplaySettings(
      * `TitleScrollRules` 里，这里只负责存用户的选择。
      */
     val scrollLongTitles: Boolean? = null,
+    /**
+     * 被用户点名「这一页所有长文件名都滚」的**页面 id**。
+     *
+     * `null` = 从没设过（一页都没点名）；空集 = 设过但把最后一个也取消了。
+     * 两者**行为完全相同**，保留区别是因为「设置过」本身将来还有用，
+     * 而把它归一成一种又要一次迁移。
+     *
+     * 存的是**字符串 id 而不是枚举**：`core:data` 不认识界面上的页面概念，
+     * 也不该认识（这里连 `core:ui` 都没依赖）。id 与 `TitleScrollPage` 的对应关系
+     * 由 UI 层用 `TitleScrollPage.known(...)` 解析，**认不出来的 id 直接丢掉**——
+     * 降级安装后仓里会留着新版写下的 id，那时宁可少滚一页也不能让设置页崩掉。
+     */
+    val alwaysScrollPages: Set<String>? = null,
 )
 
 /**
@@ -76,6 +90,22 @@ class DisplaySettingsRepository(
      */
     suspend fun setScrollLongTitles(enabled: Boolean) = edit { it[Keys.SCROLL_LONG_TITLES] = enabled }
 
+    /**
+     * 打开/关闭某一页的「全量滚动」。
+     *
+     * 读-改-写**必须在同一个 `edit` 事务里完成**：界面上用户可能连着点两页，
+     * 若两次都在事务外先读一份旧集合、算完再写回，后写的那次会把前一次吞掉
+     * （而现象只是「我明明勾了它却不滚」，不会有任何报错）。`store.edit` 的块
+     * 拿到的是当下的磁盘状态，天然串行。
+     *
+     * 取消最后一个页面时写入**空集**而不是把键删掉：「空集」与「缺键」行为相同，
+     * 但后者会把「用户设置过」这件事一并抹掉。
+     */
+    suspend fun setAlwaysScrollPage(pageId: String, enabled: Boolean) = edit { prefs ->
+        val current = prefs[Keys.ALWAYS_SCROLL_PAGES].orEmpty()
+        prefs[Keys.ALWAYS_SCROLL_PAGES] = if (enabled) current + pageId else current - pageId
+    }
+
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         withContext(dispatchers.io) { store.edit(block) }
     }
@@ -88,6 +118,14 @@ class DisplaySettingsRepository(
      */
     internal object Keys {
         val SCROLL_LONG_TITLES = booleanPreferencesKey("display.scroll_long_titles")
+
+        /**
+         * 逐页「全量滚动」的页面 id 集合。
+         *
+         * 元素是 `TitleScrollPage.id` 的字面量（`"library"` 这种）。新增页面只需
+         * 往集合里多一个 id，**不需要新键**，也不需要迁移。
+         */
+        val ALWAYS_SCROLL_PAGES = stringSetPreferencesKey("display.always_scroll_pages")
     }
 }
 
@@ -102,4 +140,8 @@ class DisplaySettingsRepository(
 internal fun Preferences.toDisplaySettings(): DisplaySettings = DisplaySettings(
     // 缺键 ⇒ null ⇒ UI 层默认（开）。**不能**写 `?: false`。
     scrollLongTitles = this[DisplaySettingsRepository.Keys.SCROLL_LONG_TITLES],
+    // 同样不能写 `?: emptySet()`：「一页都没点名」与「用户把勾全取消了」在界面上
+    // 是两件事（后者要能看见自己取消过）。而 `isEmpty()` 两种情况下都是 true，
+    // 所以判定那边不受影响。
+    alwaysScrollPages = this[DisplaySettingsRepository.Keys.ALWAYS_SCROLL_PAGES]?.toSet(),
 )
