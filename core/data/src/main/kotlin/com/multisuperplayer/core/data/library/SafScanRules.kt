@@ -218,13 +218,45 @@ internal object SafScanRules {
      * 这份表**宁可漏不可错**：漏了某个非媒体后缀，结果是目录里多显示一个打不开的
      * 文件；错把一个真的媒体后缀放进来，结果是那个文件永远看不见。所以只放
      * 100% 确定不是媒体的。
+     *
+     * ⚠️ **「漏一个」的代价并不总是「多显示一个文件」**。`UNKNOWN` 是「交给内核去
+     * 探测」，而播放页只有音频/视频两种版面（唯一判据是 `entry.kind == VIDEO`），
+     * 所以一个漏掉的后缀会以**音频页**的样子打开（封面 + 歌词，什么都播不出来，
+     * 日志里一句错都没有）。这正是 v1.4.6 之前 `.docx` 的表现，见下面「办公文档」
+     * 那一段。⇒ **常见文件类型必须补全，不能只想着冷门媒体格式。**
+     *
+     * 三张表都是 `internal` 而不是 `private`：`SafScanRulesTest` 要拿它们做结构守卫
+     * （三张表两两不相交、全部小写无点、没有残留的大写/带点写法）。这类守卫是
+     * 唯一能防住「以后往里加后缀时手滑」的东西——加错的后果都是静默的。
      */
-    private val NON_MEDIA_EXTENSIONS = setOf(
+    internal val NON_MEDIA_EXTENSIONS = setOf(
         // 字幕
         "srt", "ass", "ssa", "vtt", "lrc", "ttml", "dfxp", "smi", "sami", "sub", "idx",
         // 图片
         "jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif", "tif", "tiff",
         "svg", "ico", "dng", "raw",
+        // 办公文档（Word / Excel / PowerPoint / OpenDocument / WPS）
+        // 这一组是 v1.4.6 补的：用户报「docx 被识别成音频」。根因**不是** MIME
+        // 说谎，而是这里少了这一组后缀 ⇒ `.docx` 落到第 4 步成 UNKNOWN ⇒ 可播
+        // ⇒ 点开是一个播不出任何东西的音频页。补上之后它变成「明确不是媒体」，
+        // 在浏览页里仍然可见（用户要能看见自己的文件），只是不可播、不进队列。
+        "doc", "docx", "docm", "dot", "dotx",
+        "xls", "xlsx", "xlsm", "xlsb", "xlt", "xltx",
+        "ppt", "pptx", "pptm", "pps", "ppsx", "pot", "potx",
+        "rtf", "odt", "ods", "odp", "odg",
+        // WPS Office（国内的 .wps / .dps 极常见）、OFD（国标文档）、
+        // iWork（.pages / .numbers / .key）、Visio(.vsd/.vsdx) / Publisher(.pub) /
+        // XPS(.xps)、CHM 帮助文件。
+        // ⚠️ WPS 的**表格**后缀是 `.et`，**故意不加**——`.et` 是埃塞俄比亚的国家顶级域名，
+        // 跟 `.ai` 是同一个坑（这张表被 `RemoteUrlRules.looksLikeHost` 借去判主机名）。
+        "wps", "dps", "ofd", "pages", "numbers", "key",
+        "vsd", "vsdx", "pub", "xps", "chm",
+        // 电子书（cbz / cbr 本质是图片压缩包，不是视频）
+        "epub", "mobi", "azw", "azw3", "fb2", "djvu", "cbz", "cbr",
+        // ⚠️ 设计稿（`psd` / `ai` / `sketch` / `fig`）**故意不加**：`.ai` 同时是一个
+        // 真实顶级域名，加进来会让地址栏里不带协议的 `xxx.ai` 被当成文件名
+        // （判据见 `RemoteUrlRules.looksLikeHost`，它借的就是这张表）。
+        // 设计稿出现在音视频目录里的概率远低于这个误伤。
         // 文档 / 数据
         "txt", "log", "md", "json", "xml", "csv", "pdf", "html", "htm", "yml", "yaml",
         "ini", "conf", "properties", "db", "sqlite", "bak", "tmp",
@@ -239,7 +271,7 @@ internal object SafScanRules {
     )
 
     /** 音频后缀。视频容器里也能装纯音频（`.mka`、`.ts` 里的 AAC），所以两张表不重合。 */
-    private val AUDIO_EXTENSIONS = setOf(
+    internal val AUDIO_EXTENSIONS = setOf(
         "mp3", "m4a", "m4b", "aac", "flac", "wav", "wave", "ogg", "oga", "opus", "wma",
         "ape", "alac", "aiff", "aif", "amr", "ac3", "eac3", "dts", "mka", "mp2", "mpga",
         "mid", "midi", "tta", "wv", "dsf", "dff", "m4p", "f4a",
@@ -251,7 +283,7 @@ internal object SafScanRules {
      * `ts` / `m2ts` / `vob` / `rmvb` 这些都在表里，是因为它们**都是本应用通过
      * FFmpeg 能播的**——把它们挡在浏览页外，等于把 v0.4 那一版的成果藏起来。
      */
-    private val VIDEO_EXTENSIONS = setOf(
+    internal val VIDEO_EXTENSIONS = setOf(
         "mp4", "m4v", "mkv", "webm", "avi", "mov", "wmv", "asf", "flv", "f4v", "ts", "m2ts",
         "mts", "mpg", "mpeg", "mpe", "m2v", "3gp", "3g2", "ogv", "rm", "rmvb", "vob",
         "divx", "xvid", "tp", "trp", "mxf", "ogm", "dv", "f4p",

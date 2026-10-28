@@ -59,6 +59,78 @@ class SafScanRulesTest {
     }
 
     @Test
+    fun `办公文档和电子书不会被当成音频`() {
+        // 回归：用户报「docx 被识别成音频」。当时这些后缀一条都不在后缀表里，
+        // 于是 `kindOf` 走到第 4 步返回 UNKNOWN ⇒ `BrowserEntry.playable = true`
+        // ⇒ 点一下交给播放器，而播放页只有音频 / 视频两种版面（唯一判据是
+        // `entry.kind == MediaKind.VIDEO`）⇒ 一份 Word 文档打开成一个播不出
+        // 任何东西的音频页（封面 + 歌词），崩溃日志里一句痕迹都没有。
+        val documents = listOf(
+            "报告.docx", "报告.doc",
+            "表格.xlsx", "表格.xls", "幻灯片.pptx", "幻灯片.ppt",
+            "开放文档.odt", "开放文档.ods", "开放文档.odp", "老文档.rtf",
+            "电子书.epub", "电子书.mobi", "电子书.azw3", "电子书.fb2", "漫画.cbz",
+            // 同一类里的常见变体：WPS（国内几乎人手一个）、国标 OFD、iWork、
+            // Visio / Publisher / XPS / CHM。它们的「被当成音频」后果一模一样。
+            "WPS文字.wps", "WPS演示.dps", "国标文档.ofd",
+            "页面.pages", "数字.numbers", "幻灯片.key",
+            "流程图.vsdx", "出版物.pub", "定版文档.xps", "帮助文档.chm",
+        )
+        documents.forEach { assertNull("`$it` 不该被当成媒体", SafScanRules.kindOf(it, null)) }
+    }
+
+    @Test
+    fun `办公文档的后缀优先于说谎的 MIME`() {
+        // 两种真实的「MIME 说谎」来源：DocumentsProvider 自己报错（给一个 .docx
+        // 报 `audio/*`），以及分享进来的 uri 由系统去猜 MIME。
+        // 「后缀黑名单放在 MIME 之前」这个顺序本来就是为了兜住它们，但它一直没被
+        // 测过——而这恰好是「补后缀」这条修法能生效的前提：光加黑名单、不保证
+        // 优先级，一个乱报 MIME 的 provider 仍然能把 docx 变成音频。
+        assertNull(SafScanRules.kindOf("报告.docx", "audio/mpeg"))
+        assertNull(SafScanRules.kindOf("报告.docx", "video/mp4"))
+        // Office 文档真实的 MIME 不以 audio/video 开头，走的是第 4 步；
+        // 这里断言的是「不许变成 UNKNOWN」。
+        assertNull(
+            SafScanRules.kindOf(
+                "报告.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+        )
+        assertNull(SafScanRules.kindOf("表格.xlsx", "application/vnd.ms-excel"))
+    }
+
+    @Test
+    fun `三张后缀表两两不相交且都是小写无点的裸后缀`() {
+        // 结构守卫。往这三张表里加错一个后缀，后果**全是静默的**：
+        // - 真的媒体后缀被写进黑名单 ⇒ 那种格式永远不出现在浏览页；
+        // - 写成 `.mp3` / `MP3` ⇒ `extensionOf` 给的是小写无点的裸后缀，
+        //   这两种写法一条都匹配不上，等于没写；
+        // - 同一条既在黑名单又在媒体表里 ⇒ 结果取决于判断顺序，
+        //   而顺序是不会有人记得的东西。
+        val tables = mapOf(
+            "NON_MEDIA" to SafScanRules.NON_MEDIA_EXTENSIONS,
+            "AUDIO" to SafScanRules.AUDIO_EXTENSIONS,
+            "VIDEO" to SafScanRules.VIDEO_EXTENSIONS,
+        )
+        tables.forEach { (name, extensions) ->
+            extensions.forEach { extension ->
+                assertEquals(
+                    "$name 里的 `$extension` 应该是小写裸后缀",
+                    extension.lowercase().removePrefix("."),
+                    extension,
+                )
+                assertTrue("$name 里不该有空串", extension.isNotEmpty())
+            }
+        }
+        val overlap = tables
+            .flatMap { (name, extensions) -> extensions.map { extension -> extension to name } }
+            .groupBy { it.first }
+            .filterValues { it.size > 1 }
+            .mapValues { (_, owners) -> owners.map { it.second } }
+        assertTrue("同一个后缀出现在多张表里：$overlap", overlap.isEmpty())
+    }
+
+    @Test
     fun `后缀不认识时信 MIME`() {
         assertEquals(MediaKind.AUDIO, SafScanRules.kindOf("track.xyz", "audio/flac"))
         assertEquals(MediaKind.VIDEO, SafScanRules.kindOf("clip.xyz", "video/mp2t"))
