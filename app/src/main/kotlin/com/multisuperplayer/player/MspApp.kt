@@ -55,6 +55,7 @@ import com.multisuperplayer.core.ui.theme.MspBaseTheme
 import com.multisuperplayer.core.ui.theme.MspTheme
 import com.multisuperplayer.core.ui.theme.MspThemeDefaults
 import com.multisuperplayer.feature.library.BrowseRoute
+import com.multisuperplayer.feature.library.BrowseViewModel
 import com.multisuperplayer.feature.library.FavoritesRoute
 import com.multisuperplayer.feature.library.LibraryRoute
 import com.multisuperplayer.feature.library.NetworkRoute
@@ -386,6 +387,23 @@ private const val LOCAL_MODEL_ROUTE = "settings/translation/local"
  */
 private const val FAVORITES_ROUTE = "favorites"
 
+/**
+ * 当前这一页属不属于 [this]：标签根页本身，或从它推上来的子页面
+ * （收藏页挂在媒体库下、网络地址页挂在浏览下）。
+ *
+ * 底部栏的点击要分两种情况，而判据不能只看 `route == tab.route`：
+ * 站在**收藏页**时高亮的那一格就是媒体库，此时点它应该是「回到媒体库根页」，
+ * 而不是「重新切到媒体库」——后者会把这一格重新导航一遍。
+ *
+ * 播放页不在任何标签名下（它是从列表推上来的普通目的地）：点任何标签都算
+ * 「离开播放页去那个标签」，走的仍是切标签那条路。
+ */
+private fun MspDestination.owns(route: String?): Boolean = when (this) {
+    MspDestination.LIBRARY -> route == MspDestination.LIBRARY.route || route == FAVORITES_ROUTE
+    MspDestination.BROWSE -> route == MspDestination.BROWSE.route || route == NETWORK_ROUTE
+    MspDestination.RECENT, MspDestination.PLAYLISTS, MspDestination.SETTINGS -> route == this.route
+}
+
 @Composable
 private fun MspAppScaffold(
     updateViewModel: UpdateViewModel,
@@ -395,6 +413,14 @@ private fun MspAppScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val playbackViewModel: AppPlaybackViewModel = koinViewModel()
+    // 浏览页的状态（当前在哪个目录、排序、每个目录停在哪一行）必须**活着穿过切标签**，
+    // 所以它在这里取一次：这一层的 `viewModelStoreOwner` 是 Activity，
+    // 而 `navigateToTab` 弹栈只能弹掉 NavHost 里的 `NavBackStackEntry`，碰不到它。
+    //
+    // 顺带一提为什么不在浏览页里 `koinViewModel()` 了：那份挂在浏览标签自己的
+    // `NavBackStackEntry` 上，切到别的标签时被 `popUpTo` 弹掉、一起 `clear()`，
+    // 于是切回来时目录栈和滚动位置全没了（这就是「标签页重置」）。
+    val browseViewModel: BrowseViewModel = koinViewModel()
     val chrome = LocalAppChrome
     // 启动弹窗的数据源。读的是 `MspApp` 建的那个实例（同一个 Activity 作用域），
     // 所以用户在弹窗上点「忽略此版本」之后，更新页立刻也知道这一版被忽略了。
@@ -408,14 +434,34 @@ private fun MspAppScaffold(
     val navigateToTab: (MspDestination) -> Unit = { destination ->
         navController.popBackStack(PLAYER_ROUTE, inclusive = true)
         navController.navigate(destination.route) {
-            // 这里**不**写 saveState/restoreState：每个标签页各自都是单页，
-            // 真正需要留住的状态（列表滚动位置、筛选词）挂在**那个标签自己的**
-            // NavBackStackEntry 上，而它作为栈底永远不会被弹出，不必靠
-            // 「存取返回栈」来保。而一旦写上，播放页会被当成「起始标签的状态」
-            // 一起保存，于是「在播放页点媒体库」会立刻把它恢复回来——看起来就是没反应。
+            // 这里**不**写 saveState/restoreState：那套写法的存/取 key 是
+            // 「起始目的地」（见下面 onClick 里的注释），播放页会被当成
+            // 「媒体库标签的返回栈」一起存下来，「在播放页点媒体库」会立刻把它
+            // 恢复回来——看起来就是没反应。
+            //
+            // 代价要说清：**非起始标签的 `NavBackStackEntry` 会被这个 popUpTo
+            // 整个弹掉**，挂在上面的 ViewModel 和 `rememberSaveable` 跟着被清。
+            // 所以「切回来还在原地」不能指望导航，得靠状态本身住在弹栈碰不到的地方：
+            // 浏览页的 ViewModel 已经在上面取好、显式传进去了（`browseViewModel`）；
+            // 其余三个标签只有滚动位置（住的正是 entry 上的 `rememberSaveable`），
+            // 切回来会回到顶部。
             popUpTo(navController.graph.findStartDestination().id)
             launchSingleTop = true
         }
+    }
+
+    // 再点一次**当前**标签＝回到这个标签的根页。
+    //
+    // 不能复用 [navigateToTab]：那一条会先把栈压到起始目的地、再把目标标签重新
+    // 导航一遍，等于连它的根页也重建了一次（ViewModel 跟着换新），而用户此刻要的
+    // 恰恰是「回到起点，别的都别动」。
+    val goToTabHome: (MspDestination) -> Unit = { destination ->
+        // 推在它上面的子页面（收藏页 / 网络地址页）在这里弹掉。
+        navController.popBackStack(destination.route, inclusive = false)
+        // 浏览页「当前在哪个目录」**不在导航栈里**，而在 `BrowseViewModel` 里
+        // （进子目录不该多一层返回栈，见 `BrowseScreen` 的 KDoc），所以上面那一行
+        // 弹不掉它：不补这一句，在 `Download/电影/` 里点「浏览」什么都不会发生。
+        if (destination == MspDestination.BROWSE) browseViewModel.leaveSource()
     }
 
     // 三个页面都能「点一条就放」：走同一个入口，保证「队列 = 当前列表」
@@ -504,7 +550,14 @@ private fun MspAppScaffold(
                                 // 直接丢弃没有任何代价：播放页显示什么完全由 PlayerViewModel
                                 // 从 PlaybackController（Koin 单例）读出来，不靠导航参数，
                                 // 也不在导航状态里存任何东西——底层播放也照旧继续。
-                                navigateToTab(destination)
+                                //
+                                // 点的就是当前这一格（含它推上来的子页面）时走另一条路：
+                                // 用户要的是「回到这个标签的起点」，而不是把它重建一遍。
+                                if (destination.owns(currentRoute)) {
+                                    goToTabHome(destination)
+                                } else {
+                                    navigateToTab(destination)
+                                }
                             },
                             icon = { Icon(destination.icon, contentDescription = null) },
                             label = { Text(destination.label.string()) },
@@ -544,6 +597,11 @@ private fun MspAppScaffold(
             }
             composable(MspDestination.BROWSE.route) {
                 BrowseRoute(
+                    // 这一份是 Activity 作用域的（见上面 `browseViewModel` 的注释）：
+                    // 切标签、弹栈都不会把它清掉，切回来时目录栈和滚动位置都还在。
+                    // 用默认的 `koinViewModel()` 会拿到挂在浏览标签 `NavBackStackEntry`
+                    // 上的另一份，那份活不过一次切标签。
+                    viewModel = browseViewModel,
                     onPlayRequest = playFrom,
                     onOpenSubtitle = openSubtitle,
                     // 从收藏页过来时直接打开那个目录。用掉就清空：留在那儿的话，

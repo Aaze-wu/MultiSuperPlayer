@@ -97,7 +97,10 @@ plugins {
 //
 // 1.4.10 是 1.4.9 的现场返工：同样只改 `BrowserPane.kt` 的 Compose 列表 / 面包屑，
 // 不落盘、不加权限、不改清单 ⇒ 直接发正式版。
-val appVersionName: String = "1.4.10"
+//
+// 1.4.11 把 `BrowseViewModel` 提到 Activity 作用域并给底部标签补「点当前标签回该标签首页」，
+// 只改 `MspApp.kt` / `BrowseScreen.kt`：不落盘、不加权限、不改清单 ⇒ 直接发正式版。
+val appVersionName: String = "1.4.11"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

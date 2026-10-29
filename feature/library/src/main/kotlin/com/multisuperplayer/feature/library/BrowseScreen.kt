@@ -94,6 +94,12 @@ private const val BROWSE_TAG = "BrowseRoute"
  *   直接打开这条目录。非 null 就会被消费一次，然后必须由 [onPendingFavoriteApplied]
  *   清掉——留在那儿的话，此后每次回到浏览标签都会强制跳回那个目录，用户进去的
  *   子目录会被上一次的请求顶掉。
+ * @param viewModel 「在哪个目录、怎么排序、每个目录停在哪一行」的持有者。
+ *   正常路径上应用根（`MspApp`）会把它**显式传进来**，而且传的是 Activity 作用域的
+ *   那一份：底部标签切换会把非起始标签的 `NavBackStackEntry` 整个弹掉，
+ *   （默认值拿到的）挂在 entry 上的这一份会一起被 `clear()`——表现就是
+ *   切到别的标签再切回来，浏览页回到了来源清单、滚动位置也没了。
+ *   默认值保留只是为了让这一页在缺少外部接线时也能单独构造。
  */
 @Composable
 fun BrowseRoute(
@@ -103,8 +109,8 @@ fun BrowseRoute(
     pendingFavorite: Favorite.Folder? = null,
     onPendingFavoriteApplied: () -> Unit = {},
     modifier: Modifier = Modifier,
+    viewModel: BrowseViewModel = koinViewModel(),
 ) {
-    val viewModel: BrowseViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
