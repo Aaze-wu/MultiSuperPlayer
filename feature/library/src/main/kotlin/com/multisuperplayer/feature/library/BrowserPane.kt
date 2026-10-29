@@ -1,20 +1,25 @@
 package com.multisuperplayer.feature.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -52,8 +57,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -202,7 +209,7 @@ internal fun DirectoryBrowser(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             // 面包屑和「共 N 项」放在同一行：数字贴右边，滚面包屑时它不跟着跑。
-            // 放进 `LazyRow` 里当最后一项会变成「深层目录看不到总数」。
+            // 塞进面包屑那一行里当最后一项会变成「深层目录看不到总数」。
             val totalCount = (content as? BrowserContent.Ready)?.totalCount
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -221,7 +228,10 @@ internal fun DirectoryBrowser(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        modifier = Modifier.padding(end = 12.dp),
+                        // start 侧也留白：面包屑滚到头时文字是**贴着**自己那块区域
+                        // 右边缘画的，没有这段间距就和「共 N 项」糊成一句
+                        // （实测「测试目录一二三四五六七共 2 项」）。
+                        modifier = Modifier.padding(start = 8.dp, end = 12.dp),
                     )
                 }
             }
@@ -251,12 +261,33 @@ internal fun DirectoryBrowser(
  * 不滚的话，深层路径从最左端开始画，屏幕上只剩「内部存储 › Download › …」，
  * 而用户最需要看见的那一段（我现在在哪）被挤到右边——路径越长越明显。
  *
- * 用 `scrollToItem` 而不是 `animateScrollToItem`：位置是「本来就该在那里」的，
- * 不是一次动作；每次进目录都演一段横向滚动只是噪音。这个 effect 只在
- * [BrowserTrail.crumbs] 变化时重跑，用户自己划走之后不会被拽回去。
+ * ## 为什么不是 `LazyRow` + `scrollToItem(lastIndex)`
  *
- * 最后一段本身如果比屏幕还长，`LazyRow` 会按内容宽度铺开（滚动方向不限宽），
- * 这里停在它的**开头**：完整名字在顶栏标题上，面包屑只需要交代「在哪一级」。
+ * 那个组合只能把最后一段的**开头**对齐到视口左边。总宽一超过视口，滚动量就被
+ * 最大值夹住，最后一段的后半截照样被切——实测停在「子目」上，后面直接接上
+ * 右边的「共 1 项」，两个东西糊成一句。它也没有「滚到末尾」这个动作可用。
+ *
+ * 换成普通 [Row] + [rememberScrollState]：`maxValue` 是**测量之后**的确定值，
+ * `scrollTo(maxValue)` 就是「右边缘对齐」——最后一段一定完整，不管它多宽、
+ * 前面有几段。内容本来就不超宽时 `maxValue` 恒为 0，滚了也是原地不动。
+ *
+ * 位置是一次落定、不是动作，所以用 `scrollTo` 而不是 `animateScrollTo`：每次
+ * 进目录都演一段横向滚动只是噪音。这个 effect 只在 [BrowserTrail.crumbs]
+ * 变化时重跑，用户自己划走之后不会被拽回去。
+ *
+ * ## 为什么必须等一帧
+ *
+ * `maxValue` 在**测量之前不是真值**：Compose 里它的初始值是 `Int.MAX_VALUE`
+ * （「无限，还没量过」），而组合 / 测量 / 绘制是同一帧里接着做的——effect 跑在
+ * 测量**之前**。所以「读到 `maxValue` 就滚」读到的是那个占位值，实测结果就是
+ * 压根没滚（最后一段只靠省略号收尾，祖先段还完整留在左边）。先
+ * `withFrameNanos` 等一帧，那时这一帧的测量已经落定，`maxValue` 才是真的。
+ *
+ * ## 留白为什么用 Spacer
+ *
+ * 滚动容器没有 `contentPadding`；`LazyRow` 虽然有一个，但它一旦滚起来，内容会
+ * 滑到 padding 区**下面**、被容器 clip 成「贴着屏幕边缘的半个字」（实测最左那段
+ * 只剩「三四五六七八九」）。两端各放一个定宽 [Spacer] 才是真的留白。
  */
 @Composable
 private fun CrumbRow(
@@ -265,42 +296,98 @@ private fun CrumbRow(
     modifier: Modifier = Modifier,
 ) {
     val lastIndex = trail.crumbs.lastIndex
-    val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
     LaunchedEffect(trail.crumbs) {
-        listState.scrollToItem(lastIndex)
+        // 等一帧，让这一帧的测量把 `maxValue` 变成真值（见上面的说明）。
+        withFrameNanos { }
+        scrollState.scrollTo(scrollState.maxValue)
     }
-    LazyRow(
-        state = listState,
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        itemsIndexed(items = trail.crumbs, key = { index, _ -> index }) { index, crumb ->
-            if (index > 0) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            // 最后一段就是当前目录，点了也是原地不动：用纯文本，不给点按反馈。
-            // 可点但没反应比不可点更让人困惑。
-            if (index == lastIndex) {
-                Text(
-                    text = crumb.label.string(),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-                )
-            } else {
-                TextButton(onClick = { onOpenCrumb(index) }) {
-                    Text(text = crumb.label.string(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    BoxWithConstraints(modifier = modifier) {
+        // 最后一段最多占满整行：超长的目录名要出省略号。不设上限的话它在滚动
+        // 容器里是「无界宽」，`TextOverflow.Ellipsis` 永远不会触发，画到视口外
+        // 被硬切——切掉之后连省略号都没有，看不出「这里还有字」。
+        val lastCrumbMaxWidth = maxWidth - CrumbEdgePadding * 2
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Spacer(modifier = Modifier.width(CrumbEdgePadding))
+            trail.crumbs.forEachIndexed { index, crumb ->
+                if (index > 0) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+                // 最后一段就是当前目录，点了也是原地不动：用纯文本，不给点按反馈。
+                // 可点但没反应比不可点更让人困惑。
+                if (index == lastIndex) {
+                    Text(
+                        text = crumb.label.string(),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .widthIn(max = lastCrumbMaxWidth)
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                    )
+                } else {
+                    TextButton(onClick = { onOpenCrumb(index) }) {
+                        Text(text = crumb.label.string(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(CrumbEdgePadding))
+        }
+        // 滚起来之后最前那段是被容器边缘**硬切**的：实测「内部存储」只剩半截「储」，
+        // 半个字的偏旁看上去还像一个**别的字**（「诸」），比缺字更容易读错。
+        // 所以不是淡出，而是**盖住**：一个不透明的「…」把残字整个遮掉，右边再补
+        // 一小段渐隐当过渡。只在真的滚过之后出现，没滚动时保持干净留白。
+        if (scrollState.value > 0) {
+            Row(
+                // 必须是 matchParentSize（不影响父尺寸），不能用 fillMaxHeight：
+                // BoxWithConstraints 的高度由内容决定，fillMaxHeight 会把这一行撑到
+                // 屏幕高，面包屑整块变高、把列表顶出可视区。
+                modifier = Modifier.matchParentSize(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "…",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(CrumbTailFade)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.surface,
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+                                ),
+                            ),
+                        ),
+                )
             }
         }
     }
 }
+
+/** 面包屑两端的留白。滚动容器里只能靠两端的 [Spacer] 撑出来。 */
+private val CrumbEdgePadding = 12.dp
+
+/** 「…」右侧那一段渐隐的宽度：够了就行，再宽会吃掉可读内容。 */
+private val CrumbTailFade = 12.dp
 
 @Composable
 private fun BrowserBody(
@@ -396,6 +483,21 @@ private fun BrowserBody(
  *
  * 写得勤也不怕——这份 Map 没有 `State` 包着，写它**不触发重组**（见
  * [BrowserScrollMemory] 的注释），每帧一次 `Int` 写入的代价可以忽略。
+ *
+ * ## 为什么还要显式滚一次（`initial…` 不够）
+ *
+ * `rememberLazyListState` 恢复的是 `rememberSaveable` 里的**实例**。只要这一列
+ * 没真正离开组合（切目录时 `Loading` 那一帧被合并掉、或两次内容是同一分支），
+ * 实例就被复用，`initialFirstVisibleItemIndex` 这个**构造参数被完全忽略**：
+ * 新目录沿用上一个目录的滚动位置。反过来，实例确实重建时 `initial…` 又只在
+ * 首帧生效。两种情形都要覆盖 ⇒ 拿记住的位置显式 `scrollToItem` 一次，
+ * 跟「这个 state 是谁、创建于哪一刻」彻底无关。
+ *
+ * ## 为什么恢复期间不写回
+ *
+ * `snapshotFlow` 的**第一次发射**是「这个新列表还没滚」，也就是 (0, 0)——它不是
+ * 用户动作，写回去就把刚恢复的位置抹掉了。这就是「有时记得住、有时记不住」
+ * 的来源：抹不抹得掉取决于恢复与首次发射谁先落地。恢复落地之前一律不写。
  */
 @Composable
 private fun DirectoryList(
@@ -414,14 +516,28 @@ private fun DirectoryList(
     val restored = remember(directoryRef) {
         scrollPositionOf(directoryRef)?.clampTo(entries.size)
     }
+    // 首次创建时靠 initial 直接落位（不闪一帧）；实例被复用时 initial 无效，
+    // 由下面的 effect 纠正。两条路都要走。
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = restored?.index ?: 0,
         initialFirstVisibleItemScrollOffset = restored?.offset ?: 0,
     )
+    // 恢复还在路上时，`snapshotFlow` 的首次发射是 (0, 0)（「这个新列表还没滚」），
+    // 那不是用户动作。放它写回去，刚恢复的位置当场被抹掉——这就是「不是百分百」。
+    val restoring = remember(directoryRef) { mutableStateOf(restored != null) }
+    LaunchedEffect(listState, directoryRef) {
+        // 协程比首帧测量早跑，position 还是 0；`scrollToItem` 会自己等布局依赖。
+        if (restored != null) {
+            listState.scrollToItem(restored.index, restored.offset)
+        }
+        restoring.value = false
+    }
     LaunchedEffect(listState, directoryRef) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
-                onScrollPositionChanged(directoryRef, BrowseScrollPosition(index = index, offset = offset))
+                if (!restoring.value) {
+                    onScrollPositionChanged(directoryRef, BrowseScrollPosition(index = index, offset = offset))
+                }
             }
     }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {

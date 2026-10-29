@@ -94,7 +94,10 @@ plugins {
 //
 // 1.4.9 更小：目录列表记住滚动位置 + 面包屑停到当前层，只动 Compose 的列表状态，
 // 不落盘、不加权限、不改清单 ⇒ 直接发正式版。
-val appVersionName: String = "1.4.9"
+//
+// 1.4.10 是 1.4.9 的现场返工：同样只改 `BrowserPane.kt` 的 Compose 列表 / 面包屑，
+// 不落盘、不加权限、不改清单 ⇒ 直接发正式版。
+val appVersionName: String = "1.4.10"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()
