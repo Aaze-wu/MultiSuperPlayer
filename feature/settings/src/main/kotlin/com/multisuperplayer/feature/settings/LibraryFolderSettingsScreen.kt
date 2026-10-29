@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,6 +47,12 @@ import org.koin.androidx.compose.koinViewModel
  * 能在「浏览」页里翻到、能播、能被别的应用看到。这句话必须在页面上说出来，
  * 否则「取消勾选」看起来像是在删文件（而这一页的用词是「勾选」，很容易被读成
  * 「删除」）。
+ *
+ * ## 折叠只管「画几行」
+ *
+ * 行尾的箭头把一层子目录收起来，但它与勾选**互不影响**：收起来的子树里的文件
+ * 该进库还是进库（否则「收起来」会被当成「不选」）。首屏默认只展开根，免得目录
+ * 一多就要滚很远（见 [defaultCollapsedPaths]）。
  */
 @Composable
 fun LibraryFolderSettingsRoute(
@@ -58,6 +66,7 @@ fun LibraryFolderSettingsRoute(
         onBack = onBack,
         onToggle = viewModel::toggle,
         onClearAll = viewModel::clearAll,
+        onToggleExpanded = viewModel::toggleExpanded,
         modifier = modifier,
     )
 }
@@ -71,6 +80,7 @@ fun LibraryFolderSettingsScreen(
     modifier: Modifier = Modifier,
     onToggle: (String) -> Unit = {},
     onClearAll: () -> Unit = {},
+    onToggleExpanded: (String) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -134,10 +144,14 @@ fun LibraryFolderSettingsScreen(
                     item(key = "header") {
                         SectionHeader(stringResource(R.string.msp_settings_library_folders_section))
                     }
-                    items(state.rows, key = { it.path }) { row ->
+                    // 画可见行（`state.rows` 去掉收起来的子树的子孙）；
+                    // 勾选算的还是整棵树，见 `LibraryFolderSettingsUiState.visibleRows`。
+                    items(state.visibleRows, key = { it.path }) { row ->
                         FolderRowItem(
                             row = row,
+                            expanded = row.path !in state.collapsed,
                             onToggle = onToggle,
+                            onToggleExpanded = onToggleExpanded,
                             // 不支持时行治灰：勾了也不会生效，能点比没得点更难理解。
                             enabled = !state.unsupported,
                         )
@@ -151,14 +165,20 @@ fun LibraryFolderSettingsScreen(
 /**
  * 一个文件夹（一行）。
  *
- * 只缩进不加折叠：媒体库里的目录通常是「歌手/专辑」两层，收起来反而看不到自己
- * 勾了什么；而勾父目录时所有子孙都会跟着变成勾——这一行显示的就是**过滤结果**，
- * 不是「用户点过哪几行」。
+ * 行分三块：勾选框（只管「算不算数」）、名字 + 文件数（整行点击 = 切勾）、
+ * 行尾箭头（只管「看不看见子目录」）。两个动作必须分开：把折叠做成「点整行展开」，
+ * 用户想勾一个父目录时就会莫名其妙地展开/收起。
+ *
+ * 折叠在这里**没有**「收起来就等于不选」的含义：勾父目录时所有子孙都显示成勾，
+ * 那是**过滤结果**，不是「用户点过哪几行」；收起一棵子树之后这些勾只是暂时看不见，
+ * 打开抽屉再看就还在（默认展开已勾选那条链，见 [defaultCollapsedPaths]）。
  */
 @Composable
 private fun FolderRowItem(
     row: FolderRow,
+    expanded: Boolean,
     onToggle: (String) -> Unit,
+    onToggleExpanded: (String) -> Unit,
     enabled: Boolean = true,
 ) {
     // 缩进放在 fillMaxWidth 之前：反过来（先铺满再 pad）会让行本身超出边界，
@@ -201,6 +221,31 @@ private fun FolderRowItem(
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
+        },
+        trailingContent = {
+            // 叶子行不给按钮：一个按下去什么都不会变的箭头，比没有箭头更让人困惑。
+            if (row.hasChildren) {
+                // 这里**故意**不看 `enabled`：箭头改的是「画几行」，跟过滤能不能生效无关。
+                // 系统不支持时勾变灰了，清单还是该能收起来。
+                IconButton(onClick = { onToggleExpanded(row.path) }) {
+                    Icon(
+                        imageVector = if (expanded) {
+                            Icons.Filled.KeyboardArrowDown
+                        } else {
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight
+                        },
+                        contentDescription = stringResource(
+                            if (expanded) {
+                                R.string.msp_settings_library_folder_collapse
+                            } else {
+                                R.string.msp_settings_library_folder_expand
+                            },
+                        ),
+                        // 与勾选框同色系：箭头是辅助动作，不该比勾更抢眼。
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         },
     )
 }

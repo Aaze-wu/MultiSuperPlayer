@@ -9,6 +9,7 @@ import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.data.settings.LibraryFolderSettings
 import com.multisuperplayer.core.data.settings.LibraryFolderSettingsRepository
 import com.multisuperplayer.core.model.text.MspText
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -28,6 +29,8 @@ data class FolderRow(
     val depth: Int,
     val totalCount: Int,
     val checked: Boolean,
+    /** 底下还有子文件夹 ⇒ 这一行要带展开/收起按钮；叶子行不带（按了也没有反应）。 */
+    val hasChildren: Boolean = false,
 )
 
 /**
@@ -54,9 +57,21 @@ data class LibraryFolderSettingsUiState(
      */
     val unsupported: Boolean = false,
     val rows: List<FolderRow> = emptyList(),
+    /** 收起来了的文件夹路径。只影响这一页画几行，**不影响**媒体库过滤。 */
+    val collapsed: Set<String> = emptySet(),
     /** 用户真正选中的文件夹个数（最小形式，不是「勾了几行」）。 */
     val selectedCount: Int = 0,
 ) {
+
+    /**
+     * 当前真正要画出来的行（把收起来的子树的子孙去掉）。
+     *
+     * [rows] 本身保持整棵树：勾选要用到**所有**路径（`LibraryFolderRules.toggle`
+     * 得知道被取消的那个文件夹底下有哪些兄弟），一旦按可见行去算，收起状态下取消
+     * 一个父目录就会少展开一批兄弟。
+     */
+    val visibleRows: List<FolderRow>
+        get() = visibleFolderRows(rows, collapsed)
 
     /**
      * 「扫完了，但一个文件夹都没有」。
@@ -79,21 +94,34 @@ class LibraryFolderSettingsViewModel(
     private val folderSettings: LibraryFolderSettingsRepository,
 ) : ViewModel() {
 
+    /**
+     * 收起来了的文件夹。`null` = 还没定过（第一次拿到树时按 [defaultCollapsedPaths] 算一份）。
+     *
+     * 只活在这个 ViewModel 里、**不落盘**：它是「这次怎么看」，不是偏好。离开这一页
+     * 再进来回到「只展开根」比记住上次收了哪几个更可预期；何况 DataStore 多一个键就
+     * 多一份可能读坏、需要迁移的东西，而这一页是极低频入口。
+     */
+    private val collapsed = MutableStateFlow<Set<String>?>(null)
+
     val state: StateFlow<LibraryFolderSettingsUiState> = combine(
         // 建树用**未过滤**的 scannedPaths：用过滤后的 state 建树的话，勾掉一个文件夹
         // 它就从树上消失，再也勾不回来。
         library.scannedPaths,
         folderSettings.settings,
         library.state,
-    ) { paths, prefs, libraryState ->
-        val rows = buildFolderRows(LibraryFolderRules.folderNodes(paths), prefs)
+        collapsed,
+    ) { paths, prefs, libraryState, collapsedPaths ->
+        val nodes = LibraryFolderRules.folderNodes(paths)
         LibraryFolderSettingsUiState(
             loading = libraryState is MediaLibraryState.Loading,
             needsPermission = libraryState is MediaLibraryState.NeedsPermission,
             failed = libraryState is MediaLibraryState.Error,
             unknown = prefs.unknown,
             unsupported = !prefs.supported,
-            rows = rows,
+            rows = buildFolderRows(nodes, prefs),
+            // 还没定过就现算一份默认值；算出来就**不写回** [collapsed]，
+            // 这样用户还没动过手时，勾选变化仍然会重新算「该展开哪几条链」。
+            collapsed = collapsedPaths ?: defaultCollapsedPaths(nodes, prefs.selected),
             selectedCount = prefs.selected.size,
         )
     }.stateIn(
@@ -110,6 +138,19 @@ class LibraryFolderSettingsViewModel(
         // startObserving 是幂等的，refresh 不强制重扫 SAF（见仓库注释）。
         library.startObserving()
         library.refresh()
+    }
+
+    /**
+     * 展开/收起一个文件夹的下一层。
+     *
+     * 它只改**这一页画几行**：不碰勾、不碰过滤、不重扫，收起来的子树里的文件该进库
+     * 还是进库（与「勾选」是两件事，别让用户以为收起来等于不选）。
+     */
+    fun toggleExpanded(path: String) {
+        // 树没到（或这一行已经不在了）时别把默认值当成用户的选择记下来。
+        if (state.value.rows.none { it.path == path }) return
+        val current = state.value.collapsed
+        collapsed.value = if (path in current) current - path else current + path
     }
 
     /**
@@ -140,14 +181,72 @@ class LibraryFolderSettingsViewModel(
 internal fun buildFolderRows(
     nodes: List<FolderNode>,
     settings: LibraryFolderSettings,
-): List<FolderRow> = nodes.map { node ->
-    FolderRow(
-        path = node.path,
-        name = node.name,
-        depth = node.depth,
-        totalCount = node.totalCount,
-        checked = LibraryFolderRules.isCovered(settings.selected, node.path),
-    )
+): List<FolderRow> {
+    val allPaths = nodes.map { it.path }
+    return nodes.map { node ->
+        FolderRow(
+            path = node.path,
+            name = node.name,
+            depth = node.depth,
+            totalCount = node.totalCount,
+            checked = LibraryFolderRules.isCovered(settings.selected, node.path),
+            hasChildren = hasChildFolder(node.path, allPaths),
+        )
+    }
+}
+
+/**
+ * [path] 底下还有没有子文件夹（[allPaths] 是整棵树的路径）。
+ *
+ * 不直接用 `LibraryFolderRules.covers`：它把根（`""`）定义成「只覆盖自己」
+ * （这样才能勾「整个存储」而不被当成覆盖所有子目录），于是「根有没有子目录」
+ * 永远算出 false——而根恰恰是最常被展开的那一行。
+ */
+internal fun hasChildFolder(path: String, allPaths: Collection<String>): Boolean {
+    val prefix = if (path.isEmpty()) "" else "$path/"
+    return allPaths.any { other -> other != path && other.startsWith(prefix) }
+}
+
+/**
+ * 当前真正该画出来的行：被收起来的文件夹**自己不消失**，只遮住它的子孙。
+ *
+ * 判据用 [LibraryFolderRules.ancestorsOf]（`A/B/C` 的祖先是 `""`/`A`/`A/B`），
+ * 所以根行（祖先列表为空）永远可见——根被藏起来的话整页就只剩一行空白，
+ * 这个功能会变成「把清单藏起来」。
+ *
+ * [collapsed] 为空时原样返回（最常见的情形走不到 filter）。
+ */
+internal fun visibleFolderRows(
+    rows: List<FolderRow>,
+    collapsed: Set<String>,
+): List<FolderRow> {
+    if (collapsed.isEmpty()) return rows
+    return rows.filter { row ->
+        LibraryFolderRules.ancestorsOf(row.path).none { it in collapsed }
+    }
+}
+
+/**
+ * 第一次拿到树时的折叠集合（=默认只看顶层）。
+ *
+ * 之前这一页是**全展开**的：`Music/<歌手>/<专辑>` 这种目录一多，首屏就是一屏
+ * 名字，想勾的东西要滚很久才找得到——这正是要修的那个「不方便」。默认只展开根，
+ * 首屏就是那几个顶层目录，点一下再往里走。
+ *
+ * 但**已勾选的文件夹那条链要跟着展开**：上次勾的是 `Music/Live`，这次进来要是
+ * 一棵收起来的树、看不见任何勾，用户只会以为自己白勾了。根不在集合里，永远展开。
+ */
+internal fun defaultCollapsedPaths(
+    nodes: List<FolderNode>,
+    selected: Set<String>,
+): Set<String> {
+    val allPaths = nodes.map { it.path }
+    val reveal = selected.flatMapTo(mutableSetOf()) { LibraryFolderRules.ancestorsOf(it) }
+    return allPaths
+        .filter { path ->
+            path.isNotEmpty() && path !in reveal && hasChildFolder(path, allPaths)
+        }
+        .toSet()
 }
 
 /**

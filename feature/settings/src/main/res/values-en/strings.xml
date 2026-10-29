@@ -680,4 +680,6 @@
     <string name="msp_settings_library_folders_empty">The scan found no media files, so there are no folders to pick.</string>
     <string name="msp_settings_library_folder_root">Storage root</string>
     <string name="msp_settings_library_folder_files">%1$d files</string>
+    <string name="msp_settings_library_folder_expand">Expand subfolders</string>
+    <string name="msp_settings_library_folder_collapse">Collapse subfolders</string>
 </resources>

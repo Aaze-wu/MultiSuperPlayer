@@ -664,4 +664,6 @@
     <string name="msp_settings_library_folders_empty">掃完了，但一個媒體檔案都沒有，所以沒有資料夾可選。</string>
     <string name="msp_settings_library_folder_root">儲存根目錄</string>
     <string name="msp_settings_library_folder_files">%1$d 個檔案</string>
+    <string name="msp_settings_library_folder_expand">展開子資料夾</string>
+    <string name="msp_settings_library_folder_collapse">收合子資料夾</string>
 </resources>

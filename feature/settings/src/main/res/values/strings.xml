@@ -828,4 +828,6 @@
     <string name="msp_settings_library_folders_empty">扫完了，但一个媒体文件都没有，所以没有文件夹可选。</string>
     <string name="msp_settings_library_folder_root">存储根目录</string>
     <string name="msp_settings_library_folder_files">%1$d 个文件</string>
+    <string name="msp_settings_library_folder_expand">展开子文件夹</string>
+    <string name="msp_settings_library_folder_collapse">收起子文件夹</string>
 </resources>
