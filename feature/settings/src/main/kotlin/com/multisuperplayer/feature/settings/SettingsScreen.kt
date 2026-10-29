@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatterySaver
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Lock
@@ -37,6 +38,7 @@ import com.multisuperplayer.core.data.permissions.PermissionSnapshot
 import com.multisuperplayer.core.data.permissions.PermissionState
 import com.multisuperplayer.core.data.power.KeepAliveState
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettings
+import com.multisuperplayer.core.data.settings.LibraryFolderSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.ThemeSettings
 import com.multisuperplayer.core.data.settings.TranslationSettings
@@ -44,9 +46,9 @@ import com.multisuperplayer.core.ui.text.string
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * 设置**入口页**：十行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
+ * 设置**入口页**：十一行，每行一句话说清「现在是什么状态」，点进去才是具体设置。
  *
- * 为什么把它拆成入口页 + 九个子页，而不是继续把设置项铺在一页里：
+ * 为什么把它拆成入口页 + 十个子页，而不是继续把设置项铺在一页里：
  *
  * 1. 一页铺开的表在设置项变多之后必然要滚两三屏，而用户每次进来只为一件事。
  *    找「长按倍速」要先滚过所有主题选项，这个成本会随每一项新增而增长。
@@ -56,7 +58,7 @@ import org.koin.androidx.compose.koinViewModel
  * 3. 「关于」这类信息页和「调什么」的设置页混在一起，是后面加「检查更新」、
  *    开源许可、导出日志时最别扭的地方。分开之后它们各有各的地方。
  *
- * 这个页面因此**几乎**不需要写入回调：只读摘要 + 九条导航 + 最后一行一个动作
+ * 这个页面因此**几乎**不需要写入回调：只读摘要 + 十条导航 + 最后一行一个动作
  * （「恢复所有提示」）。那个动作之所以留在这页而不是塞进子页，是因为它不存在「参数」：
  * 关掉几条全由本地偏好决定，用户能做的只有「全部恢复」一件事。
  */
@@ -69,6 +71,7 @@ fun SettingsRoute(
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenLibraryFolders: () -> Unit = {},
     onOpenPermissions: () -> Unit = {},
     onOpenKeepAlive: () -> Unit = {},
     onOpenUpdate: () -> Unit = {},
@@ -78,6 +81,7 @@ fun SettingsRoute(
     val translation by viewModel.translation.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
     val desktopLyrics by viewModel.desktopLyrics.collectAsStateWithLifecycle()
+    val libraryFolders by viewModel.libraryFolders.collectAsStateWithLifecycle()
     val permissionState by viewModel.permissionState.collectAsStateWithLifecycle()
     val keepAliveState by viewModel.keepAliveState.collectAsStateWithLifecycle()
     val asrEntry by viewModel.asrEntry.collectAsStateWithLifecycle()
@@ -119,6 +123,7 @@ fun SettingsRoute(
         translation = translation,
         asrEntry = asrEntry,
         localModelEntry = localModelEntry,
+        libraryFolders = libraryFolders,
         softwareDecodingAvailable = viewModel.softwareDecodingAvailable,
         permissionState = permissionState,
         keepAliveState = keepAliveState,
@@ -130,6 +135,7 @@ fun SettingsRoute(
         onOpenTranslationSettings = onOpenTranslationSettings,
         onOpenAsrSettings = onOpenAsrSettings,
         onOpenAbout = onOpenAbout,
+        onOpenLibraryFolders = onOpenLibraryFolders,
         onOpenPermissions = onOpenPermissions,
         onOpenKeepAlive = onOpenKeepAlive,
         onOpenUpdate = onOpenUpdate,
@@ -161,6 +167,12 @@ fun SettingsScreen(
      * 但那个判断在 [SettingsSummaries.translation] 里（与缺项判定同源），这里不做。
      */
     localModelEntry: LocalModelEntryState = LocalModelEntryState(),
+    /**
+     * 媒体库↔文件夹偏好。默认值 [LibraryFolderSettings] 的 `folders` 是 `null`
+     * （从未设置过），不是「已选 0 个」——默认体验是「媒体库正常列出全部」，
+     * 所以这一行首帧不该说「一个都没勾」。
+     */
+    libraryFolders: LibraryFolderSettings = LibraryFolderSettings(),
     softwareDecodingAvailable: Boolean = true,
     permissionState: PermissionSnapshot = PermissionSnapshot(),
     /**
@@ -180,6 +192,7 @@ fun SettingsScreen(
     onOpenTranslationSettings: () -> Unit = {},
     onOpenAsrSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenLibraryFolders: () -> Unit = {},
     onOpenPermissions: () -> Unit = {},
     onOpenKeepAlive: () -> Unit = {},
     onOpenUpdate: () -> Unit = {},
@@ -201,7 +214,7 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            // 七行平铺，不加小节标题：「设置」标题下紧跟一个「设置」小节是废话，
+            // 十行平铺，不加小节标题：「设置」标题下紧跟一个「设置」小节是废话，
             // 而这几个分类各自就是一个小节名，再加一层分组只是多两行留白。
             item {
                 SettingActionRow(
@@ -265,6 +278,22 @@ fun SettingsScreen(
                     title = stringResource(R.string.msp_settings_asr),
                     subtitle = SettingsSummaries.asr(asrEntry.settings, asrEntry.status).string(),
                     onClick = onOpenAsrSettings,
+                )
+            }
+            item {
+                SettingActionRow(
+                    // 放在「权限」**之前**：从这里往下，这一页问的就不再是
+                    // 「怎么播、怎么出字幕」，而是「应用看得见什么、能不能活下去」。
+                    // 它和「权限」是同一类问题的两个答案——那个由系统给（能不能读存储），
+                    // 这个由用户给（读了之后显示哪些）。反过来说，只给了权限却一个文件夹
+                    // 都没勾，媒体库会是空的，所以这两行挨着看才讲得通。
+                    //
+                    // 副标题只说「选了几个」，不列文件夹名：名字可以很长、层级可以很深，
+                    // 挤进一行会被截断；想知道具体是哪几个，点进去就是完整的树。
+                    icon = Icons.Outlined.FolderOpen,
+                    title = stringResource(R.string.msp_settings_library_folders),
+                    subtitle = LibraryFolderSummaries.entry(libraryFolders).string(),
+                    onClick = onOpenLibraryFolders,
                 )
             }
             item {

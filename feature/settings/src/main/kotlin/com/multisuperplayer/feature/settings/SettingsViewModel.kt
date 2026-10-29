@@ -24,6 +24,8 @@ import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
 import com.multisuperplayer.core.data.settings.DisplaySettings
 import com.multisuperplayer.core.data.settings.DisplaySettingsRepository
 import com.multisuperplayer.core.data.settings.HintSettingsRepository
+import com.multisuperplayer.core.data.settings.LibraryFolderSettings
+import com.multisuperplayer.core.data.settings.LibraryFolderSettingsRepository
 import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettings
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
@@ -165,6 +167,14 @@ class SettingsViewModel(
      */
     private val desktopLyricsSettings: DesktopLyricsSettingsRepository,
     /**
+     * 媒体库↔文件夹偏好。
+     *
+     * 和 [desktopLyricsSettings] 同一个分工：入口页只**读**它（那一行的副标题
+     * 「已选 3 个文件夹」），**写**它的只有「媒体库文件夹」子页。
+     * 真正的过滤发生在 `:core:data` 的媒体库仓库里，这里不参与。
+     */
+    private val libraryFolderSettings: LibraryFolderSettingsRepository,
+    /**
      * 「恢复所有提示」那一行。
      *
      * 说明类提示（浏览页怎么用、怎么拖动排序）被用户关掉之后记在 DataStore 里，
@@ -287,6 +297,16 @@ class SettingsViewModel(
      */
     val desktopLyrics: StateFlow<DesktopLyricsSettings> = desktopLyricsSettings.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, DesktopLyricsSettings())
+
+    /**
+     * 媒体库文件夹偏好的当前值（入口页那一行的副标题用）。
+     *
+     * 初值是 `LibraryFolderSettings()`（`folders = null` = 未设置过），不是
+     * 「已选 0 个」——用户的默认体验是「媒体库正常列出全部」，
+     * 若先把 `null` 当成「空选」显示，第一帧会说「一个都没勾」，而那是不对的。
+     */
+    val libraryFolders: StateFlow<LibraryFolderSettings> = libraryFolderSettings.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, LibraryFolderSettings())
 
     /**
      * 用 `Eagerly` 而不是 `WhileSubscribed`：主题要在界面出现之前就位，

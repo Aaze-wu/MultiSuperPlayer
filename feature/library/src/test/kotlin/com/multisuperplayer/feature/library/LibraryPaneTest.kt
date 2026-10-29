@@ -38,7 +38,8 @@ class LibraryPaneTest {
         library: MediaLibraryState = this.library,
         filter: LibraryFilter = LibraryFilter.ALL,
         query: String = "",
-    ) = buildLibraryUiState(library, filter, query)
+        noFoldersSelected: Boolean = false,
+    ) = buildLibraryUiState(library, filter, query, noFoldersSelected = noFoldersSelected)
 
     // -------------------------------------------------------------- 分支选择
 
@@ -92,6 +93,39 @@ class LibraryPaneTest {
         assertEquals(LibraryPane.Content, state().pane)
         assertEquals(LibraryPane.Content, state(query = "晴天").pane)
         assertEquals(LibraryPane.Content, state(filter = LibraryFilter.VIDEO).pane)
+    }
+
+    // ---------------------------------------------- 分支选择：没勾文件夹
+
+    @Test
+    fun `一个文件夹都没勾时说的是没勾文件夹而不是没有文件`() {
+        // 这两种空长得一模一样（列表都是空的），但下一步动作完全相反：
+        // 「没有文件」要用户去传文件，「没勾文件夹」要用户回设置里勾一个。
+        // 说错了会让用户传完文件依旧全空——因为过滤器还在挡。
+        assertEquals(
+            LibraryPane.NoFoldersSelected,
+            state(library = MediaLibraryState.Ready(emptyList()), noFoldersSelected = true).pane,
+        )
+    }
+
+    @Test
+    fun `没勾文件夹优先于没扫描到媒体`() {
+        // 两者同时成立时（库被偏好规则清空，于是条目为 0），
+        // 只有「没勾文件夹」是可行动的，必须抢在 NoMedia 前面。
+        assertEquals(
+            LibraryPane.NoFoldersSelected,
+            state(library = MediaLibraryState.Ready(emptyList()), noFoldersSelected = true).pane,
+        )
+        assertEquals(
+            LibraryPane.NoMedia,
+            state(library = MediaLibraryState.Ready(emptyList()), noFoldersSelected = false).pane,
+        )
+    }
+
+    @Test
+    fun `勾了文件夹且有内容时不受这个标记影响`() {
+        // 标记只是「为什么空」的一种解释，不该改变有内容时的渲染。
+        assertEquals(LibraryPane.Content, state(noFoldersSelected = true).pane)
     }
 
     // ------------------------------------------------- 回归 1：搜索框不能消失

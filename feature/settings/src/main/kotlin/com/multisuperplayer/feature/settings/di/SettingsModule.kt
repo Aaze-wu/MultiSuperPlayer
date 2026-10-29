@@ -4,6 +4,7 @@ import com.multisuperplayer.feature.settings.AboutViewModel
 import com.multisuperplayer.feature.settings.AsrSettingsViewModel
 import com.multisuperplayer.feature.settings.DesktopLyricsSettingsViewModel
 import com.multisuperplayer.feature.settings.KeepAliveViewModel
+import com.multisuperplayer.feature.settings.LibraryFolderSettingsViewModel
 import com.multisuperplayer.feature.settings.LocalModelSettingsViewModel
 import com.multisuperplayer.feature.settings.PermissionsViewModel
 import com.multisuperplayer.feature.settings.SettingsViewModel
@@ -46,4 +47,9 @@ val settingsFeatureModule = module {
     viewModelOf(::DesktopLyricsSettingsViewModel)
 
     viewModelOf(::UpdateViewModel)
+
+    // 「媒体库文件夹」子页。它跟「桌面歌词」同一类：只服务这一页，
+    // 而写下的偏好由 `:core:data` 的媒体库仓库自己观察（筛选发生在那一边），
+    // 这里不需要再养一个全局单例。
+    viewModelOf(::LibraryFolderSettingsViewModel)
 }

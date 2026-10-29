@@ -67,6 +67,7 @@ import com.multisuperplayer.feature.settings.AppearanceSettingsRoute
 import com.multisuperplayer.feature.settings.AsrSettingsRoute
 import com.multisuperplayer.feature.settings.DesktopLyricsSettingsRoute
 import com.multisuperplayer.feature.settings.KeepAliveRoute
+import com.multisuperplayer.feature.settings.LibraryFolderSettingsRoute
 import com.multisuperplayer.feature.settings.UpdateRoute
 import com.multisuperplayer.feature.settings.LocalModelSettingsRoute
 import com.multisuperplayer.feature.settings.PermissionsRoute
@@ -328,6 +329,17 @@ private const val ABOUT_ROUTE = "settings/about"
 private const val PERMISSIONS_ROUTE = "settings/permissions"
 
 /**
+ * 媒体库文件夹页：勾选哪些文件夹的内容进媒体库。
+ *
+ * 和权限页相邻但不合并：那页说「系统允许应用读什么」，这页说「读完只显示哪些」。
+ * 只给权限却一个文件夹都没勾，媒体库是空的，所以这两件事必须在同一个视野里讲。
+ *
+ * 它必须看到**全部**扫描结果才能列出文件夹树，所以过滤只发生在仓库发布数据时，
+ * 而非扫描时（否则取消勾选会让那一行自己消失）。
+ */
+private const val LIBRARY_FOLDERS_ROUTE = "settings/library-folders"
+
+/**
  * 后台保活页：电池优化白名单 + 厂商后台管理入口。
  *
  * 和权限页一样是**真目的地**。两页分开是因为它们解决的不是同一类问题：
@@ -581,6 +593,9 @@ private fun MspAppScaffold(
                     onOpenFavorites = {
                         navController.navigate(FAVORITES_ROUTE) { launchSingleTop = true }
                     },
+                    // 空库提示里那颗「去选择文件夹」按钮。
+                    // 不开 singleTop：从媒体库进设置是正常的前后关系，回头要能一层层退。
+                    onOpenLibraryFolders = { navController.navigate(LIBRARY_FOLDERS_ROUTE) },
                 )
             }
             composable(FAVORITES_ROUTE) {
@@ -670,6 +685,7 @@ private fun MspAppScaffold(
                     onOpenTranslationSettings = { navController.navigate(TRANSLATION_SETTINGS_ROUTE) },
                     onOpenAsrSettings = { navController.navigate(ASR_SETTINGS_ROUTE) },
                     onOpenAbout = { navController.navigate(ABOUT_ROUTE) },
+                    onOpenLibraryFolders = { navController.navigate(LIBRARY_FOLDERS_ROUTE) },
                     onOpenPermissions = { navController.navigate(PERMISSIONS_ROUTE) },
                     onOpenKeepAlive = { navController.navigate(KEEP_ALIVE_ROUTE) },
                     onOpenUpdate = { navController.navigate(UPDATE_ROUTE) },
@@ -691,6 +707,9 @@ private fun MspAppScaffold(
             }
             composable(PERMISSIONS_ROUTE) {
                 PermissionsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(LIBRARY_FOLDERS_ROUTE) {
+                LibraryFolderSettingsRoute(onBack = { navController.popBackStack() })
             }
             composable(KEEP_ALIVE_ROUTE) {
                 KeepAliveRoute(onBack = { navController.popBackStack() })

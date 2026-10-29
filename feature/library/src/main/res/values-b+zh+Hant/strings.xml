@@ -14,7 +14,10 @@
     <string name="msp_library_filtered_out_title">沒有符合的內容</string>
     <string name="msp_library_filtered_out_desc">庫裡的媒體還在，只是目前搜尋或篩選沒對上。</string>
     <string name="msp_library_clear_filters">清空搜尋與篩選</string>
-
+    <!-- ===== 空状態：一個媒體資料夾都沒勾 ===== -->
+    <string name="msp_library_no_folders_title">還沒有選擇任何資料夾</string>
+    <string name="msp_library_no_folders_desc">媒體庫只會顯示你勾選的資料夾裡的內容。現在一個都沒勾，所以這裡是空的。</string>
+    <string name="msp_library_no_folders_action">去選擇資料夾</string>
     <!-- ===== 空狀態：庫本身是空的 ===== -->
     <string name="msp_library_empty_title">還沒有掃描到媒體</string>
     <string name="msp_library_empty_desc">本機沒有找到音訊或視訊檔案。\n把檔案放進手機儲存空間後重新掃描即可。</string>

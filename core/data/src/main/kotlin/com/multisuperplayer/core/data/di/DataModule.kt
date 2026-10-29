@@ -29,6 +29,7 @@ import com.multisuperplayer.core.data.settings.LocaleSettingsRepository
 import com.multisuperplayer.core.data.settings.DesktopLyricsSettingsRepository
 import com.multisuperplayer.core.data.settings.DisplaySettingsRepository
 import com.multisuperplayer.core.data.settings.HintSettingsRepository
+import com.multisuperplayer.core.data.settings.LibraryFolderSettingsRepository
 import com.multisuperplayer.core.data.settings.PlaybackSettingsRepository
 import com.multisuperplayer.core.data.settings.SubtitleSettingsRepository
 import com.multisuperplayer.core.data.settings.ThemeSettingsRepository
@@ -99,12 +100,19 @@ val dataModule = module {
         )
     }
 
+    // 媒体库只看哪些文件夹。放在 MediaLibraryRepository 前面只是为了让人先看到
+    // 依赖：Koin 是惰性解析的，先后顺序其实不影响。
+    //
+    // 它只管媒体库：没被选中的文件夹仍然可以在浏览页里翻到、能播放，只是不进媒体库列表。
+    single { LibraryFolderSettingsRepository(context = androidContext(), dispatchers = get()) }
+
     single {
         MediaLibraryRepository(
             context = androidContext(),
             scanner = get(),
             safScanner = get(),
             safTreeStore = get(),
+            folderSettings = get(),
             dispatchers = get(),
         )
     }

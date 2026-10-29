@@ -805,4 +805,27 @@
     <string name="msp_desktop_lyrics_reset_position_title">恢复默认位置</string>
     <string name="msp_desktop_lyrics_reset_position_subtitle">回到屏幕下方居中；不会关掉桌面歌词</string>
     <string name="msp_desktop_lyrics_reset_position_action">重置位置</string>
+
+    <!--
+      媒体库文件夹偏好（设置 › 媒体库文件夹）。
+
+      这一整组文案要反复说清一件事：**勾选只影响媒体库列表，不动文件**。
+      用「勾选」而不用「删除」的原因是前者不带后果，而用户第一次看到这个页面时
+      最怕的正是「我会不会把它从手机里删掉」。
+    -->
+    <string name="msp_settings_library_folders">媒体库文件夹</string>
+    <string name="msp_settings_library_folders_section">文件夹</string>
+    <string name="msp_settings_library_folders_note">只有勾上的文件夹里的内容会进媒体库；没勾的仍然可以在「浏览」里找到并播放。</string>
+    <string name="msp_settings_library_folders_none">一个文件夹都没勾：媒体库现在是空的，但文件都还在。</string>
+    <string name="msp_settings_library_folders_unknown">读不出文件夹设置，媒体库暂不按文件夹过滤。</string>
+    <string name="msp_settings_library_folders_unsupported">系统不支持</string>
+    <string name="msp_settings_library_folders_unsupported_note">这台设备是 Android 9 或更早的版本，系统不告诉应用文件在哪个文件夹，没法按文件夹过滤。媒体库会照常显示全部内容。</string>
+    <string name="msp_settings_library_folders_clear">全不选</string>
+    <string name="msp_settings_library_folders_count">已选 %1$d 个文件夹</string>
+    <string name="msp_settings_library_folders_loading">正在扫描媒体文件…</string>
+    <string name="msp_settings_library_folders_needs_permission">还没有存储权限，扫不出任何文件夹。先去「权限」里开启。</string>
+    <string name="msp_settings_library_folders_failed">扫描出错了，暂时列不出文件夹。回媒体库页重试一次。</string>
+    <string name="msp_settings_library_folders_empty">扫完了，但一个媒体文件都没有，所以没有文件夹可选。</string>
+    <string name="msp_settings_library_folder_root">存储根目录</string>
+    <string name="msp_settings_library_folder_files">%1$d 个文件</string>
 </resources>

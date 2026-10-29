@@ -15,6 +15,11 @@
     <string name="msp_library_filtered_out_desc">库里的媒体还在，只是当前搜索或筛选没匹配到。</string>
     <string name="msp_library_clear_filters">清空搜索与筛选</string>
 
+    <!-- ===== 空状态：一个媒体文件夹都没勾 ===== -->
+    <string name="msp_library_no_folders_title">还没有选择任何文件夹</string>
+    <string name="msp_library_no_folders_desc">媒体库只会显示你勾选的文件夹里的内容。现在一个都没勾，所以这里是空的。</string>
+    <string name="msp_library_no_folders_action">去选择文件夹</string>
+
     <!-- ===== 空状态：库本身是空的 ===== -->
     <string name="msp_library_empty_title">还没有扫描到媒体</string>
     <string name="msp_library_empty_desc">本机没有找到音频或视频文件。\n把文件放进手机存储后重新扫描即可。</string>

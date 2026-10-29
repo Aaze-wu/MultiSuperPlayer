@@ -29,6 +29,18 @@ internal sealed interface LibraryPane {
     /** 库里一条都没有，并且**不是**因为搜索/筛选挡掉了。 */
     data object NoMedia : LibraryPane
 
+    /**
+     * 库是空的，因为用户在「设置 › 媒体库文件夹」里一个文件夹都没勾。
+     *
+     * 与 [NoMedia] 分开的理由和 [FilteredOut] 与 [NoMedia] 分开一样：两者看起来
+     * 都是「空」，但用户要做的下一步完全相反——这里要去勾一个文件夹（然后文件
+     * **已经在手机里了**），而 [NoMedia] 才是真的没有文件。
+     *
+     * 它会先于 [NoMedia] 判定：没勾文件夹时扫描结果被挡光了，[NoMedia] 的说法
+     * （「把文件放进手机存储后重新扫描」）会让用户去传文件，传完依旧是空的。
+     */
+    data object NoFoldersSelected : LibraryPane
+
     /** 库里有内容，只是被当前搜索或筛选挡光了。 */
     data object FilteredOut : LibraryPane
 
@@ -51,9 +63,18 @@ internal val LibraryUiState.pane: LibraryPane
         is MediaLibraryState.NeedsPermission -> LibraryPane.NeedsPermission
         is MediaLibraryState.Error -> LibraryPane.Failure(lib.message)
         is MediaLibraryState.Ready -> when {
-            // 注意顺序：先判「库里真的没有」，再判「被挡光了」。
-            // 反过来写的话，扫描到 0 条会走进 FilteredOut，提示变成「没有匹配的内容」，
-            // 也就是把「本机没有文件」说成了「你没搜到」。
+            // 顺序有两层讲究：
+            // 1. 「自己没勾文件夹」排在「库里真的没有」之前——前者的列表是**被规则
+            //    清空的**，此时本机有没有文件我们并不知道，说「本机没有文件」是精的。
+            // 2. 「库里真的没有」排在「被搜索/筛选挡光」之前：反过来写的话，扫描到
+            //    0 条会走进 FilteredOut，提示变成「没有匹配的内容」，
+            //    也就是把「本机没有文件」说成了「你没搜到」。
+            //
+            // 第一条还额外要求 `entries.isEmpty()`：勾选状态刚变、仓库还没来得及
+            // 重新过滤的那一瞬间，两个条件会同时成立。这时把有内容的库画成
+            // 「一个文件夹都没勾」是把用户的数据藏起来，而它就是画一帧列表也
+            // 不会错——所以「有内容」永远优先。
+            lib.entries.isEmpty() && noFoldersSelected -> LibraryPane.NoFoldersSelected
             lib.entries.isEmpty() -> LibraryPane.NoMedia
             filteredOut -> LibraryPane.FilteredOut
             else -> LibraryPane.Content

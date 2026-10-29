@@ -657,4 +657,27 @@
     <string name="msp_desktop_lyrics_reset_position_title">Reset position</string>
     <string name="msp_desktop_lyrics_reset_position_subtitle">Back to the bottom centre of the screen; does not turn the lyrics off</string>
     <string name="msp_desktop_lyrics_reset_position_action">Reset</string>
+
+    <!--
+      Library folder preference (Settings > Library folders).
+
+      The whole group has to repeat one thing: checking a folder changes what the
+      library *lists*, never what is on the disk. That is why the wording is
+      "checked" and not "remove" — the fear people bring to this page is deletion.
+    -->
+    <string name="msp_settings_library_folders">Library folders</string>
+    <string name="msp_settings_library_folders_section">Folders</string>
+    <string name="msp_settings_library_folders_note">Only checked folders show up in the library. Unchecked ones are still in Browse, and still playable.</string>
+    <string name="msp_settings_library_folders_none">Nothing is checked, so the library is empty right now. Your files are untouched.</string>
+    <string name="msp_settings_library_folders_unknown">The folder setting could not be read, so the library is not filtered by folder.</string>
+    <string name="msp_settings_library_folders_unsupported">Not supported</string>
+    <string name="msp_settings_library_folders_unsupported_note">This device runs Android 9 or older, which does not tell apps which folder a file is in, so filtering by folder is not possible here. The library keeps showing everything.</string>
+    <string name="msp_settings_library_folders_clear">Clear all</string>
+    <string name="msp_settings_library_folders_count">Selected: %1$d</string>
+    <string name="msp_settings_library_folders_loading">Scanning media files…</string>
+    <string name="msp_settings_library_folders_needs_permission">Storage permission is not granted, so no folder can be listed. Turn it on under Permissions.</string>
+    <string name="msp_settings_library_folders_failed">Scanning failed, so folders cannot be listed right now. Try again from the library.</string>
+    <string name="msp_settings_library_folders_empty">The scan found no media files, so there are no folders to pick.</string>
+    <string name="msp_settings_library_folder_root">Storage root</string>
+    <string name="msp_settings_library_folder_files">%1$d files</string>
 </resources>

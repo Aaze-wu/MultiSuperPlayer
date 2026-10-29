@@ -8,6 +8,7 @@ import com.multisuperplayer.core.data.favorites.FavoriteStore
 import com.multisuperplayer.core.data.library.MediaLibraryRepository
 import com.multisuperplayer.core.data.library.MediaLibraryState
 import com.multisuperplayer.core.data.playlist.PlaylistStore
+import com.multisuperplayer.core.data.settings.LibraryFolderSettingsRepository
 import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.Playlist
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,18 @@ data class LibraryUiState(
     val sort: LibrarySort = LibrarySort.TITLE_ASC,
     val groupMode: LibraryGroupMode = LibraryGroupMode.NONE,
     val viewMode: LibraryViewMode = LibraryViewMode.LIST,
+    /**
+     * 库是空的**因为用户一个媒体文件夹都没勾**，而不是因为本机没有文件。
+     *
+     * 必须和 [libraryEmpty] 分开，理由和 [filteredOut] 一样：两种「空」用户要做的
+     * 下一步完全相反——这里要去「设置 › 媒体库文件夹」勾一个，那边才是把文件放进手机。
+     * 共用一句「还没有扫描到媒体」的话，用户会去传文件，传完还是空的，因为过滤器
+     * 还在把他的新文件挡在外面。
+     *
+     * 偏好读不出来的时候（[MediaLibraryState] 照旧发布全部内容）这里必须是 false：
+     * 那种情况的空是「不知道」，不能反过来说成「你自己没勾」。
+     */
+    val noFoldersSelected: Boolean = false,
 ) {
     /** 当前搜索命中了多少条（尚未应用类型筛选）。**不是**库里一共有多少条。 */
     val allCount: Int get() = counts[LibraryFilter.ALL] ?: 0
@@ -90,6 +103,7 @@ internal fun buildLibraryUiState(
     sort: LibrarySort = LibrarySort.TITLE_ASC,
     groupMode: LibraryGroupMode = LibraryGroupMode.NONE,
     viewMode: LibraryViewMode = LibraryViewMode.LIST,
+    noFoldersSelected: Boolean = false,
 ): LibraryUiState {
     val all = (library as? MediaLibraryState.Ready)?.entries.orEmpty()
     val searched = all.filterByQuery(query)
@@ -110,6 +124,7 @@ internal fun buildLibraryUiState(
         sort = sort,
         groupMode = groupMode,
         viewMode = viewMode,
+        noFoldersSelected = noFoldersSelected,
     )
 }
 
@@ -142,6 +157,14 @@ class LibraryViewModel(
     private val repository: MediaLibraryRepository,
     playlistStore: PlaylistStore,
     favoriteStore: FavoriteStore,
+    /**
+     * 只用来回答「是不是一个文件夹都没勾」。
+     *
+     * 过滤本身发生在仓库层（发布数据时就把不该显示的条目剔掉），这里读同一个偏好
+     * **不是**为了再过滤一遍，而是为了把「空」的两种成因区分开：仓库发布出来的空
+     * 列表已经把「本机没有文件」和「被自己的偏好挡光」压成了同一个结果。
+     */
+    folderSettings: LibraryFolderSettingsRepository,
 ) : ViewModel() {
 
     private val playlistEditing = PlaylistEditing(playlistStore)
@@ -189,7 +212,8 @@ class LibraryViewModel(
     )
 
     val uiState: StateFlow<LibraryUiState> =
-        combine(repository.state, filter, query, options) { library, currentFilter, currentQuery, current ->
+        combine(repository.state, filter, query, options, folderSettings.settings) {
+                library, currentFilter, currentQuery, current, folders ->
             buildLibraryUiState(
                 library = library,
                 filter = currentFilter,
@@ -197,6 +221,9 @@ class LibraryViewModel(
                 sort = current.sort,
                 groupMode = current.groupMode,
                 viewMode = current.viewMode,
+                // `filtering` 为 false 表示偏好读不出来（仓库此时会照旧发布全部内容），
+                // 那种「空」是「不知道」，不能说成「你自己没勾」。
+                noFoldersSelected = folders.filtering && folders.selected.isEmpty(),
             )
         }.stateIn(
             scope = viewModelScope,

@@ -11,6 +11,9 @@ import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.text.MspText
 import com.multisuperplayer.core.data.R
+import com.multisuperplayer.core.data.settings.LibraryFolderSettings
+import com.multisuperplayer.core.data.settings.LibraryFolderSettingsRepository
+import com.multisuperplayer.core.model.MediaEntry
 import com.multisuperplayer.core.model.SafTreeInfo
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -63,6 +66,7 @@ class MediaLibraryRepository(
     private val scanner: MediaStoreScanner,
     private val safScanner: SafTreeScanner,
     private val safTreeStore: SafTreeStore,
+    private val folderSettings: LibraryFolderSettingsRepository,
     private val dispatchers: DispatcherProvider,
 ) {
 
@@ -86,6 +90,44 @@ class MediaLibraryRepository(
      */
     private var safCache: SafScanOutcome? = null
 
+    /**
+     * 上一次合并后的**未过滤**结果，[publish] 拿它按当前偏好过滤。
+     *
+     * 分成「合并」与「过滤」两步，是为了让**改选文件夹**不触发重扫：条目本身
+     * 一个字节都没变，变的只是「哪些算数」。重扫一遍 MediaStore 是几十毫秒、
+     * 重扫 SAF 是几秒（见类注释），而用户是在设置页里一行一行勾的。
+     */
+    @Volatile
+    private var merged: List<MediaEntry> = emptyList()
+
+    @Volatile
+    private var mergedPartial = false
+
+    @Volatile
+    private var mergedTruncated = false
+
+    private val _scannedPaths = MutableStateFlow<List<String?>>(emptyList())
+
+    /**
+     * 扫描到的**全部**条目的相对路径，**没有**经过文件夹偏好过滤。
+     *
+     * 设置页要拿它建「可选文件夹」这棵树，所以必须是没有过滤过的那一份：
+     * 用 [state] 里的条目建树的话，用户勾掉一个文件夹，那一行就会从树上消失——
+     * 于是再也勾不回来（这是「用结果去描述选项」的经典死循环）。
+     *
+     * 与 [state] 一起在同一次扫描里更新，所以两者不会出现「树上有一个文件夹、
+     * 库里查不到一条」的错位。
+     */
+    val scannedPaths: StateFlow<List<String?>> = _scannedPaths.asStateFlow()
+
+    /**
+     * 当前的文件夹偏好。初始值故意是 [LibraryFolderSettings.unknown]：
+     * 磁盘还没读完时**不能**当成「用户什么都没选」，那会在启动瞬间把媒体库
+     * 清空一下（用户看到的是「列表闪一下空了又回来」）。
+     */
+    @Volatile
+    private var folderPrefs: LibraryFolderSettings = LibraryFolderSettings(unknown = true)
+
     /** 已授权的 SAF 目录清单，给「浏览」页用。 */
     val safTrees: Flow<List<SafTreeInfo>> get() = safTreeStore.trees
 
@@ -95,6 +137,16 @@ class MediaLibraryRepository(
             changeSignals.debounce(DEBOUNCE_MS).collect {
                 MspLog.d(TAG) { "媒体库发生变化，重新扫描" }
                 refresh()
+            }
+        }
+        // 文件夹偏好一变就重新过滤。不重扫、不清 safCache：只换「哪些算数」。
+        scope.launch {
+            folderSettings.settings.collect { prefs ->
+                if (prefs == folderPrefs) return@collect
+                folderPrefs = prefs
+                MspLog.d(TAG) { "媒体库文件夹偏好变化，重新过滤（不重扫）" }
+                // 还没有扫描结果时不用管：扫描结束时自然会用上最新的 folderPrefs。
+                if (_state.value is MediaLibraryState.Ready) publish()
             }
         }
     }
@@ -193,11 +245,13 @@ class MediaLibraryRepository(
                 mediaStore to scanSaf(treeUris, forceSaf)
             }
                 .onSuccess { (mediaStore, saf) ->
-                    _state.value = MediaLibraryState.Ready(
-                        entries = LibraryMergeRules.merge(mediaStore.entries, saf.entries),
-                        partial = mediaStore.partial,
-                        truncated = saf.truncated,
-                    )
+                    merged = LibraryMergeRules.merge(mediaStore.entries, saf.entries)
+                    mergedPartial = mediaStore.partial
+                    mergedTruncated = saf.truncated
+                    // 先更新「可选文件夹」，再发布过滤后的列表：设置页的树与媒体库
+                    // 列表来自同一次扫描。
+                    _scannedPaths.value = merged.map { it.relativePath }
+                    publish()
                 }
                 .onFailure { error ->
                     MspLog.e(TAG, error) { "扫描媒体库失败" }
@@ -210,6 +264,23 @@ class MediaLibraryRepository(
                     )
                 }
         }
+    }
+
+    /**
+     * 把 [merged] 按当前文件夹偏好过滤后发布成 [MediaLibraryState.Ready]。
+     *
+     * 过滤交给 [LibraryFolderSettings.accepts]（读不出来时不过滤），判断细节在
+     * `LibraryFolderRules` 里。**过滤发生在合并之后**，所以「选中一个文件夹」能同时
+     * 盖住 MediaStore 与 SAF 两个来源的条目——它们只共用相对路径这一种语言。
+     */
+    private fun publish() {
+        val prefs = folderPrefs
+        val entries = if (prefs.filtering) merged.filter { prefs.accepts(it.relativePath) } else merged
+        _state.value = MediaLibraryState.Ready(
+            entries = entries,
+            partial = mergedPartial,
+            truncated = mergedTruncated,
+        )
     }
 
     /**

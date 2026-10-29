@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.FolderOff
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Movie
@@ -104,6 +105,8 @@ fun LibraryRoute(
     modifier: Modifier = Modifier,
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit = { _, _ -> },
     onOpenFavorites: () -> Unit = {},
+    /** 去「设置 › 媒体库文件夹」。空库提示里的「去选择」按钮用它。 */
+    onOpenLibraryFolders: () -> Unit = {},
 ) {
     val viewModel: LibraryViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -146,6 +149,7 @@ fun LibraryRoute(
         onCreatePlaylistWith = viewModel::createPlaylistWith,
         onToggleFavorite = viewModel::toggleFavorite,
         onOpenFavorites = onOpenFavorites,
+        onOpenLibraryFolders = onOpenLibraryFolders,
         onPlayRequest = onPlayRequest,
     )
 }
@@ -176,6 +180,7 @@ fun LibraryScreen(
     onCreatePlaylistWith: (name: String, entries: List<MediaEntry>) -> Unit = { _, _ -> },
     onToggleFavorite: (entries: List<MediaEntry>) -> Unit = {},
     onOpenFavorites: () -> Unit = {},
+    onOpenLibraryFolders: () -> Unit = {},
     onPlayRequest: (entries: List<MediaEntry>, startIndex: Int) -> Unit = { _, _ -> },
 ) {
     // 只需要 partial / truncated 这两个信息，分支判定整个交给 state.pane（纯函数，有单测）。
@@ -320,6 +325,17 @@ fun LibraryScreen(
                             onQueryChange("")
                             onFilterChange(LibraryFilter.ALL)
                         },
+                    )
+
+                    // 「没勾文件夹」必须排在 NoMedia 前面：那时列表是被偏好规则清空的，
+                    // 本机到底有没有文件我们并不知道，说「还没有扫描到媒体」是精的，
+                    // 而且会让用户去传文件——传完依旧空白，因为过滤器还在挡。
+                    LibraryPane.NoFoldersSelected -> EmptyState(
+                        icon = Icons.Outlined.FolderOpen,
+                        title = stringResource(R.string.msp_library_no_folders_title),
+                        description = stringResource(R.string.msp_library_no_folders_desc),
+                        actionLabel = stringResource(R.string.msp_library_no_folders_action),
+                        onAction = onOpenLibraryFolders,
                     )
 
                     LibraryPane.NoMedia -> EmptyState(

@@ -641,4 +641,27 @@
     <string name="msp_desktop_lyrics_reset_position_title">恢復預設位置</string>
     <string name="msp_desktop_lyrics_reset_position_subtitle">回到螢幕下方置中；不會關掉桌面歌詞</string>
     <string name="msp_desktop_lyrics_reset_position_action">重設位置</string>
+
+    <!--
+      媒體庫資料夾偏好（設定 › 媒體庫資料夾）。
+
+      這一整組文案要反覆說清一件事：**勾選只影響媒體庫列表，不動檔案**。
+      用「勾選」而不用「刪除」的原因是前者不帶後果，而使用者第一次看到這個頁面時
+      最怕的正是「我會不會把它從手機裡刪掉」。
+    -->
+    <string name="msp_settings_library_folders">媒體庫資料夾</string>
+    <string name="msp_settings_library_folders_section">資料夾</string>
+    <string name="msp_settings_library_folders_note">只有勾選的資料夾裡的內容會進媒體庫；沒勾的仍然可以在「瀏覽」裡找到並播放。</string>
+    <string name="msp_settings_library_folders_none">一個資料夾都沒勾：媒體庫現在是空的，但檔案都還在。</string>
+    <string name="msp_settings_library_folders_unknown">讀不出資料夾設定，媒體庫暫不按資料夾過濾。</string>
+    <string name="msp_settings_library_folders_unsupported">系統不支援</string>
+    <string name="msp_settings_library_folders_unsupported_note">這台裝置是 Android 9 或更早的版本，系統不告訴應用程式檔案在哪個資料夾，沒法按資料夾過濾。媒體庫會照常顯示全部內容。</string>
+    <string name="msp_settings_library_folders_clear">全不選</string>
+    <string name="msp_settings_library_folders_count">已選 %1$d 個資料夾</string>
+    <string name="msp_settings_library_folders_loading">正在掃描媒體檔案…</string>
+    <string name="msp_settings_library_folders_needs_permission">還沒有儲存權限，掃不出任何資料夾。先去「權限」裡開啟。</string>
+    <string name="msp_settings_library_folders_failed">掃描出錯了，暫時列不出資料夾。回媒體庫頁重試一次。</string>
+    <string name="msp_settings_library_folders_empty">掃完了，但一個媒體檔案都沒有，所以沒有資料夾可選。</string>
+    <string name="msp_settings_library_folder_root">儲存根目錄</string>
+    <string name="msp_settings_library_folder_files">%1$d 個檔案</string>
 </resources>

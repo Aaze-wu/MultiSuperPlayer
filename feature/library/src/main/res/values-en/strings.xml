@@ -16,6 +16,11 @@
     <string name="msp_library_filtered_out_desc">Your media is still here; the current search or filter just does not match it.</string>
     <string name="msp_library_clear_filters">Clear search and filter</string>
 
+    <!-- ===== Empty state: no folder selected ===== -->
+    <string name="msp_library_no_folders_title">No folders selected</string>
+    <string name="msp_library_no_folders_desc">The library only shows what is inside the folders you select. None are selected now, so it is empty.</string>
+    <string name="msp_library_no_folders_action">Select folders</string>
+
     <!-- ===== Empty state: the library itself is empty ===== -->
     <string name="msp_library_empty_title">No media found yet</string>
     <string name="msp_library_empty_desc">No audio or video files were found on this device.\nAdd files to your storage and rescan.</string>
