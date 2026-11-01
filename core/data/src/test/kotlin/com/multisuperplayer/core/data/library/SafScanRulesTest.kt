@@ -2,6 +2,7 @@ package com.multisuperplayer.core.data.library
 
 import com.multisuperplayer.core.model.MediaKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,6 +17,25 @@ import org.junit.Test
 class SafScanRulesTest {
 
     // --------------------------------------------------------------- 类型判定
+
+    @Test
+    fun `只有 provider 的目录 MIME 才算目录`() {
+        assertTrue(SafScanRules.isDirectoryMime(SafScanRules.DIRECTORY_MIME))
+        // provider 偶尔会带参数；和 kindOf 一样先切掉 `;` 之后的部分。
+        assertTrue(SafScanRules.isDirectoryMime("vnd.android.document/directory;charset=utf-8"))
+    }
+
+    @Test
+    fun `文件 MIME 与缺失 MIME 都不算目录`() {
+        // 判成目录的后果是「多查一次空子项」，代价小；反过来把目录判成文件，
+        // 整棵子树会静默消失，界面上只会表现为「我的文件夹里少了东西」。
+        assertFalse(SafScanRules.isDirectoryMime("audio/mpeg"))
+        assertFalse(SafScanRules.isDirectoryMime("application/octet-stream"))
+        // provider 完全不给 MIME 是常见情况（null / 空串），这两种必须走文件分支，
+        // 否则这些条目会被当成目录递归进去、然后一个字都收不到。
+        assertFalse(SafScanRules.isDirectoryMime(null))
+        assertFalse(SafScanRules.isDirectoryMime(""))
+    }
 
     @Test
     fun `常见音频视频后缀都能判出大类`() {

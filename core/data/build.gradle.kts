@@ -58,7 +58,8 @@ dependencies {
     implementation(project(":core:player"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.documentfile)
+    // 不用 androidx.documentfile：它的 TreeDocumentFile 每个属性一次跨进程 query，
+    // 大目录会慢到不可接受。SafTreeScanner 直接用 ContentResolver 一次查出整层。
     implementation(libs.androidx.datastore.preferences)
 
     // 从封面里量化出种子色（ArtworkPaletteRepository）

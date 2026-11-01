@@ -48,6 +48,25 @@ internal object SafScanRules {
     // --------------------------------------------------------------- 类型判定
 
     /**
+     * provider 上报的「这是目录」MIME。
+     *
+     * 值取自 `DocumentsContract.Document.MIME_TYPE_DIR`，但这里**不引用那个常量**：
+     * 本对象的全部判断都要能在 JVM 单测里跑，而引用 `android.provider.*` 会让这一条
+     * 变成「只在真机上才验证得了」。这是平台约定的固定字符串，抄一份是安全的。
+     */
+    const val DIRECTORY_MIME = "vnd.android.document/directory"
+
+    /**
+     * 这一行是不是目录。
+     *
+     * `DocumentsProvider` 只给 MIME，**没有** `isDirectory` 列——递归能不能往下走
+     * 全看这一条。判错了后果不对称：把目录当成文件 ⇒ 整个子树静默消失；把文件
+     * 当成目录 ⇒ 多查一次空子项。所以除了全等还容 `;` 之后的参数（和 [kindOf] 一致）。
+     */
+    fun isDirectoryMime(mimeType: String?): Boolean =
+        mimeType?.substringBefore(';')?.trim() == DIRECTORY_MIME
+
+    /**
      * 判定一个 SAF 条目的媒体大类；返回 `null` 表示「这不是媒体文件，别收」。
      *
      * ## 为什么不是「只收白名单里的后缀」

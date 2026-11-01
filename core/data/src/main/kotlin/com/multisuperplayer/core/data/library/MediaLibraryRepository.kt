@@ -5,6 +5,7 @@ import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private const val TAG = "MediaLibraryRepo"
@@ -236,22 +238,62 @@ class MediaLibraryRepository(
                 _state.value = MediaLibraryState.Loading
             }
 
+            val safPlan = SafScanPlan.of(
+                treeUris = treeUris,
+                force = forceSaf,
+                hasCache = safCache != null,
+            )
+            val scanStartedAt = SystemClock.elapsedRealtime()
             runCatching {
+                val mediaStoreStartedAt = SystemClock.elapsedRealtime()
                 val mediaStore = if (hasMediaStorePermission) {
                     scanner.scanAll()
                 } else {
                     MediaStoreScanner.ScanOutcome(entries = emptyList(), partial = false)
                 }
-                mediaStore to scanSaf(treeUris, forceSaf)
+                val mediaStoreMs = SystemClock.elapsedRealtime() - mediaStoreStartedAt
+
+                // MediaStore 那一半是毫秒级的，SAF 目录树可能要枚丽几万个 document。
+                // 只在**确实要走进目录树**时先把 MediaStore 的结果发出去：这样用户
+                // 先看到库，目录树枚举完再原地补齐。其他分支（命中缓存 / 没授权任何
+                // 目录）不需要这次中间发布——那只会让列表白闪一次。
+                if (isActive && safPlan == SafScanPlan.WalkTrees) {
+                    publishMerged(
+                        entries = mediaStore.entries,
+                        partial = mediaStore.partial,
+                        safEntries = safCache?.entries.orEmpty(),
+                        safTruncated = safCache?.truncated ?: false,
+                    )
+                }
+
+                val safStartedAt = SystemClock.elapsedRealtime()
+                val saf = scanSaf(safPlan, treeUris)
+                val safMs = SystemClock.elapsedRealtime() - safStartedAt
+
+                // 分段计时。这两条路的耗时差着数量级（MediaStore 几十毫秒，SAF 目录树
+                // 可能几十秒），而用户看到的只有一个转圈——不把这两段分开量，
+                // 「启动很久」就只能靠猜是哪个环节。
+                MspLog.d(TAG) {
+                    "扫描耗时：MediaStore ${mediaStoreMs}ms/${mediaStore.entries.size} 条，" +
+                        "SAF ${safMs}ms/${saf.entries.size} 条（目录树 ${treeUris?.size ?: 0} 棵，$safPlan）"
+                }
+                mediaStore to saf
             }
                 .onSuccess { (mediaStore, saf) ->
-                    merged = LibraryMergeRules.merge(mediaStore.entries, saf.entries)
-                    mergedPartial = mediaStore.partial
-                    mergedTruncated = saf.truncated
-                    // 先更新「可选文件夹」，再发布过滤后的列表：设置页的树与媒体库
-                    // 列表来自同一次扫描。
-                    _scannedPaths.value = merged.map { it.relativePath }
-                    publish()
+                    // 扫描是串行的，而 `scan()` 开新任务只是 cancel 旧任务——旧任务可能
+                    // 还卡在阻塞的 SAF 枚举里。它回来之后如果照旧发布，就会用**旧**结果
+                    // 盖掉新扫描刚发布的结果（表现为列表突然回退）。这里直接放弃。
+                    if (!isActive) return@onSuccess
+                    publishMerged(
+                        entries = mediaStore.entries,
+                        partial = mediaStore.partial,
+                        safEntries = saf.entries,
+                        safTruncated = saf.truncated,
+                    )
+                    MspLog.d(TAG) {
+                        "扫描完成：合并 ${merged.size} 条，总耗时 " +
+                            "${SystemClock.elapsedRealtime() - scanStartedAt}ms"
+                    }
                 }
                 .onFailure { error ->
                     MspLog.e(TAG, error) { "扫描媒体库失败" }
@@ -264,6 +306,30 @@ class MediaLibraryRepository(
                     )
                 }
         }
+    }
+
+    /**
+     * 把两边结果合并成 [merged] 并发布。
+     *
+     * 两个调用点：[MediaLibraryRepository.scan] 里的**中间发布**（只有 MediaStore，
+     * SAF 这边塞上次的缓存）和最后的**完整发布**。两次都是
+     * [MediaLibraryState.Ready]，所以列表不会消失，只会原地补齐——这是「刷新应当
+     * 原地替换」那条约定的延伸：先看到东西，再看到更多。
+     *
+     * 先更新「可选文件夹」（[_scannedPaths]）再发布：设置页的树与媒体库列表必须
+     * 来自同一次扫描。
+     */
+    private fun publishMerged(
+        entries: List<MediaEntry>,
+        partial: Boolean,
+        safEntries: List<MediaEntry>,
+        safTruncated: Boolean,
+    ) {
+        merged = LibraryMergeRules.merge(entries, safEntries)
+        mergedPartial = partial
+        mergedTruncated = safTruncated
+        _scannedPaths.value = merged.map { it.relativePath }
+        publish()
     }
 
     /**
@@ -286,25 +352,27 @@ class MediaLibraryRepository(
     /**
      * SAF 那半边。
      *
-     * [treeUris] 为 null 表示清单读不出来（文件被外部清掉），此时**沿用上一次的
-     * 结果**而不是当成「没有授权任何目录」：清单读不出来和用户取消了授权是两件事，
-     * 把前者当成后者会让媒体库里所有 SAF 条目突然消失一次——而它们其实还在。
+     * 要做什么全交给 [SafScanPlan]（四个分支的含义见那个枚举）。这里只负责把计划
+     * 执行到底，并顺手维护 [safCache]。
      */
-    private suspend fun scanSaf(treeUris: List<String>?, force: Boolean): SafScanOutcome {
-        val cached = safCache
-        if (!force && cached != null) return cached
-        if (treeUris == null) {
-            MspLog.w(TAG) { "SAF 授权清单读不出来，沿用上次扫描结果" }
-            return cached ?: SafScanOutcome(entries = emptyList(), truncated = false)
+    private suspend fun scanSaf(plan: SafScanPlan, treeUris: List<String>?): SafScanOutcome =
+        when (plan) {
+            // `Cached` 是「缓存一定在」的意思（由 [SafScanPlan.of] 保证），兜底留给
+            // 编译器：真的为 null 时也该是空表而不是崩掉。
+            SafScanPlan.Cached -> safCache ?: SafScanOutcome(entries = emptyList(), truncated = false)
+
+            SafScanPlan.ReuseCache -> {
+                MspLog.w(TAG) { "SAF 授权清单读不出来，沿用上次扫描结果" }
+                safCache ?: SafScanOutcome(entries = emptyList(), truncated = false)
+            }
+
+            // 空表也必须覆盖缓存，否则用户删光所有授权目录之后，媒体库里会一直留着
+            // 那些 SAF 条目。
+            SafScanPlan.NoTrees ->
+                SafScanOutcome(entries = emptyList(), truncated = false).also { safCache = it }
+
+            SafScanPlan.WalkTrees -> safScanner.scan(treeUris.orEmpty()).also { safCache = it }
         }
-        val outcome = if (treeUris.isEmpty()) {
-            SafScanOutcome(entries = emptyList(), truncated = false)
-        } else {
-            safScanner.scan(treeUris)
-        }
-        safCache = outcome
-        return outcome
-    }
 
     /** 开始监听媒体库变化。幂等，重复调用只注册一次。 */
     fun startObserving() {
