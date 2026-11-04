@@ -32,11 +32,11 @@ class LibraryFolderRowsTest {
 
     @Test
     fun `根目录有子文件夹时算有孩子`() {
-        // 回归用例：不能用 `covers` 实现——`covers("", "")` 为真但 `covers("", "Music")`
-        // 被**故意**定义为假（卷根只覆盖自己），于是根这一行永远拿不到箭头，
-        // 而根恰恰是最常被收起来的那一行。
+        // 保留这条回归用例的理由：箭头只看「底下还有没有行」，与「勾选会不会覆盖它」
+        // 是两件事。v1.4.13 之前 `covers("", x)` 为假，两者必须分开写；现在两者
+        // 结论恰好一致，但判据的含义仍然不同，不要为了少一个函数把它们合并。
         Assert.assertTrue(hasChildFolder("", paths))
-        Assert.assertFalse(LibraryFolderRules.covers("", "Music"))
+        Assert.assertTrue(LibraryFolderRules.covers("", "Music"))
     }
 
     @Test

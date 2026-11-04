@@ -21,7 +21,8 @@ package com.multisuperplayer.core.data.library
  *
  * ## 「选中的文件夹包含它的子文件夹」
  *
- * 勾上 `Music` 就显示 `Music/Live` 里的歌，见 [covers]。于是**已选集必须保持最小**
+ * 勾上 `Music` 就显示 `Music/Live` 里的歌，勾上卷根（界面上的「存储根目录」）就是全选，
+ * 见 [covers]。于是**已选集必须保持最小**
  * （见 [minimize]）：同时存 `Music` 和 `Music/Live` 是冗余的，冗余会让
  * 「取消勾选 `Music/Live`」变得无法表达——集合里还留着一个覆盖它的 `Music`，
  * 取消之后照样显示。这正是 [toggle] 存在的理由。
@@ -60,9 +61,22 @@ object LibraryFolderRules {
         return raw.trimEnd('/')
     }
 
-    /** [parent] 覆盖 [child] 吗？父子、自己、以及多级后代都算覆盖。 */
+    /**
+     * [parent] 覆盖 [child] 吗？父子、自己、以及多级后代都算覆盖。
+     *
+     * **卷根 `""` 覆盖一切**（包括自己）。这条规则的来历值得写下来：以前它被定义成
+     * 「只覆盖自己」，理由是「`""` 代表『文件就在存储根』这一种位置，而不是整个存储」。
+     * 那个定义在语义上自洽，但在界面上是错的——偏好页里 `""` 那一行写着「存储根目录」，
+     * 用户读到的意思是**整个存储**，于是两件怪事同时出现：那一行的文件数只统计直接躺在
+     * 根目录里的文件（实测是 `0 个文件`，而它下面列着 47 个），勾上它也只收录根目录直属的
+     * 那几条。一个节点缩进在最外层、下面挂着整棵树、却说自己没有任何内容，这没法解释。
+     *
+     * 反过来定义（根覆盖一切）顺带换来两个好处：根那一行就是天然的「全选」，而取消某个
+     * 子文件夹时 [toggle] 的展开分支会把「根」展开成「除了这一支，其余的顶级文件夹」，
+     * 语义正好是「除了它都要」。[folderNodes] 的 `totalCount` 也因此自洽。
+     */
     fun covers(parent: String, child: String): Boolean =
-        parent == child || (parent.isNotEmpty() && child.startsWith("$parent/"))
+        parent.isEmpty() || parent == child || child.startsWith("$parent/")
 
     /** [path] 是否已被 [selected] 里某一项覆盖（含「自己被选中」）。 */
     fun isCovered(selected: Set<String>, path: String): Boolean =
@@ -82,7 +96,8 @@ object LibraryFolderRules {
     /**
      * 去掉被别的已选项覆盖的冗余项，让集合保持**最小**。
      *
-     * `{"Music", "Music/Live"}` → `{"Music"}`。卷根 `""` 只覆盖自己，所以它不会被别的项吃掉。
+     * `{"Music", "Music/Live"}` → `{"Music"}`。卷根 `""` 覆盖一切（见 [covers]），
+     * 所以只要它在集合里，别的项全部都会被吃掉 ⇒ `{""}`，这正是「全选」的最小形式。
      */
     fun minimize(selected: Set<String>): Set<String> =
         selected.filterNot { path ->
@@ -126,8 +141,9 @@ object LibraryFolderRules {
     /**
      * 全选：把整个文件夹清单折成最小形式。
      *
-     * 卷根 `""` 只覆盖自己，所以结果里一定同时有 `""` 和各层顶级文件夹——
-     * 那是这条语义的必然结果，不是漏优化（见 [covers]）。
+     * 卷根 `""` 覆盖一切（见 [covers]），而清单里只要有文件就一定有 `""`
+     * （[folderNodes] 会给每个路径补上祖先），所以结果恒为 `{""}`。
+     * 清单为空时是空集——那时页面上没有任何文件夹可选。
      */
     fun selectAll(allFolders: Collection<String>): Set<String> = minimize(allFolders.toSet())
 

@@ -103,10 +103,13 @@ plugins {
 // 1.4.12 起的是「媒体库文件夹偏好」：只落 DataStore、不加权限、不改清单 ⇒ 直接发正式版。
 // 1.4.13 是纯性能修复：授权目录的枚举从「每个文件 5 次跨进程 query」改成
 // 「每个目录 1 次」，并让媒体库先出 MediaStore 结果、SAF 扫完再合并。
-// 先在内部 alpha 包里验证过耗时（改善明显，alpha 不打 tag、不建 Release），
-// 现在转成公开 beta：业务代码未动，只改版本号与两套文案。
-// 「持久化快照」仍然推迟，等这一版收完反馈再说。
-val appVersionName: String = "1.4.13-beta.1"
+// 先在内部 alpha 包里验证过耗时（改善明显），再公开 beta（`1.4.13-beta.1`）收反馈，
+// 期间没有需要撤回的问题 ⇒ 同一套扫描代码直接转正式版。
+// 转正式版时额外带上两处修正：`LibraryFolderRules.covers` 让卷根 `""` 覆盖一切
+// （根那一行原本显示 `0 个文件`、勾上也不等于全选），以及两份 README 的去陈旧。
+// 「持久化快照」仍然推迟到后续版本。
+
+val appVersionName: String = "1.4.13"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

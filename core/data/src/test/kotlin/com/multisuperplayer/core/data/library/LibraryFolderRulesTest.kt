@@ -51,17 +51,18 @@ class LibraryFolderRulesTest {
     // --------------------------------------------------------------- 覆盖判定
 
     @Test
-    fun `父覆盖子，但卷根只覆盖自己`() {
+    fun `父覆盖子，卷根覆盖全部`() {
         assertTrue(LibraryFolderRules.covers("Music", "Music"))
         assertTrue(LibraryFolderRules.covers("Music", "Music/Live"))
         assertTrue(LibraryFolderRules.covers("Music", "Music/Live/2024"))
         // 前缀相同但不是子目录：把 "Music2" 当成 "Music" 的子目录会让取消勾选失效。
         assertFalse(LibraryFolderRules.covers("Music", "Music2"))
         assertFalse(LibraryFolderRules.covers("Music/Live", "Music"))
-        // 卷根「包含子文件夹」等于「全部显示」，那不是我们给的单行语义：
-        // 它只代表「文件就在存储根」这一种位置。
+        // 卷根 = 偏好页里那一行「存储根目录」= 整个存储。它是每一行的祖先，
+        // 所以覆盖全部。以前它是「只覆盖自己」，后果就是那一行永远显示 0 个文件。
         assertTrue(LibraryFolderRules.covers("", ""))
-        assertFalse(LibraryFolderRules.covers("", "Music"))
+        assertTrue(LibraryFolderRules.covers("", "Music"))
+        assertTrue(LibraryFolderRules.covers("", "Music/Live"))
     }
 
     // --------------------------------------------------------------- 过滤
@@ -87,10 +88,13 @@ class LibraryFolderRulesTest {
     }
 
     @Test
-    fun `只选卷根时只有根目录的文件进库`() {
+    fun `只选卷根就是全选`() {
+        // 回归用例（v1.4.13）：卷根那一行在界面上叫「存储根目录」，只收录根目录
+        // 直属文件的本意是错的——它下面挂着整棵树、却显示 0 个文件。
         val selected = setOf("")
         assertTrue(LibraryFolderRules.accepts("", selected))
-        assertFalse(LibraryFolderRules.accepts("Music/", selected))
+        assertTrue(LibraryFolderRules.accepts("Music/", selected))
+        assertTrue(LibraryFolderRules.accepts("Music/Album/2024/", selected))
     }
 
     @Test
@@ -110,9 +114,9 @@ class LibraryFolderRulesTest {
             setOf("Music"),
             LibraryFolderRules.minimize(setOf("Music", "Music/Live", "Music/Live/2024")),
         )
-        // 卷根谁都不覆盖（除了自己），不能把它当冗余删掉。
+        // 卷根覆盖一切，所以只要它在集合里，其余项全是冗余。
         assertEquals(
-            setOf("", "Music"),
+            setOf(""),
             LibraryFolderRules.minimize(setOf("", "Music", "Music/Live")),
         )
         assertEquals(emptySet<String>(), LibraryFolderRules.minimize(emptySet()))
@@ -176,12 +180,45 @@ class LibraryFolderRulesTest {
 
     @Test
     fun `全选折成最小形式`() {
-        // 卷根只覆盖自己，所以顶级文件夹得各自留下；Music/Live 被 Music 吃掉。
+        // 卷根覆盖一切 ⇒ 全选的最小形式就是卷根一项。
         assertEquals(
-            setOf("", "Music", "Movies"),
+            setOf(""),
             LibraryFolderRules.selectAll(listOf("", "Music", "Music/Live", "Movies")),
         )
         assertEquals(emptySet<String>(), LibraryFolderRules.selectAll(emptyList()))
+    }
+
+    @Test
+    fun `取消卷根覆盖的子文件夹时展开成其余顶级文件夹`() {
+        // 勾着「存储根目录」（= 全选）时单独去掉 Music：
+        // 结果必须是「除了 Music 整支，其余都要」。
+        val result = LibraryFolderRules.toggle(
+            selected = setOf(""),
+            target = "Music",
+            allFolders = listOf("", "Download", "Music", "Music/Live", "Movies"),
+        )
+        assertEquals(setOf("Download", "Movies"), result)
+        assertFalse(LibraryFolderRules.accepts("Music/", result))
+        assertFalse(LibraryFolderRules.accepts("Music/Live/", result))
+        assertTrue(LibraryFolderRules.accepts("Movies/", result))
+        // 已知取舍（写在这里免得以后被当成 bug）：展开之后 `""` 不在集合里了，
+        // 所以**直接躺在存储根**的文件也不再进库。集合表示法表达不出「除了 Music
+        // 其余都要，**包括根目录那几个**」——`""` 现在的含义是「全部」，没有「只有根」
+        // 这个值了。代价极小（根目录直属的媒体文件本来就罕见，而且用户想连根目录一起
+        // 要时勾的就是那一行），换来的是那一行不再是「0 个文件」。
+        assertFalse(LibraryFolderRules.accepts("", result))
+    }
+
+    @Test
+    fun `勾上卷根等于全选`() {
+        assertEquals(
+            setOf(""),
+            LibraryFolderRules.toggle(
+                selected = setOf("Music"),
+                target = "",
+                allFolders = listOf("", "Music", "Movies"),
+            ),
+        )
     }
 
     // --------------------------------------------------------------- 文件夹树
@@ -205,7 +242,10 @@ class LibraryFolderRulesTest {
         assertEquals(0, nodes.first { it.path == "Music" }.directCount)
         assertEquals(2, nodes.first { it.path == "Music" }.totalCount)
         assertEquals(1, nodes.first { it.path == "Music/Album" }.totalCount)
-        assertEquals(1, nodes.first { it.path == "" }.totalCount)
+        // 卷根覆盖一切 ⇒ 它的总计数是**全库**的条目数（回归用例：以前这里恒为 1）。
+        // 界面那一行就叫「存储根目录」，显示 0 个文件是没法解释的。
+        assertEquals(1, nodes.first { it.path == "" }.directCount)
+        assertEquals(3, nodes.first { it.path == "" }.totalCount)
     }
 
     @Test

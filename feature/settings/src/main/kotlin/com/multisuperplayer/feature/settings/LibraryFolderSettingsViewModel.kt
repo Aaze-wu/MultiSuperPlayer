@@ -198,9 +198,10 @@ internal fun buildFolderRows(
 /**
  * [path] 底下还有没有子文件夹（[allPaths] 是整棵树的路径）。
  *
- * 不直接用 `LibraryFolderRules.covers`：它把根（`""`）定义成「只覆盖自己」
- * （这样才能勾「整个存储」而不被当成覆盖所有子目录），于是「根有没有子目录」
- * 永远算出 false——而根恰恰是最常被展开的那一行。
+ * 它回答的是「这一行下面还有没有别的行」（箭头画不画），**不是**「勾上它会不会
+ * 覆盖别人」——v1.4.13 之前 `LibraryFolderRules.covers` 把卷根 `""` 定义成「只覆盖
+ * 自己」，两者结论正好相反，复用它会弄丢根那一行的箭头；现在卷根覆盖一切、两者
+ * 结论一致，但判据的含义仍然不同，别为了少一个函数把它们合并。
  */
 internal fun hasChildFolder(path: String, allPaths: Collection<String>): Boolean {
     val prefix = if (path.isEmpty()) "" else "$path/"
