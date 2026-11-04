@@ -108,8 +108,11 @@ plugins {
 // 转正式版时额外带上两处修正：`LibraryFolderRules.covers` 让卷根 `""` 覆盖一切
 // （根那一行原本显示 `0 个文件`、勾上也不等于全选），以及两份 README 的去陈旧。
 // 「持久化快照」仍然推迟到后续版本。
+// 1.4.14 做的是 `todo/thinks.txt` 里两项 [0]：
+// 随机播放改成「已播不重排、未播每次切歌重洗」（`ShuffleRules` 纯函数 + 自己装 `ShuffleOrder`），
+// 以及关于页的更新说明从「1.2.0 以来的全部改动」精简成「只讲本版」。两项都不动数据、不加权限。
 
-val appVersionName: String = "1.4.13"
+val appVersionName: String = "1.4.14"
 
 /** 去掉预发行后缀的数值部分（`0.6.1-alpha.1` → `0.6.1`）。 */
 val appVersionCore: String = appVersionName.substringBefore('-').trim()

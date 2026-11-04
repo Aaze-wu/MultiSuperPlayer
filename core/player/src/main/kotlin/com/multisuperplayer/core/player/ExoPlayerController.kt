@@ -14,9 +14,11 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.ShuffleOrder
 import com.multisuperplayer.core.common.coroutines.DispatcherProvider
 import com.multisuperplayer.core.common.log.MspLog
 import com.multisuperplayer.core.model.MediaEntry
@@ -34,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 private const val TAG = "ExoPlayerController"
 
@@ -153,6 +156,24 @@ class ExoPlayerController(
 
     /** 上一轮回调时是不是在播；用于识别「刚停下来」这个瞬间。 */
     private var wasPlaying = false
+
+    /**
+     * 随机播放的随机源。
+     *
+     * 单独留一个字段（而不是到处 `Random.Default`）是为了理论上能在测试里
+     * 换掉它；规则本身在 [ShuffleRules] 里，那边接收 `Random` 参数，
+     * 已经可以逐条钉死。
+     */
+    private val shuffleRandom: Random = Random.Default
+
+    /**
+     * 正在换乱序表。
+     *
+     * `player.setShuffleOrder(...)` 会**同步**触发一次 `onEvents`，
+     * 而换表又发生在 `onMediaItemTransition` 里——没有这个标记的话，
+     * 一次切歌可能连锁换好几次表（每次都把后面的顺序又打乱一遍）。
+     */
+    private var reshufflingShuffleOrder = false
 
     /** 轨道清单（音频 + 字幕）。没有媒体时是空列表。 */
     private val _tracks = MutableStateFlow<List<MspTrackInfo>>(emptyList())
@@ -464,6 +485,17 @@ class ExoPlayerController(
                         reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
                     ) {
                         consumeSleepTimerAtItemEnd()
+                        // 随机播放：一次**自然**切歌之后，把「还没播到的那些」重新洗一次。
+                        // 于是「下一首」不是建队列时那张表里写死的那个，一轮播完也会换
+                        // 一条路线（规则见 [ShuffleRules]）。
+                        //
+                        // 手点队列跳转（SEEK）和队列编辑（PLAYLIST_CHANGED）**不**重洗：
+                        // 那两种情况下用户刚刚亲自指定了要听哪一条，跟着换掉后面的顺序
+                        // 只会让「我刚点的下一首怎么没了」变得无法解释。
+                        // 单曲循环时切的是同一条（REPEAT + 下标没变），没有「后面的顺序」
+                        // 可洗，跳过。
+                        val toIndex = player.currentMediaItemIndex
+                        if (toIndex != _currentIndex.value) reshuffleAfterAdvance(toIndex)
                     }
 
                     publish()
@@ -1202,6 +1234,10 @@ class ExoPlayerController(
                 C.TIME_UNSET,
             )
             player.prepare()
+            // 新队列 + 随机播放还开着：重新洗一副，从这一轮要播的这一首开始。
+            // 不重洗的话会沿用上一条队列留下的那张表（长度已经对不上，Media3 会
+            // 自己 clone 出一张带着「历史」的表），绕回点就变得无法解释。
+            if (player.shuffleModeEnabled) installShuffleOrderStartingAt(safeIndex)
             // 续播：seek 放在 prepare 之后、playWhenReady 之前。
             // 反过来的话，内核会先把开头几十毫秒放出来再跳走（听起来像卡了一下）。
             resumePositionMs?.takeIf { it > 0L }?.let { player.seekTo(it) }
@@ -1393,7 +1429,18 @@ class ExoPlayerController(
 
     override fun setShuffleEnabled(enabled: Boolean) {
         onMain {
-            player.shuffleModeEnabled = enabled
+            val wasEnabled = player.shuffleModeEnabled
+            if (enabled && !wasEnabled) {
+                // 打开随机时换一副**全新**的表，并且从当前这一首开始走。
+                //
+                // 不换的话 Media3 会沿用建队列时生成的那张表——那张表中当前条目
+                // 的位置是随机的，于是「点开随机之后紧接着听到的两三首」完全由
+                // 建队列那一刻的种子决定，与本刻无关，也常常紧挨着刚放完的那一首。
+                player.shuffleModeEnabled = true
+                installShuffleOrderStartingAt(player.currentMediaItemIndex)
+            } else {
+                player.shuffleModeEnabled = enabled
+            }
             publish()
         }
     }
@@ -1517,6 +1564,84 @@ class ExoPlayerController(
         is SleepTimerState.Off -> "关"
         is SleepTimerState.UntilItemEnd -> "本集结束"
         is SleepTimerState.Countdown -> "${state.totalMs / 1000L} 秒后"
+    }
+
+    // ------------------------------------------------------------------ 随机播放
+
+    /**
+     * 从 [currentIndex] 开始重洗一副，并交给 Media3。
+     *
+     * 长度校验不是「防御性编程」而是**必需**：`ExoPlayerImpl.setShuffleOrder(...)`
+     * 第一句就是 `checkArgument(order.getLength() == 队列长度)`，对不上直接抛
+     * `IllegalArgumentException`（点在「打开随机播放」这个按钮上，用户看到的就是
+     * 「点了没反应」）。队列为空时什么都不做。
+     */
+    private fun installShuffleOrderStartingAt(currentIndex: Int) {
+        val count = player.mediaItemCount
+        if (count <= 0) return
+        installShuffleOrder(ShuffleRules.orderStartingAt(currentIndex, count, shuffleRandom))
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun installShuffleOrder(order: IntArray) {
+        if (order.isEmpty() || order.size != player.mediaItemCount) return
+        player.setShuffleOrder(ShuffleOrder.DefaultShuffleOrder(order, shuffleRandom.nextLong()))
+    }
+
+    /**
+     * 一次**自然切歌**之后重洗「还没播到的那些」。
+     *
+     * 为什么必须挂在切歌那一刻，而不是播到一半或者定时重洗：Media3 只在真的需要
+     * 下一条时才去问乱序表。早了（比如播到一半就换表）会把「已经播过的历史」也换掉，
+     * 于是上一首变成一首没听过的；晚了下一条已经被预载进解码器，用户听到的仍是旧路线。
+     *
+     * `setShuffleOrder` 在播放中调用是安全的：`ExoPlayerImpl` 会重新
+     * `maskWindowPositionMsOrGetPeriodPositionUs`，当前条目和播放位置都保留，
+     * 只改「后面怎么走」。
+     */
+    @OptIn(UnstableApi::class)
+    private fun reshuffleAfterAdvance(currentIndex: Int) {
+        if (!player.shuffleModeEnabled) return
+        if (reshufflingShuffleOrder) return
+        val permutation = currentShufflePermutation() ?: return
+        if (permutation.size != player.mediaItemCount) return
+        val next = ShuffleRules.orderAfterAdvance(permutation, currentIndex, shuffleRandom)
+        if (next.contentEquals(permutation)) return
+        reshufflingShuffleOrder = true
+        try {
+            installShuffleOrder(next)
+        } finally {
+            reshufflingShuffleOrder = false
+        }
+    }
+
+    /**
+     * 把 Media3 当前的乱序表读成一条完整排列（队首 → 一路 `getNextIndex`）。
+     *
+     * 为什么每次现读而不是自己缓存一张表：队列编辑（删除、拖动）时 Media3 会自己
+     * `cloneAndRemove` / `cloneAndInsert` 出一张新表，缓存的副本立刻过期；表里存的又是
+     * **播放列表下标**，删掉一条之后所有下标平移，自己维护只会得到一张错位的表
+     * （症状是随机播放时重复或漏掉某几条）。现读只是 O(n) 次纯读。
+     *
+     * 读不成完整排列（长度为 0、走不到 n 步、出现重复、长度与队列不一致）时返回
+     * null，调用方放弃这一次重洗——宁可少洗一次，也不交一张坏表回去。
+     */
+    @OptIn(UnstableApi::class)
+    private fun currentShufflePermutation(): IntArray? {
+        val order = player.shuffleOrder
+        val count = order.getLength()
+        if (count <= 0 || count != player.mediaItemCount) return null
+        val result = IntArray(count)
+        val seen = BooleanArray(count)
+        var index = order.getFirstIndex()
+        for (i in 0 until count) {
+            if (index !in 0 until count) return null
+            if (seen[index]) return null
+            seen[index] = true
+            result[i] = index
+            index = order.getNextIndex(index)
+        }
+        return result
     }
 
     override fun setRememberPosition(enabled: Boolean) {
